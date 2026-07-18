@@ -20,6 +20,20 @@ export default function SettingsPage() {
   const [importMsg, setImportMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // 通知設定（リマインドメールのオプトアウト）
+  const [mailOptOut, setMailOptOut] = useState(false);
+  const [mailMsg, setMailMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
+  async function toggleMail(next: boolean) {
+    setMailMsg(null);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update({ mail_opt_out: next }).eq('id', user.id);
+    if (error) { setMailMsg({ cls: 'err', text: `保存に失敗しました: ${error.message}` }); return; }
+    setMailOptOut(next);
+    setMailMsg({ cls: 'ok', text: next ? 'リマインドメールを停止しました。' : 'リマインドメールを受け取ります。' });
+  }
+
   // アカウント削除
   const [delConfirm, setDelConfirm] = useState('');
   const [delMsg, setDelMsg] = useState('');
@@ -96,10 +110,15 @@ export default function SettingsPage() {
       setName(prof.display_name || '');
       setSex(prof.sex); setHeight(String(prof.height_cm)); setAge(String(prof.age));
       setLife(String(prof.life_factor));
+      setMailOptOut(!!prof.mail_opt_out);
     })();
   }, [router]);
 
   async function saveProfile() {
+    if (Number(age) < 16) {
+      setMsg({ cls: 'err', text: '本サービスは16歳以上の方のみご利用いただけます（利用規約 第3条）。' });
+      return;
+    }
     setBusy(true); setMsg(null);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -204,6 +223,16 @@ export default function SettingsPage() {
         <textarea value={importJson} onChange={(e) => setImportJson(e.target.value)} placeholder='[{"date":"2026-06-27", ...}]' />
         <button className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={runImport} disabled={busy || !importJson.trim()}>取り込む</button>
         {importMsg && <div className={`msg ${importMsg.cls}`}>{importMsg.text}</div>}
+      </div>
+
+      <div className="card">
+        <h2>🔔 通知</h2>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
+          <input type="checkbox" checked={!mailOptOut} onChange={(e) => toggleMail(!e.target.checked)}
+                 style={{ width: 20, height: 20, minHeight: 0 }} />
+          3日間記録がないときのリマインドメールを受け取る
+        </label>
+        {mailMsg && <div className={`msg ${mailMsg.cls}`}>{mailMsg.text}</div>}
       </div>
 
       <div className="card">

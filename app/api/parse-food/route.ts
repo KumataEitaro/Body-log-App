@@ -99,6 +99,7 @@ export async function POST(req: Request) {
     '- mood: 気分・メンタルに関する記述の要約(20字以内)\n' +
     dictBlock +
     (outLang ? `\n出力言語: items[].name・qty・mood・questionsの文字列は${outLang}で書くこと。\n` : '') +
+    '\n【禁止事項】疾病名の指摘・医療的な診断・治療の提案は行わないこと（本サービスは医療機器ではない）。\n' +
     '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
     '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0}],' +
     '"total":{"kcal":0,"p":0,"f":0,"c":0},' +

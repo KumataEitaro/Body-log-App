@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const [usersRes, entriesRes, profilesRes] = await Promise.all([
     svc.auth.admin.listUsers({ page: 1, perPage: 500 }),
     svc.from('entries').select('user_id,date'),
-    svc.from('profiles').select('id,display_name,last_inactivity_mail'),
+    svc.from('profiles').select('id,display_name,last_inactivity_mail,mail_opt_out'),
   ]);
   if (usersRes.error) return NextResponse.json({ ok: false, error: usersRes.error.message }, { status: 500 });
   const entries = entriesRes.data || [];
@@ -36,6 +36,7 @@ export async function GET(req: Request) {
     if (!u.email) continue;
     const prof = profiles.find((p) => p.id === u.id);
     if (!prof) continue; // プロフィール未作成（使い始めていない）はスキップ
+    if (prof.mail_opt_out) continue; // 配信停止を選んだユーザーはスキップ
 
     const dates = entries.filter((e) => e.user_id === u.id).map((e) => e.date as string).sort();
     const lastDate = dates.length ? dates[dates.length - 1] : (u.created_at || '').slice(0, 10);
@@ -74,7 +75,8 @@ async function sendMail(to: string, name: string, idleDays: number): Promise<boo
           `<p>${name ? name + 'さん、' : ''}こんにちは。BodyLogです。</p>` +
           `<p>最後の記録から<b>${idleDays}日</b>経ちました。記録の継続が目標達成の一番の近道です💪</p>` +
           `<p><a href="${APP_URL}/log" style="background:#0e8a7d;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">今日の記録をつける</a></p>` +
-          `<p style="color:#888;font-size:12px">このメールは3日以上記録がない場合に自動送信されています。</p>` +
+          `<p style="color:#888;font-size:12px">このメールは3日以上記録がない場合に自動送信されています。<br />` +
+          `配信を停止するには、アプリの「設定」→「🔔 通知」でリマインドメールをオフにしてください。</p>` +
           `</div>`,
       }),
     });

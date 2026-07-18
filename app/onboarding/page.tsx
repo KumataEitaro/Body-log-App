@@ -19,6 +19,10 @@ export default function OnboardingPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (Number(age) < 16) {
+      setErr('申し訳ありません。本サービスは16歳以上の方のみご利用いただけます（利用規約 第3条）。');
+      return;
+    }
     setBusy(true);
     setErr('');
     const supabase = createClient();
