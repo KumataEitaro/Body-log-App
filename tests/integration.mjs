@@ -121,6 +121,29 @@ for (const [id, table] of [['D-8', 'goals'], ['D-9', 'events'], ['D-10', 'body_p
   });
 }
 
+// ===== F. 公開準備（規約・削除・ヘッダー） =====
+await t('F-1', '利用規約が未ログインで閲覧できる', async () => {
+  const r = await fetch(`${BASE}/terms`, { redirect: 'manual' });
+  eq(r.status, 200, `status=${r.status}`);
+});
+await t('F-2', 'プライバシーポリシーが未ログインで閲覧できる', async () => {
+  const r = await fetch(`${BASE}/privacy`, { redirect: 'manual' });
+  eq(r.status, 200, `status=${r.status}`);
+});
+await t('F-3', 'アカウント削除APIは未ログインで401', async () => {
+  const r = await fetch(`${BASE}/api/account/delete`, { method: 'POST' });
+  eq(r.status, 401, `status=${r.status}`);
+});
+await t('F-4', 'セキュリティヘッダーが設定されている', async () => {
+  const r = await fetch(`${BASE}/login`, { redirect: 'manual' });
+  eq(r.headers.get('x-frame-options'), 'DENY', 'X-Frame-Options');
+  eq(r.headers.get('x-content-type-options'), 'nosniff', 'X-Content-Type-Options');
+});
+await t('F-5', '翻訳APIは未ログインで401', async () => {
+  const r = await fetch(`${BASE}/api/i18n`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"lang":"en","texts":["設定"]}' });
+  eq(r.status, 401, `status=${r.status}`);
+});
+
 // ===== E. ストレージ: 匿名アクセス防止 =====
 await t('E-1', '匿名でmealsバケットの写真一覧は取得できない', async () => {
   const r = await fetch(`${SUPA}/storage/v1/object/list/meals`, {

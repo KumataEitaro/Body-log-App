@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
+import { globalCapReached } from '@/lib/globalUsage';
 
 // UI文字列の翻訳（AIで一度だけ翻訳→DBキャッシュ→以後は即返す）
 export async function POST(req: Request) {
@@ -34,6 +35,11 @@ export async function POST(req: Request) {
   for (const row of cached || []) map[row.src] = row.dst;
   const missing = texts.filter((t) => !(t in map));
   if (missing.length === 0) return NextResponse.json({ ok: true, map });
+
+  // コスト保護: 全体のAI上限に達している場合、新規翻訳は行わない（キャッシュ分のみ返す）
+  if (await globalCapReached()) {
+    return NextResponse.json({ ok: Object.keys(map).length > 0, map, error: '本日のAI利用上限に達しています' });
+  }
 
   // 未翻訳分をAIでまとめて翻訳
   const key = process.env.GEMINI_API_KEY;

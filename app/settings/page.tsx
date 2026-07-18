@@ -20,6 +20,27 @@ export default function SettingsPage() {
   const [importMsg, setImportMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // アカウント削除
+  const [delConfirm, setDelConfirm] = useState('');
+  const [delMsg, setDelMsg] = useState('');
+  async function deleteAccount() {
+    if (delConfirm !== '削除') return;
+    setBusy(true); setDelMsg('');
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' });
+      const j = await res.json();
+      if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      alert('アカウントを削除しました。ご利用ありがとうございました。');
+      router.push('/login');
+    } catch (e) {
+      setDelMsg(`削除に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // 言語設定
   const [curLang, setCurLang] = useState('ja');
   const [langQuery, setLangQuery] = useState('');
@@ -183,6 +204,27 @@ export default function SettingsPage() {
         <textarea value={importJson} onChange={(e) => setImportJson(e.target.value)} placeholder='[{"date":"2026-06-27", ...}]' />
         <button className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={runImport} disabled={busy || !importJson.trim()}>取り込む</button>
         {importMsg && <div className={`msg ${importMsg.cls}`}>{importMsg.text}</div>}
+      </div>
+
+      <div className="card">
+        <h2>📄 規約・ポリシー</h2>
+        <p className="muted">
+          <a href="/terms">利用規約</a> ／ <a href="/privacy">プライバシーポリシー</a>
+        </p>
+      </div>
+
+      <div className="card" style={{ borderColor: 'var(--coral)' }}>
+        <h2 style={{ color: 'var(--coral)' }}>⚠ アカウント削除</h2>
+        <p className="muted">
+          アカウントと全てのデータ（記録・写真・目標・マイ食品）を完全に削除します。<b>この操作は取り消せません。</b>
+        </p>
+        <label>確認のため「削除」と入力してください</label>
+        <input value={delConfirm} onChange={(e) => setDelConfirm(e.target.value)} placeholder="削除" />
+        <button className="btn-primary" style={{ marginTop: 10, background: 'var(--coral)' }}
+                onClick={deleteAccount} disabled={busy || delConfirm !== '削除'}>
+          {busy ? <><span className="spin" />削除中…</> : 'アカウントを完全に削除する'}
+        </button>
+        {delMsg && <div className="msg err">{delMsg}</div>}
       </div>
     </AppShell>
   );
