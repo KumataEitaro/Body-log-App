@@ -145,6 +145,19 @@ describe('macroTargets（1日の目標PFC）', () => {
     expect(m.p).toBe(140);
     expect(m.f).toBe(63);
   });
+  it('脂質の絶対上限が体重×係数より低ければ上限を採用', () => {
+    const m = macroTargets(85, 1900, 2.0, 0.9, 50); // 85×0.9=77 > 50
+    expect(m.f).toBe(50);
+    expect(m.c).toBe(Math.round((1900 - 170 * 4 - 50 * 9) / 4)); // Fが減った分Cが増える
+  });
+  it('絶対上限が体重×係数より高ければ係数側を採用', () => {
+    const m = macroTargets(85, 1900, 2.0, 0.9, 120);
+    expect(m.f).toBe(77);
+  });
+  it('絶対上限null/0は無視', () => {
+    expect(macroTargets(85, 1900, 2.0, 0.9, null).f).toBe(77);
+    expect(macroTargets(85, 1900, 2.0, 0.9, 0).f).toBe(77);
+  });
 });
 
 describe('movingAverage（7日移動平均）', () => {

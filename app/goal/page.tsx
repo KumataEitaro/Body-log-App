@@ -26,6 +26,7 @@ export default function GoalPage() {
   const [gAbsorb, setGAbsorb] = useState(''); // ''=目標日まで均等 / '7'|'14'|'30'=N日で取り返す
   const [gProtein, setGProtein] = useState('2.0'); // たんぱく質: 体重1kgあたりg
   const [gFat, setGFat] = useState('0.9');         // 脂質: 体重1kgあたりg
+  const [gFatMax, setGFatMax] = useState('');      // 脂質の絶対上限(g/日・任意)
   const [goalMsg, setGoalMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
 
   // イベントフォーム
@@ -58,6 +59,7 @@ export default function GoalPage() {
       setGAbsorb(g.absorb_days != null ? String(g.absorb_days) : '');
       if (g.protein_per_kg != null) setGProtein(String(g.protein_per_kg));
       if (g.fat_per_kg != null) setGFat(String(g.fat_per_kg));
+      if (g.fat_max_g != null) setGFatMax(String(g.fat_max_g));
     }
     setEvents((evs as EventRow[]) || []);
     if (ws && ws.length) setLatestWeight(Number(ws[0].weight));
@@ -87,9 +89,10 @@ export default function GoalPage() {
       ...base,
       protein_per_kg: Number(gProtein) || null,
       fat_per_kg: Number(gFat) || null,
+      fat_max_g: gFatMax === '' ? null : Number(gFatMax) || null,
     });
     // DB未更新（PFC列がまだ無い）環境ではPFC抜きで保存
-    if (error && /protein_per_kg|fat_per_kg|column|schema/.test(error.message)) {
+    if (error && /protein_per_kg|fat_per_kg|fat_max_g|column|schema/.test(error.message)) {
       ({ error } = await supabase.from('goals').upsert(base));
     }
     setBusy(false);
@@ -156,6 +159,9 @@ export default function GoalPage() {
             <input type="number" step="0.1" className="num" value={gFat} onChange={(e) => setGFat(e.target.value)} placeholder="0.9" />
           </div>
         </div>
+        <label>脂質の1日上限（g・任意）</label>
+        <input type="number" step="1" className="num" value={gFatMax} onChange={(e) => setGFatMax(e.target.value)}
+               placeholder="例: 50（体重×係数より低い場合はこちらが目標に）" />
         <p className="muted" style={{ margin: '4px 0 0' }}>
           炭水化物は自動計算（計画カロリー − P×4kcal − F×9kcal の残り）。減量中の目安: P 1.6〜2.2 ／ F 0.8〜1.0
         </p>

@@ -159,7 +159,7 @@ export default function LogPage() {
 
   // 今日の目標PFCと残り（計画目標カロリー基準。目標未設定なら維持カロリー基準）
   const macroBase = planIntake ?? target;
-  const macros = profile ? macroTargets(weightForBmr, macroBase, goal?.protein_per_kg, goal?.fat_per_kg) : null;
+  const macros = profile ? macroTargets(weightForBmr, macroBase, goal?.protein_per_kg, goal?.fat_per_kg, goal?.fat_max_g) : null;
   const eatenP = Math.round(summary.p ?? 0);
   const eatenF = Math.round(summary.f ?? 0);
   const eatenC = Math.round(summary.c ?? 0);
