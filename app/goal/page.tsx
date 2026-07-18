@@ -24,6 +24,8 @@ export default function GoalPage() {
   const [gBf, setGBf] = useState('');
   const [gNote, setGNote] = useState('');
   const [gAbsorb, setGAbsorb] = useState(''); // ''=目標日まで均等 / '7'|'14'|'30'=N日で取り返す
+  const [gProtein, setGProtein] = useState('2.0'); // たんぱく質: 体重1kgあたりg
+  const [gFat, setGFat] = useState('0.9');         // 脂質: 体重1kgあたりg
   const [goalMsg, setGoalMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
 
   // イベントフォーム
@@ -54,6 +56,8 @@ export default function GoalPage() {
       setGDate(g.target_date); setGWeight(g.target_weight != null ? String(g.target_weight) : '');
       setGBf(g.target_bf != null ? String(g.target_bf) : ''); setGNote(g.note || '');
       setGAbsorb(g.absorb_days != null ? String(g.absorb_days) : '');
+      if (g.protein_per_kg != null) setGProtein(String(g.protein_per_kg));
+      if (g.fat_per_kg != null) setGFat(String(g.fat_per_kg));
     }
     setEvents((evs as EventRow[]) || []);
     if (ws && ws.length) setLatestWeight(Number(ws[0].weight));
@@ -68,7 +72,7 @@ export default function GoalPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const startWeight = goal?.start_weight ?? latestWeight ?? Number(profile?.init_weight) ?? 0;
-    const { error } = await supabase.from('goals').upsert({
+    const base = {
       user_id: user.id,
       target_date: gDate,
       target_weight: Number(gWeight),
@@ -78,7 +82,16 @@ export default function GoalPage() {
       start_weight: startWeight,
       absorb_days: gAbsorb === '' ? null : Number(gAbsorb),
       updated_at: new Date().toISOString(),
+    };
+    let { error } = await supabase.from('goals').upsert({
+      ...base,
+      protein_per_kg: Number(gProtein) || null,
+      fat_per_kg: Number(gFat) || null,
     });
+    // DB未更新（PFC列がまだ無い）環境ではPFC抜きで保存
+    if (error && /protein_per_kg|fat_per_kg|column|schema/.test(error.message)) {
+      ({ error } = await supabase.from('goals').upsert(base));
+    }
     setBusy(false);
     if (error) { setGoalMsg({ cls: 'err', text: error.message }); return; }
     const isFirstGoal = !goal;
@@ -133,6 +146,19 @@ export default function GoalPage() {
           <div><label>目標体脂肪率 (%) 任意</label><input type="number" step="0.5" className="num" value={gBf} onChange={(e) => setGBf(e.target.value)} /></div>
           <div><label>なりたい姿（自由記述）</label><input value={gNote} onChange={(e) => setGNote(e.target.value)} placeholder="例）腹筋を割りたい" /></div>
         </div>
+        <div className="row2">
+          <div>
+            <label>たんぱく質目標（体重1kgあたり g）</label>
+            <input type="number" step="0.1" className="num" value={gProtein} onChange={(e) => setGProtein(e.target.value)} placeholder="2.0" />
+          </div>
+          <div>
+            <label>脂質目標（体重1kgあたり g）</label>
+            <input type="number" step="0.1" className="num" value={gFat} onChange={(e) => setGFat(e.target.value)} placeholder="0.9" />
+          </div>
+        </div>
+        <p className="muted" style={{ margin: '4px 0 0' }}>
+          炭水化物は自動計算（計画カロリー − P×4kcal − F×9kcal の残り）。減量中の目安: P 1.6〜2.2 ／ F 0.8〜1.0
+        </p>
         <label>チートデイ超過の取り返し方</label>
         <select value={gAbsorb} onChange={(e) => setGAbsorb(e.target.value)}>
           <option value="">目標日まで均等でならす（先回りで貯金するタイプ）</option>

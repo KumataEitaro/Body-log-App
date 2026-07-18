@@ -10,7 +10,23 @@ export type Goal = {
   start_date: string;
   start_weight: number;
   absorb_days?: number | null; // チートデイ超過の吸収方式: null=目標日まで均等 / N=各チートデイ後N日で取り返す
+  protein_per_kg?: number | null; // たんぱく質目標: 体重1kgあたりg（デフォルト2.0）
+  fat_per_kg?: number | null;     // 脂質目標: 体重1kgあたりg（デフォルト0.9）
 };
+
+export const PROTEIN_PER_KG_DEFAULT = 2.0;
+export const FAT_PER_KG_DEFAULT = 0.9;
+
+// 1日の目標PFC(g)。P/Fは体重×係数、Cは目標カロリーの残りから算出（P=4kcal/g, F=9kcal/g, C=4kcal/g）
+export function macroTargets(
+  weightKg: number, targetKcal: number,
+  proteinPerKg?: number | null, fatPerKg?: number | null
+): { p: number; f: number; c: number } {
+  const p = Math.round(weightKg * (proteinPerKg ?? PROTEIN_PER_KG_DEFAULT));
+  const f = Math.round(weightKg * (fatPerKg ?? FAT_PER_KG_DEFAULT));
+  const c = Math.max(Math.round((targetKcal - p * 4 - f * 9) / 4), 0);
+  return { p, f, c };
+}
 
 export type PlanEvent = { date: string; title: string; extra_kcal: number };
 

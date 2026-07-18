@@ -93,6 +93,14 @@ button:disabled { opacity: .5; cursor: default; }
 .hero-unit { font-size: 16px; font-weight: 700; color: var(--sub); }
 .hero-cheat { display: inline-block; background: var(--amber-weak); color: var(--amber); font-size: 13px; font-weight: 700;
   border-radius: 8px; padding: 5px 10px; margin: 2px 0 6px; }
+/* 今日あと摂れるPFC */
+.macro-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; }
+.macro-chip { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 5px 10px;
+  font-size: 13px; color: var(--sub); }
+.macro-chip b { color: var(--teal); font-size: 15.5px; margin: 0 1px; }
+.macro-chip.over b { color: var(--coral); }
+.macro-chip small { font-size: 11px; opacity: 0.8; }
+
 .daybar-sub { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--sub); margin-top: 2px; }
 .daybar-sub b { color: var(--ink); font-size: 15px; }
 .daybar-fine { font-size: 11px; color: var(--sub); opacity: 0.75; margin-top: 6px; line-height: 1.5; }

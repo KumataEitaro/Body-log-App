@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
-import { computePlan, type Goal, type PlanEvent } from '@/lib/goal';
+import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { servingOf } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 
@@ -156,6 +156,13 @@ export default function LogPage() {
   const planIntakeBase = plan ? Math.max(target - plan.requiredDailyWithEvents, Math.round(bmr)) : null;
   const planIntake = planIntakeBase != null && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
   const planLeft = planIntake != null ? planIntake - eaten : null;
+
+  // 今日の目標PFCと残り（計画目標カロリー基準。目標未設定なら維持カロリー基準）
+  const macroBase = planIntake ?? target;
+  const macros = profile ? macroTargets(weightForBmr, macroBase, goal?.protein_per_kg, goal?.fat_per_kg) : null;
+  const eatenP = Math.round(summary.p ?? 0);
+  const eatenF = Math.round(summary.f ?? 0);
+  const eatenC = Math.round(summary.c ?? 0);
 
   async function addPhotos(files: FileList | null) {
     if (!files) return;
@@ -452,6 +459,19 @@ export default function LogPage() {
             </div>
             {todayEvent && (
               <div className="hero-cheat">🍺 今日はチートデイ「{todayEvent.title}」— +{Math.round(Number(todayEvent.extra_kcal)).toLocaleString()}kcalまで想定内</div>
+            )}
+            {macros && (
+              <div className="macro-row">
+                {[
+                  { key: 'P', emoji: '🍗', left: macros.p - eatenP, tgt: macros.p },
+                  { key: 'F', emoji: '🥑', left: macros.f - eatenF, tgt: macros.f },
+                  { key: 'C', emoji: '🍚', left: macros.c - eatenC, tgt: macros.c },
+                ].map((m) => (
+                  <span key={m.key} className={`macro-chip ${m.left < 0 ? 'over' : ''}`}>
+                    {m.emoji}{m.key} あと<b className="num">{m.left.toLocaleString()}</b>g<small className="num">/{m.tgt}</small>
+                  </span>
+                ))}
+              </div>
             )}
             <div className="daybar-sub">
               <span>摂取済み <b className="num">{eaten.toLocaleString()}</b></span>

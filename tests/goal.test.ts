@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { daysBetween, addDays, dateTicks, plannedWeightAt, computePlan, progressStatus, movingAverage, type Goal } from '../lib/goal';
+import { daysBetween, addDays, dateTicks, plannedWeightAt, computePlan, progressStatus, movingAverage, macroTargets, type Goal } from '../lib/goal';
 
 const goal: Goal = {
   target_date: '2026-09-12',   // 開始から60日
@@ -119,6 +119,31 @@ describe('computePlan（window方式: チートデイ後N日で取り返す）',
     ])!;
     expect(p.mode).toBe('spread');
     expect(p.absorbToday).toBe(30); // 1800/60
+  });
+});
+
+describe('macroTargets（1日の目標PFC）', () => {
+  it('体重85kg・目標1900kcal・デフォルト係数(P2.0/F0.9)', () => {
+    const m = macroTargets(85, 1900);
+    expect(m.p).toBe(170);            // 85×2.0
+    expect(m.f).toBe(77);             // 85×0.9=76.5→77
+    // C = (1900 − 170×4 − 77×9) / 4 = (1900−680−693)/4 = 131.75 → 132
+    expect(m.c).toBe(132);
+  });
+  it('係数を指定できる（P2.2/F0.7）', () => {
+    const m = macroTargets(80, 2200, 2.2, 0.7);
+    expect(m.p).toBe(176);
+    expect(m.f).toBe(56);
+    expect(m.c).toBe(Math.round((2200 - 176 * 4 - 56 * 9) / 4));
+  });
+  it('カロリーが小さくCがマイナスになる場合は0で下限', () => {
+    const m = macroTargets(85, 800);
+    expect(m.c).toBe(0);
+  });
+  it('係数null時はデフォルトが使われる', () => {
+    const m = macroTargets(70, 2000, null, null);
+    expect(m.p).toBe(140);
+    expect(m.f).toBe(63);
   });
 });
 
