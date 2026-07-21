@@ -15,6 +15,13 @@ const config: CapacitorConfig = {
     contentInset: 'always', // ノッチ・ステータスバーと重ならないように
     backgroundColor: '#0c131c',
   },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1000,
+      backgroundColor: '#0c131c',
+      launchAutoHide: true,
+    },
+  },
 };
 
 export default config;

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { todayJST } from '@/lib/calc';
 import { resizeImage, type ResizedImage } from '@/lib/image';
+import { pickPhotoNative, getIsNative, hapticSuccess } from '@/lib/native';
 
 type BodyPhoto = { id: string; date: string; path: string; bf_est: number | null; assessment: string; url?: string };
 type ProfileLite = { sex: 'male' | 'female'; height_cm: number; age: number } | null;
@@ -79,6 +80,7 @@ export default function BodyPhotos({
       if (upErr) throw new Error(upErr.message);
       await supabase.from('body_photos').insert({ user_id: user.id, date: d, path, bf_est: bf, assessment });
       setAiMsg({ cls: 'ok', text: `AI判定: 推定体脂肪率 ${bf ?? '?'}%（±3%）。${j.result.comment || ''}` });
+      hapticSuccess();
       setPendingPhoto(null);
       setPhotoDate(today);
       await loadPhotos();
@@ -170,7 +172,15 @@ export default function BodyPhotos({
       <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。写真は本人以外見られません。</p>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { selectPhoto(e.target.files); e.target.value = ''; }} />
       <div className="row2" style={{ marginTop: 8 }}>
-        <button className={pendingPhoto ? 'btn-ghost' : 'btn-primary'} onClick={() => fileRef.current?.click()} disabled={busy}>
+        <button className={pendingPhoto ? 'btn-ghost' : 'btn-primary'} disabled={busy}
+                onClick={async () => {
+                  if (await getIsNative()) {
+                    const p = await pickPhotoNative();
+                    if (p) { setAiMsg(null); setCompareResult(''); setPendingPhoto(p); }
+                  } else {
+                    fileRef.current?.click();
+                  }
+                }}>
           📷 {pendingPhoto ? '写真を選び直す' : '写真を選ぶ'}
         </button>
         <button className="btn-ghost" onClick={comparePhotos} disabled={busy || photos.length < 2}>

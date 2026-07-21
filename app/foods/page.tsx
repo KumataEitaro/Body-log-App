@@ -7,6 +7,7 @@ import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { rescaleByQty, sumItems, emptyItem, type FoodItem } from '@/lib/items';
 import { resizeImage, type ResizedImage } from '@/lib/image';
 import { parseRatio } from '@/lib/foods';
+import { pickPhotoNative, getIsNative, hapticSuccess } from '@/lib/native';
 
 type MyFood = {
   id: string; name: string; unit: string; kcal: number; p: number; f: number; c: number; note: string;
@@ -128,6 +129,7 @@ export default function FoodsPage() {
     }, { onConflict: 'user_id,name' });
     setBusy(false);
     if (error) { setMsg({ cls: 'err', text: error.message }); return; }
+    hapticSuccess();
     setMsg({ cls: 'ok', text: `「${fName.trim()}」を登録しました。入力画面のチップとAI辞書に反映されます。` });
     setChat(''); setPhotos([]); setItems(null); setManual(null); setFName(''); setFRatio('1');
     await loadFoods();
@@ -169,7 +171,14 @@ export default function FoodsPage() {
             </div>
           ))}
           {photos.length < 4 && (
-            <button className="thumb-add" onClick={() => fileRef.current?.click()}>📷<br />写真追加</button>
+            <button className="thumb-add" onClick={async () => {
+              if (await getIsNative()) {
+                const p = await pickPhotoNative();
+                if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
+              } else {
+                fileRef.current?.click();
+              }
+            }}>📷<br />写真追加</button>
           )}
         </div>
 

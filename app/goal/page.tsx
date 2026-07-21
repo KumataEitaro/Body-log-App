@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { todayJST } from '@/lib/calc';
 import { type Goal, type PlanEvent } from '@/lib/goal';
+import { hapticSuccess } from '@/lib/native';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type EventRow = PlanEvent & { id: string };
@@ -97,6 +98,7 @@ export default function GoalPage() {
     }
     setBusy(false);
     if (error) { setGoalMsg({ cls: 'err', text: error.message }); return; }
+    hapticSuccess();
     const isFirstGoal = !goal;
     await loadAll();
     if (isFirstGoal) {

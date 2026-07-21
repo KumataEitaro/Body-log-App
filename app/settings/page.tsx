@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS } from '@/lib/calc';
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
+import { getIsNative, setDailyReminder } from '@/lib/native';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -19,6 +20,31 @@ export default function SettingsPage() {
   const [importJson, setImportJson] = useState('');
   const [importMsg, setImportMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ネイティブアプリのローカル通知リマインド
+  const [nativeApp, setNativeApp] = useState(false);
+  const [remindOn, setRemindOn] = useState(false);
+  const [remindTime, setRemindTime] = useState('20:00');
+  const [remindMsg, setRemindMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
+  useEffect(() => {
+    getIsNative().then(setNativeApp);
+    try {
+      const saved = JSON.parse(localStorage.getItem('bodylog-reminder') || 'null');
+      if (saved) { setRemindOn(!!saved.on); setRemindTime(saved.time || '20:00'); }
+    } catch { /* 破損は無視 */ }
+  }, []);
+  async function applyReminder(on: boolean, time: string) {
+    setRemindMsg(null);
+    const [h, m] = time.split(':').map(Number);
+    const ok = await setDailyReminder(on, h, m);
+    if (on && !ok) {
+      setRemindMsg({ cls: 'err', text: '通知が許可されていません。iOSの設定 > BodyLog > 通知 を許可してください。' });
+      return;
+    }
+    setRemindOn(on); setRemindTime(time);
+    localStorage.setItem('bodylog-reminder', JSON.stringify({ on, time }));
+    setRemindMsg({ cls: 'ok', text: on ? `毎日 ${time} にアプリ通知でお知らせします。` : 'アプリ通知を停止しました。' });
+  }
 
   // 通知設定（リマインドメールのオプトアウト）
   const [mailOptOut, setMailOptOut] = useState(false);
@@ -233,6 +259,23 @@ export default function SettingsPage() {
           3日間記録がないときのリマインドメールを受け取る
         </label>
         {mailMsg && <div className={`msg ${mailMsg.cls}`}>{mailMsg.text}</div>}
+
+        {nativeApp && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
+              <input type="checkbox" checked={remindOn} onChange={(e) => applyReminder(e.target.checked, remindTime)}
+                     style={{ width: 20, height: 20, minHeight: 0 }} />
+              毎日決まった時刻にアプリ通知でリマインド
+            </label>
+            {remindOn && (
+              <div style={{ marginTop: 8 }}>
+                <label>通知時刻</label>
+                <input type="time" value={remindTime} onChange={(e) => applyReminder(true, e.target.value)} />
+              </div>
+            )}
+            {remindMsg && <div className={`msg ${remindMsg.cls}`}>{remindMsg.text}</div>}
+          </div>
+        )}
       </div>
 
       <div className="card">

@@ -9,6 +9,7 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { servingOf } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
+import { hapticSuccess, hapticTap, pickPhotoNative, getIsNative, setTodayRecordedBadge } from '@/lib/native';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -129,6 +130,13 @@ export default function LogPage() {
       await loadDay(todayJST());
     })();
   }, [router, loadDay]);
+
+  // ネイティブアプリ: 今日未記録ならアイコンにバッジを付ける
+  useEffect(() => {
+    if (date === todayJST()) {
+      setTodayRecordedBadge(dayLogs.length > 0 || !!legacyEntry);
+    }
+  }, [dayLogs, legacyEntry, date]);
 
   // ===== 日次サマリー・目安の内訳（画面上部に常時表示） =====
   // logsが無い日でも旧形式（1日まとめ）の記録があれば集計に含める
@@ -275,6 +283,7 @@ export default function LogPage() {
   }
 
   function addFromFood(fd: MyFood) {
+    hapticTap();
     // よく使う量が設定されていればその量で追加（例: 全量1800kcalの鍋→丼1杯300kcal）
     const sv = servingOf(fd);
     const item: ParsedItem = { name: fd.name, qty: sv.qty, kcal: sv.kcal, p: sv.p, f: sv.f, c: sv.c };
@@ -342,6 +351,7 @@ export default function LogPage() {
         if (upErr) throw new Error(upErr.message);
         const rows2 = await syncDaySummary(user.id, date);
         const s2 = summarizeDay(rows2);
+        hapticSuccess();
         if (s2.weight != null) setLatestWeight(s2.weight);
         setSaveMsg({ cls: 'ok', text: `${timeJST(editingLog.at)}の記録を更新しました（1日の合計・ダッシュボードにも反映済み）。` });
         setEditingLog(null);
@@ -373,6 +383,7 @@ export default function LogPage() {
         const { data: entry } = await supabase.from('entries').select('*').eq('date', date).maybeSingle();
         setLegacyEntry(entry);
         setDayLogs([]);
+        hapticSuccess();
         if (s.weight != null) setLatestWeight(s.weight);
         setSaveMsg({ cls: 'ok', text: `保存しました（この日のまとめに合算）。摂取合計 ${s.intake != null ? Math.round(s.intake).toLocaleString() : '—'}kcal` });
         setChat(''); setPhotos([]); setParsed(null); setEditMode(false); setParseMsg(null);
@@ -393,6 +404,7 @@ export default function LogPage() {
       }
 
       const rows = await syncDaySummary(user.id, date);
+      hapticSuccess();
       const s = summarizeDay(rows);
       const w = s.weight ?? latestWeight ?? (profile?.init_weight != null ? Number(profile.init_weight) : 70);
       if (s.weight != null) setLatestWeight(s.weight);
@@ -510,7 +522,14 @@ export default function LogPage() {
             </div>
           ))}
           {photos.length < 4 && (
-            <button className="thumb-add" onClick={() => fileRef.current?.click()}>📷<br />写真追加</button>
+            <button className="thumb-add" onClick={async () => {
+              if (await getIsNative()) {
+                const p = await pickPhotoNative();
+                if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
+              } else {
+                fileRef.current?.click();
+              }
+            }}>📷<br />写真追加</button>
           )}
         </div>
 

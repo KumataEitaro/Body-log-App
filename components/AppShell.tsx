@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { setupNativeChrome } from '@/lib/native';
 
 export default function AppShell({
   children,
@@ -16,6 +17,9 @@ export default function AppShell({
   const [needGoal, setNeedGoal] = useState(false);
   const [needPhoto, setNeedPhoto] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
+
+  // ネイティブアプリ時のステータスバー調整（ブラウザでは何もしない）
+  useEffect(() => { setupNativeChrome(); }, []);
 
   // 目標・体写真の未入力チェック（タブ移動のたびに再確認→入力したらバッジが消える）
   useEffect(() => {
