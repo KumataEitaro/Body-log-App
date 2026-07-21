@@ -618,10 +618,27 @@ export default function LogPage() {
               今日あと食べられる{plan ? '（計画）' : '（維持）'}
               {dayVerdict && <span className={`pill ${verdictClass(dayVerdict)}`} style={{ marginLeft: 8 }}>{dayVerdict}</span>}
             </div>
-            <div className="hero-row">
-              <span className={`hero-num num ${heroLeft < 0 ? 'over' : ''}`}>{heroLeft.toLocaleString()}</span>
-              <span className="hero-unit">kcal</span>
-            </div>
+            {(() => {
+              const goalKcal = planIntake ?? target;
+              const ratio = goalKcal > 0 ? Math.min(1, Math.max(0, eaten / goalKcal)) : 0;
+              const R = 52, CIRC = 2 * Math.PI * R;
+              const over = heroLeft < 0;
+              return (
+                <div className="ring-wrap">
+                  <svg viewBox="0 0 120 120">
+                    <circle className="ring-bg" cx="60" cy="60" r={R} />
+                    <circle className={`ring-fg ${over ? 'over' : ''}`} cx="60" cy="60" r={R}
+                            strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - ratio)} />
+                  </svg>
+                  <div className="ring-center">
+                    <div className={`ring-label ${over ? 'over' : ''}`}>{over ? '超過' : '残り'}</div>
+                    <div className={`ring-num num ${over ? 'over' : ''}`}>{Math.abs(heroLeft).toLocaleString()}</div>
+                    <div className="ring-unit">kcal</div>
+                    <div className="ring-sub num">目標: {goalKcal.toLocaleString()} / 摂取: {eaten.toLocaleString()}</div>
+                  </div>
+                </div>
+              );
+            })()}
             {todayEvent && (
               <div className="hero-cheat">🍺 今日はチートデイ「{todayEvent.title}」— +{Math.round(Number(todayEvent.extra_kcal)).toLocaleString()}kcalまで想定内</div>
             )}

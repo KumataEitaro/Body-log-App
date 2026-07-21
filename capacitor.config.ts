@@ -13,14 +13,14 @@ const config: CapacitorConfig = {
   },
   ios: {
     contentInset: 'always', // ノッチ・ステータスバーと重ならないように
-    backgroundColor: '#0c131c',
+    backgroundColor: '#f8fafc',
     // Service Worker（オフラインキャッシュ）をWKWebViewで有効化するために必要
     limitsNavigationsToAppBoundDomains: true,
   },
   plugins: {
     SplashScreen: {
       launchShowDuration: 1000,
-      backgroundColor: '#0c131c',
+      backgroundColor: '#f8fafc',
       launchAutoHide: true,
     },
   },

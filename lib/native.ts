@@ -43,7 +43,7 @@ export async function setupNativeChrome(): Promise<void> {
   if (!(await getIsNative())) return;
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setStyle({ style: Style.Light }); // ライトUI用（濃色の時刻・電池表示）
   } catch { /* 非対応環境は無視 */ }
 }
 
