@@ -28,13 +28,6 @@ function IconTarget() {
     </svg>
   );
 }
-function IconBasket() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 8h14l-1.5 12h-11L5 8Z" /><path d="M8.5 8a3.5 3.5 0 1 1 7 0" />
-    </svg>
-  );
-}
 function IconGear() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -51,11 +44,11 @@ function IconRefresh() {
   );
 }
 
+// マイ食品登録は設定ページ内へ移動（タブは4つ）
 const TABS = [
   { href: '/log', label: '入力', icon: <IconPencil />, dotKey: 'photo' },
   { href: '/dashboard', label: 'ダッシュボード', icon: <IconChart />, dotKey: null },
   { href: '/goal', label: '目標', icon: <IconTarget />, dotKey: 'goal' },
-  { href: '/foods', label: '食品', icon: <IconBasket />, dotKey: null },
   { href: '/settings', label: '設定', icon: <IconGear />, dotKey: null },
 ] as const;
 

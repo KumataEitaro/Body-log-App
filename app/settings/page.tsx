@@ -236,9 +236,12 @@ export default function SettingsPage() {
       </div>
 
       <div className="card">
-        <h2>マイ食品</h2>
-        <p className="muted">作り置き・毎日食べるものの登録は「食品」タブに移動しました。AIチャットで材料を書くだけで登録できます。</p>
-        <a className="btn-ghost" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 8 }} href="/foods">🍲 マイ食品ページを開く</a>
+        <h2>🍲 マイ食品登録</h2>
+        <p className="muted">
+          作り置きや毎日食べるものを登録すると、入力画面のチップから1タップで記録できます。
+          自然文＋写真（栄養成分表示の撮影OK）からAIが計算します。
+        </p>
+        <a className="btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 8 }} href="/foods">マイ食品を登録・管理する</a>
       </div>
 
       <div className="card">

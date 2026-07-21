@@ -13,6 +13,7 @@ import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, set
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 import Sheet from '@/components/Sheet';
+import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -582,6 +583,46 @@ export default function LogPage() {
 
   const remainLabel = unlimited ? '' : remaining == null ? '' : `（今日あと${Math.max(0, remaining)}回）`;
 
+  // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
+  const [struggle, setStruggle] = useState<StruggleKind>(null);
+  useEffect(() => {
+    if (date !== todayJST()) { setStruggle(null); return; }
+    try {
+      // 一度「このまま続ける」を選んだら3日間は出さない
+      const snooze = localStorage.getItem('bodylog-struggle-snooze');
+      if (snooze && Date.now() - new Date(snooze + 'T00:00:00').getTime() < 3 * 86400000) { setStruggle(null); return; }
+    } catch { /* 無視 */ }
+    setStruggle(detectStruggle(dayLogs.flatMap((l) => [String(l.mood || ''), String(l.text || '')])));
+  }, [dayLogs, date]);
+
+  function snoozeStruggle() {
+    try { localStorage.setItem('bodylog-struggle-snooze', todayJST()); } catch { /* 無視 */ }
+    setStruggle(null);
+  }
+
+  // 目標日を1週間延ばして毎日の必要赤字を緩める
+  async function loosenGoal() {
+    if (!goal) return;
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const newDate = shiftDate(goal.target_date, 7);
+    const { error } = await supabase.from('goals').update({ target_date: newDate }).eq('user_id', uid);
+    if (error) { setSaveMsg({ cls: 'err', text: '更新に失敗しました: ' + error.message }); return; }
+    hapticSuccess();
+    setGoal({ ...goal, target_date: newDate });
+    snoozeStruggle();
+    setSaveMsg({ cls: 'ok', text: `🕊 目標日を1週間延ばしました（${newDate}まで）。毎日の目標カロリーが少し緩みます。無理せず続けましょう！` });
+  }
+
+  const loosenDelta = (() => {
+    if (!goal || !plan || !profile) return null;
+    const loosened = computePlan({ ...goal, target_date: shiftDate(goal.target_date, 7) }, todayJST(), weightForBmr, futureEvents, goal.absorb_days);
+    if (!loosened) return null;
+    return Math.max(0, plan.requiredDailyWithEvents - loosened.requiredDailyWithEvents);
+  })();
+
   function logSummaryText(l: LogRow): string {
     const parts: string[] = [];
     const items = (l.items as ParsedItem[]) || [];
@@ -804,6 +845,23 @@ export default function LogPage() {
 
       {saveMsg && <div className={`msg ${saveMsg.cls}`} style={{ marginBottom: 12 }}>{saveMsg.text}</div>}
 
+      {/* ===== つらい/爆食のサイン検知 → 目標緩和のリコメンド ===== */}
+      {struggle && goal && (
+        <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
+          <h2>{struggle === 'binge' ? '🍔 食べ過ぎた日があっても大丈夫' : '😮‍💨 無理していませんか？'}</h2>
+          <p className="muted" style={{ margin: '0 0 8px' }}>
+            {struggle === 'binge'
+              ? '今日の記録に「爆食・食べ過ぎ」のサインがありました。1日の失敗は挽回できます。ただ、毎日の目標がきつすぎるサインかもしれません。'
+              : '今日の記録に「つらい」のサインがありました。減量は続けられるペースがいちばん大事です。'}
+            目標日を1週間延ばすと、毎日の目標カロリーが{loosenDelta != null && loosenDelta > 0 ? `約${Math.round(loosenDelta).toLocaleString()}kcal` : '少し'}緩みます。
+          </p>
+          <div className="row2">
+            <button className="btn-primary" onClick={loosenGoal}>🕊 1週間延ばして緩める</button>
+            <button className="btn-ghost" onClick={snoozeStruggle}>大丈夫、このまま続ける</button>
+          </div>
+        </div>
+      )}
+
       {/* ===== この日の記録フィード ===== */}
       <div className="card">
         <h2>{date === todayJST() ? '今日' : date} の記録 <span className="muted" style={{ fontWeight: 400 }}>{dayLogs.length + (legacyEntry ? 1 : 0)}件</span></h2>
@@ -894,7 +952,7 @@ export default function LogPage() {
                 fileRef.current?.click();
               }
             }}>📷</button>
-            <textarea rows={1} value={chat} placeholder="食事・体重・運動・気分をそのまま書く…"
+            <textarea rows={1} value={chat} placeholder="食事・体重・気分を自由に…"
                       onChange={(e) => {
                         setChat(e.target.value);
                         e.target.style.height = 'auto';

@@ -172,6 +172,7 @@ export default function FoodsPage() {
 
   return (
     <AppShell userName={userName}>
+      <p className="muted" style={{ margin: '0 0 10px' }}><a href="/settings">← 設定に戻る</a></p>
       {/* ===== AIチャットで登録 ===== */}
       <div className="card">
         <h2>🍲 マイ食品を登録 <span className="muted" style={{ fontWeight: 400 }}>— 作り置き・毎日食べるもの</span></h2>

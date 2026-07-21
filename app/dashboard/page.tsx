@@ -9,6 +9,7 @@ import WeightChart, { type ChartEvent, type BfPoint } from '@/components/WeightC
 import CumChart from '@/components/CumChart';
 import Link from 'next/link';
 import { cacheGet, cacheSet } from '@/lib/cache';
+import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, type MaintReview } from '@/lib/adaptive';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
@@ -32,6 +33,9 @@ export default function DashboardPage() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<(ChartEvent & PlanEvent)[]>([]);
   const [bfPoints, setBfPoints] = useState<BfPoint[]>([]);
+  // 2週間ごとのメンテナンスカロリー見直し提案
+  const [maintCard, setMaintCard] = useState<{ review: Exclude<MaintReview, { status: 'insufficient' }>; base: number; bmr: number; uid: string } | null>(null);
+  const [maintBusy, setMaintBusy] = useState(false);
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
@@ -120,8 +124,57 @@ export default function DashboardPage() {
         userName: prof.display_name || user.email || '',
         rows: computed, kpi: kpiObj, goal: g ?? null, events: evList, bfPoints: bfList,
       } satisfies DashCache);
+
+      // ===== 2週間ごとのメンテナンスカロリー見直し =====
+      try {
+        const today = todayJST();
+        const key = `blmr:${user.id}`;
+        let last: string | null = null;
+        try { last = (JSON.parse(localStorage.getItem(key) || 'null') as { last?: string } | null)?.last ?? null; } catch { /* 無視 */ }
+        if (!last && computed.length > 0) {
+          // 初回は「記録開始日」を起点にする（すでに14日分あれば即提案される）
+          last = computed[0].date;
+          localStorage.setItem(key, JSON.stringify({ last }));
+        }
+        const daysSince = last ? Math.floor((new Date(today + 'T00:00:00').getTime() - new Date(last + 'T00:00:00').getTime()) / 86400000) : 0;
+        if (last && daysSince >= REVIEW_INTERVAL_DAYS) {
+          const cutoff = new Date(today + 'T00:00:00');
+          cutoff.setDate(cutoff.getDate() - (REVIEW_INTERVAL_DAYS - 1));
+          const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+          const period = computed.filter((r) => r.date >= cutoffKey)
+            .map((r) => ({ date: r.date, intake: r.intake, target: Math.round(r.target), weight: r.weight }));
+          const review = reviewMaintenance(period, kpiObj.base, kpiObj.bmr);
+          if (review.status !== 'insufficient') {
+            setMaintCard({ review, base: kpiObj.base, bmr: kpiObj.bmr, uid: user.id });
+          }
+        }
+      } catch { /* 見直しは失敗しても本体に影響させない */ }
     })();
   }, [router]);
+
+  // メンテナンスカロリーの見直しを確定/見送り
+  async function resolveMaintReview(accept: boolean) {
+    if (!maintCard) return;
+    setMaintBusy(true);
+    try {
+      if (accept && maintCard.review.status === 'change') {
+        const supabase = createClient();
+        const lf = lifeFactorFor(maintCard.review.newBase, maintCard.bmr);
+        const { error } = await supabase.from('profiles').update({ life_factor: lf }).eq('id', maintCard.uid);
+        if (error) throw new Error(error.message);
+      }
+      localStorage.setItem(`blmr:${maintCard.uid}`, JSON.stringify({ last: todayJST() }));
+      if (accept && maintCard.review.status === 'change') {
+        window.location.reload(); // 新しい目安kcalで全体を再計算
+        return;
+      }
+      setMaintCard(null);
+    } catch (e) {
+      alert('更新に失敗しました: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setMaintBusy(false);
+    }
+  }
 
   if (!rows || !kpi) {
     return <AppShell userName={userName}><p className="muted">読み込み中…</p></AppShell>;
@@ -147,6 +200,43 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
+          {/* ===== 2週間レビュー: メンテナンスカロリー再校正の提案 ===== */}
+          {maintCard && (
+            <div className="card" style={{ border: '1.5px solid var(--teal)' }}>
+              <h2>🎉 2週間継続おめでとうございます！</h2>
+              {maintCard.review.status === 'change' ? (
+                <>
+                  <p className="muted" style={{ margin: '0 0 8px' }}>
+                    直近2週間の理論値（カロリー収支 {maintCard.review.expectedDelta > 0 ? '+' : ''}{maintCard.review.expectedDelta}kg 相当）と
+                    実測の体重変化（{maintCard.review.actualDelta > 0 ? '+' : ''}{maintCard.review.actualDelta}kg）のズレから、
+                    あなたの本当のメンテナンスカロリーを再計算しました。
+                  </p>
+                  <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="stat"><div className="stat-l">メンテナンスカロリー</div>
+                      <div className="stat-v num">{maintCard.base.toLocaleString()} → <span style={{ color: 'var(--teal)' }}>{maintCard.review.newBase.toLocaleString()}</span><small> kcal/日</small></div></div>
+                    <div className="stat"><div className="stat-l">毎日の目標カロリー</div>
+                      <div className="stat-v num" style={{ fontSize: 14 }}>自動で{maintCard.review.newBase > maintCard.base ? '上がります' : '下がります'}<small>（差 {maintCard.review.newBase > maintCard.base ? '+' : ''}{(maintCard.review.newBase - maintCard.base).toLocaleString()}kcal）</small></div></div>
+                  </div>
+                  <div className="row2" style={{ marginTop: 10 }}>
+                    <button className="btn-primary" disabled={maintBusy} onClick={() => resolveMaintReview(true)}>
+                      {maintBusy ? '更新中…' : '新しい値に更新する'}
+                    </button>
+                    <button className="btn-ghost" disabled={maintBusy} onClick={() => resolveMaintReview(false)}>今のままにする</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="muted" style={{ margin: '0 0 8px' }}>
+                    理論値と実測の体重変化がほぼ一致しています（実測 {maintCard.review.actualDelta > 0 ? '+' : ''}{maintCard.review.actualDelta}kg / 理論 {maintCard.review.expectedDelta > 0 ? '+' : ''}{maintCard.review.expectedDelta}kg）。
+                    現在のメンテナンスカロリー <b className="num">{maintCard.base.toLocaleString()}kcal</b> は妥当です。この調子！
+                  </p>
+                  <button className="btn-primary" disabled={maintBusy} onClick={() => resolveMaintReview(false)}>OK、続ける！</button>
+                </>
+              )}
+              <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>目標タブでいつでも手動調整できます。次回の見直しは2週間後です。</p>
+            </div>
+          )}
+
           <div className="kpis">
             <div className="kpi emph">
               <div className="lbl">目標との進捗</div>

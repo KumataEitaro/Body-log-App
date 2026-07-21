@@ -29,12 +29,45 @@ export default function DevPreviewPage() {
         <button className="arrow">›</button>
       </div>
 
+      {/* 2週間レビュー（お祝い＋メンテナンスカロリー変更提案） */}
+      <div className="card" style={{ border: '1.5px solid var(--teal)' }}>
+        <h2>🎉 2週間継続おめでとうございます！</h2>
+        <p className="muted" style={{ margin: '0 0 8px' }}>
+          直近2週間の理論値（カロリー収支 −0.39kg 相当）と実測の体重変化（−0.78kg）のズレから、あなたの本当のメンテナンスカロリーを再計算しました。
+        </p>
+        <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="stat"><div className="stat-l">メンテナンスカロリー</div>
+            <div className="stat-v num">1,800 → <span style={{ color: 'var(--teal)' }}>2,000</span><small> kcal/日</small></div></div>
+          <div className="stat"><div className="stat-l">毎日の目標カロリー</div>
+            <div className="stat-v num" style={{ fontSize: 14 }}>自動で上がります<small>（差 +200kcal）</small></div></div>
+        </div>
+        <div className="row2" style={{ marginTop: 10 }}>
+          <button className="btn-primary">新しい値に更新する</button>
+          <button className="btn-ghost">今のままにする</button>
+        </div>
+        <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>目標タブでいつでも手動調整できます。次回の見直しは2週間後です。</p>
+      </div>
+
       <div className="card daybar">
         <div className="hero-label">今日あと食べられる（計画） <span className="pill OK">OK</span></div>
-        <div className="hero-row">
-          <span className="hero-num num">427</span>
-          <span className="hero-unit">kcal</span>
-        </div>
+        {(() => {
+          const eaten = 1373, goalKcal = 1800, R = 52, CIRC = 2 * Math.PI * R;
+          const ratio = Math.min(1, eaten / goalKcal);
+          return (
+            <div className="ring-wrap">
+              <svg viewBox="0 0 120 120">
+                <circle className="ring-bg" cx="60" cy="60" r={R} />
+                <circle className="ring-fg" cx="60" cy="60" r={R} strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - ratio)} />
+              </svg>
+              <div className="ring-center">
+                <div className="ring-label">残り</div>
+                <div className="ring-num num">427</div>
+                <div className="ring-unit">kcal</div>
+                <div className="ring-sub num">目標: 1,800 / 摂取: 1,373</div>
+              </div>
+            </div>
+          );
+        })()}
         <div className="macro-bars">
           {macros.map((m) => (
             <div key={m.key}>
@@ -71,6 +104,18 @@ export default function DevPreviewPage() {
         ))}
       </div>
 
+      {/* つらい/爆食のサイン検知 → 目標緩和リコメンド */}
+      <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
+        <h2>😮‍💨 無理していませんか？</h2>
+        <p className="muted" style={{ margin: '0 0 8px' }}>
+          今日の記録に「つらい」のサインがありました。減量は続けられるペースがいちばん大事です。目標日を1週間延ばすと、毎日の目標カロリーが約180kcal緩みます。
+        </p>
+        <div className="row2">
+          <button className="btn-primary">🕊 1週間延ばして緩める</button>
+          <button className="btn-ghost">大丈夫、このまま続ける</button>
+        </div>
+      </div>
+
       <div className="card">
         <h2>📸 体の写真（進捗チェック）</h2>
         <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。</p>
@@ -91,7 +136,7 @@ export default function DevPreviewPage() {
           </div>
           <div className="dock-row">
             <button className="dock-cam">📷</button>
-            <textarea rows={1} placeholder="食事・体重・運動・気分をそのまま書く…" readOnly />
+            <textarea rows={1} placeholder="食事・体重・気分を自由に…" readOnly />
             <button className="dock-send">✨ AI解析</button>
           </div>
           <div className="dock-hint num">写真だけでもOK・自由な言葉で （今日あと12回）</div>

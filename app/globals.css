@@ -200,6 +200,8 @@ button:disabled { opacity: .5; cursor: default; }
   border-radius: 21px; background: var(--panel); border: 1px solid var(--line);
   font-size: 16px; line-height: 1.4; resize: none;
 }
+/* プレースホルダーが42px枠で切れないよう小さめに（入力文字は16pxのままiOSズームなし） */
+.dock textarea::placeholder { font-size: 13px; color: var(--sub); opacity: .9; }
 .dock-cam {
   width: 42px; height: 42px; min-height: 42px; flex: none; padding: 0;
   display: flex; align-items: center; justify-content: center;

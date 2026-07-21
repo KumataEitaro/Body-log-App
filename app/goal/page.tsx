@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { todayJST } from '@/lib/calc';
+import { todayJST, mifflinBMR } from '@/lib/calc';
+import { lifeFactorFor } from '@/lib/adaptive';
 import { type Goal, type PlanEvent } from '@/lib/goal';
 import { hapticSuccess } from '@/lib/native';
 import { cacheGet, cacheSet } from '@/lib/cache';
@@ -156,6 +157,28 @@ export default function GoalPage() {
 
   const futureEvents = events.filter((e) => e.date >= today);
 
+  // ===== メンテナンスカロリー手動調整 =====
+  const bmrNow = profile ? mifflinBMR(profile.sex, latestWeight ?? Number(profile.init_weight) ?? 70, Number(profile.height_cm), Number(profile.age)) : 0;
+  const baseNow = profile ? Math.round(bmrNow * Number(profile.life_factor)) : 0;
+  const [maintInput, setMaintInput] = useState('');
+  const [maintMsg, setMaintMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
+  useEffect(() => { if (baseNow > 0 && maintInput === '') setMaintInput(String(baseNow)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [baseNow]);
+
+  async function saveMaintenance(next: number) {
+    if (!profile || bmrNow <= 0) return;
+    const clamped = Math.max(Math.round(bmrNow), Math.min(Math.round(bmrNow * 2.2), Math.round(next / 10) * 10));
+    setMaintMsg(null);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update({ life_factor: lifeFactorFor(clamped, bmrNow) }).eq('id', user.id);
+    if (error) { setMaintMsg({ cls: 'err', text: `保存に失敗しました: ${error.message}` }); return; }
+    hapticSuccess();
+    setMaintInput(String(clamped));
+    await loadAll();
+    setMaintMsg({ cls: 'ok', text: `メンテナンスカロリーを ${clamped.toLocaleString()}kcal/日 に更新しました（毎日の目標カロリーにも反映済み）。` });
+  }
+
   return (
     <AppShell userName={userName}>
       {goal ? (
@@ -165,6 +188,29 @@ export default function GoalPage() {
       ) : (
         <div className="msg ok" style={{ marginTop: 0 }}>
           🎯 ステップ2/2: 目標を設定しましょう（いつまでに何kg）。設定すると毎日の摂取カロリー計画と進捗グラフが自動で作られます。あとから変更もできます。
+        </div>
+      )}
+
+      {/* ===== メンテナンスカロリー調整 ===== */}
+      {profile && (
+        <div className="card">
+          <h2>🔥 メンテナンスカロリー <span className="muted" style={{ fontWeight: 400 }}>— 1日の消費の基準値</span></h2>
+          <p className="muted" style={{ margin: '0 0 8px' }}>
+            基礎代謝 <b className="num">{Math.round(bmrNow).toLocaleString()}</b> × 生活係数 <b className="num">{Number(profile.life_factor)}</b> ＝
+            現在 <b className="num" style={{ color: 'var(--teal)', fontSize: 16 }}>{baseNow.toLocaleString()}</b> kcal/日（運動分は毎日自動加算）。
+            2週間ごとに実測の体重変化から自動で見直し提案されます。ここでは手動でいつでも調整できます。
+          </p>
+          <div className="row3" style={{ alignItems: 'end' }}>
+            <button className="btn-ghost" onClick={() => saveMaintenance((Number(maintInput) || baseNow) - 100)}>−100</button>
+            <div>
+              <label>kcal/日</label>
+              <input type="number" step="10" className="num" value={maintInput} onChange={(e) => setMaintInput(e.target.value)} />
+            </div>
+            <button className="btn-ghost" onClick={() => saveMaintenance((Number(maintInput) || baseNow) + 100)}>＋100</button>
+          </div>
+          <button className="btn-primary" style={{ marginTop: 10 }} disabled={busy || Number(maintInput) === baseNow}
+                  onClick={() => saveMaintenance(Number(maintInput) || baseNow)}>この値に更新する</button>
+          {maintMsg && <div className={`msg ${maintMsg.cls}`}>{maintMsg.text}</div>}
         </div>
       )}
 
