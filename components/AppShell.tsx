@@ -75,6 +75,7 @@ export default function AppShell({
         <h1>BodyLog</h1>
         <span className="spacer" />
         {userName ? <span className="who">{userName}</span> : null}
+        <button className="link refresh-btn" onClick={() => window.location.reload()} title="最新のデータ・アプリに更新">🔄 更新</button>
         <button className="link" onClick={logout}>ログアウト</button>
       </div>
       <div className="tabs">
