@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { todayJST } from '@/lib/calc';
 import { type Goal, type PlanEvent } from '@/lib/goal';
 import { hapticSuccess } from '@/lib/native';
+import { cacheGet, cacheSet } from '@/lib/cache';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type EventRow = PlanEvent & { id: string };
@@ -39,12 +40,40 @@ export default function GoalPage() {
 
   const today = todayJST();
 
+  // 目標フォームへゴール値を反映（キャッシュ復元とサーバ取得で共用）
+  function applyGoalToForm(g: Goal) {
+    setGoal(g);
+    setGDate(g.target_date); setGWeight(g.target_weight != null ? String(g.target_weight) : '');
+    setGBf(g.target_bf != null ? String(g.target_bf) : ''); setGNote(g.note || '');
+    setGAbsorb(g.absorb_days != null ? String(g.absorb_days) : '');
+    if (g.protein_per_kg != null) setGProtein(String(g.protein_per_kg));
+    if (g.fat_per_kg != null) setGFat(String(g.fat_per_kg));
+    if (g.fat_max_g != null) setGFatMax(String(g.fat_max_g));
+  }
+
   async function loadAll() {
     const supabase = createClient();
+
+    // ① キャッシュ即表示
+    const { data: { session } } = await supabase.auth.getSession();
+    const cachedUid = session?.user?.id;
+    if (cachedUid) {
+      const c = cacheGet<{ profile: Profile; userName: string; goal: Goal | null; events: EventRow[]; latestWeight: number | null }>(`goalpage:${cachedUid}`);
+      if (c) {
+        setProfile(c.profile); setUserName(c.userName);
+        if (c.goal) applyGoalToForm(c.goal);
+        setEvents(c.events || []); setLatestWeight(c.latestWeight);
+      }
+    }
+
+    // ② 裏で最新を取得
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    if (!user) {
+      if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+      router.push('/login'); return;
+    }
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    if (!prof) { router.push('/onboarding'); return; }
+    if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
     setProfile(prof);
     setUserName(prof.display_name || user.email || '');
 
@@ -53,17 +82,16 @@ export default function GoalPage() {
       supabase.from('events').select('*').order('date', { ascending: true }),
       supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
     ]);
-    if (g) {
-      setGoal(g);
-      setGDate(g.target_date); setGWeight(g.target_weight != null ? String(g.target_weight) : '');
-      setGBf(g.target_bf != null ? String(g.target_bf) : ''); setGNote(g.note || '');
-      setGAbsorb(g.absorb_days != null ? String(g.absorb_days) : '');
-      if (g.protein_per_kg != null) setGProtein(String(g.protein_per_kg));
-      if (g.fat_per_kg != null) setGFat(String(g.fat_per_kg));
-      if (g.fat_max_g != null) setGFatMax(String(g.fat_max_g));
-    }
-    setEvents((evs as EventRow[]) || []);
+    if (g) applyGoalToForm(g);
+    if (evs !== null) setEvents((evs as EventRow[]) || []);
     if (ws && ws.length) setLatestWeight(Number(ws[0].weight));
+    cacheSet(`goalpage:${user.id}`, {
+      profile: prof,
+      userName: prof.display_name || user.email || '',
+      goal: g ?? null,
+      events: (evs as EventRow[]) || [],
+      latestWeight: ws && ws.length ? Number(ws[0].weight) : null,
+    });
   }
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);

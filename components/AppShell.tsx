@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { setupNativeChrome } from '@/lib/native';
+import { cacheClearAll } from '@/lib/cache';
 
 export default function AppShell({
   children,
@@ -17,6 +18,17 @@ export default function AppShell({
   const [needGoal, setNeedGoal] = useState(false);
   const [needPhoto, setNeedPhoto] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
+  const [offline, setOffline] = useState(false);
+
+  // オフライン検知（バナー表示用）
+  useEffect(() => {
+    setOffline(!navigator.onLine);
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
   // ネイティブアプリ時のステータスバー調整（ブラウザでは何もしない）
   useEffect(() => { setupNativeChrome(); }, []);
@@ -51,6 +63,7 @@ export default function AppShell({
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    cacheClearAll(); // 共用端末での他人データ表示を防ぐ
     router.push('/login');
     router.refresh();
   }
@@ -71,6 +84,9 @@ export default function AppShell({
         <Link className={`tab ${pathname === '/foods' ? 'active' : ''}`} href="/foods">食品</Link>
         <Link className={`tab ${pathname === '/settings' ? 'active' : ''}`} href="/settings">設定</Link>
       </div>
+      {offline && (
+        <div className="offline-bar">📡 オフライン表示中 — 前回のデータを表示しています。通信回復時に自動更新されます</div>
+      )}
       <div className="wrap">{children}</div>
 
       {/* 未入力ユーザー向けの案内ポップアップ */}

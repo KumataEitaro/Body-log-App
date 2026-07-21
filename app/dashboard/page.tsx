@@ -8,6 +8,7 @@ import { progressStatus, computePlan, type Goal, type PlanEvent } from '@/lib/go
 import WeightChart, { type ChartEvent, type BfPoint } from '@/components/WeightChart';
 import CumChart from '@/components/CumChart';
 import Link from 'next/link';
+import { cacheGet, cacheSet } from '@/lib/cache';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
@@ -17,26 +18,49 @@ type Row = {
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 
+type Kpi = {
+  latestWeight: number | null; weightDelta: number | null;
+  sum7: number; std7: number; range7: string;
+  sumAll: number; fatKg: number; rangeAll: string; base: number; bmr: number;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [kpi, setKpi] = useState<{
-    latestWeight: number | null; weightDelta: number | null;
-    sum7: number; std7: number; range7: string;
-    sumAll: number; fatKg: number; rangeAll: string; base: number; bmr: number;
-  } | null>(null);
+  const [kpi, setKpi] = useState<Kpi | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<(ChartEvent & PlanEvent)[]>([]);
   const [bfPoints, setBfPoints] = useState<BfPoint[]>([]);
 
+  type DashCache = {
+    userName: string; rows: Row[]; kpi: Kpi;
+    goal: Goal | null; events: (ChartEvent & PlanEvent)[]; bfPoints: BfPoint[];
+  };
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
+
+      // ① キャッシュを即表示（起動直後・オフラインでも前回のダッシュボードが見える）
+      const { data: { session } } = await supabase.auth.getSession();
+      const cachedUid = session?.user?.id;
+      if (cachedUid) {
+        const c = cacheGet<DashCache>(`dash:${cachedUid}`);
+        if (c) {
+          setUserName(c.userName); setRows(c.rows); setKpi(c.kpi);
+          setGoal(c.goal); setEvents(c.events || []); setBfPoints(c.bfPoints || []);
+        }
+      }
+
+      // ② 裏で最新を取得して差し替え
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) {
+        if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+        router.push('/login'); return;
+      }
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!prof) { router.push('/onboarding'); return; }
+      if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
       setUserName(prof.display_name || user.email || '');
 
       const [{ data: entries }, { data: g }, { data: evs }, { data: phs }] = await Promise.all([
@@ -45,9 +69,13 @@ export default function DashboardPage() {
         supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
         supabase.from('body_photos').select('date,bf_est').not('bf_est', 'is', null).order('date', { ascending: true }),
       ]);
+      // オフライン等でentriesが取れなかった場合はキャッシュ表示を維持
+      if (entries === null && !navigator.onLine) return;
       if (g) setGoal(g);
-      setEvents((evs as (ChartEvent & PlanEvent)[]) || []);
-      setBfPoints(((phs as { date: string; bf_est: number }[]) || []).map((p) => ({ date: p.date, bf: Number(p.bf_est) })));
+      const evList = (evs as (ChartEvent & PlanEvent)[]) || [];
+      const bfList = ((phs as { date: string; bf_est: number }[]) || []).map((p) => ({ date: p.date, bf: Number(p.bf_est) }));
+      setEvents(evList);
+      setBfPoints(bfList);
       const list = entries || [];
 
       // 体重の直近値をBMRに反映（さかのぼって最後に記録された体重を使う）
@@ -76,7 +104,7 @@ export default function DashboardPage() {
       const latestWeight = weights.length ? weights[weights.length - 1].weight : null;
       const firstWeight = weights.length ? weights[0].weight : null;
       const bmrNow = mifflinBMR(prof.sex, latestWeight ?? Number(prof.init_weight) ?? 70, Number(prof.height_cm), Number(prof.age));
-      setKpi({
+      const kpiObj: Kpi = {
         latestWeight,
         weightDelta: latestWeight != null && firstWeight != null ? Math.round((latestWeight - firstWeight) * 10) / 10 : null,
         sum7, std7: sum7 - WEEKLY_STD,
@@ -85,7 +113,13 @@ export default function DashboardPage() {
         rangeAll: withDiff.length ? `${withDiff[0].label}〜${withDiff[withDiff.length - 1].label}` : '',
         base: Math.round(bmrNow * Number(prof.life_factor)),
         bmr: Math.round(bmrNow),
-      });
+      };
+      setKpi(kpiObj);
+      // 次回起動を即表示にするためキャッシュ保存
+      cacheSet(`dash:${user.id}`, {
+        userName: prof.display_name || user.email || '',
+        rows: computed, kpi: kpiObj, goal: g ?? null, events: evList, bfPoints: bfList,
+      } satisfies DashCache);
     })();
   }, [router]);
 

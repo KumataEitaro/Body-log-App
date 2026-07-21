@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import DomTranslator from '@/components/DomTranslator';
+import SWRegister from '@/components/SWRegister';
 
 export const metadata: Metadata = {
   title: 'BodyLog — 減量トラッカー',
@@ -15,7 +16,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body><DomTranslator />{children}</body>
+      <body><SWRegister /><DomTranslator />{children}</body>
     </html>
   );
 }

@@ -10,6 +10,8 @@ import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal
 import { servingOf } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, getIsNative, setTodayRecordedBadge } from '@/lib/native';
+import { cacheGet, cacheSet } from '@/lib/cache';
+import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -90,26 +92,75 @@ export default function LogPage() {
   const [parseMsg, setParseMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
 
+  // キューに残っている未同期記録を、その日のフィードに合流させる
+  const withPending = useCallback((uid: string | undefined, d: string, rows: (LogRow & { id: string; at: string })[]) => {
+    if (!uid) return rows;
+    const pend = getQueue(uid).filter((q) => q.date === d)
+      .map((q) => ({ ...q.log, id: q.localId, at: new Date(q.ts).toISOString() } as LogRow & { id: string; at: string }));
+    return [...rows, ...pend];
+  }, []);
+
   const loadDay = useCallback(async (d: string) => {
     const supabase = createClient();
     setParsed(null); setEditMode(false); setPhotos([]); setChat('');
     setParseMsg(null); setSaveMsg(null); setEditingLog(null);
-    const [{ data: logs }, { data: entry }] = await Promise.all([
+
+    // ① まずキャッシュを即表示（オフライン・低速回線でも前回の状態が見える）
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (uid) {
+      const cached = cacheGet<{ logs: (LogRow & { id: string; at: string })[]; entry: Record<string, unknown> | null }>(`logs:${uid}:${d}`);
+      if (cached) {
+        setDayLogs(withPending(uid, d, cached.logs || []));
+        setLegacyEntry(cached.entry ?? null);
+      }
+    }
+
+    // ② 裏で最新を取得して差し替え＋キャッシュ更新
+    const [logsRes, entryRes] = await Promise.all([
       supabase.from('logs').select('*').eq('date', d).order('at', { ascending: true }),
       supabase.from('entries').select('*').eq('date', d).maybeSingle(),
     ]);
-    setDayLogs((logs as (LogRow & { id: string; at: string })[]) || []);
-    // logsが未作成(クエリ失敗)や空でも、その日の旧形式記録があれば表示する
-    setLegacyEntry((!logs || logs.length === 0) && entry ? entry : null);
-  }, []);
+    // 通信不能（オフライン等）の失敗ならキャッシュ表示を維持して終了
+    if (logsRes.data === null && (!navigator.onLine || /fetch|network/i.test(String(logsRes.error?.message || '')))) return;
+    const logs = logsRes.data; const entry = entryRes.data;
+    const rows = (logs as (LogRow & { id: string; at: string })[]) || [];
+    const legacy = (!logs || logs.length === 0) && entry ? entry : null;
+    setDayLogs(withPending(uid, d, rows));
+    setLegacyEntry(legacy);
+    if (uid && logs !== null) cacheSet(`logs:${uid}:${d}`, { logs: rows, entry: legacy });
+  }, [withPending]);
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
+
+      // ① キャッシュを即表示（プロフィール・チップ・目標など）
+      const { data: { session } } = await supabase.auth.getSession();
+      const cachedUid = session?.user?.id;
+      if (cachedUid) {
+        const h = cacheGet<{
+          profile: Profile; userName: string; latestWeight: number | null;
+          remaining: number | null; unlimited: boolean; myFoods: MyFood[];
+          goal: Goal | null; futureEvents: (PlanEvent & { id: string })[];
+        }>(`loghdr:${cachedUid}`);
+        if (h) {
+          setProfile(h.profile); setUserName(h.userName); setLatestWeight(h.latestWeight);
+          setRemaining(h.remaining); setUnlimited(h.unlimited); setMyFoods(h.myFoods || []);
+          setGoal(h.goal); setFutureEvents(h.futureEvents || []);
+        }
+        loadDay(todayJST()); // キャッシュ分を即描画（待たずに次へ）
+        flushOffline();      // 未同期の記録があれば送信
+      }
+
+      // ② 裏で最新を取得
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) {
+        if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+        router.push('/login'); return;
+      }
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!prof) { router.push('/onboarding'); return; }
+      if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
       setProfile(prof);
       setUserName(prof.display_name || user.email || '');
       const { data: w } = await supabase.from('entries').select('weight,date').not('weight', 'is', null)
@@ -127,9 +178,31 @@ export default function LogPage() {
       ]);
       if (g) setGoal(g);
       setFutureEvents((evs as (PlanEvent & { id: string })[]) || []);
+      // 次回起動を即表示にするためのヘッダキャッシュ
+      cacheSet(`loghdr:${user.id}`, {
+        profile: prof,
+        userName: prof.display_name || user.email || '',
+        latestWeight: w && w.length ? Number(w[0].weight) : null,
+        remaining: AI_DAILY_LIMIT - (usage?.count ?? 0),
+        unlimited: isUnlimited(user.email),
+        myFoods: (foods as MyFood[]) || [],
+        goal: g ?? null,
+        futureEvents: (evs as (PlanEvent & { id: string })[]) || [],
+      });
+      if (!cachedUid) flushOffline();
       await loadDay(todayJST());
     })();
   }, [router, loadDay]);
+
+  // 通信回復時に未同期の記録を自動送信
+  const dateRef = useRef(date);
+  useEffect(() => { dateRef.current = date; }, [date]);
+  useEffect(() => {
+    const onOnline = () => { flushOffline(); };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ネイティブアプリ: 今日未記録ならアイコンにバッジを付ける
   useEffect(() => {
@@ -295,7 +368,7 @@ export default function LogPage() {
   }
 
   // 日次サマリーをentriesへ反映（ダッシュボードはこの行を見る）
-  async function syncDaySummary(userId: string, d: string) {
+  async function syncDaySummary(userId: string, d: string, updateState = true) {
     const supabase = createClient();
     const { data: logs } = await supabase.from('logs').select('*').eq('date', d).order('at', { ascending: true });
     const rows = (logs as (LogRow & { id: string; at: string })[]) || [];
@@ -311,18 +384,68 @@ export default function LogPage() {
         food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
       }, { onConflict: 'user_id,date' });
     }
-    setDayLogs(rows);
+    if (logs !== null) cacheSet(`logs:${userId}:${d}`, { logs: rows, entry: null });
+    if (updateState) setDayLogs(withPending(userId, d, rows));
     return rows;
+  }
+
+  // オフライン中に貯めた記録をサーバへ送信（起動時と通信回復時に呼ばれる）
+  async function flushOffline() {
+    if (!navigator.onLine) return;
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const queue = getQueue(uid);
+    if (queue.length === 0) return;
+    const dates = new Set<string>();
+    let sent = 0;
+    for (const q of queue) {
+      const { error } = await supabase.from('logs').insert({ user_id: uid, date: q.date, ...q.log });
+      if (!error) { removeFromQueue(uid, q.localId); dates.add(q.date); sent++; }
+      else if (/fetch|network/i.test(error.message)) break; // まだ繋がらない→次の機会に
+      else { removeFromQueue(uid, q.localId); } // データ不正等は破棄（無限再送を防ぐ）
+    }
+    for (const d of dates) await syncDaySummary(uid, d, d === dateRef.current);
+    if (sent > 0) setSaveMsg({ cls: 'ok', text: `📶 通信が回復したため、オフライン中の記録 ${sent}件を同期しました。` });
+  }
+
+  // オフライン保存: 端末のキューに積んでフィードへ楽観的に表示
+  function queueOfflineSave(uid: string) {
+    if (!parsed) return;
+    const hasMeal = parsed.items.length > 0 || parsed.total.kcal > 0;
+    const newLog: LogRow = {
+      items: parsed.items,
+      kcal: hasMeal ? parsed.total.kcal : null,
+      p: hasMeal ? parsed.total.p : null, f: hasMeal ? parsed.total.f : null, c: hasMeal ? parsed.total.c : null,
+      weight: parsed.weight,
+      ex: parsed.ex, adj: parsed.adj,
+      mood: parsed.mood || '', text: chat,
+      photo_urls: [],
+    };
+    const q = enqueueLog(uid, date, newLog);
+    setDayLogs((prev) => [...prev, { ...newLog, id: q.localId, at: new Date().toISOString() } as LogRow & { id: string; at: string }]);
+    hapticSuccess();
+    setSaveMsg({ cls: 'ok', text: `📡 オフラインのため端末に保存しました。通信が回復すると自動で同期されます。${photos.length ? '（写真はオフライン保存の対象外です）' : ''}` });
+    setChat(''); setPhotos([]); setParsed(null); setEditMode(false); setParseMsg(null);
   }
 
   async function save() {
     if (!date || !parsed) return;
     setSaving(true); setSaveMsg(null);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    // getUser()はネットワーク必須のため、オフラインでも動くgetSession()を使う
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
+    if (!user) { setSaving(false); router.push('/login'); return; }
 
     try {
+      // ===== オフライン: 端末に保存して通信回復後に自動送信 =====
+      if (!navigator.onLine && !editingLog) {
+        queueOfflineSave(user.id);
+        return;
+      }
+
       // 写真アップロード
       const paths: string[] = [];
       for (const ph of photos) {
@@ -419,7 +542,13 @@ export default function LogPage() {
       // 入力欄をクリア（フィードに積まれる）
       setChat(''); setPhotos([]); setParsed(null); setEditMode(false); setParseMsg(null);
     } catch (e) {
-      setSaveMsg({ cls: 'err', text: '保存失敗: ' + (e instanceof Error ? e.message : String(e)) });
+      const msg = e instanceof Error ? e.message : String(e);
+      // 回線断による失敗ならオフライン保存に切り替える（新規記録のみ）
+      if (!editingLog && (/fetch|network|load failed/i.test(msg) || !navigator.onLine)) {
+        queueOfflineSave(user.id);
+      } else {
+        setSaveMsg({ cls: 'err', text: '保存失敗: ' + msg });
+      }
     } finally {
       setSaving(false);
     }
@@ -427,8 +556,16 @@ export default function LogPage() {
 
   async function deleteLog(log: LogRow & { id: string }) {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     if (!user) return;
+    // 未同期（オフライン保存）の記録はキューから取り消すだけ
+    if (log.id.startsWith('local-')) {
+      removeFromQueue(user.id, log.id);
+      setDayLogs((prev) => prev.filter((l) => l.id !== log.id));
+      setSaveMsg({ cls: 'ok', text: '未同期の記録を1件取り消しました。' });
+      return;
+    }
     if (log.photo_urls && log.photo_urls.length) {
       await supabase.storage.from('meals').remove(log.photo_urls);
     }
@@ -691,11 +828,11 @@ export default function LogPage() {
           <div className="feed-row" key={l.id}>
             <div className="feed-time num">{timeJST(l.at)}</div>
             <div className="feed-body">
-              <div>{logSummaryText(l)}</div>
+              <div>{logSummaryText(l)}{l.id.startsWith('local-') && <span className="pending-tag" title="通信回復後に自動同期されます">⏳未同期</span>}</div>
               {l.text ? <div className="muted feed-text">{String(l.text).slice(0, 80)}</div> : null}
             </div>
-            <button className="item-edit" onClick={() => startEditLog(l)} title="この記録を編集">✎</button>
-            <button className="item-del" onClick={() => deleteLog(l)} title="この記録を削除">×</button>
+            {!l.id.startsWith('local-') && <button className="item-edit" onClick={() => startEditLog(l)} title="この記録を編集">✎</button>}
+            <button className="item-del" onClick={() => deleteLog(l)} title={l.id.startsWith('local-') ? 'この未同期記録を取り消す' : 'この記録を削除'}>×</button>
           </div>
         ))}
       </div>

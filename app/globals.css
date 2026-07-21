@@ -39,6 +39,14 @@ a { color: var(--teal); }
 .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
 .wrap { max-width: 780px; margin: 0 auto; padding: 16px; }
 
+/* オフラインバナー */
+.offline-bar { background: var(--amber-weak); color: var(--amber); font-size: 12.5px; font-weight: 700;
+  text-align: center; padding: 7px 12px; }
+
+/* 未同期（オフライン保存）の記録マーク */
+.pending-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  background: var(--amber-weak); color: var(--amber); font-size: 11px; font-weight: 700; }
+
 /* タブの未入力バッジ */
 .tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--coral); margin-left: 3px; vertical-align: super; }
 

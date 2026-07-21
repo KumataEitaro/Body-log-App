@@ -8,6 +8,7 @@ import { rescaleByQty, sumItems, emptyItem, type FoodItem } from '@/lib/items';
 import { resizeImage, type ResizedImage } from '@/lib/image';
 import { parseRatio } from '@/lib/foods';
 import { pickPhotoNative, getIsNative, hapticSuccess } from '@/lib/native';
+import { cacheGet, cacheSet } from '@/lib/cache';
 
 type MyFood = {
   id: string; name: string; unit: string; kcal: number; p: number; f: number; c: number; note: string;
@@ -41,14 +42,31 @@ export default function FoodsPage() {
   async function loadFoods() {
     const supabase = createClient();
     const { data } = await supabase.from('my_foods').select('id,name,unit,kcal,p,f,c,note,serving_label,serving_ratio').order('created_at', { ascending: true });
+    if (data === null && !navigator.onLine) return; // オフラインはキャッシュ表示を維持
     setFoods((data as MyFood[]) || []);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user && data !== null) cacheSet(`foods:${session.user.id}`, (data as MyFood[]) || []);
   }
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
+
+      // ① キャッシュ即表示
+      const { data: { session } } = await supabase.auth.getSession();
+      const cachedUid = session?.user?.id;
+      if (cachedUid) {
+        const c = cacheGet<MyFood[]>(`foods:${cachedUid}`);
+        if (c) setFoods(c);
+        if (session?.user?.email) { setUserName(session.user.email); setUnlimited(isUnlimited(session.user.email)); }
+      }
+
+      // ② 裏で最新を取得
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) {
+        if (!navigator.onLine && cachedUid) return;
+        router.push('/login'); return;
+      }
       const { data: prof } = await supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
       setUserName(prof?.display_name || user.email || '');
       setUnlimited(isUnlimited(user.email));

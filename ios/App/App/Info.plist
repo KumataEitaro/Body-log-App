@@ -28,6 +28,11 @@
 	<string>食事や体の写真を撮影して記録するために使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>食事や体の写真を選択して記録するために使用します。</string>
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>bodylog-orcin.vercel.app</string>
+		<string>aistudio.google.com</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
