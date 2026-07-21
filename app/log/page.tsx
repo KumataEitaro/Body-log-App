@@ -9,7 +9,7 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { servingOf } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
-import { hapticSuccess, hapticTap, pickPhotoNative, getIsNative, setTodayRecordedBadge } from '@/lib/native';
+import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 
@@ -660,7 +660,8 @@ export default function LogPage() {
           ))}
           {photos.length < 4 && (
             <button className="thumb-add" onClick={async () => {
-              if (await getIsNative()) {
+              // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
+              if (isNativeCameraAvailable()) {
                 const p = await pickPhotoNative();
                 if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
               } else {

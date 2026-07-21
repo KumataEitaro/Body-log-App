@@ -7,7 +7,7 @@ import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { rescaleByQty, sumItems, emptyItem, type FoodItem } from '@/lib/items';
 import { resizeImage, type ResizedImage } from '@/lib/image';
 import { parseRatio } from '@/lib/foods';
-import { pickPhotoNative, getIsNative, hapticSuccess } from '@/lib/native';
+import { pickPhotoNative, isNativeCameraAvailable, hapticSuccess } from '@/lib/native';
 import { cacheGet, cacheSet } from '@/lib/cache';
 
 type MyFood = {
@@ -190,7 +190,8 @@ export default function FoodsPage() {
           ))}
           {photos.length < 4 && (
             <button className="thumb-add" onClick={async () => {
-              if (await getIsNative()) {
+              // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
+              if (isNativeCameraAvailable()) {
                 const p = await pickPhotoNative();
                 if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
               } else {

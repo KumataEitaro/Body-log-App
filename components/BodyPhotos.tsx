@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { todayJST } from '@/lib/calc';
 import { resizeImage, type ResizedImage } from '@/lib/image';
-import { pickPhotoNative, getIsNative, hapticSuccess } from '@/lib/native';
+import { pickPhotoNative, isNativeCameraAvailable, hapticSuccess } from '@/lib/native';
 
 type BodyPhoto = { id: string; date: string; path: string; bf_est: number | null; assessment: string; url?: string };
 type ProfileLite = { sex: 'male' | 'female'; height_cm: number; age: number } | null;
@@ -174,7 +174,8 @@ export default function BodyPhotos({
       <div className="row2" style={{ marginTop: 8 }}>
         <button className={pendingPhoto ? 'btn-ghost' : 'btn-primary'} disabled={busy}
                 onClick={async () => {
-                  if (await getIsNative()) {
+                  // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
+                  if (isNativeCameraAvailable()) {
                     const p = await pickPhotoNative();
                     if (p) { setAiMsg(null); setCompareResult(''); setPendingPhoto(p); }
                   } else {

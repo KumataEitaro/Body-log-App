@@ -4,6 +4,31 @@
 
 export type NativePhoto = { blob: Blob; dataUrl: string; base64: string; mime: string };
 
+type CapGlobal = {
+  isNativePlatform?: () => boolean;
+  isPluginAvailable?: (name: string) => boolean;
+};
+
+function capGlobal(): CapGlobal | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as unknown as { Capacitor?: CapGlobal }).Capacitor;
+}
+
+// タップハンドラ内で使う同期判定。
+// awaitを挟んでからfileInput.click()を呼ぶと、ブラウザ（特にiOS Safari）が
+// ユーザー操作由来と認めずクリックを無視するため、クリック分岐は必ずこちらを使う。
+// ネイティブではCapacitorブリッジがページ読み込み前にwindow.Capacitorを注入している。
+export function isNativeSync(): boolean {
+  return !!capGlobal()?.isNativePlatform?.();
+}
+
+// ネイティブかつCameraプラグインが今のアプリバイナリに入っているか（同期）。
+// 古いTestFlightビルドはプラグイン未搭載のことがあり、その場合はWebのファイル選択に落とす。
+export function isNativeCameraAvailable(): boolean {
+  const cap = capGlobal();
+  return !!cap?.isNativePlatform?.() && cap.isPluginAvailable?.('Camera') === true;
+}
+
 export async function getIsNative(): Promise<boolean> {
   try {
     const { Capacitor } = await import('@capacitor/core');
