@@ -11,7 +11,7 @@ workflows:
       app_store_connect: bodylog-asc
     environment:
       xcode: latest
-      node: 20
+      node: 22
       vars:
         BUNDLE_ID: com.gotcha.bodylog
       ios_signing:
