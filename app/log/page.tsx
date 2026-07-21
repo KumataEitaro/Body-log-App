@@ -12,6 +12,7 @@ import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
+import Sheet from '@/components/Sheet';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -29,11 +30,6 @@ type MyFood = {
 };
 type NewPhoto = { blob: Blob; dataUrl: string; base64: string; mime: string };
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
-
-const PLACEHOLDER =
-  '1回分の記録を書いて保存 → 1日に何度でも追加できます。例）\n' +
-  '昼は牛丼並盛とサラダ。\n' +
-  '体重75.2kg。ジムで筋トレ1時間。';
 
 async function resizeImage(file: File): Promise<NewPhoto> {
   const dataUrl: string = await new Promise((res, rej) => {
@@ -63,6 +59,13 @@ function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
+function shiftDate(d: string, n: number): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  const y = dt.getFullYear(), m = String(dt.getMonth() + 1).padStart(2, '0'), dd = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
 export default function LogPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -82,6 +85,7 @@ export default function LogPage() {
   const [legacyEntry, setLegacyEntry] = useState<Record<string, unknown> | null>(null);
 
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false); // 解析結果ボトムシートの開閉
   const [editingLog, setEditingLog] = useState<(LogRow & { id: string; at: string }) | null>(null); // 保存済み記録の編集中
   const [editMode, setEditMode] = useState(false);
   const [eKcal, setEKcal] = useState(''); const [eP, setEP] = useState(''); const [eF, setEF] = useState(''); const [eC, setEC] = useState('');
@@ -103,7 +107,7 @@ export default function LogPage() {
   const loadDay = useCallback(async (d: string) => {
     const supabase = createClient();
     setParsed(null); setEditMode(false); setPhotos([]); setChat('');
-    setParseMsg(null); setSaveMsg(null); setEditingLog(null);
+    setParseMsg(null); setSaveMsg(null); setEditingLog(null); setSheetOpen(false);
 
     // ① まずキャッシュを即表示（オフライン・低速回線でも前回の状態が見える）
     const { data: { session } } = await supabase.auth.getSession();
@@ -276,7 +280,8 @@ export default function LogPage() {
         questions: Array.isArray(j.result.questions) ? j.result.questions.filter((q: unknown) => typeof q === 'string') : [],
       });
       setEditMode(false);
-      setParseMsg({ cls: 'ok', text: '解析しました。内容を確認して保存してください。' });
+      setSheetOpen(true); // 結果はボトムシートで確認
+      setParseMsg(null);
     } catch (e) {
       setParseMsg({ cls: 'err', text: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -347,12 +352,12 @@ export default function LogPage() {
       mood: l.mood || null,
       questions: [],
     });
-    setEditMode(false); setParseMsg(null);
-    setSaveMsg({ cls: 'ok', text: `${timeJST(l.at)}の記録を編集中です。修正して「編集を保存」を押してください。` });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setEditMode(false); setParseMsg(null); setSaveMsg(null);
+    setSheetOpen(true); // 編集内容をシートで開く
   }
   function cancelEditLog() {
     setEditingLog(null); setParsed(null); setChat(''); setPhotos([]); setSaveMsg(null); setParseMsg(null);
+    setSheetOpen(false);
   }
 
   function addFromFood(fd: MyFood) {
@@ -365,6 +370,7 @@ export default function LogPage() {
     } else {
       setParsed({ items: [item], total: sumItems([item]), weight: null, ex: null, adj: 0, mood: null, questions: [] });
     }
+    setSheetOpen(true); // 追加内容をシートで確認
   }
 
   // 日次サマリーをentriesへ反映（ダッシュボードはこの行を見る）
@@ -593,6 +599,16 @@ export default function LogPage() {
 
   return (
     <AppShell userName={userName}>
+      {/* ===== 日付ナビ（‹ 日付 › ＋ 今日へ） ===== */}
+      <div className="datenav">
+        <button className="arrow" onClick={() => { const d = shiftDate(date, -1); setDate(d); loadDay(d); }} title="前日">‹</button>
+        <input type="date" value={date} onChange={(e) => { setDate(e.target.value); loadDay(e.target.value); }} />
+        <button className="arrow" onClick={() => { const d = shiftDate(date, 1); setDate(d); loadDay(d); }} title="翌日">›</button>
+        {date !== todayJST() && (
+          <button className="today-chip" onClick={() => { const d = todayJST(); setDate(d); loadDay(d); }}>今日へ</button>
+        )}
+      </div>
+
       {/* ===== 今日あと食べられるkcal（ヒーロー表示） ===== */}
       {profile && (() => {
         const heroLeft = planLeft ?? left; // 計画があれば計画基準、なければ維持基準
@@ -610,16 +626,26 @@ export default function LogPage() {
               <div className="hero-cheat">🍺 今日はチートデイ「{todayEvent.title}」— +{Math.round(Number(todayEvent.extra_kcal)).toLocaleString()}kcalまで想定内</div>
             )}
             {macros && (
-              <div className="macro-row">
+              <div className="macro-bars">
                 {[
-                  { key: 'P', emoji: '🍗', left: macros.p - eatenP, tgt: macros.p },
-                  { key: 'F', emoji: '🥑', left: macros.f - eatenF, tgt: macros.f },
-                  { key: 'C', emoji: '🍚', left: macros.c - eatenC, tgt: macros.c },
-                ].map((m) => (
-                  <span key={m.key} className={`macro-chip ${m.left < 0 ? 'over' : ''}`}>
-                    {m.emoji}{m.key} あと<b className="num">{m.left.toLocaleString()}</b>g<small className="num">/{m.tgt}</small>
-                  </span>
-                ))}
+                  { key: 'p', label: '🍗 Protein', eaten: eatenP, tgt: macros.p },
+                  { key: 'f', label: '🥑 Fat', eaten: eatenF, tgt: macros.f },
+                  { key: 'c', label: '🍚 Carbs', eaten: eatenC, tgt: macros.c },
+                ].map((m) => {
+                  const over = m.eaten > m.tgt;
+                  const pct = m.tgt > 0 ? Math.min(100, (m.eaten / m.tgt) * 100) : 0;
+                  return (
+                    <div key={m.key}>
+                      <div className="macro-bar-head">
+                        <span className="macro-bar-label">{m.label}</span>
+                        <span className="macro-bar-val num"><b>{m.eaten}</b>/{m.tgt}g</span>
+                      </div>
+                      <div className="macro-track">
+                        <div className={`macro-fill ${m.key} ${over ? 'over' : ''}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="daybar-sub">
@@ -640,67 +666,10 @@ export default function LogPage() {
         );
       })()}
 
-      {/* ===== 入力① 文字・写真からAIで解析するフロー ===== */}
-      <div className="card">
-        <label>日付</label>
-        <input type="date" value={date} onChange={(e) => { setDate(e.target.value); loadDay(e.target.value); }} />
-
-        <label>✍️ 記録を書いてAIで解析（食事・体重・運動・気分を自由に）</label>
-        <textarea rows={4} value={chat} onChange={(e) => setChat(e.target.value)} placeholder={PLACEHOLDER} />
-
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden
-               onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} />
-        <div className="photo-row">
-          {photos.map((p, i) => (
-            <div className="thumb" key={i}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.dataUrl} alt="" />
-              <button className="thumb-x" onClick={() => setPhotos((arr) => arr.filter((_, j) => j !== i))}>×</button>
-            </div>
-          ))}
-          {photos.length < 4 && (
-            <button className="thumb-add" onClick={async () => {
-              // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
-              if (isNativeCameraAvailable()) {
-                const p = await pickPhotoNative();
-                if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
-              } else {
-                fileRef.current?.click();
-              }
-            }}>📷<br />写真追加</button>
-          )}
-        </div>
-
-        <button className="btn-primary" style={{ marginTop: 10 }} onClick={parse} disabled={parsing || (!unlimited && remaining === 0)}>
-          {parsing ? <><span className="spin" />解析中…</> : `🤖 AIで解析 ${remainLabel}`}
-        </button>
-        {!unlimited && remaining != null && remaining <= 3 && remaining > 0 && (
-          <p className="muted center" style={{ marginTop: 6 }}>無料AI枠のため1日{AI_DAILY_LIMIT}回までです。残りわずか！</p>
-        )}
-        {!unlimited && remaining === 0 && (
-          <p className="muted center" style={{ marginTop: 6 }}>本日のAI解析（{AI_DAILY_LIMIT}回）を使い切りました。明日リセットされます。</p>
-        )}
-        {parseMsg && <div className={`msg ${parseMsg.cls}`}>{parseMsg.text}</div>}
-      </div>
-
-      {/* ===== 入力② マイ食品をタップで追加するフロー（AI不要・別フロー） ===== */}
-      {myFoods.length > 0 && (
-        <div className="card">
-          <h2>⚡ よく使う品目をタップで追加 <span className="muted" style={{ fontWeight: 400 }}>— AI不要・即時</span></h2>
-          <div className="chips">
-            {myFoods.map((fd) => (
-              <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>
-                ＋ {fd.name}
-              </button>
-            ))}
-          </div>
-          <p className="muted" style={{ marginTop: 8 }}>タップすると下の確認画面に品目が入ります。分量（×0.5 等）はそこで調整→保存。</p>
-        </div>
-      )}
-
-      {/* ===== 解析結果（保存前の確認） ===== */}
-      {parsed && (
-        <div className="card" style={editingLog ? { borderColor: 'var(--teal)' } : undefined}>
+      {/* ===== 解析結果（保存前の確認）— iOSボトムシート ===== */}
+      <Sheet open={sheetOpen && !!parsed} onClose={() => (editingLog ? cancelEditLog() : setSheetOpen(false))}>
+        {parsed && (
+        <div>
           <h2>
             {editingLog ? <>✎ 記録を編集中 <span className="muted" style={{ fontWeight: 400 }}>— {timeJST(editingLog.at)}の記録</span></> : <>解析結果 <span className="muted" style={{ fontWeight: 400 }}>— 確認して保存</span></>}
             {editingLog && (
@@ -797,13 +766,26 @@ export default function LogPage() {
             </>
           )}
 
+          {/* クイック追加チップ（シート下部・1タップで品目追加） */}
+          {!editingLog && myFoods.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>⚡ よく使う品目を追加</div>
+              <div className="chips">
+                {myFoods.slice(0, 8).map((fd) => (
+                  <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>＋ {fd.name}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button className="btn-primary" style={{ marginTop: 14 }} onClick={save} disabled={saving}>
             {saving ? <><span className="spin" />保存中…</> : editingLog ? '編集を保存する（上書き）' : 'この内容で保存する'}
           </button>
         </div>
-      )}
+        )}
+      </Sheet>
 
-      {saveMsg && <div className={`msg ${saveMsg.cls}`}>{saveMsg.text}</div>}
+      {saveMsg && <div className={`msg ${saveMsg.cls}`} style={{ marginBottom: 12 }}>{saveMsg.text}</div>}
 
       {/* ===== この日の記録フィード ===== */}
       <div className="card">
@@ -827,10 +809,13 @@ export default function LogPage() {
         )}
         {dayLogs.map((l) => (
           <div className="feed-row" key={l.id}>
-            <div className="feed-time num">{timeJST(l.at)}</div>
+            <div className="feed-icon">{l.kcal != null ? '🍽' : (l.ex && l.ex !== 'オフ') || Number(l.adj) ? '🏃' : l.weight != null ? '⚖️' : '📝'}</div>
             <div className="feed-body">
               <div>{logSummaryText(l)}{l.id.startsWith('local-') && <span className="pending-tag" title="通信回復後に自動同期されます">⏳未同期</span>}</div>
-              {l.text ? <div className="muted feed-text">{String(l.text).slice(0, 80)}</div> : null}
+              <div className="muted feed-text">
+                <span className="num">{timeJST(l.at)}</span>
+                {l.text ? <>　{String(l.text).slice(0, 60)}</> : null}
+              </div>
             </div>
             {!l.id.startsWith('local-') && <button className="item-edit" onClick={() => startEditLog(l)} title="この記録を編集">✎</button>}
             <button className="item-del" onClick={() => deleteLog(l)} title={l.id.startsWith('local-') ? 'この未同期記録を取り消す' : 'この記録を削除'}>×</button>
@@ -841,6 +826,74 @@ export default function LogPage() {
       {/* ===== 体写真（日々の入力はこのタブに統一） ===== */}
       <BodyPhotos profile={profile} latestWeight={latestWeight}
                   goalNote={goal?.note ?? null} targetBf={goal?.target_bf ?? null} />
+
+      {/* ドックに隠れないための余白 */}
+      <div className="dock-spacer" />
+
+      {/* ===== フローティングAI入力ドック（タブバーの上・メッセージアプリ風） ===== */}
+      <div className="dock">
+        <div className="dock-inner">
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+                 onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} />
+
+          {/* 添付済み写真 */}
+          {photos.length > 0 && (
+            <div className="dock-photos">
+              {photos.map((p, i) => (
+                <div className="thumb" key={i}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.dataUrl} alt="" />
+                  <button className="thumb-x" onClick={() => setPhotos((arr) => arr.filter((_, j) => j !== i))}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 保存前の内容があるのに閉じている時は戻れるピルを出す */}
+          {parsed && !sheetOpen && (
+            <button className="resume-pill" onClick={() => setSheetOpen(true)}>
+              📋 保存前の記録があります — タップして確認・保存
+            </button>
+          )}
+
+          {/* マイ食品チップ（横スクロール・1タップで記録開始） */}
+          {myFoods.length > 0 && !parsed && (
+            <div className="chip-strip">
+              {myFoods.map((fd) => (
+                <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>＋ {fd.name}</button>
+              ))}
+            </div>
+          )}
+
+          {parseMsg && <div className={`msg ${parseMsg.cls}`} style={{ marginTop: 0, marginBottom: 8 }}>{parseMsg.text}</div>}
+
+          <div className="dock-row">
+            <button className="dock-cam" title="写真を追加" onClick={async () => {
+              // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
+              if (isNativeCameraAvailable()) {
+                const p = await pickPhotoNative();
+                if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
+              } else {
+                fileRef.current?.click();
+              }
+            }}>📷</button>
+            <textarea rows={1} value={chat} placeholder="食事・体重・運動・気分をそのまま書く…"
+                      onChange={(e) => {
+                        setChat(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
+                      }} />
+            <button className="dock-send" onClick={parse} disabled={parsing || (!unlimited && remaining === 0)}>
+              {parsing ? <><span className="spin" />解析中</> : '✨ AI解析'}
+            </button>
+          </div>
+          <div className="dock-hint num">
+            {!unlimited && remaining === 0
+              ? `本日のAI解析（${AI_DAILY_LIMIT}回）を使い切りました。明日リセットされます`
+              : `写真だけでもOK・自由な言葉で ${remainLabel}`}
+          </div>
+        </div>
+      </div>
     </AppShell>
   );
 }

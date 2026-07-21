@@ -6,6 +6,59 @@ import { createClient } from '@/lib/supabase/client';
 import { setupNativeChrome } from '@/lib/native';
 import { cacheClearAll } from '@/lib/cache';
 
+/* 下部タブバー用アイコン（SF Symbols風のシンプルなストロークSVG） */
+function IconPencil() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+function IconChart() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" />
+    </svg>
+  );
+}
+function IconTarget() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+function IconBasket() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 8h14l-1.5 12h-11L5 8Z" /><path d="M8.5 8a3.5 3.5 0 1 1 7 0" />
+    </svg>
+  );
+}
+function IconGear() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z" />
+    </svg>
+  );
+}
+function IconRefresh() {
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+const TABS = [
+  { href: '/log', label: '入力', icon: <IconPencil />, dotKey: 'photo' },
+  { href: '/dashboard', label: 'ダッシュボード', icon: <IconChart />, dotKey: null },
+  { href: '/goal', label: '目標', icon: <IconTarget />, dotKey: 'goal' },
+  { href: '/foods', label: '食品', icon: <IconBasket />, dotKey: null },
+  { href: '/settings', label: '設定', icon: <IconGear />, dotKey: null },
+] as const;
+
 export default function AppShell({
   children,
   userName,
@@ -68,27 +121,41 @@ export default function AppShell({
     router.refresh();
   }
 
+  function hasDot(dotKey: 'photo' | 'goal' | null): boolean {
+    if (dotKey === 'photo') return needPhoto;
+    if (dotKey === 'goal') return needGoal;
+    return false;
+  }
+
   return (
     <>
       <div className="topbar">
         <span className="bar" />
         <h1>BodyLog</h1>
         <span className="spacer" />
-        {userName ? <span className="who">{userName}</span> : null}
-        <button className="link refresh-btn" onClick={() => window.location.reload()} title="最新のデータ・アプリに更新">🔄 更新</button>
+        <button className="link" onClick={() => window.location.reload()} title="最新のデータ・アプリに更新"><IconRefresh /></button>
         <button className="link" onClick={logout}>ログアウト</button>
-      </div>
-      <div className="tabs">
-        <Link className={`tab ${pathname === '/log' ? 'active' : ''}`} href="/log">入力{needPhoto && <span className="tab-dot" />}</Link>
-        <Link className={`tab ${pathname === '/dashboard' ? 'active' : ''}`} href="/dashboard">ダッシュボード</Link>
-        <Link className={`tab ${pathname === '/goal' ? 'active' : ''}`} href="/goal">目標{needGoal && <span className="tab-dot" />}</Link>
-        <Link className={`tab ${pathname === '/foods' ? 'active' : ''}`} href="/foods">食品</Link>
-        <Link className={`tab ${pathname === '/settings' ? 'active' : ''}`} href="/settings">設定</Link>
+        <Link href="/settings" className="avatar" title={userName || 'プロフィール'}>
+          {(userName || '?').trim().charAt(0).toUpperCase()}
+        </Link>
       </div>
       {offline && (
         <div className="offline-bar">📡 オフライン表示中 — 前回のデータを表示しています。通信回復時に自動更新されます</div>
       )}
       <div className="wrap">{children}</div>
+
+      {/* 下部タブバー（ブラー・セーフエリア対応） */}
+      <nav className="tabbar">
+        <div className="tabbar-inner">
+          {TABS.map((t) => (
+            <Link key={t.href} href={t.href} className={`tab ${pathname === t.href ? 'active' : ''}`}>
+              {hasDot(t.dotKey) && <span className="tab-dot" />}
+              {t.icon}
+              <span>{t.label}</span>
+            </Link>
+          ))}
+        </div>
+      </nav>
 
       {/* 未入力ユーザー向けの案内ポップアップ */}
       {showNudge && (
