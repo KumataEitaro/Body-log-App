@@ -26,6 +26,22 @@ workflows:
         script: |
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
+      - name: Diagnose compile (no signing)
+        script: |
+          # 署名なしでコンパイルのみ実行し、Swiftのコンパイルエラーを可視化する。
+          # （xcode-project build-ipa は xcodebuild の詳細出力を握りつぶすため、ここで生ログを出す）
+          set +e
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO clean build > /tmp/diag.log 2>&1
+          DIAG=$?
+          echo "===== diagnostic xcodebuild exit=$DIAG ====="
+          echo "----- error / failure lines -----"
+          grep -nE "error:|error generated|no such module|cannot find|The following build commands failed|HealthPlugin" /tmp/diag.log | head -80
+          echo "----- last 60 lines of diagnostic log -----"
+          tail -60 /tmp/diag.log
+          echo "===== END DIAGNOSTIC (exit=$DIAG) ====="
+          set -e
       - name: Build ipa
         script: |
           xcode-project use-profiles
