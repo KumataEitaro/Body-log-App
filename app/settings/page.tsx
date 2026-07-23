@@ -7,7 +7,7 @@ import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
 import { getIsNative, setDailyReminder } from '@/lib/native';
-import { healthAvailable, healthRequestAuth, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
+import { healthAvailable, healthRequestAuth, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthDiagnostics } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 
 export default function SettingsPage() {
@@ -53,7 +53,12 @@ export default function SettingsPage() {
   const [healthOn, setHealthOn] = useState(false);   // 連携ON/OFF
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
-  useEffect(() => { healthAvailable().then((ok) => { setHealthOK(ok); setHealthOn(isHealthEnabled()); }); }, []);
+  const [healthDiag, setHealthDiag] = useState<string>('');
+  useEffect(() => {
+    healthAvailable().then((ok) => { setHealthOK(ok); setHealthOn(isHealthEnabled()); });
+    // 出ない原因を可視化（native/プラグイン登録/isAvailable/エラー）
+    healthDiagnostics().then((d) => setHealthDiag(`native=${d.native} / listed=${d.pluginListed} / available=${d.available}${d.error ? ` / err=${d.error}` : ''}`));
+  }, []);
 
   async function toggleHealth(on: boolean) {
     setHealthMsg(null);
@@ -350,13 +355,19 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {healthOK && (
+      {nativeApp && (
         <div className="card">
           <h2>❤️ Apple ヘルスケア連携</h2>
           <p className="muted" style={{ marginTop: 0 }}>
             体重・体脂肪率・ウエスト・摂取カロリー・PFC をヘルスケアと双方向で同期します。
             スマート体重計などの記録を取り込み、BodyLogの記録も書き出せます。
           </p>
+          {!healthOK && (
+            <div className="msg warn" style={{ marginTop: 0 }}>
+              ヘルスケア機能を準備中です。連携を有効にすると許可画面が出ます。うまくいかない場合は下の状態をお知らせください。
+              <br /><span className="num" style={{ fontSize: 11, opacity: 0.8 }}>診断: {healthDiag || '確認中…'}</span>
+            </div>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
             <input type="checkbox" checked={healthOn} disabled={healthBusy} onChange={(e) => toggleHealth(e.target.checked)}
                    style={{ width: 20, height: 20, minHeight: 0 }} />

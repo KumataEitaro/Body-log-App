@@ -51,6 +51,24 @@ export async function healthAvailable(): Promise<boolean> {
   try { return (await p.isAvailable()).available; } catch { return false; }
 }
 
+// 診断用: どこで止まっているかを可視化する（設定画面のデバッグ表示に使う）
+export async function healthDiagnostics(): Promise<{ native: boolean; pluginListed: boolean; available: boolean | null; error: string | null }> {
+  const out = { native: false, pluginListed: false, available: null as boolean | null, error: null as string | null };
+  try {
+    out.native = await getIsNative();
+    if (!out.native) return out;
+    const { Capacitor, registerPlugin } = await import('@capacitor/core');
+    // 実行時にHealthプラグインが登録されているか
+    out.pluginListed = typeof Capacitor.isPluginAvailable === 'function' ? Capacitor.isPluginAvailable('Health') : false;
+    const p = registerPlugin<HealthPlugin>('Health');
+    const r = await p.isAvailable();
+    out.available = !!r?.available;
+  } catch (e) {
+    out.error = e instanceof Error ? (e.message || e.name) : String(e);
+  }
+  return out;
+}
+
 // 権限リクエスト（初回に許可シートが出る）
 export async function healthRequestAuth(): Promise<boolean> {
   const p = await plugin();
