@@ -26,24 +26,6 @@ workflows:
         script: |
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
-      - name: Diagnose signed archive
-        script: |
-          # コンパイルは成功済み。ここでは署名付きArchiveを実行して、
-          # コード署名/エンタイトルメントの実際のエラー文を可視化する。
-          xcode-project use-profiles
-          set +e
-          xcodebuild -project ios/App/App.xcodeproj -scheme App \
-            -archivePath /tmp/diag.xcarchive archive \
-            COMPILER_INDEX_STORE_ENABLE=NO DEVELOPMENT_TEAM=JBQJBFY3JJ \
-            'CODE_SIGN_IDENTITY=Apple Distribution' CODE_SIGN_STYLE=Manual > /tmp/arch.log 2>&1
-          A=$?
-          echo "===== signed archive exit=$A ====="
-          echo "----- signing / entitlement / error lines -----"
-          grep -nE "error:|entitlement|[Pp]rovisioning|doesn't|does not|not supported|[Cc]ode ?[Ss]ign|requires|The following build commands failed" /tmp/arch.log | head -80
-          echo "----- last 80 lines -----"
-          tail -80 /tmp/arch.log
-          echo "===== END DIAGNOSTIC (exit=$A) ====="
-          set -e
       - name: Build ipa
         script: |
           xcode-project use-profiles
