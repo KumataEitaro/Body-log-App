@@ -330,28 +330,32 @@ export default function SettingsPage() {
 
       <div className="card">
         <h2>🔔 通知</h2>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
-          <input type="checkbox" checked={!mailOptOut} onChange={(e) => toggleMail(!e.target.checked)}
-                 style={{ width: 20, height: 20, minHeight: 0 }} />
-          3日間記録がないときのリマインドメールを受け取る
+        <label className="switch-row">
+          <span className="switch-row-txt">3日間記録がないときのリマインドメールを受け取る</span>
+          <span className="switch">
+            <input type="checkbox" checked={!mailOptOut} onChange={(e) => toggleMail(!e.target.checked)} />
+            <span className="track"><span className="thumb" /></span>
+          </span>
         </label>
         {mailMsg && <div className={`msg ${mailMsg.cls}`}>{mailMsg.text}</div>}
 
         {nativeApp && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
-              <input type="checkbox" checked={remindOn} onChange={(e) => applyReminder(e.target.checked, remindTime)}
-                     style={{ width: 20, height: 20, minHeight: 0 }} />
-              毎日決まった時刻にアプリ通知でリマインド
+          <>
+            <label className="switch-row">
+              <span className="switch-row-txt">毎日決まった時刻にアプリ通知でリマインド</span>
+              <span className="switch">
+                <input type="checkbox" checked={remindOn} onChange={(e) => applyReminder(e.target.checked, remindTime)} />
+                <span className="track"><span className="thumb" /></span>
+              </span>
             </label>
             {remindOn && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 4 }}>
                 <label>通知時刻</label>
                 <input type="time" value={remindTime} onChange={(e) => applyReminder(true, e.target.value)} />
               </div>
             )}
             {remindMsg && <div className={`msg ${remindMsg.cls}`}>{remindMsg.text}</div>}
-          </div>
+          </>
         )}
       </div>
 
@@ -368,10 +372,12 @@ export default function SettingsPage() {
               <br /><span className="num" style={{ fontSize: 11, opacity: 0.8 }}>診断: {healthDiag || '確認中…'}</span>
             </div>
           )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
-            <input type="checkbox" checked={healthOn} disabled={healthBusy} onChange={(e) => toggleHealth(e.target.checked)}
-                   style={{ width: 20, height: 20, minHeight: 0 }} />
-            ヘルスケア連携を有効にする
+          <label className="switch-row">
+            <span className="switch-row-txt">ヘルスケア連携を有効にする{healthBusy ? <span className="muted"> …処理中</span> : ''}</span>
+            <span className="switch">
+              <input type="checkbox" checked={healthOn} onChange={(e) => toggleHealth(e.target.checked)} />
+              <span className="track"><span className="thumb" /></span>
+            </span>
           </label>
           {healthOn && (
             <button className="btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={syncHealthNow} disabled={healthBusy}>

@@ -23,6 +23,16 @@ type HealthPlugin = {
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
 };
 
+// プラグイン応答が返らない場合に固まらないためのタイムアウト付きラッパー
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve(fallback); } }, ms);
+    p.then((v) => { if (!done) { done = true; clearTimeout(t); resolve(v); } })
+     .catch(() => { if (!done) { done = true; clearTimeout(t); resolve(fallback); } });
+  });
+}
+
 let _plugin: HealthPlugin | null | undefined;
 async function plugin(): Promise<HealthPlugin | null> {
   if (_plugin !== undefined) return _plugin;
@@ -48,7 +58,7 @@ export function setHealthEnabled(on: boolean): void {
 export async function healthAvailable(): Promise<boolean> {
   const p = await plugin();
   if (!p) return false;
-  try { return (await p.isAvailable()).available; } catch { return false; }
+  try { return (await withTimeout(p.isAvailable(), 6000, { available: false })).available; } catch { return false; }
 }
 
 // 診断用: どこで止まっているかを可視化する（設定画面のデバッグ表示に使う）
@@ -61,7 +71,7 @@ export async function healthDiagnostics(): Promise<{ native: boolean; pluginList
     // 実行時にHealthプラグインが登録されているか
     out.pluginListed = typeof Capacitor.isPluginAvailable === 'function' ? Capacitor.isPluginAvailable('Health') : false;
     const p = registerPlugin<HealthPlugin>('Health');
-    const r = await p.isAvailable();
+    const r = await withTimeout(p.isAvailable(), 6000, { available: false });
     out.available = !!r?.available;
   } catch (e) {
     out.error = e instanceof Error ? (e.message || e.name) : String(e);
@@ -73,7 +83,7 @@ export async function healthDiagnostics(): Promise<{ native: boolean; pluginList
 export async function healthRequestAuth(): Promise<boolean> {
   const p = await plugin();
   if (!p) return false;
-  try { return (await p.requestAuthorization()).granted; } catch { return false; }
+  try { return (await withTimeout(p.requestAuthorization(), 20000, { granted: false })).granted; } catch { return false; }
 }
 
 // 最新の体重/体脂肪/ウエストを取り込む（連携ONのときだけ）
@@ -81,7 +91,7 @@ export async function healthPullLatest(): Promise<HealthLatest | null> {
   if (!isHealthEnabled()) return null;
   const p = await plugin();
   if (!p) return null;
-  try { return await p.readLatest(); } catch { return null; }
+  try { return await withTimeout(p.readLatest(), 10000, {} as HealthLatest); } catch { return null; }
 }
 
 // 指定日の消費エネルギー(kcal)を取得
@@ -104,7 +114,7 @@ export async function healthPushDay(w: HealthWrite): Promise<number> {
       if (v != null && Number(v) > 0) payload[k] = Number(v);
     }
     if (Object.keys(payload).length <= 1) return 0;
-    return (await p.writeMetrics(payload)).written;
+    return (await withTimeout(p.writeMetrics(payload), 12000, { written: 0 })).written;
   } catch {
     return 0;
   }
