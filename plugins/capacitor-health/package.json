@@ -1,0 +1,26 @@
+{
+  "name": "bodylog-health",
+  "version": "1.0.0",
+  "description": "BodyLog 専用の軽量 HealthKit ブリッジ（体重/体脂肪/ウエスト/摂取kcal/PFC の読み書き＋消費エネルギー読み取り）",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "scripts": {
+    "build": "echo 'prebuilt'"
+  },
+  "files": [
+    "dist/",
+    "ios/Plugin/",
+    "Package.swift"
+  ],
+  "keywords": ["capacitor", "plugin", "native", "ios", "healthkit"],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "devDependencies": {},
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}

@@ -17,6 +17,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
     "@capawesome/capacitor-badge": "^8.0.2",
+    "bodylog-health": "file:plugins/capacitor-health",
     "@supabase/ssr": "^0.12.1",
     "@supabase/supabase-js": "^2.110.3",
     "framer-motion": "^12.42.2",

@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
-import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS } from '@/lib/calc';
+import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc';
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
 import { getIsNative, setDailyReminder } from '@/lib/native';
+import { healthAvailable, healthRequestAuth, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
+import { summarizeDay, type LogRow } from '@/lib/day';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -44,6 +46,73 @@ export default function SettingsPage() {
     setRemindOn(on); setRemindTime(time);
     localStorage.setItem('bodylog-reminder', JSON.stringify({ on, time }));
     setRemindMsg({ cls: 'ok', text: on ? `毎日 ${time} にアプリ通知でお知らせします。` : 'アプリ通知を停止しました。' });
+  }
+
+  // ===== Apple ヘルスケア連携 =====
+  const [healthOK, setHealthOK] = useState(false);   // 端末でヘルスケアが使えるか
+  const [healthOn, setHealthOn] = useState(false);   // 連携ON/OFF
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthMsg, setHealthMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
+  useEffect(() => { healthAvailable().then((ok) => { setHealthOK(ok); setHealthOn(isHealthEnabled()); }); }, []);
+
+  async function toggleHealth(on: boolean) {
+    setHealthMsg(null);
+    if (on) {
+      setHealthBusy(true);
+      const granted = await healthRequestAuth();
+      setHealthBusy(false);
+      if (!granted) {
+        setHealthMsg({ cls: 'err', text: 'ヘルスケアの許可が下りませんでした。iPhoneの「設定 > プライバシーとセキュリティ > ヘルスケア > BodyLog」で項目をオンにしてください。' });
+        return;
+      }
+      setHealthEnabled(true); setHealthOn(true);
+      setHealthMsg({ cls: 'ok', text: 'ヘルスケア連携をオンにしました。保存時に自動で書き出し、下のボタンで取り込みできます。' });
+    } else {
+      setHealthEnabled(false); setHealthOn(false);
+      setHealthMsg({ cls: 'ok', text: 'ヘルスケア連携をオフにしました。' });
+    }
+  }
+
+  // ヘルスケア↔BodyLog を今すぐ双方向同期
+  async function syncHealthNow() {
+    setHealthBusy(true); setHealthMsg(null);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const d = todayJST();
+
+      // ① ヘルスケア → BodyLog（最新の体重/体脂肪/ウエストを今日の記録として取り込み）
+      const latest = await healthPullLatest();
+      let pulled = 0;
+      if (latest && (latest.weight != null || latest.waist != null)) {
+        const log: Partial<LogRow> = {};
+        if (latest.weight != null) log.weight = Math.round(latest.weight * 10) / 10;
+        if (latest.waist != null) log.waist = Math.round(latest.waist * 10) / 10;
+        const row = { user_id: user.id, date: d, items: [], kcal: null, ...log, text: 'ヘルスケアから取り込み' };
+        let { error } = await supabase.from('logs').insert(row);
+        if (error && /waist/i.test(error.message)) {
+          const { waist: _w, ...noWaist } = row as Record<string, unknown>;
+          ({ error } = await supabase.from('logs').insert(noWaist));
+        }
+        if (!error) pulled = 1;
+      }
+
+      // ② BodyLog → ヘルスケア（今日のサマリーを書き出し）
+      const { data: logs } = await supabase.from('logs').select('*').eq('date', d).order('at', { ascending: true });
+      const s = summarizeDay((logs as LogRow[]) || []);
+      const pushed = await healthPushDay({
+        date: d,
+        weight: s.weight, waist: s.waist,
+        energy: s.intake, protein: s.p, fat: s.f, carbs: s.c,
+      });
+
+      setHealthMsg({ cls: 'ok', text: `同期しました。取り込み ${pulled} 件 ／ 書き出し ${pushed} 項目（今日）。` });
+    } catch (e) {
+      setHealthMsg({ cls: 'err', text: '同期に失敗しました: ' + (e instanceof Error ? e.message : String(e)) });
+    } finally {
+      setHealthBusy(false);
+    }
   }
 
   // 通知設定（リマインドメールのオプトアウト）
@@ -280,6 +349,30 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {healthOK && (
+        <div className="card">
+          <h2>❤️ Apple ヘルスケア連携</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            体重・体脂肪率・ウエスト・摂取カロリー・PFC をヘルスケアと双方向で同期します。
+            スマート体重計などの記録を取り込み、BodyLogの記録も書き出せます。
+          </p>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14.5, color: 'var(--ink)', fontWeight: 400, margin: 0 }}>
+            <input type="checkbox" checked={healthOn} disabled={healthBusy} onChange={(e) => toggleHealth(e.target.checked)}
+                   style={{ width: 20, height: 20, minHeight: 0 }} />
+            ヘルスケア連携を有効にする
+          </label>
+          {healthOn && (
+            <button className="btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={syncHealthNow} disabled={healthBusy}>
+              {healthBusy ? <><span className="spin" />同期中…</> : '🔄 今すぐ同期（双方向）'}
+            </button>
+          )}
+          {healthMsg && <div className={`msg ${healthMsg.cls}`}>{healthMsg.text}</div>}
+          <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>
+            連携をオンにすると、記録の保存時に体重・ウエスト・摂取カロリー・PFCが自動でヘルスケアへ書き出されます。
+          </p>
+        </div>
+      )}
 
       <div className="card">
         <h2>📄 規約・ポリシー</h2>

@@ -14,6 +14,7 @@ import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 import Sheet from '@/components/Sheet';
 import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
+import { healthPushDay, healthPullLatest, isHealthEnabled } from '@/lib/health';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -415,6 +416,8 @@ export default function LogPage() {
       if (eErr && isMissingWaist(eErr.message)) {
         ({ error: eErr } = await supabase.from('entries').upsert(stripWaist(entryRow), { onConflict: 'user_id,date' }));
       }
+      // ヘルスケア連携がONなら、その日のサマリーを書き出す（ネイティブ・許可時のみ・無害）
+      healthPushDay({ date: d, weight: s.weight, waist: s.waist, energy: s.intake, protein: s.p, fat: s.f, carbs: s.c });
     }
     if (logs !== null) cacheSet(`logs:${userId}:${d}`, { logs: rows, entry: null });
     if (updateState) setDayLogs(withPending(userId, d, rows));
@@ -621,6 +624,28 @@ export default function LogPage() {
   }
 
   const remainLabel = unlimited ? '' : remaining == null ? '' : `（今日あと${Math.max(0, remaining)}回）`;
+
+  // ヘルスケア連携（ONのとき入力ドックに取り込みチップを出す）
+  const [healthEnabled, setHealthEnabled] = useState(false);
+  useEffect(() => { setHealthEnabled(isHealthEnabled()); }, []);
+
+  // ヘルスケアの最新の体重・ウエストを取り込んで保存前シートに反映
+  async function pullFromHealth() {
+    const latest = await healthPullLatest();
+    if (!latest || (latest.weight == null && latest.waist == null)) {
+      setSaveMsg({ cls: 'err', text: 'ヘルスケアから体重・ウエストを取得できませんでした。' });
+      return;
+    }
+    setParsed((p) => ({
+      items: p?.items ?? [],
+      total: p?.total ?? { kcal: 0, p: 0, f: 0, c: 0 },
+      weight: latest.weight != null ? Math.round(latest.weight * 10) / 10 : (p?.weight ?? null),
+      waist: latest.waist != null ? Math.round(latest.waist * 10) / 10 : (p?.waist ?? null),
+      ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null, questions: p?.questions ?? [],
+    }));
+    hapticTap();
+    setSheetOpen(true);
+  }
 
   // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
   const [struggle, setStruggle] = useState<StruggleKind>(null);
@@ -978,8 +1003,11 @@ export default function LogPage() {
           )}
 
           {/* マイ食品チップ（横スクロール・1タップで記録開始） */}
-          {myFoods.length > 0 && !parsed && (
+          {(myFoods.length > 0 || healthEnabled) && !parsed && (
             <div className="chip-strip">
+              {healthEnabled && (
+                <button className="chip" style={{ background: 'var(--coral-weak)', color: 'var(--coral)' }} onClick={pullFromHealth}>❤️ ヘルスケアから取り込み</button>
+              )}
               {myFoods.map((fd) => (
                 <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>＋ {fd.name}</button>
               ))}

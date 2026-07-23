@@ -28,6 +28,10 @@
 	<string>食事や体の写真を撮影して記録するために使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>食事や体の写真を選択して記録するために使用します。</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>体重・体脂肪率・ウエスト・消費カロリーをヘルスケアから読み取り、記録に反映するために使用します。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>記録した体重・ウエスト・摂取カロリー・PFCをヘルスケアに書き込むために使用します。</string>
 	<key>WKAppBoundDomains</key>
 	<array>
 		<string>bodylog-orcin.vercel.app</string>
