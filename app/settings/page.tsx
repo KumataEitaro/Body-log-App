@@ -7,7 +7,7 @@ import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
 import { getIsNative, setDailyReminder } from '@/lib/native';
-import { healthAvailable, healthRequestAuth, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthDiagnostics } from '@/lib/health';
+import { healthRequestAuth, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 
 export default function SettingsPage() {
@@ -49,31 +49,23 @@ export default function SettingsPage() {
   }
 
   // ===== Apple ヘルスケア連携 =====
-  const [healthOK, setHealthOK] = useState(false);   // 端末でヘルスケアが使えるか
   const [healthOn, setHealthOn] = useState(false);   // 連携ON/OFF
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
-  const [healthDiag, setHealthDiag] = useState<string>('');
-  useEffect(() => {
-    healthAvailable().then((ok) => { setHealthOK(ok); setHealthOn(isHealthEnabled()); });
-    // 出ない原因を可視化（native/プラグイン登録/isAvailable/エラー）
-    healthDiagnostics().then((d) => setHealthDiag(`native=${d.native} / listed=${d.pluginListed} / available=${d.available}${d.error ? ` / err=${d.error}` : ''}`));
-  }, []);
+  useEffect(() => { setHealthOn(isHealthEnabled()); }, []);
 
-  async function toggleHealth(on: boolean) {
+  // トグルは待たずに即切替（Appleの許可画面は裏で出す＝固まらない）
+  function toggleHealth(on: boolean) {
     setHealthMsg(null);
+    setHealthOn(on);
+    setHealthEnabled(on);
     if (on) {
-      setHealthBusy(true);
-      const granted = await healthRequestAuth();
-      setHealthBusy(false);
-      if (!granted) {
-        setHealthMsg({ cls: 'err', text: 'ヘルスケアの許可が下りませんでした。iPhoneの「設定 > プライバシーとセキュリティ > ヘルスケア > BodyLog」で項目をオンにしてください。' });
-        return;
-      }
-      setHealthEnabled(true); setHealthOn(true);
-      setHealthMsg({ cls: 'ok', text: 'ヘルスケア連携をオンにしました。保存時に自動で書き出し、下のボタンで取り込みできます。' });
+      setHealthMsg({ cls: 'ok', text: 'この後に出る許可画面で各項目を「オン」にしてください。以降、保存時に自動でヘルスケアへ書き出します。' });
+      // 許可シートを表示（結果は待たない）。拒否時のみ案内を出す。
+      healthRequestAuth().then((granted) => {
+        if (!granted) setHealthMsg({ cls: 'err', text: '許可が確認できませんでした。iPhoneの「設定 > プライバシーとセキュリティ > ヘルスケア > BodyLog」で各項目をオンにしてください。' });
+      });
     } else {
-      setHealthEnabled(false); setHealthOn(false);
       setHealthMsg({ cls: 'ok', text: 'ヘルスケア連携をオフにしました。' });
     }
   }
@@ -366,14 +358,8 @@ export default function SettingsPage() {
             体重・体脂肪率・ウエスト・摂取カロリー・PFC をヘルスケアと双方向で同期します。
             スマート体重計などの記録を取り込み、BodyLogの記録も書き出せます。
           </p>
-          {!healthOK && (
-            <div className="msg warn" style={{ marginTop: 0 }}>
-              ヘルスケア機能を準備中です。連携を有効にすると許可画面が出ます。うまくいかない場合は下の状態をお知らせください。
-              <br /><span className="num" style={{ fontSize: 11, opacity: 0.8 }}>診断: {healthDiag || '確認中…'}</span>
-            </div>
-          )}
           <label className="switch-row">
-            <span className="switch-row-txt">ヘルスケア連携を有効にする{healthBusy ? <span className="muted"> …処理中</span> : ''}</span>
+            <span className="switch-row-txt">ヘルスケア連携を有効にする</span>
             <span className="switch">
               <input type="checkbox" checked={healthOn} onChange={(e) => toggleHealth(e.target.checked)} />
               <span className="track"><span className="thumb" /></span>
