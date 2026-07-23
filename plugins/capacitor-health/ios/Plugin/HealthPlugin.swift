@@ -49,12 +49,15 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["granted": false])
             return
         }
-        store.requestAuthorization(toShare: shareTypes, read: readTypes) { success, error in
-            if let error = error {
-                call.reject(error.localizedDescription)
-                return
+        // 権限シートはメインスレッドから要求しないと表示されないことがあるため main へ
+        DispatchQueue.main.async {
+            self.store.requestAuthorization(toShare: self.shareTypes, read: self.readTypes) { success, error in
+                if let error = error {
+                    call.reject(error.localizedDescription)
+                    return
+                }
+                call.resolve(["granted": success])
             }
-            call.resolve(["granted": success])
         }
     }
 

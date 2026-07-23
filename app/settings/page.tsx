@@ -73,10 +73,17 @@ export default function SettingsPage() {
   // ヘルスケア↔BodyLog を今すぐ双方向同期
   async function syncHealthNow() {
     setHealthBusy(true); setHealthMsg(null);
+    // 何が起きても25秒で必ず解除（ネットワーク/プラグイン無応答でも固まらない）
+    const safety = setTimeout(() => {
+      setHealthBusy(false);
+      setHealthMsg({ cls: 'err', text: '同期がタイムアウトしました。通信状況を確認して、もう一度お試しください。' });
+    }, 25000);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // getUser()はネットワーク必須で固まり得るため、ローカルのgetSession()を使う
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      if (!user) { setHealthMsg({ cls: 'err', text: 'ログインが必要です。' }); return; }
       const d = todayJST();
 
       // ① ヘルスケア → BodyLog（最新の体重/体脂肪/ウエストを今日の記録として取り込み）
@@ -108,6 +115,7 @@ export default function SettingsPage() {
     } catch (e) {
       setHealthMsg({ cls: 'err', text: '同期に失敗しました: ' + (e instanceof Error ? e.message : String(e)) });
     } finally {
+      clearTimeout(safety);
       setHealthBusy(false);
     }
   }
