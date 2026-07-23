@@ -1,9 +1,8 @@
 'use client';
 // Apple ヘルスケア（HealthKit）連携。
 // ネイティブアプリ（Capacitor）でのみ動作し、Web・旧ビルドでは全て安全に no-op になる。
-// カスタムプラグイン（plugins/capacitor-health, jsName: 'Health'）を registerPlugin で橋渡しする。
-
-import { getIsNative } from './native';
+// 重要: 動的 import は WebView + Service Worker 環境で稀に応答が返らず固まるため使わない。
+// ネイティブが必ず注入している window.Capacitor を「同期」で参照してプラグインを得る。
 
 export type HealthLatest = {
   weight?: number; bodyFat?: number; waist?: number;
@@ -23,6 +22,36 @@ type HealthPlugin = {
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
 };
 
+type CapGlobal = {
+  isNativePlatform?: () => boolean;
+  isPluginAvailable?: (name: string) => boolean;
+  registerPlugin?: <T>(name: string) => T;
+  Plugins?: Record<string, unknown>;
+};
+
+function cap(): CapGlobal | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as unknown as { Capacitor?: CapGlobal }).Capacitor;
+}
+
+// ネイティブか（同期・window.Capacitor 直参照。動的importしない）
+export function healthIsNative(): boolean {
+  return !!cap()?.isNativePlatform?.();
+}
+
+// Health プラグインのプロキシを同期で取得（固まらない）
+function getPlugin(): HealthPlugin | null {
+  const c = cap();
+  if (!c?.isNativePlatform?.()) return null;
+  try {
+    // 既に登録済みならそれを、無ければ registerPlugin で生成（どちらも同期）
+    const existing = c.Plugins?.Health as HealthPlugin | undefined;
+    if (existing) return existing;
+    if (typeof c.registerPlugin === 'function') return c.registerPlugin<HealthPlugin>('Health');
+  } catch { /* 無視 */ }
+  return null;
+}
+
 // プラグイン応答が返らない場合に固まらないためのタイムアウト付きラッパー
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>((resolve) => {
@@ -31,19 +60,6 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
     p.then((v) => { if (!done) { done = true; clearTimeout(t); resolve(v); } })
      .catch(() => { if (!done) { done = true; clearTimeout(t); resolve(fallback); } });
   });
-}
-
-let _plugin: HealthPlugin | null | undefined;
-async function plugin(): Promise<HealthPlugin | null> {
-  if (_plugin !== undefined) return _plugin;
-  try {
-    if (!(await getIsNative())) { _plugin = null; return null; }
-    const { registerPlugin } = await import('@capacitor/core');
-    _plugin = registerPlugin<HealthPlugin>('Health');
-  } catch {
-    _plugin = null;
-  }
-  return _plugin;
 }
 
 const LS_KEY = 'bodylog-health-on';
@@ -56,79 +72,52 @@ export function setHealthEnabled(on: boolean): void {
 
 // ネイティブでヘルスケアが使えるか
 export async function healthAvailable(): Promise<boolean> {
-  const p = await plugin();
+  const p = getPlugin();
   if (!p) return false;
   try { return (await withTimeout(p.isAvailable(), 6000, { available: false })).available; } catch { return false; }
 }
 
+// 権限リクエスト（初回に許可シートが出る）
+export async function healthRequestAuth(): Promise<boolean> {
+  const p = getPlugin();
+  if (!p) return false;
+  try { return (await withTimeout(p.requestAuthorization(), 20000, { granted: false })).granted; } catch { return false; }
+}
+
 // 各ネイティブ呼び出しを個別に「必ず結果が返る」形でテストし、どこで固まるかを可視化する。
 export async function healthSelfTest(onStep: (msg: string) => void): Promise<void> {
-  const cap = <T,>(pr: Promise<T>, ms: number) =>
+  const race = <T,>(pr: Promise<T>, ms: number) =>
     Promise.race<{ v: T } | { e: unknown } | { t: true }>([
       pr.then((v) => ({ v })).catch((e) => ({ e })),
       new Promise((r) => setTimeout(() => r({ t: true }), ms)),
     ]);
   const show = (r: { v?: unknown; e?: unknown; t?: true }) =>
-    ('v' in r) ? JSON.stringify(r.v) : ('t' in r) ? '⏱応答なし' : `⚠${(r as { e: unknown }).e instanceof Error ? ((r as { e: Error }).e.message || (r as { e: Error }).e.name) : String((r as { e: unknown }).e)}`;
+    ('v' in r) ? JSON.stringify(r.v)
+      : ('t' in r) ? '⏱応答なし'
+      : `⚠${(r as { e: unknown }).e instanceof Error ? ((r as { e: Error }).e.message || (r as { e: Error }).e.name) : String((r as { e: unknown }).e)}`;
 
-  onStep('①プラグイン取得中…');
-  const p = await cap(plugin() as Promise<HealthPlugin | null>, 6000);
-  if (!('v' in p) || !p.v) { onStep(`① プラグイン取得: ${'t' in p ? '応答なし' : 'null（ネイティブ外）'}`); return; }
-  const plug = p.v;
+  const c = cap();
+  if (!c) { onStep('window.Capacitor が無い（Web/ブラウザ）'); return; }
+  if (!c.isNativePlatform?.()) { onStep('ネイティブではありません（ブラウザ表示）'); return; }
+  const listed = c.isPluginAvailable?.('Health');
+  const p = getPlugin();
+  if (!p) { onStep(`プラグイン取得失敗（isPluginAvailable=${listed}）`); return; }
 
-  onStep('②isAvailable 確認中…');
-  const a = await cap(plug.isAvailable(), 8000);
-  onStep(`②isAvailable: ${show(a)} … ③許可要求中（シートが出ます）…`);
+  onStep(`登録=${listed} / ②isAvailable確認中…`);
+  const a = await race(p.isAvailable(), 8000);
+  onStep(`登録=${listed} / ②avail=${show(a)} / ③許可要求中（シートが出ます）…`);
 
-  const r = await cap(plug.requestAuthorization(), 15000);
-  onStep(`②isAvailable:${show(a)} / ③requestAuth:${show(r)} … ④読取中…`);
+  const r = await race(p.requestAuthorization(), 15000);
+  onStep(`②avail=${show(a)} / ③auth=${show(r)} / ④読取中…`);
 
-  const l = await cap(plug.readLatest(), 8000);
-  onStep(`②avail:${show(a)} / ③auth:${show(r)} / ④read:${show(l)}`);
-}
-
-// 診断用: どこで止まっているかを可視化する（設定画面のデバッグ表示に使う）
-export async function healthDiagnostics(): Promise<{ native: boolean; pluginListed: boolean; available: boolean | null; error: string | null }> {
-  const out = { native: false, pluginListed: false, available: null as boolean | null, error: null as string | null };
-  try {
-    out.native = await getIsNative();
-    if (!out.native) return out;
-    const { Capacitor, registerPlugin } = await import('@capacitor/core');
-    // 実行時にHealthプラグインが登録されているか
-    out.pluginListed = typeof Capacitor.isPluginAvailable === 'function' ? Capacitor.isPluginAvailable('Health') : false;
-    const p = registerPlugin<HealthPlugin>('Health');
-    const r = await withTimeout(p.isAvailable(), 6000, { available: false });
-    out.available = !!r?.available;
-  } catch (e) {
-    out.error = e instanceof Error ? (e.message || e.name) : String(e);
-  }
-  return out;
-}
-
-// 権限リクエスト（初回に許可シートが出る）
-export async function healthRequestAuth(): Promise<boolean> {
-  const p = await plugin();
-  if (!p) return false;
-  try { return (await withTimeout(p.requestAuthorization(), 20000, { granted: false })).granted; } catch { return false; }
-}
-
-// 権限要求の詳細（成功可否＋失敗理由）を返す。原因診断に使う。
-export async function healthRequestAuthDetailed(): Promise<{ granted: boolean; error: string | null }> {
-  const p = await plugin();
-  if (!p) return { granted: false, error: 'ネイティブ/プラグインが利用できません' };
-  const res = await Promise.race([
-    p.requestAuthorization()
-      .then((v) => ({ granted: !!v?.granted, error: null as string | null }))
-      .catch((e: unknown) => ({ granted: false, error: e instanceof Error ? (e.message || e.name) : String(e) })),
-    new Promise<{ granted: boolean; error: string | null }>((r) => setTimeout(() => r({ granted: false, error: '応答なし（20秒でタイムアウト）' }), 20000)),
-  ]);
-  return res;
+  const l = await race(p.readLatest(), 8000);
+  onStep(`②avail=${show(a)} / ③auth=${show(r)} / ④read=${show(l)}`);
 }
 
 // 最新の体重/体脂肪/ウエストを取り込む（連携ONのときだけ）
 export async function healthPullLatest(): Promise<HealthLatest | null> {
   if (!isHealthEnabled()) return null;
-  const p = await plugin();
+  const p = getPlugin();
   if (!p) return null;
   try { return await withTimeout(p.readLatest(), 10000, {} as HealthLatest); } catch { return null; }
 }
@@ -136,7 +125,7 @@ export async function healthPullLatest(): Promise<HealthLatest | null> {
 // 指定日の消費エネルギー(kcal)を取得
 export async function healthActiveEnergy(date: string): Promise<number | null> {
   if (!isHealthEnabled()) return null;
-  const p = await plugin();
+  const p = getPlugin();
   if (!p) return null;
   try { return (await p.readActiveEnergy({ date })).kcal; } catch { return null; }
 }
@@ -144,7 +133,7 @@ export async function healthActiveEnergy(date: string): Promise<number | null> {
 // その日の指標をヘルスケアへ書き出す（連携ONのときだけ・失敗しても無害）
 export async function healthPushDay(w: HealthWrite): Promise<number> {
   if (!isHealthEnabled()) return 0;
-  const p = await plugin();
+  const p = getPlugin();
   if (!p) return 0;
   try {
     const payload: Record<string, unknown> = { date: w.date };
