@@ -30,6 +30,30 @@ workflows:
         script: |
           xcode-project use-profiles
           xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+      - name: Verify entitlements (診断)
+        script: |
+          set +e
+          echo "===== pbxproj CODE_SIGN_ENTITLEMENTS ====="
+          grep -n "CODE_SIGN_ENTITLEMENTS" ios/App/App.xcodeproj/project.pbxproj || echo "(なし)"
+          echo "===== App.entitlements ====="
+          cat ios/App/App/App.entitlements
+          echo "===== Info.plist NSHealth ====="
+          grep -n "NSHealth" ios/App/App/Info.plist || echo "(なし)"
+          echo "===== packageClassList ====="
+          grep -A12 packageClassList ios/App/App/capacitor.config.json
+          APP=$(find build/ios -path "*Products/Applications/*.app" -type d 2>/dev/null | head -1)
+          echo "===== signed app: $APP ====="
+          if [ -n "$APP" ]; then
+            echo "----- 署名済みエンタイトルメント -----"
+            codesign -d --entitlements :- "$APP" 2>/dev/null | tr -cd '\11\12\15\40-\176'
+            echo ""
+            echo "----- healthkit判定 -----"
+            (codesign -d --entitlements :- "$APP" 2>/dev/null | tr -cd '\11\12\15\40-\176' | grep -i health) && echo ">>> HEALTHKIT ENTITLEMENT: 有り" || echo ">>> HEALTHKIT ENTITLEMENT: 無し（これが原因）"
+          else
+            echo "app が見つかりません"
+          fi
+          echo "===== END VERIFY ====="
+          set -e
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
