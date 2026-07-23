@@ -7,7 +7,7 @@ import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
 import { getIsNative, setDailyReminder } from '@/lib/native';
-import { healthRequestAuthDetailed, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
+import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 
 export default function SettingsPage() {
@@ -60,17 +60,9 @@ export default function SettingsPage() {
     setHealthOn(on);
     setHealthEnabled(on);
     if (on) {
-      setHealthMsg({ cls: 'ok', text: '許可画面を呼び出しています…' });
-      // 許可シートを表示。結果/エラーを画面に出して原因を可視化する。
-      healthRequestAuthDetailed().then(({ granted, error }) => {
-        if (granted) {
-          setHealthMsg({ cls: 'ok', text: '✅ ヘルスケアの許可を確認しました。保存時に自動で書き出します。' });
-        } else if (error) {
-          setHealthMsg({ cls: 'err', text: `許可要求が失敗しました：${error}` });
-        } else {
-          setHealthMsg({ cls: 'err', text: '許可画面が表示されませんでした（拒否/未応答）。iPhoneの「設定 > プライバシーとセキュリティ > ヘルスケア > BodyLog」も確認してください。' });
-        }
-      });
+      // 各ネイティブ呼び出しを個別に必ず結果が返る形でテストし、どこで固まるか可視化
+      setHealthMsg({ cls: 'ok', text: '診断を開始します…' });
+      healthSelfTest((msg) => setHealthMsg({ cls: 'ok', text: msg }));
     } else {
       setHealthMsg({ cls: 'ok', text: 'ヘルスケア連携をオフにしました。' });
     }

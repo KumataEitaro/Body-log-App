@@ -61,6 +61,32 @@ export async function healthAvailable(): Promise<boolean> {
   try { return (await withTimeout(p.isAvailable(), 6000, { available: false })).available; } catch { return false; }
 }
 
+// 各ネイティブ呼び出しを個別に「必ず結果が返る」形でテストし、どこで固まるかを可視化する。
+export async function healthSelfTest(onStep: (msg: string) => void): Promise<void> {
+  const cap = <T,>(pr: Promise<T>, ms: number) =>
+    Promise.race<{ v: T } | { e: unknown } | { t: true }>([
+      pr.then((v) => ({ v })).catch((e) => ({ e })),
+      new Promise((r) => setTimeout(() => r({ t: true }), ms)),
+    ]);
+  const show = (r: { v?: unknown; e?: unknown; t?: true }) =>
+    ('v' in r) ? JSON.stringify(r.v) : ('t' in r) ? '⏱応答なし' : `⚠${(r as { e: unknown }).e instanceof Error ? ((r as { e: Error }).e.message || (r as { e: Error }).e.name) : String((r as { e: unknown }).e)}`;
+
+  onStep('①プラグイン取得中…');
+  const p = await cap(plugin() as Promise<HealthPlugin | null>, 6000);
+  if (!('v' in p) || !p.v) { onStep(`① プラグイン取得: ${'t' in p ? '応答なし' : 'null（ネイティブ外）'}`); return; }
+  const plug = p.v;
+
+  onStep('②isAvailable 確認中…');
+  const a = await cap(plug.isAvailable(), 8000);
+  onStep(`②isAvailable: ${show(a)} … ③許可要求中（シートが出ます）…`);
+
+  const r = await cap(plug.requestAuthorization(), 15000);
+  onStep(`②isAvailable:${show(a)} / ③requestAuth:${show(r)} … ④読取中…`);
+
+  const l = await cap(plug.readLatest(), 8000);
+  onStep(`②avail:${show(a)} / ③auth:${show(r)} / ④read:${show(l)}`);
+}
+
 // 診断用: どこで止まっているかを可視化する（設定画面のデバッグ表示に使う）
 export async function healthDiagnostics(): Promise<{ native: boolean; pluginListed: boolean; available: boolean | null; error: string | null }> {
   const out = { native: false, pluginListed: false, available: null as boolean | null, error: null as string | null };
