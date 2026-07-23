@@ -248,6 +248,46 @@ button:disabled { opacity: .5; cursor: default; }
 /* ===== よく使う品目チップ（旧・シート内でも使用） ===== */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 
+/* ===== ダッシュボード サマリー（KPI統合カード） ===== */
+.summary { padding: 16px 18px; }
+.summary-hero { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.summary-hero-l { font-size: 12.5px; font-weight: 700; color: var(--sub); }
+.summary-state { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
+.summary-hero-sub { font-size: 12px; color: var(--sub); margin-top: 2px; }
+.summary-divider { height: 1px; background: var(--line); margin: 14px 0; }
+.summary-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 8px; }
+.summary-stats.two { grid-template-columns: 1fr 1fr; }
+.s-stat .s-lbl { font-size: 10.5px; font-weight: 700; color: var(--sub); }
+.s-stat .s-val { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; margin-top: 1px; }
+.s-stat .s-val small { font-size: 10.5px; font-weight: 600; color: var(--sub); margin-left: 1px; }
+.s-stat .s-delta { font-size: 11px; font-weight: 700; margin-top: 1px; }
+
+/* ===== カレンダー ===== */
+.cal-head { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 10px; }
+.cal-month { font-size: 15px; font-weight: 800; }
+.cal-nav { width: 34px; height: 34px; padding: 0; border-radius: 10px; background: var(--bg);
+  border: 1px solid var(--line); color: var(--sub); font-size: 16px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
+.cal-dow { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--sub); padding-bottom: 4px; }
+.cal-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px;
+  background: none; border: none; border-radius: 12px; }
+.cal-cell:active { background: var(--bg); }
+.cal-cell.sel { background: var(--teal-weak); }
+.cal-cell.future { opacity: 0.32; }
+.cal-num { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border-radius: 50%; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.cal-num.today { background: var(--teal); color: #fff; font-weight: 800; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; }
+.cal-dot.ok { background: var(--green); }
+.cal-dot.over { background: var(--coral); }
+.cal-dot.none { background: transparent; }
+
+/* 日別詳細シート内 */
+.day-detail-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.day-detail-kcal { font-size: 22px; font-weight: 800; }
+.day-macro { display: flex; gap: 14px; font-size: 12.5px; color: var(--sub); margin: 6px 0 12px; }
+.day-macro b { color: var(--ink); font-size: 14px; }
+
 /* ===== table / pills / chart ===== */
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 7px 8px; text-align: right; border-bottom: 0.5px solid var(--line); white-space: nowrap; }

@@ -94,6 +94,7 @@ export async function POST(req: Request) {
     '- 同じ食事がメモと写真の両方にある場合は二重計上しない\n' +
     '\n【タスク2: その他の抽出】メモに書かれていれば抽出する（なければnull）:\n' +
     '- weight: 体重(kg)の数値\n' +
+    '- waist: ウエスト・腹囲(cm)の数値\n' +
     '- ex: 運動量。次の5択にマッピング → "オフ"(運動なし)/"軽い"(散歩・ストレッチ程度≒+30kcal)/"通常"(筋トレ・ジム1時間程度≒+150kcal)/"高"(ランニング・スイム・登山半日などしっかり有酸素≒+400kcal)/"特大"(終日登山・レースなど≒+800kcal)\n' +
     '- adj: 補正kcal。基本は0。本人が消費kcalを明記している場合のみ、上記レベル値との差分を入れる\n' +
     '- mood: 気分・メンタルに関する記述の要約(20字以内)\n' +
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
     '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0}],' +
     '"total":{"kcal":0,"p":0,"f":0,"c":0},' +
-    '"weight":null,"ex":null,"adj":0,"mood":null,"questions":[]}\n' +
+    '"weight":null,"waist":null,"ex":null,"adj":0,"mood":null,"questions":[]}\n' +
     '\n記録メモ:\n' + (text.trim() || '(写真のみ)');
 
   const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [{ text: prompt }];

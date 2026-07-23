@@ -20,6 +20,7 @@ type Parsed = {
   items: ParsedItem[];
   total: { kcal: number; p: number; f: number; c: number };
   weight: number | null;
+  waist: number | null;
   ex: ExLevel | null;
   adj: number;
   mood: string | null;
@@ -60,6 +61,15 @@ function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
+// waist列がまだ無い環境（migration-13未適用）でも壊れないよう、waistを除いたコピーを返す
+function stripWaist<T extends Record<string, unknown>>(o: T): T {
+  const { waist: _w, ...rest } = o;
+  return rest as T;
+}
+function isMissingWaist(msg: string | undefined): boolean {
+  return !!msg && /waist/i.test(msg);
+}
+
 function shiftDate(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
   dt.setDate(dt.getDate() + n);
@@ -90,7 +100,7 @@ export default function LogPage() {
   const [editingLog, setEditingLog] = useState<(LogRow & { id: string; at: string }) | null>(null); // 保存済み記録の編集中
   const [editMode, setEditMode] = useState(false);
   const [eKcal, setEKcal] = useState(''); const [eP, setEP] = useState(''); const [eF, setEF] = useState(''); const [eC, setEC] = useState('');
-  const [eEx, setEEx] = useState<ExLevel>('オフ'); const [eAdj, setEAdj] = useState('0'); const [eWeight, setEWeight] = useState(''); const [eMood, setEMood] = useState('');
+  const [eEx, setEEx] = useState<ExLevel>('オフ'); const [eAdj, setEAdj] = useState('0'); const [eWeight, setEWeight] = useState(''); const [eWaist, setEWaist] = useState(''); const [eMood, setEMood] = useState('');
 
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,6 +150,13 @@ export default function LogPage() {
     (async () => {
       const supabase = createClient();
 
+      // カレンダー等から ?date=YYYY-MM-DD で特定日を開けるようにする
+      let startDate = todayJST();
+      try {
+        const qd = new URLSearchParams(window.location.search).get('date');
+        if (qd && /^\d{4}-\d{2}-\d{2}$/.test(qd)) { startDate = qd; setDate(qd); }
+      } catch { /* 無視 */ }
+
       // ① キャッシュを即表示（プロフィール・チップ・目標など）
       const { data: { session } } = await supabase.auth.getSession();
       const cachedUid = session?.user?.id;
@@ -154,7 +171,7 @@ export default function LogPage() {
           setRemaining(h.remaining); setUnlimited(h.unlimited); setMyFoods(h.myFoods || []);
           setGoal(h.goal); setFutureEvents(h.futureEvents || []);
         }
-        loadDay(todayJST()); // キャッシュ分を即描画（待たずに次へ）
+        loadDay(startDate); // キャッシュ分を即描画（待たずに次へ）
         flushOffline();      // 未同期の記録があれば送信
       }
 
@@ -195,7 +212,7 @@ export default function LogPage() {
         futureEvents: (evs as (PlanEvent & { id: string })[]) || [],
       });
       if (!cachedUid) flushOffline();
-      await loadDay(todayJST());
+      await loadDay(startDate);
     })();
   }, [router, loadDay]);
 
@@ -275,6 +292,7 @@ export default function LogPage() {
         items: j.result.items || [],
         total: j.result.total || { kcal: 0, p: 0, f: 0, c: 0 },
         weight: j.result.weight ?? null,
+        waist: j.result.waist ?? null,
         ex: EX_LEVELS.includes(j.result.ex) ? j.result.ex : null,
         adj: Number(j.result.adj) || 0,
         mood: j.result.mood ?? null,
@@ -295,6 +313,7 @@ export default function LogPage() {
     setEKcal(String(Math.round(parsed.total.kcal))); setEP(String(Math.round(parsed.total.p)));
     setEF(String(Math.round(parsed.total.f))); setEC(String(Math.round(parsed.total.c)));
     setEEx(parsed.ex ?? 'オフ'); setEAdj(String(parsed.adj)); setEWeight(parsed.weight == null ? '' : String(parsed.weight));
+    setEWaist(parsed.waist == null ? '' : String(parsed.waist));
     setEMood(parsed.mood ?? '');
     setEditMode(true);
   }
@@ -307,6 +326,7 @@ export default function LogPage() {
       return {
         items, total,
         weight: eWeight === '' ? null : Number(eWeight),
+        waist: eWaist === '' ? null : Number(eWaist),
         ex: eEx, adj: Number(eAdj) || 0, mood: eMood || null,
         questions: p?.questions ?? [],
       };
@@ -348,6 +368,7 @@ export default function LogPage() {
       items: ((l.items as ParsedItem[]) || []),
       total: { kcal: Number(l.kcal) || 0, p: Number(l.p) || 0, f: Number(l.f) || 0, c: Number(l.c) || 0 },
       weight: l.weight == null ? null : Number(l.weight),
+      waist: l.waist == null ? null : Number(l.waist),
       ex: (l.ex as ExLevel) ?? null,
       adj: Number(l.adj) || 0,
       mood: l.mood || null,
@@ -369,7 +390,7 @@ export default function LogPage() {
     if (parsed) {
       setItems([...parsed.items, item]);
     } else {
-      setParsed({ items: [item], total: sumItems([item]), weight: null, ex: null, adj: 0, mood: null, questions: [] });
+      setParsed({ items: [item], total: sumItems([item]), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
     }
     setSheetOpen(true); // 追加内容をシートで確認
   }
@@ -383,13 +404,17 @@ export default function LogPage() {
       await supabase.from('entries').delete().eq('user_id', userId).eq('date', d);
     } else {
       const s = summarizeDay(rows);
-      await supabase.from('entries').upsert({
+      const entryRow = {
         user_id: userId, date: d,
         ex: s.ex, adj: s.adj,
         intake: s.intake, p: s.p, f: s.f, c: s.c,
-        weight: s.weight, mood: s.mood, note: '',
+        weight: s.weight, waist: s.waist, mood: s.mood, note: '',
         food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
-      }, { onConflict: 'user_id,date' });
+      };
+      let { error: eErr } = await supabase.from('entries').upsert(entryRow, { onConflict: 'user_id,date' });
+      if (eErr && isMissingWaist(eErr.message)) {
+        ({ error: eErr } = await supabase.from('entries').upsert(stripWaist(entryRow), { onConflict: 'user_id,date' }));
+      }
     }
     if (logs !== null) cacheSet(`logs:${userId}:${d}`, { logs: rows, entry: null });
     if (updateState) setDayLogs(withPending(userId, d, rows));
@@ -408,7 +433,10 @@ export default function LogPage() {
     const dates = new Set<string>();
     let sent = 0;
     for (const q of queue) {
-      const { error } = await supabase.from('logs').insert({ user_id: uid, date: q.date, ...q.log });
+      let { error } = await supabase.from('logs').insert({ user_id: uid, date: q.date, ...q.log });
+      if (error && isMissingWaist(error.message)) {
+        ({ error } = await supabase.from('logs').insert(stripWaist({ user_id: uid, date: q.date, ...q.log })));
+      }
       if (!error) { removeFromQueue(uid, q.localId); dates.add(q.date); sent++; }
       else if (/fetch|network/i.test(error.message)) break; // まだ繋がらない→次の機会に
       else { removeFromQueue(uid, q.localId); } // データ不正等は破棄（無限再送を防ぐ）
@@ -426,6 +454,7 @@ export default function LogPage() {
       kcal: hasMeal ? parsed.total.kcal : null,
       p: hasMeal ? parsed.total.p : null, f: hasMeal ? parsed.total.f : null, c: hasMeal ? parsed.total.c : null,
       weight: parsed.weight,
+      waist: parsed.waist,
       ex: parsed.ex, adj: parsed.adj,
       mood: parsed.mood || '', text: chat,
       photo_urls: [],
@@ -467,6 +496,7 @@ export default function LogPage() {
         kcal: hasMeal ? parsed.total.kcal : null,
         p: hasMeal ? parsed.total.p : null, f: hasMeal ? parsed.total.f : null, c: hasMeal ? parsed.total.c : null,
         weight: parsed.weight,
+        waist: parsed.waist,
         ex: parsed.ex, adj: parsed.adj,
         mood: parsed.mood || '', text: chat,
         photo_urls: paths,
@@ -475,9 +505,11 @@ export default function LogPage() {
       // ===== 編集モード: 既存の記録を上書き =====
       if (editingLog) {
         const mergedPhotos = [...(editingLog.photo_urls || []), ...paths]; // 既存写真は保持し追加分を合流
-        const { error: upErr } = await supabase.from('logs')
-          .update({ ...newLog, photo_urls: mergedPhotos })
-          .eq('id', editingLog.id);
+        const upRow = { ...newLog, photo_urls: mergedPhotos };
+        let { error: upErr } = await supabase.from('logs').update(upRow).eq('id', editingLog.id);
+        if (upErr && isMissingWaist(upErr.message)) {
+          ({ error: upErr } = await supabase.from('logs').update(stripWaist(upRow)).eq('id', editingLog.id));
+        }
         if (upErr) throw new Error(upErr.message);
         const rows2 = await syncDaySummary(user.id, date);
         const s2 = summarizeDay(rows2);
@@ -489,7 +521,10 @@ export default function LogPage() {
         return;
       }
 
-      const { error } = await supabase.from('logs').insert({ user_id: user.id, date, ...newLog });
+      let { error } = await supabase.from('logs').insert({ user_id: user.id, date, ...newLog });
+      if (error && isMissingWaist(error.message)) {
+        ({ error } = await supabase.from('logs').insert(stripWaist({ user_id: user.id, date, ...newLog })));
+      }
 
       if (error && /schema cache|does not exist/i.test(error.message)) {
         // フォールバック: logsテーブル未作成の環境では旧方式（日次まとめ）に直接合算
@@ -502,13 +537,17 @@ export default function LogPage() {
           photo_urls: (legacyEntry.photo_urls as string[]) || [],
         }] : [];
         const s = summarizeDay([...prior, newLog]);
-        const { error: e2 } = await supabase.from('entries').upsert({
+        const legacyRow = {
           user_id: user.id, date,
           ex: s.ex, adj: s.adj,
           intake: s.intake, p: s.p, f: s.f, c: s.c,
-          weight: s.weight, mood: s.mood, note: '',
+          weight: s.weight, waist: s.waist, mood: s.mood, note: '',
           food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
-        }, { onConflict: 'user_id,date' });
+        };
+        let { error: e2 } = await supabase.from('entries').upsert(legacyRow, { onConflict: 'user_id,date' });
+        if (e2 && isMissingWaist(e2.message)) {
+          ({ error: e2 } = await supabase.from('entries').upsert(stripWaist(legacyRow), { onConflict: 'user_id,date' }));
+        }
         if (e2) throw new Error(e2.message);
         const { data: entry } = await supabase.from('entries').select('*').eq('date', date).maybeSingle();
         setLegacyEntry(entry);
@@ -633,6 +672,7 @@ export default function LogPage() {
     if (l.ex && l.ex !== 'オフ') parts.push(`🏃 ${l.ex}(+${EX_ADD[l.ex as ExLevel] + (Number(l.adj) || 0)})`);
     else if (Number(l.adj)) parts.push(`🏃 補正${Number(l.adj) > 0 ? '+' : ''}${l.adj}`);
     if (l.weight != null) parts.push(`⚖ ${Number(l.weight).toFixed(1)}kg`);
+    if (l.waist != null) parts.push(`📏 ${Number(l.waist).toFixed(1)}cm`);
     if (l.mood) parts.push(`😊 ${l.mood}`);
     if (parts.length === 0) parts.push(String(l.text || '').slice(0, 30) || '記録');
     return parts.join('　');
@@ -781,7 +821,7 @@ export default function LogPage() {
               <div className="stat-grid">
                 <div className="stat"><div className="stat-l">この記録の摂取</div><div className="stat-v num">{Math.round(parsed.total.kcal).toLocaleString()}<small> kcal</small></div></div>
                 <div className="stat"><div className="stat-l">P / F / C</div><div className="stat-v num">{Math.round(parsed.total.p)} / {Math.round(parsed.total.f)} / {Math.round(parsed.total.c)}<small> g</small></div></div>
-                <div className="stat"><div className="stat-l">体重</div><div className="stat-v num">{parsed.weight != null ? parsed.weight.toFixed(1) : '—'}<small> kg</small></div></div>
+                <div className="stat"><div className="stat-l">体重 / ウエスト</div><div className="stat-v num">{parsed.weight != null ? parsed.weight.toFixed(1) : '—'}<small> kg</small> / {parsed.waist != null ? parsed.waist.toFixed(1) : '—'}<small> cm</small></div></div>
                 <div className="stat"><div className="stat-l">運動</div><div className="stat-v">{parsed.ex ?? '—'}{parsed.ex && parsed.ex !== 'オフ' ? ` (+${EX_ADD[parsed.ex] + parsed.adj})` : parsed.adj ? ` (補正${parsed.adj})` : ''}</div></div>
               </div>
               {parsed.mood && <p className="muted">気分: {parsed.mood}</p>}
@@ -794,14 +834,20 @@ export default function LogPage() {
               {parsed.items.length > 0 ? (
                 <>
                   <p className="muted">摂取kcal・PFCは上の品目表から自動計算されます（品目を直接修正してください）</p>
-                  <label>体重(kg)</label>
-                  <input type="number" step="0.1" className="num" value={eWeight} onChange={(e) => setEWeight(e.target.value)} />
+                  <div className="row2">
+                    <div><label>体重(kg)</label><input type="number" step="0.1" className="num" value={eWeight} onChange={(e) => setEWeight(e.target.value)} /></div>
+                    <div><label>ウエスト(cm)</label><input type="number" step="0.1" className="num" value={eWaist} onChange={(e) => setEWaist(e.target.value)} /></div>
+                  </div>
                 </>
               ) : (
                 <>
                   <div className="row2">
                     <div><label>摂取kcal</label><input type="number" className="num" value={eKcal} onChange={(e) => setEKcal(e.target.value)} /></div>
                     <div><label>体重(kg)</label><input type="number" step="0.1" className="num" value={eWeight} onChange={(e) => setEWeight(e.target.value)} /></div>
+                  </div>
+                  <div className="row2">
+                    <div><label>ウエスト(cm)</label><input type="number" step="0.1" className="num" value={eWaist} onChange={(e) => setEWaist(e.target.value)} /></div>
+                    <div></div>
                   </div>
                   <div className="row3">
                     <div><label>P</label><input type="number" className="num" value={eP} onChange={(e) => setEP(e.target.value)} /></div>
