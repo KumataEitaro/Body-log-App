@@ -86,6 +86,19 @@ export async function healthRequestAuth(): Promise<boolean> {
   try { return (await withTimeout(p.requestAuthorization(), 20000, { granted: false })).granted; } catch { return false; }
 }
 
+// 権限要求の詳細（成功可否＋失敗理由）を返す。原因診断に使う。
+export async function healthRequestAuthDetailed(): Promise<{ granted: boolean; error: string | null }> {
+  const p = await plugin();
+  if (!p) return { granted: false, error: 'ネイティブ/プラグインが利用できません' };
+  const res = await Promise.race([
+    p.requestAuthorization()
+      .then((v) => ({ granted: !!v?.granted, error: null as string | null }))
+      .catch((e: unknown) => ({ granted: false, error: e instanceof Error ? (e.message || e.name) : String(e) })),
+    new Promise<{ granted: boolean; error: string | null }>((r) => setTimeout(() => r({ granted: false, error: '応答なし（20秒でタイムアウト）' }), 20000)),
+  ]);
+  return res;
+}
+
 // 最新の体重/体脂肪/ウエストを取り込む（連携ONのときだけ）
 export async function healthPullLatest(): Promise<HealthLatest | null> {
   if (!isHealthEnabled()) return null;
