@@ -28,6 +28,8 @@ type Kpi = {
   sumAll: number; fatKg: number; base: number; bmr: number;
 };
 
+type DayPhoto = { id: string; path: string; bf_est: number | null; assessment: string; url?: string };
+
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
@@ -45,10 +47,12 @@ export default function DashboardPage() {
   // カレンダー日別詳細
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayLogs, setDayLogs] = useState<(LogRow & { id: string; at: string })[] | null>(null);
+  const [dayPhotos, setDayPhotos] = useState<DayPhoto[]>([]);
+  const [photoDates, setPhotoDates] = useState<string[]>([]);
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
-    goal: Goal | null; events: (ChartEvent & PlanEvent)[];
+    goal: Goal | null; events: (ChartEvent & PlanEvent)[]; photoDates: string[];
   };
 
   useEffect(() => {
@@ -62,7 +66,7 @@ export default function DashboardPage() {
         const c = cacheGet<DashCache>(`dash:${cachedUid}`);
         if (c) {
           setUserName(c.userName); setRows(c.rows); setKpi(c.kpi);
-          setGoal(c.goal); setEvents(c.events || []);
+          setGoal(c.goal); setEvents(c.events || []); setPhotoDates(c.photoDates || []);
         }
       }
 
@@ -76,14 +80,17 @@ export default function DashboardPage() {
       if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
       setUserName(prof.display_name || user.email || '');
 
-      const [{ data: entries }, { data: g }, { data: evs }] = await Promise.all([
+      const [{ data: entries }, { data: g }, { data: evs }, { data: phDates }] = await Promise.all([
         supabase.from('entries').select('*').order('date', { ascending: true }),
         supabase.from('goals').select('*').maybeSingle(),
         supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
+        supabase.from('body_photos').select('date').order('date', { ascending: true }),
       ]);
       // オフライン等でentriesが取れなかった場合はキャッシュ表示を維持
       if (entries === null && !navigator.onLine) return;
       if (g) setGoal(g);
+      const photoDateList = [...new Set(((phDates as { date: string }[]) || []).map((p) => p.date))];
+      setPhotoDates(photoDateList);
       const evList = (evs as (ChartEvent & PlanEvent)[]) || [];
       setEvents(evList);
       const list = entries || [];
@@ -132,7 +139,7 @@ export default function DashboardPage() {
       setKpi(kpiObj);
       cacheSet(`dash:${user.id}`, {
         userName: prof.display_name || user.email || '',
-        rows: computed, kpi: kpiObj, goal: g ?? null, events: evList,
+        rows: computed, kpi: kpiObj, goal: g ?? null, events: evList, photoDates: photoDateList,
       } satisfies DashCache);
 
       // ===== 2週間ごとのメンテナンスカロリー見直し =====
@@ -182,13 +189,34 @@ export default function DashboardPage() {
     }
   }
 
-  // カレンダーの日をタップ → その日の記録を取得して詳細シートを開く
+  // カレンダーの日をタップ → その日の記録＋体写真を取得して詳細シートを開く
   async function openDay(dateKey: string) {
     setDaySel(dateKey);
     setDayLogs(null);
+    setDayPhotos([]);
     const supabase = createClient();
-    const { data: logs } = await supabase.from('logs').select('*').eq('date', dateKey).order('at', { ascending: true });
+    const [{ data: logs }, { data: phs }] = await Promise.all([
+      supabase.from('logs').select('*').eq('date', dateKey).order('at', { ascending: true }),
+      supabase.from('body_photos').select('id,path,bf_est,assessment').eq('date', dateKey).order('id', { ascending: true }),
+    ]);
     setDayLogs((logs as (LogRow & { id: string; at: string })[]) || []);
+    const plist = (phs as DayPhoto[]) || [];
+    if (plist.length) {
+      const { data: signed } = await supabase.storage.from('body').createSignedUrls(plist.map((p) => p.path), 3600);
+      plist.forEach((p, i) => { p.url = signed?.[i]?.signedUrl || undefined; });
+    }
+    setDayPhotos(plist);
+  }
+
+  // 詳細シートから写真を削除
+  async function delDayPhoto(p: DayPhoto) {
+    const supabase = createClient();
+    await supabase.storage.from('body').remove([p.path]);
+    await supabase.from('body_photos').delete().eq('id', p.id);
+    const remaining = dayPhotos.filter((x) => x.id !== p.id);
+    setDayPhotos(remaining);
+    // その日の写真が全て消えたらカレンダーの📷マークも外す
+    if (daySel && remaining.length === 0) setPhotoDates((prev) => prev.filter((d) => d !== daySel));
   }
 
   if (!rows || !kpi) {
@@ -201,6 +229,12 @@ export default function DashboardPage() {
   const wpoints = rows.filter((r) => r.weight != null).map((r) => ({ date: r.date, weight: r.weight as number }));
   const diffPoints = rows.filter((r) => r.diff != null).map((r) => ({ date: r.date, diff: r.diff as number }));
   const marks = new Map<string, DayMark>(rows.map((r) => [r.date, { logged: true, over: r.verdict === 'NG' }]));
+  // 写真のある日にマークを付ける（記録が無い日でも写真だけあれば表示）
+  for (const d of photoDates) {
+    const m = marks.get(d);
+    if (m) m.photo = true;
+    else marks.set(d, { logged: false, over: false, photo: true });
+  }
 
   // 日別詳細の集計
   const daySummary = dayLogs && dayLogs.length ? summarizeDay(dayLogs) : null;
@@ -357,36 +391,64 @@ export default function DashboardPage() {
             </div>
             {dayLogs === null ? (
               <p className="muted" style={{ padding: '16px 0' }}>読み込み中…</p>
-            ) : daySummary ? (
-              <>
-                <div className="day-detail-kcal num">
-                  {daySummary.intake != null ? Math.round(daySummary.intake).toLocaleString() : '—'}<small style={{ fontSize: 13, color: 'var(--sub)', fontWeight: 600 }}> kcal 摂取</small>
-                </div>
-                <div className="day-macro num">
-                  <span>P <b>{daySummary.p != null ? Math.round(daySummary.p) : '—'}</b>g</span>
-                  <span>F <b>{daySummary.f != null ? Math.round(daySummary.f) : '—'}</b>g</span>
-                  <span>C <b>{daySummary.c != null ? Math.round(daySummary.c) : '—'}</b>g</span>
-                  {daySummary.weight != null && <span>⚖ <b>{daySummary.weight.toFixed(1)}</b>kg</span>}
-                  {daySummary.waist != null && <span>📏 <b>{daySummary.waist.toFixed(1)}</b>cm</span>}
-                </div>
-                {dayLogs.map((l) => {
-                  const items = (l.items as { name: string }[]) || [];
-                  const names = items.slice(0, 3).map((it) => it.name).filter(Boolean).join('、');
-                  return (
-                    <div className="feed-row" key={l.id}>
-                      <div className="feed-icon">{l.kcal != null ? '🍽' : (l.ex && l.ex !== 'オフ') ? '🏃' : l.weight != null || l.waist != null ? '⚖️' : '📝'}</div>
-                      <div className="feed-body">
-                        <div>
-                          {l.kcal != null ? `${names || '食事'} ${Math.round(Number(l.kcal)).toLocaleString()}kcal` : (l.ex && l.ex !== 'オフ') ? `運動 ${l.ex}` : l.weight != null ? `体重 ${Number(l.weight).toFixed(1)}kg` : l.waist != null ? `ウエスト ${Number(l.waist).toFixed(1)}cm` : (l.text || '記録')}
-                        </div>
-                        <div className="muted feed-text num">{timeJST(l.at)}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
             ) : (
-              <p className="muted" style={{ padding: '16px 0' }}>この日の記録はありません。<Link href={`/log?date=${daySel}`}>この日に記録する</Link></p>
+              <>
+                {daySummary && (
+                  <>
+                    <div className="day-detail-kcal num">
+                      {daySummary.intake != null ? Math.round(daySummary.intake).toLocaleString() : '—'}<small style={{ fontSize: 13, color: 'var(--sub)', fontWeight: 600 }}> kcal 摂取</small>
+                    </div>
+                    <div className="day-macro num">
+                      <span>P <b>{daySummary.p != null ? Math.round(daySummary.p) : '—'}</b>g</span>
+                      <span>F <b>{daySummary.f != null ? Math.round(daySummary.f) : '—'}</b>g</span>
+                      <span>C <b>{daySummary.c != null ? Math.round(daySummary.c) : '—'}</b>g</span>
+                      {daySummary.weight != null && <span>⚖ <b>{daySummary.weight.toFixed(1)}</b>kg</span>}
+                      {daySummary.waist != null && <span>📏 <b>{daySummary.waist.toFixed(1)}</b>cm</span>}
+                    </div>
+                    {dayLogs.map((l) => {
+                      const items = (l.items as { name: string }[]) || [];
+                      const names = items.slice(0, 3).map((it) => it.name).filter(Boolean).join('、');
+                      return (
+                        <div className="feed-row" key={l.id}>
+                          <div className="feed-icon">{l.kcal != null ? '🍽' : (l.ex && l.ex !== 'オフ') ? '🏃' : l.weight != null || l.waist != null ? '⚖️' : '📝'}</div>
+                          <div className="feed-body">
+                            <div>
+                              {l.kcal != null ? `${names || '食事'} ${Math.round(Number(l.kcal)).toLocaleString()}kcal` : (l.ex && l.ex !== 'オフ') ? `運動 ${l.ex}` : l.weight != null ? `体重 ${Number(l.weight).toFixed(1)}kg` : l.waist != null ? `ウエスト ${Number(l.waist).toFixed(1)}cm` : (l.text || '記録')}
+                            </div>
+                            <div className="muted feed-text num">{timeJST(l.at)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* 体の写真 */}
+                {dayPhotos.length > 0 && (
+                  <>
+                    <div className="muted" style={{ fontSize: 12, fontWeight: 700, margin: '12px 0 6px' }}>📸 この日の写真</div>
+                    <div className="photo-row">
+                      {dayPhotos.map((p) => (
+                        <div key={p.id} style={{ textAlign: 'center' }}>
+                          <div className="thumb bphoto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {p.url ? <img src={p.url} alt="" /> : null}
+                            <button className="thumb-x" onClick={() => delDayPhoto(p)} title="この写真を削除">×</button>
+                          </div>
+                          {p.bf_est != null && <div className="muted" style={{ fontSize: 11 }}>体脂肪 {p.bf_est}%</div>}
+                        </div>
+                      ))}
+                    </div>
+                    {dayPhotos.some((p) => p.assessment) && (
+                      <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{dayPhotos.find((p) => p.assessment)?.assessment}</p>
+                    )}
+                  </>
+                )}
+
+                {!daySummary && dayPhotos.length === 0 && (
+                  <p className="muted" style={{ padding: '16px 0' }}>この日の記録はありません。<Link href={`/log?date=${daySel}`}>この日に記録する</Link></p>
+                )}
+              </>
             )}
           </div>
         )}

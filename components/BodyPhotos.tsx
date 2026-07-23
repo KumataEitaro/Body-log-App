@@ -91,22 +91,6 @@ export default function BodyPhotos({
     }
   }
 
-  async function delPhoto(p: BodyPhoto) {
-    setBusy(true); setAiMsg(null);
-    try {
-      const supabase = createClient();
-      await supabase.storage.from('body').remove([p.path]);
-      const { error } = await supabase.from('body_photos').delete().eq('id', p.id);
-      if (error) throw new Error(error.message);
-      setAiMsg({ cls: 'ok', text: `${p.date}の写真を削除しました。` });
-      await loadPhotos();
-    } catch (e) {
-      setAiMsg({ cls: 'err', text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function urlToB64(url: string) {
     const blob = await (await fetch(url)).blob();
     return (await resizeImage(blob)).base64;
@@ -169,7 +153,7 @@ export default function BodyPhotos({
   return (
     <div className="card">
       <h2>📸 体の写真（進捗チェック）</h2>
-      <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。写真は本人以外見られません。</p>
+      <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。写真は本人以外見られません。過去の写真はダッシュボードのカレンダー📷から見られます。</p>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { selectPhoto(e.target.files); e.target.value = ''; }} />
       <div className="row2" style={{ marginTop: 8 }}>
         <button className={pendingPhoto ? 'btn-ghost' : 'btn-primary'} disabled={busy}
@@ -215,18 +199,9 @@ export default function BodyPhotos({
       {aiMsg && <div className={`msg ${aiMsg.cls}`}>{aiMsg.text}</div>}
       {compareResult && <div className="msg ok">{compareResult}</div>}
       {photos.length > 0 && (
-        <div className="photo-row" style={{ marginTop: 10 }}>
-          {photos.map((p) => (
-            <div key={p.id} style={{ textAlign: 'center' }}>
-              <div className="thumb bphoto">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {p.url ? <img src={p.url} alt="" /> : null}
-                <button className="thumb-x" onClick={() => delPhoto(p)} title="この写真を削除" disabled={busy}>×</button>
-              </div>
-              <div className="muted" style={{ fontSize: 11 }}>{p.date.slice(5)}{p.bf_est != null ? ` / ${p.bf_est}%` : ''}</div>
-            </div>
-          ))}
-        </div>
+        <p className="muted center" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
+          これまでの写真は {photos.length} 枚。ダッシュボードのカレンダーで📷の日をタップすると見られます。
+        </p>
       )}
     </div>
   );

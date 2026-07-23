@@ -24,7 +24,7 @@ export default function DevDashboardPreview() {
       weights.push({ date: k, weight: 75 - (29 - i) * 0.06 + (i % 3 === 0 ? 0.3 : -0.1) });
       const diff = i % 6 === 0 ? 250 : -350 + (i % 4) * 40;
       points.push({ date: k, diff });
-      marks.set(k, { logged: true, over: diff > 100 });
+      marks.set(k, { logged: true, over: diff > 100, photo: i % 7 === 0 });
     }
     return { weights, points, marks };
   }, []);
@@ -82,6 +82,13 @@ export default function DevDashboardPreview() {
             <div className="feed-row"><div className="feed-icon">🍽</div><div className="feed-body"><div>プロテイン、ゆで卵 320kcal</div><div className="muted feed-text num">08:12</div></div></div>
             <div className="feed-row"><div className="feed-icon">🍽</div><div className="feed-body"><div>牛丼並盛、サラダ 800kcal</div><div className="muted feed-text num">12:30</div></div></div>
             <div className="feed-row"><div className="feed-icon">🏃</div><div className="feed-body"><div>運動 通常</div><div className="muted feed-text num">18:40</div></div></div>
+            <div className="muted" style={{ fontSize: 12, fontWeight: 700, margin: '12px 0 6px' }}>📸 この日の写真</div>
+            <div className="photo-row">
+              <div style={{ textAlign: 'center' }}>
+                <div className="thumb bphoto" style={{ background: 'var(--teal-weak)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📷</div>
+                <div className="muted" style={{ fontSize: 11 }}>体脂肪 18%</div>
+              </div>
+            </div>
           </div>
         )}
       </Sheet>

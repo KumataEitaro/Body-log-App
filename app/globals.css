@@ -269,8 +269,9 @@ button:disabled { opacity: .5; cursor: default; }
   border: 1px solid var(--line); color: var(--sub); font-size: 16px; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
 .cal-dow { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--sub); padding-bottom: 4px; }
-.cal-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px;
+.cal-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px;
   background: none; border: none; border-radius: 12px; }
+.cal-photo { position: absolute; top: 1px; right: 3px; font-size: 9px; line-height: 1; }
 .cal-cell:active { background: var(--bg); }
 .cal-cell.sel { background: var(--teal-weak); }
 .cal-cell.future { opacity: 0.32; }
