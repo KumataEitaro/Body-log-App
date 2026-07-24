@@ -1,6 +1,12 @@
 'use client';
 // ネイティブアプリ（Capacitor）専用機能のヘルパー。
-// すべて動的importで、ブラウザ実行時は静かに何もしない（Web版の挙動に影響ゼロ）。
+// 重要: 動的 import（await import('@capacitor/...')）は WebView + Service Worker 環境で
+// 稀にチャンク読み込みが応答を返さず固まる。そのため一切使わず、ネイティブが必ず注入する
+// window.Capacitor.Plugins を「同期」で参照して各プラグインを呼ぶ。
+// ブラウザ実行時は window.Capacitor が無い/非ネイティブなので静かに no-op になる。
+
+// 静的import：ページのJSチャンクに同梱され読込時に確定する（呼び出し時の動的フェッチが無く固まらない）。
+import { registerPlugin } from '@capacitor/core';
 
 export type NativePhoto = { blob: Blob; dataUrl: string; base64: string; mime: string };
 
@@ -14,65 +20,58 @@ function capGlobal(): CapGlobal | undefined {
   return (window as unknown as { Capacitor?: CapGlobal }).Capacitor;
 }
 
-// タップハンドラ内で使う同期判定。
-// awaitを挟んでからfileInput.click()を呼ぶと、ブラウザ（特にiOS Safari）が
-// ユーザー操作由来と認めずクリックを無視するため、クリック分岐は必ずこちらを使う。
-// ネイティブではCapacitorブリッジがページ読み込み前にwindow.Capacitorを注入している。
+// 同期のネイティブ判定
 export function isNativeSync(): boolean {
   return !!capGlobal()?.isNativePlatform?.();
 }
 
-// ネイティブかつCameraプラグインが今のアプリバイナリに入っているか（同期）。
-// 古いTestFlightビルドはプラグイン未搭載のことがあり、その場合はWebのファイル選択に落とす。
+// 指定プラグインのプロキシを同期で取得（未ネイティブなら null）。
+// registerPlugin は名前でネイティブへ橋渡しするプロキシを同期生成する（動的importしない）。
+function nativePlugin<T = Record<string, (...args: unknown[]) => Promise<unknown>>>(name: string): T | null {
+  if (!isNativeSync()) return null;
+  try { return registerPlugin<T>(name); } catch { return null; }
+}
+
+// ネイティブかつCameraプラグインが今のアプリバイナリに入っているか（同期）
 export function isNativeCameraAvailable(): boolean {
   const cap = capGlobal();
   return !!cap?.isNativePlatform?.() && cap.isPluginAvailable?.('Camera') === true;
 }
 
+// 互換のため残す（従来 await getIsNative() を使っていた箇所向け）。同期判定をPromiseで返すだけ。
 export async function getIsNative(): Promise<boolean> {
-  try {
-    const { Capacitor } = await import('@capacitor/core');
-    return Capacitor.isNativePlatform();
-  } catch {
-    return false;
-  }
+  return isNativeSync();
 }
 
-// 起動時の見た目調整（ステータスバーをダーク面に合わせる）
+// 起動時の見た目調整（ステータスバーをライトUIに合わせる）
 export async function setupNativeChrome(): Promise<void> {
-  if (!(await getIsNative())) return;
-  try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setStyle({ style: Style.Light }); // ライトUI用（濃色の時刻・電池表示）
-  } catch { /* 非対応環境は無視 */ }
+  const sb = nativePlugin<{ setStyle: (o: { style: string }) => Promise<void> }>('StatusBar');
+  if (!sb) return;
+  try { await sb.setStyle({ style: 'LIGHT' }); } catch { /* 非対応は無視 */ }
 }
 
 // 保存成功などの触覚フィードバック
 export async function hapticSuccess(): Promise<void> {
-  if (!(await getIsNative())) return;
-  try {
-    const { Haptics, NotificationType } = await import('@capacitor/haptics');
-    await Haptics.notification({ type: NotificationType.Success });
-  } catch { /* 無視 */ }
+  const h = nativePlugin<{ notification: (o: { type: string }) => Promise<void> }>('Haptics');
+  if (!h) return;
+  try { await h.notification({ type: 'SUCCESS' }); } catch { /* 無視 */ }
 }
 
-// 軽いタップ感（チップ追加・削除など）
+// 軽いタップ感
 export async function hapticTap(): Promise<void> {
-  if (!(await getIsNative())) return;
-  try {
-    const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
-    await Haptics.impact({ style: ImpactStyle.Light });
-  } catch { /* 無視 */ }
+  const h = nativePlugin<{ impact: (o: { style: string }) => Promise<void> }>('Haptics');
+  if (!h) return;
+  try { await h.impact({ style: 'LIGHT' }); } catch { /* 無視 */ }
 }
 
 // ネイティブのカメラ/フォトピッカーで1枚取得（1024px・JPEG圧縮済み）
 export async function pickPhotoNative(): Promise<NativePhoto | null> {
-  if (!(await getIsNative())) return null;
+  const cam = nativePlugin<{ getPhoto: (o: Record<string, unknown>) => Promise<{ base64String?: string }> }>('Camera');
+  if (!cam) return null;
   try {
-    const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
-    const photo = await Camera.getPhoto({
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Prompt, // 撮影 or ライブラリを選ばせる
+    const photo = await cam.getPhoto({
+      resultType: 'base64',
+      source: 'PROMPT', // 撮影 or ライブラリを選ばせる
       quality: 80,
       width: 1024,
       correctOrientation: true,
@@ -89,21 +88,25 @@ export async function pickPhotoNative(): Promise<NativePhoto | null> {
   }
 }
 
-// 毎日のリマインド通知（端末内で完結・サーバー不要）
+// 毎日のリマインド通知（端末内で完結）
 export async function setDailyReminder(enabled: boolean, hour = 20, minute = 0): Promise<boolean> {
-  if (!(await getIsNative())) return false;
+  const ln = nativePlugin<{
+    cancel: (o: unknown) => Promise<void>;
+    requestPermissions: () => Promise<{ display: string }>;
+    schedule: (o: unknown) => Promise<void>;
+  }>('LocalNotifications');
+  if (!ln) return false;
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-    await LocalNotifications.cancel({ notifications: [{ id: 1 }] }).catch(() => { /* 未登録なら無視 */ });
+    await ln.cancel({ notifications: [{ id: 1 }] }).catch(() => { /* 未登録なら無視 */ });
     if (!enabled) return true;
-    const perm = await LocalNotifications.requestPermissions();
+    const perm = await ln.requestPermissions();
     if (perm.display !== 'granted') return false;
-    await LocalNotifications.schedule({
+    await ln.schedule({
       notifications: [{
         id: 1,
         title: 'BodyLog',
         body: '今日の記録はまだですか？📝 続けることが一番の近道です',
-        schedule: { on: { hour, minute } }, // 毎日この時刻に繰り返し
+        schedule: { on: { hour, minute } },
       }],
     });
     return true;
@@ -112,20 +115,25 @@ export async function setDailyReminder(enabled: boolean, hour = 20, minute = 0):
   }
 }
 
-// アプリアイコンのバッジ（今日未記録なら1、記録済みなら消す）
+// アプリアイコンのバッジ
 export async function setTodayRecordedBadge(recorded: boolean): Promise<void> {
-  if (!(await getIsNative())) return;
+  const badge = nativePlugin<{
+    clear: () => Promise<void>;
+    set: (o: { count: number }) => Promise<void>;
+    checkPermissions: () => Promise<{ display: string }>;
+    requestPermissions: () => Promise<{ display: string }>;
+  }>('Badge');
+  if (!badge) return;
   try {
-    const { Badge } = await import('@capawesome/capacitor-badge');
     if (recorded) {
-      await Badge.clear();
+      await badge.clear();
     } else {
-      const perm = await Badge.checkPermissions();
+      const perm = await badge.checkPermissions();
       if (perm.display !== 'granted') {
-        const req = await Badge.requestPermissions();
+        const req = await badge.requestPermissions();
         if (req.display !== 'granted') return;
       }
-      await Badge.set({ count: 1 });
+      await badge.set({ count: 1 });
     }
   } catch { /* 無視 */ }
 }

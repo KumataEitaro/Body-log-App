@@ -22,11 +22,12 @@ type HealthPlugin = {
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
 };
 
+// 静的import：呼び出し時の動的フェッチが無く固まらない。
+import { registerPlugin } from '@capacitor/core';
+
 type CapGlobal = {
   isNativePlatform?: () => boolean;
   isPluginAvailable?: (name: string) => boolean;
-  registerPlugin?: <T>(name: string) => T;
-  Plugins?: Record<string, unknown>;
 };
 
 function cap(): CapGlobal | undefined {
@@ -34,22 +35,10 @@ function cap(): CapGlobal | undefined {
   return (window as unknown as { Capacitor?: CapGlobal }).Capacitor;
 }
 
-// ネイティブか（同期・window.Capacitor 直参照。動的importしない）
-export function healthIsNative(): boolean {
-  return !!cap()?.isNativePlatform?.();
-}
-
 // Health プラグインのプロキシを同期で取得（固まらない）
 function getPlugin(): HealthPlugin | null {
-  const c = cap();
-  if (!c?.isNativePlatform?.()) return null;
-  try {
-    // 既に登録済みならそれを、無ければ registerPlugin で生成（どちらも同期）
-    const existing = c.Plugins?.Health as HealthPlugin | undefined;
-    if (existing) return existing;
-    if (typeof c.registerPlugin === 'function') return c.registerPlugin<HealthPlugin>('Health');
-  } catch { /* 無視 */ }
-  return null;
+  if (!cap()?.isNativePlatform?.()) return null;
+  try { return registerPlugin<HealthPlugin>('Health'); } catch { return null; }
 }
 
 // プラグイン応答が返らない場合に固まらないためのタイムアウト付きラッパー
