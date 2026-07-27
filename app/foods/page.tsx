@@ -179,7 +179,7 @@ export default function FoodsPage() {
         <label>内容（自然文でOK。材料を書けばAIが計算します）</label>
         <textarea rows={4} value={chat} onChange={(e) => setChat(e.target.value)} placeholder={PLACEHOLDER} />
 
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden
+        <input ref={fileRef} type="file" accept="image/*" multiple className="file-hidden"
                onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} />
         <div className="photo-row">
           {photos.map((p, i) => (
@@ -193,8 +193,11 @@ export default function FoodsPage() {
             <button className="thumb-add" onClick={async () => {
               // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
               if (isNativeCameraAvailable()) {
-                const p = await pickPhotoNative();
-                if (p) setPhotos((arr) => (arr.length < 4 ? [...arr, p] : arr));
+                const r = await pickPhotoNative();
+                if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
+                if (!r.error) return; // ユーザーキャンセル
+                setMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。` });
+                fileRef.current?.click();
               } else {
                 fileRef.current?.click();
               }

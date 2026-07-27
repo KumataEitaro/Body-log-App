@@ -39,10 +39,14 @@ function cap(): CapGlobal | undefined {
   return (window as unknown as { Capacitor?: CapGlobal }).Capacitor;
 }
 
-// Health プラグインのプロキシを同期で取得（固まらない）
+// Health プラグインのプロキシを同期で取得（固まらない）。
+// registerPlugin は同名で2回呼ぶと警告が出るため1回だけ生成してキャッシュする。
+let _healthPlugin: HealthPlugin | null | undefined;
 function getPlugin(): HealthPlugin | null {
   if (!cap()?.isNativePlatform?.()) return null;
-  try { return registerPlugin<HealthPlugin>('Health'); } catch { return null; }
+  if (_healthPlugin !== undefined) return _healthPlugin;
+  try { _healthPlugin = registerPlugin<HealthPlugin>('Health'); } catch { _healthPlugin = null; }
+  return _healthPlugin;
 }
 
 // プラグイン応答が返らない場合に固まらないためのタイムアウト付きラッパー

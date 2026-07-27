@@ -154,14 +154,17 @@ export default function BodyPhotos({
     <div className="card">
       <h2>📸 体の写真（進捗チェック）</h2>
       <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。写真は本人以外見られません。過去の写真はダッシュボードのカレンダー📷から見られます。</p>
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { selectPhoto(e.target.files); e.target.value = ''; }} />
+      <input ref={fileRef} type="file" accept="image/*" className="file-hidden" onChange={(e) => { selectPhoto(e.target.files); e.target.value = ''; }} />
       <div className="row2" style={{ marginTop: 8 }}>
         <button className={pendingPhoto ? 'btn-ghost' : 'btn-primary'} disabled={busy}
                 onClick={async () => {
                   // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
                   if (isNativeCameraAvailable()) {
-                    const p = await pickPhotoNative();
-                    if (p) { setAiMsg(null); setCompareResult(''); setPendingPhoto(p); }
+                    const r = await pickPhotoNative();
+                    if (r.photo) { setAiMsg(null); setCompareResult(''); setPendingPhoto(r.photo); return; }
+                    if (!r.error) return; // ユーザーキャンセル
+                    setAiMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。` });
+                    fileRef.current?.click();
                   } else {
                     fileRef.current?.click();
                   }

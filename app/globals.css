@@ -366,6 +366,9 @@ td .item-input.num-cell { width: 64px; text-align: right; }
 .stat-v { font-size: 17px; font-weight: 800; margin-top: 2px; }
 .stat-v small { font-size: 11px; color: var(--sub); font-weight: 600; }
 
+/* file input を視覚的に隠す（hidden/display:none だと iOS WKWebView が programmatic click を無視することがある） */
+.file-hidden { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; min-height: 0; padding: 0; border: none; }
+
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
 @keyframes sp { to { transform: rotate(360deg); } }
 .hidden { display: none; }

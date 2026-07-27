@@ -26,14 +26,27 @@ export function isNativeSync(): boolean {
 }
 
 // 指定プラグインのプロキシを同期で取得（未ネイティブなら null）。
-// registerPlugin は名前でネイティブへ橋渡しするプロキシを同期生成する（動的importしない）。
+// registerPlugin は同名で2回呼ぶと警告が出るため、モジュールスコープで1回だけ生成してキャッシュする。
+const _plugins = new Map<string, unknown>();
 function nativePlugin<T = Record<string, (...args: unknown[]) => Promise<unknown>>>(name: string): T | null {
   if (!isNativeSync()) return null;
-  try { return registerPlugin<T>(name); } catch { return null; }
+  if (_plugins.has(name)) return _plugins.get(name) as T;
+  try {
+    const p = registerPlugin<T>(name);
+    _plugins.set(name, p);
+    return p;
+  } catch {
+    return null;
+  }
 }
+
+// 実行時にカメラ呼び出しが失敗した場合に立てるフラグ。
+// 以降のタップは同期でWebのファイル選択に落ちる（＝タップ起点のユーザー操作扱いが保たれ確実に開く）。
+let cameraBrokenRuntime = false;
 
 // ネイティブかつCameraプラグインが今のアプリバイナリに入っているか（同期）
 export function isNativeCameraAvailable(): boolean {
+  if (cameraBrokenRuntime) return false;
   const cap = capGlobal();
   return !!cap?.isNativePlatform?.() && cap.isPluginAvailable?.('Camera') === true;
 }
@@ -64,10 +77,17 @@ export async function hapticTap(): Promise<void> {
   try { await h.impact({ style: 'LIGHT' }); } catch { /* 無視 */ }
 }
 
-// ネイティブのカメラ/フォトピッカーで1枚取得（1024px・JPEG圧縮済み）
-export async function pickPhotoNative(): Promise<NativePhoto | null> {
+// ネイティブカメラの結果。photo=取得成功 / error=失敗理由（表示用） / 両方null=ユーザーキャンセル
+export type PickPhotoResult = { photo: NativePhoto | null; error: string | null };
+
+// ネイティブのカメラ/フォトピッカーで1枚取得（1024px・JPEG圧縮済み）。
+// 失敗は握り潰さず理由を返す（呼び出し側でエラー表示＋ファイル選択へフォールバックする）。
+export async function pickPhotoNative(): Promise<PickPhotoResult> {
   const cam = nativePlugin<{ getPhoto: (o: Record<string, unknown>) => Promise<{ base64String?: string }> }>('Camera');
-  if (!cam) return null;
+  if (!cam) {
+    cameraBrokenRuntime = true;
+    return { photo: null, error: 'カメラプラグインを取得できませんでした' };
+  }
   try {
     const photo = await cam.getPhoto({
       resultType: 'base64',
@@ -77,14 +97,17 @@ export async function pickPhotoNative(): Promise<NativePhoto | null> {
       correctOrientation: true,
     });
     const base64 = photo.base64String;
-    if (!base64) return null;
+    if (!base64) return { photo: null, error: '写真データを取得できませんでした' };
     const mime = 'image/jpeg';
     const bin = atob(base64);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return { blob: new Blob([arr], { type: mime }), dataUrl: `data:${mime};base64,${base64}`, base64, mime };
-  } catch {
-    return null; // キャンセル・権限拒否
+    return { photo: { blob: new Blob([arr], { type: mime }), dataUrl: `data:${mime};base64,${base64}`, base64, mime }, error: null };
+  } catch (e) {
+    const msg = e instanceof Error ? (e.message || e.name) : String(e);
+    if (/cancel/i.test(msg)) return { photo: null, error: null }; // ユーザーキャンセルはエラー扱いしない
+    if (/not implemented|unimplemented/i.test(msg)) cameraBrokenRuntime = true; // 以降はファイル選択へ直行
+    return { photo: null, error: msg };
   }
 }
 
