@@ -7,7 +7,7 @@ import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
 import { getIsNative, setDailyReminder } from '@/lib/native';
-import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay } from '@/lib/health';
+import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthPullHistory } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 
 export default function SettingsPage() {
@@ -112,6 +112,42 @@ export default function SettingsPage() {
       setHealthMsg({ cls: 'ok', text: `同期しました。取り込み ${pulled} 件 ／ 書き出し ${pushed} 項目（今日）。` });
     } catch (e) {
       setHealthMsg({ cls: 'err', text: '同期に失敗しました: ' + (e instanceof Error ? e.message : String(e)) });
+    } finally {
+      clearTimeout(safety);
+      setHealthBusy(false);
+    }
+  }
+
+  // ヘルスケアの過去データ（体重・ウエスト全期間）を一括取り込み
+  async function importHealthHistory() {
+    setHealthBusy(true); setHealthMsg(null);
+    const safety = setTimeout(() => { setHealthBusy(false); setHealthMsg({ cls: 'err', text: '取込がタイムアウトしました。' }); }, 45000);
+    try {
+      const hist = await healthPullHistory();
+      if (!hist) { setHealthMsg({ cls: 'err', text: 'ヘルスケアから取得できませんでした。連携を有効にして許可してください。' }); return; }
+      // ISO時刻→JSTの日付(yyyy-mm-dd)
+      const jstDate = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+      // 日付ごとに最新の体重/ウエストへ集約（samplesは昇順なので後勝ち＝その日の最後の値）
+      const byDate = new Map<string, { weight?: number; waist?: number }>();
+      for (const s of hist.weight) { const d = jstDate(s.date); byDate.set(d, { ...byDate.get(d), weight: Math.round(s.value * 10) / 10 }); }
+      for (const s of hist.waist) { const d = jstDate(s.date); byDate.set(d, { ...byDate.get(d), waist: Math.round(s.value * 10) / 10 }); }
+      if (byDate.size === 0) { setHealthMsg({ cls: 'ok', text: 'ヘルスケアに体重・ウエストの記録がありませんでした。' }); return; }
+
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
+      if (!user) { setHealthMsg({ cls: 'err', text: 'ログインが必要です。' }); return; }
+
+      // entries（日次サマリー）へ直接upsert＝ダッシュボードの体重グラフ/カレンダーに即反映
+      const rows = [...byDate.entries()].map(([date, v]) => ({ user_id: user.id, date, weight: v.weight ?? null, waist: v.waist ?? null }));
+      let { error } = await supabase.from('entries').upsert(rows, { onConflict: 'user_id,date' });
+      if (error && /waist/i.test(error.message)) {
+        ({ error } = await supabase.from('entries').upsert(rows.map(({ waist: _w, ...r }) => r), { onConflict: 'user_id,date' }));
+      }
+      if (error) throw new Error(error.message);
+      setHealthMsg({ cls: 'ok', text: `過去データを ${rows.length} 日分 取り込みました。ダッシュボードのグラフ・カレンダーに反映されます。` });
+    } catch (e) {
+      setHealthMsg({ cls: 'err', text: '取込に失敗: ' + (e instanceof Error ? e.message : String(e)) });
     } finally {
       clearTimeout(safety);
       setHealthBusy(false);
@@ -372,9 +408,14 @@ export default function SettingsPage() {
             </span>
           </label>
           {healthOn && (
+            <>
             <button className="btn-ghost" style={{ width: '100%', marginTop: 10 }} onClick={syncHealthNow} disabled={healthBusy}>
-              {healthBusy ? <><span className="spin" />同期中…</> : '🔄 今すぐ同期（双方向）'}
+              {healthBusy ? <><span className="spin" />処理中…</> : '🔄 今すぐ同期（双方向・今日）'}
             </button>
+            <button className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={importHealthHistory} disabled={healthBusy}>
+              📥 過去データを全て取り込む（体重・ウエスト）
+            </button>
+            </>
           )}
           {healthMsg && <div className={`msg ${healthMsg.cls}`}>{healthMsg.text}</div>}
           <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>

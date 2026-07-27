@@ -14,10 +14,14 @@ export type HealthWrite = {
   energy?: number | null; protein?: number | null; fat?: number | null; carbs?: number | null;
 };
 
+export type HealthSample = { date: string; value: number };
+export type HealthHistory = { weight: HealthSample[]; bodyFat: HealthSample[]; waist: HealthSample[] };
+
 type HealthPlugin = {
   isAvailable(): Promise<{ available: boolean }>;
   requestAuthorization(): Promise<{ granted: boolean }>;
   readLatest(): Promise<HealthLatest>;
+  readHistory(): Promise<HealthHistory>;
   readActiveEnergy(o: { date: string }): Promise<{ kcal: number }>;
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
 };
@@ -109,6 +113,13 @@ export async function healthPullLatest(): Promise<HealthLatest | null> {
   const p = getPlugin();
   if (!p) return null;
   try { return await withTimeout(p.readLatest(), 10000, {} as HealthLatest); } catch { return null; }
+}
+
+// 全期間の体重/体脂肪/ウエスト履歴を取得（過去データ一括取込用）
+export async function healthPullHistory(): Promise<HealthHistory | null> {
+  const p = getPlugin();
+  if (!p) return null;
+  try { return await withTimeout(p.readHistory(), 30000, { weight: [], bodyFat: [], waist: [] }); } catch { return null; }
 }
 
 // 指定日の消費エネルギー(kcal)を取得

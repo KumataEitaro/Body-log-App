@@ -16,6 +16,7 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestAuthorization", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "authStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readLatest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readHistory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readActiveEnergy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise)
     ]
@@ -98,6 +99,31 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
             if let bf = result["bodyFat"] as? Double { result["bodyFat"] = bf * 100.0 }
             call.resolve(result)
         }
+    }
+
+    // 全期間の体重/体脂肪/ウエストの履歴を返す（過去データ一括取込用）
+    @objc func readHistory(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["weight": [], "bodyFat": [], "waist": []]); return }
+        let group = DispatchGroup()
+        var result: [String: [[String: Any]]] = ["weight": [], "bodyFat": [], "waist": []]
+        let iso = ISO8601DateFormatter()
+
+        func series(_ type: HKQuantityType, _ unit: HKUnit, _ key: String, _ scale: Double) {
+            group.enter()
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)
+            let q = HKSampleQuery(sampleType: type, predicate: nil, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { _, samples, _ in
+                if let arr = samples as? [HKQuantitySample] {
+                    result[key] = arr.map { ["date": iso.string(from: $0.endDate), "value": $0.quantity.doubleValue(for: unit) * scale] }
+                }
+                group.leave()
+            }
+            self.store.execute(q)
+        }
+        series(weightType, .gramUnit(with: .kilo), "weight", 1)
+        series(bodyFatType, HKUnit.percent(), "bodyFat", 100)   // 0-1 → %
+        series(waistType, HKUnit.meterUnit(with: .centi), "waist", 1)
+
+        group.notify(queue: .main) { call.resolve(result) }
     }
 
     // 指定日の消費エネルギー(active energy, kcal)合計
