@@ -14,6 +14,7 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestAuthorization", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readLatest", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readActiveEnergy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise)
@@ -46,7 +47,7 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func requestAuthorization(_ call: CAPPluginCall) {
         guard HKHealthStore.isHealthDataAvailable() else {
-            call.resolve(["granted": false])
+            call.resolve(["granted": false, "reason": "unavailable"])
             return
         }
         // 権限シートはメインスレッドから要求しないと表示されないことがあるため main へ
@@ -56,9 +57,17 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.reject(error.localizedDescription)
                     return
                 }
-                call.resolve(["granted": success])
+                // 書き込み権限の実ステータス（0=未決定 / 1=拒否 / 2=許可）も返す＝実際に許可されたか確認できる
+                let writeStatus = self.store.authorizationStatus(for: self.weightType).rawValue
+                call.resolve(["granted": success, "writeStatus": writeStatus])
             }
         }
+    }
+
+    // 現在の書き込み権限ステータスのみ取得（要求せず確認だけ）
+    @objc func authStatus(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["writeStatus": -1]); return }
+        call.resolve(["writeStatus": store.authorizationStatus(for: weightType).rawValue])
     }
 
     // 各指標の最新値（体重kg / 体脂肪% / ウエストcm）を返す
