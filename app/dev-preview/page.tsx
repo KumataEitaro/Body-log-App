@@ -146,15 +146,23 @@ export default function DevPreviewPage() {
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)}>
         <div>
           <h2>解析結果 <span className="muted" style={{ fontWeight: 400 }}>— 確認して保存</span></h2>
-          <div style={{ overflowX: 'auto' }}>
-            <table>
-              <thead><tr><th>品目</th><th>分量</th><th>kcal</th><th>P</th><th>F</th><th>C</th><th></th></tr></thead>
-              <tbody>
-                <tr><td>牛丼並盛</td><td>1杯</td><td className="num">635</td><td className="num">20</td><td className="num">20</td><td className="num">92</td><td><button className="item-del">×</button></td></tr>
-                <tr><td>サラダ</td><td>1皿</td><td className="num">85</td><td className="num">2</td><td className="num">5</td><td className="num">8</td><td><button className="item-del">×</button></td></tr>
-              </tbody>
-            </table>
-          </div>
+          {[{ n: '牛丼並盛', q: '1杯', k: 635, p: 20, f: 20, c: 92 }, { n: 'サラダ', q: '1皿', k: 85, p: 2, f: 5, c: 8 }].map((it) => (
+            <div className="item-row" key={it.n}>
+              <div className="item-row-head">
+                <input className="item-input name-cell" defaultValue={it.n} readOnly />
+                <input className="item-input qty-cell" defaultValue={it.q} readOnly />
+                <button className="item-del">×</button>
+              </div>
+              <div className="item-row-nums">
+                {([['kcal', it.k], ['P', it.p], ['F', it.f], ['C', it.c]] as const).map(([lbl, val]) => (
+                  <div key={lbl}>
+                    <span className="item-num-lbl">{lbl}{lbl !== 'kcal' ? ' (g)' : ''}</span>
+                    <input className="item-input num" type="number" defaultValue={val} readOnly />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
           <div className="stat-grid" style={{ marginTop: 10 }}>
             <div className="stat"><div className="stat-l">この記録の摂取</div><div className="stat-v num">720<small> kcal</small></div></div>
             <div className="stat"><div className="stat-l">P / F / C</div><div className="stat-v num">22 / 25 / 100<small> g</small></div></div>

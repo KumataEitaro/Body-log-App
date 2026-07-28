@@ -340,6 +340,18 @@ th { color: var(--sub); font-size: 11px; font-weight: 700; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12.5px; color: var(--sub); }
 .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
+/* ===== 品目編集（スマホ幅・横スクロール不要の2段カード） ===== */
+.item-row { padding: 9px 0; border-bottom: 0.5px solid var(--line); }
+.item-row .item-input { padding: 8px 10px; min-height: 38px; border-radius: 10px; font-size: 16px; }
+.item-row-head { display: flex; align-items: center; gap: 6px; }
+.item-row-head .name-cell { flex: 1; min-width: 0; }
+.item-row-head .qty-cell { width: 84px; flex: none; }
+.item-row-head .item-del { flex: none; width: 38px; height: 38px; padding: 0; border-radius: 10px;
+  background: var(--coral-weak); font-size: 17px; }
+.item-row-nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.item-row-nums input { text-align: right; }
+.item-num-lbl { display: block; font-size: 10px; font-weight: 700; color: var(--sub); margin: 0 0 2px 2px; }
+
 /* ===== 品目インライン編集 ===== */
 td .item-input { padding: 6px; min-height: 36px; border-radius: 8px; font-size: 16px; }
 td .item-input.name-cell { min-width: 96px; }

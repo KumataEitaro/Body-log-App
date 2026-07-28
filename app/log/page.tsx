@@ -813,30 +813,27 @@ export default function LogPage() {
           {parsed.items.length > 0 && (
             <div style={{ marginBottom: 10 }}>
               <p className="muted" style={{ margin: '0 0 6px' }}>品目はタップで直接修正できます（分量を変えるとkcal/PFCも自動で再計算）</p>
-              <div style={{ overflowX: 'auto' }}>
-                <table>
-                  <thead><tr><th>品目</th><th>分量</th><th>kcal</th><th>P</th><th>F</th><th>C</th><th></th></tr></thead>
-                  <tbody>
-                    {parsed.items.map((it, i) => (
-                      <tr key={`${i}-${parsed.items.length}`}>
-                        <td><input className="item-input name-cell" defaultValue={it.name}
-                                   onBlur={(e) => updateItemName(i, e.target.value)} /></td>
-                        <td><input className="item-input qty-cell" defaultValue={it.qty} placeholder="50g"
-                                   onBlur={(e) => applyQty(i, e.target.value)} /></td>
-                        <td><input className="item-input num-cell num" type="number" inputMode="decimal"
-                                   value={it.kcal} onChange={(e) => updateItemNum(i, 'kcal', e.target.value)} /></td>
-                        <td><input className="item-input num-cell num" type="number" inputMode="decimal"
-                                   value={it.p} onChange={(e) => updateItemNum(i, 'p', e.target.value)} /></td>
-                        <td><input className="item-input num-cell num" type="number" inputMode="decimal"
-                                   value={it.f} onChange={(e) => updateItemNum(i, 'f', e.target.value)} /></td>
-                        <td><input className="item-input num-cell num" type="number" inputMode="decimal"
-                                   value={it.c} onChange={(e) => updateItemNum(i, 'c', e.target.value)} /></td>
-                        <td><button className="item-del" onClick={() => removeItem(i)} title="この品目を削除">×</button></td>
-                      </tr>
+              {/* スマホ幅で横スクロール不要の2段カード型（1行目=品目・分量・削除 / 2行目=kcal・PFC） */}
+              {parsed.items.map((it, i) => (
+                <div className="item-row" key={`${i}-${parsed.items.length}`}>
+                  <div className="item-row-head">
+                    <input className="item-input name-cell" defaultValue={it.name} placeholder="品目名"
+                           onBlur={(e) => updateItemName(i, e.target.value)} />
+                    <input className="item-input qty-cell" defaultValue={it.qty} placeholder="50g"
+                           onBlur={(e) => applyQty(i, e.target.value)} />
+                    <button className="item-del" onClick={() => removeItem(i)} title="この品目を削除">×</button>
+                  </div>
+                  <div className="item-row-nums">
+                    {([['kcal', it.kcal], ['P', it.p], ['F', it.f], ['C', it.c]] as const).map(([lbl, val]) => (
+                      <div key={lbl}>
+                        <span className="item-num-lbl">{lbl}{lbl !== 'kcal' ? ' (g)' : ''}</span>
+                        <input className="item-input num" type="number" inputMode="decimal" value={val}
+                               onChange={(e) => updateItemNum(i, lbl === 'kcal' ? 'kcal' : lbl.toLowerCase() as 'p' | 'f' | 'c', e.target.value)} />
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </div>
+              ))}
               <button className="btn-ghost" style={{ marginTop: 8 }} onClick={addItem}>＋ 品目を追加</button>
             </div>
           )}
