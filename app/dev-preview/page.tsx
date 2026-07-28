@@ -48,26 +48,16 @@ export default function DevPreviewPage() {
         <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>目標タブでいつでも手動調整できます。次回の見直しは2週間後です。</p>
       </div>
 
-      <div className="card daybar">
-        <div className="hero-label">今日あと食べられる（計画） <span className="pill OK">OK</span></div>
-        {(() => {
-          const eaten = 1373, goalKcal = 1800, R = 52, CIRC = 2 * Math.PI * R;
-          const ratio = Math.min(1, eaten / goalKcal);
-          return (
-            <div className="ring-wrap">
-              <svg viewBox="0 0 120 120">
-                <circle className="ring-bg" cx="60" cy="60" r={R} />
-                <circle className="ring-fg" cx="60" cy="60" r={R} strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - ratio)} />
-              </svg>
-              <div className="ring-center">
-                <div className="ring-label">残り</div>
-                <div className="ring-num num">427</div>
-                <div className="ring-unit">kcal</div>
-                <div className="ring-sub num">目標: 1,800 / 摂取: 1,373</div>
-              </div>
-            </div>
-          );
-        })()}
+      <div className="hero2">
+        <div className="hero2-label">あと食べられる（計画） <span className="pill OK">OK</span></div>
+        <div className="hero2-num num">427<small> kcal</small></div>
+        <div className="hline"><i style={{ width: '76%' }} /><b style={{ left: '76%' }} /></div>
+        <div className="hero2-meta num"><span>摂取 1,373</span><span>目標 1,800</span></div>
+        <div className="hero2-pfc num">
+          <span>P <b>82</b>/150</span><span>F <b>41</b>/63</span><span>C <b>210</b>/250</span>
+        </div>
+      </div>
+      <div className="card daybar" style={{ display: 'none' }}>
         <div className="macro-bars">
           {macros.map((m) => (
             <div key={m.key}>

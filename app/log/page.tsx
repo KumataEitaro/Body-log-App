@@ -715,75 +715,41 @@ export default function LogPage() {
         )}
       </div>
 
-      {/* ===== 今日あと食べられるkcal（ヒーロー表示） ===== */}
+      {/* ===== C案ヒーロー: 巨大数字＋水平プログレスライン ===== */}
       {profile && (() => {
         const heroLeft = planLeft ?? left; // 計画があれば計画基準、なければ維持基準
+        const goalKcal = planIntake ?? target;
+        const pct = goalKcal > 0 ? Math.min(100, Math.max(0, (eaten / goalKcal) * 100)) : 0;
+        const over = heroLeft < 0;
         return (
-          <div className="card daybar">
-            <div className="hero-label">
-              今日あと食べられる{plan ? '（計画）' : '（維持）'}
-              {dayVerdict && <span className={`pill ${verdictClass(dayVerdict)}`} style={{ marginLeft: 8 }}>{dayVerdict}</span>}
+          <div className="hero2">
+            <div className="hero2-label">
+              {over ? 'オーバー' : 'あと食べられる'}{plan ? '（計画）' : '（維持）'}
+              {dayVerdict && <span className={`pill ${verdictClass(dayVerdict)}`}>{dayVerdict}</span>}
             </div>
-            {(() => {
-              const goalKcal = planIntake ?? target;
-              const ratio = goalKcal > 0 ? Math.min(1, Math.max(0, eaten / goalKcal)) : 0;
-              const R = 52, CIRC = 2 * Math.PI * R;
-              const over = heroLeft < 0;
-              return (
-                <div className="ring-wrap">
-                  <svg viewBox="0 0 120 120">
-                    <circle className="ring-bg" cx="60" cy="60" r={R} />
-                    <circle className={`ring-fg ${over ? 'over' : ''}`} cx="60" cy="60" r={R}
-                            strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - ratio)} />
-                  </svg>
-                  <div className="ring-center">
-                    <div className={`ring-label ${over ? 'over' : ''}`}>{over ? '超過' : '残り'}</div>
-                    <div className={`ring-num num ${over ? 'over' : ''}`}>{Math.abs(heroLeft).toLocaleString()}</div>
-                    <div className="ring-unit">kcal</div>
-                    <div className="ring-sub num">目標: {goalKcal.toLocaleString()} / 摂取: {eaten.toLocaleString()}</div>
-                  </div>
-                </div>
-              );
-            })()}
+            <div className={`hero2-num num ${over ? 'over' : ''}`}>{Math.abs(heroLeft).toLocaleString()}<small> kcal</small></div>
             {todayEvent && (
-              <div className="hero-cheat">🍺 今日はチートデイ「{todayEvent.title}」— +{Math.round(Number(todayEvent.extra_kcal)).toLocaleString()}kcalまで想定内</div>
+              <div className="hero-cheat">今日はチートデイ「{todayEvent.title}」— +{Math.round(Number(todayEvent.extra_kcal)).toLocaleString()}kcalまで想定内</div>
             )}
+            <div className="hline">
+              <i className={over ? 'over' : ''} style={{ width: `${pct}%` }} />
+              <b className={over ? 'over' : ''} style={{ left: `${pct}%` }} />
+            </div>
+            <div className="hero2-meta num"><span>摂取 {eaten.toLocaleString()}</span><span>目標 {goalKcal.toLocaleString()}</span></div>
             {macros && (
-              <div className="macro-bars">
-                {[
-                  { key: 'p', label: '🍗 Protein', eaten: eatenP, tgt: macros.p },
-                  { key: 'f', label: '🥑 Fat', eaten: eatenF, tgt: macros.f },
-                  { key: 'c', label: '🍚 Carbs', eaten: eatenC, tgt: macros.c },
-                ].map((m) => {
-                  const over = m.eaten > m.tgt;
-                  const pct = m.tgt > 0 ? Math.min(100, (m.eaten / m.tgt) * 100) : 0;
-                  return (
-                    <div key={m.key}>
-                      <div className="macro-bar-head">
-                        <span className="macro-bar-label">{m.label}</span>
-                        <span className="macro-bar-val num"><b>{m.eaten}</b>/{m.tgt}g</span>
-                      </div>
-                      <div className="macro-track">
-                        <div className={`macro-fill ${m.key} ${over ? 'over' : ''}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="hero2-pfc num">
+                <span>P <b className={eatenP > macros.p ? 'over' : ''}>{eatenP}</b>/{macros.p}</span>
+                <span>F <b className={eatenF > macros.f ? 'over' : ''}>{eatenF}</b>/{macros.f}</span>
+                <span>C <b className={eatenC > macros.c ? 'over' : ''}>{eatenC}</b>/{macros.c}</span>
               </div>
             )}
-            <div className="daybar-sub">
-              <span>摂取済み <b className="num">{eaten.toLocaleString()}</b></span>
-              {plan && <span>維持まで <b className="num">{left.toLocaleString()}</b></span>}
-              <span>目安 <b className="num">{target.toLocaleString()}</b></span>
-              {planIntake != null && <span>計画目標 <b className="num">{planIntake.toLocaleString()}</b></span>}
-            </div>
             <div className="daybar-fine">
               基礎代謝{Math.round(bmr).toLocaleString()}×{Number(profile.life_factor)}＋運動{exTotal.toLocaleString()}＝目安{target.toLocaleString()}
               {plan && ` ／ 必要赤字${plan.requiredDailyWithEvents.toLocaleString()}/日`}
               {plan && plan.mode === 'spread' && plan.absorbToday > 0 &&
-                `（🍺+${plan.eventsExtra.toLocaleString()}を残り${plan.remainingDays}日で吸収 +${plan.absorbToday}/日）`}
+                `（チートデイ+${plan.eventsExtra.toLocaleString()}を残り${plan.remainingDays}日で吸収 +${plan.absorbToday}/日）`}
               {plan && plan.mode === 'window' && plan.absorbToday > 0 &&
-                `（🍺取り返し中 +${plan.absorbToday}/日・後${plan.absorbDays}日方式）`}
+                `（チートデイ取り返し中 +${plan.absorbToday}/日・後${plan.absorbDays}日方式）`}
             </div>
           </div>
         );

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { notFound } from 'next/navigation';
 import AppShell from '@/components/AppShell';
-import ProgressChart from '@/components/ProgressChart';
+import InteractiveChart from '@/components/InteractiveChart';
 import Calendar, { type DayMark } from '@/components/Calendar';
 import Sheet from '@/components/Sheet';
 import type { Goal } from '@/lib/goal';
@@ -61,8 +61,17 @@ export default function DevDashboardPreview() {
       </div>
 
       <div className="card">
-        <h2>体重の推移と計画 <span className="muted" style={{ fontWeight: 400 }}>— 背景＝カロリー収支の積み上げ</span></h2>
-        <ProgressChart goal={goal} weights={weights} points={points} events={[]} today="2026-07-21" />
+        <h2>推移</h2>
+        <div className="chips" style={{ marginBottom: 10 }}>
+          <button className="chip on">体重</button>
+          <button className="chip">ウエスト</button>
+          <button className="chip">体脂肪率</button>
+          <button className="chip">摂取kcal</button>
+        </div>
+        <InteractiveChart
+          series={weights.map((p) => ({ date: p.date, value: p.weight }))}
+          today="2026-07-21" unit="kg" decimals={1} minSpan={2}
+          plan={[{ date: goal.start_date, value: goal.start_weight }, { date: goal.target_date, value: goal.target_weight as number }]} />
       </div>
 
       <div className="card">

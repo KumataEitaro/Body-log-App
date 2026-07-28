@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 import { mifflinBMR, targetKcal, judge, FAT_KCAL_PER_KG, WEEKLY_STD, todayJST, type ExLevel, type Verdict } from '@/lib/calc';
 import { progressStatus, computePlan, type Goal, type PlanEvent } from '@/lib/goal';
 import { summarizeDay, type LogRow } from '@/lib/day';
-import ProgressChart, { type ChartEvent } from '@/components/ProgressChart';
+import { type ChartEvent } from '@/components/ProgressChart';
+import InteractiveChart from '@/components/InteractiveChart';
 import Calendar, { type DayMark } from '@/components/Calendar';
 import Sheet from '@/components/Sheet';
 import Link from 'next/link';
@@ -49,10 +50,14 @@ export default function DashboardPage() {
   const [dayLogs, setDayLogs] = useState<(LogRow & { id: string; at: string })[] | null>(null);
   const [dayPhotos, setDayPhotos] = useState<DayPhoto[]>([]);
   const [photoDates, setPhotoDates] = useState<string[]>([]);
+  const [bfPoints, setBfPoints] = useState<{ date: string; value: number }[]>([]);
+  // チャートの表示系列
+  const [serie, setSerie] = useState<'weight' | 'waist' | 'bf' | 'intake'>('weight');
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
     goal: Goal | null; events: (ChartEvent & PlanEvent)[]; photoDates: string[];
+    bfPoints?: { date: string; value: number }[];
   };
 
   useEffect(() => {
@@ -67,6 +72,7 @@ export default function DashboardPage() {
         if (c) {
           setUserName(c.userName); setRows(c.rows); setKpi(c.kpi);
           setGoal(c.goal); setEvents(c.events || []); setPhotoDates(c.photoDates || []);
+          setBfPoints(c.bfPoints || []);
         }
       }
 
@@ -84,13 +90,16 @@ export default function DashboardPage() {
         supabase.from('entries').select('*').order('date', { ascending: true }),
         supabase.from('goals').select('*').maybeSingle(),
         supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
-        supabase.from('body_photos').select('date').order('date', { ascending: true }),
+        supabase.from('body_photos').select('date,bf_est').order('date', { ascending: true }),
       ]);
       // オフライン等でentriesが取れなかった場合はキャッシュ表示を維持
       if (entries === null && !navigator.onLine) return;
       if (g) setGoal(g);
-      const photoDateList = [...new Set(((phDates as { date: string }[]) || []).map((p) => p.date))];
+      const phList = (phDates as { date: string; bf_est: number | null }[]) || [];
+      const photoDateList = [...new Set(phList.map((p) => p.date))];
       setPhotoDates(photoDateList);
+      const bfList = phList.filter((p) => p.bf_est != null).map((p) => ({ date: p.date, value: Number(p.bf_est) }));
+      setBfPoints(bfList);
       const evList = (evs as (ChartEvent & PlanEvent)[]) || [];
       setEvents(evList);
       const list = entries || [];
@@ -140,6 +149,7 @@ export default function DashboardPage() {
       cacheSet(`dash:${user.id}`, {
         userName: prof.display_name || user.email || '',
         rows: computed, kpi: kpiObj, goal: g ?? null, events: evList, photoDates: photoDateList,
+        bfPoints: bfList,
       } satisfies DashCache);
 
       // ===== 2週間ごとのメンテナンスカロリー見直し =====
@@ -226,8 +236,6 @@ export default function DashboardPage() {
   const goalStatus = goal && kpi.latestWeight != null ? progressStatus(goal, todayJST(), kpi.latestWeight) : null;
   const plan = goal && kpi.latestWeight != null ? computePlan(goal, todayJST(), kpi.latestWeight, events, goal.absorb_days) : null;
   const recommendedIntake = plan ? Math.max(kpi.base - plan.requiredDailyWithEvents, kpi.bmr) : null;
-  const wpoints = rows.filter((r) => r.weight != null).map((r) => ({ date: r.date, weight: r.weight as number }));
-  const diffPoints = rows.filter((r) => r.diff != null).map((r) => ({ date: r.date, diff: r.diff as number }));
   const marks = new Map<string, DayMark>(rows.map((r) => [r.date, { logged: true, over: r.verdict === 'NG' }]));
   // 写真のある日にマークを付ける（記録が無い日でも写真だけあれば表示）
   for (const d of photoDates) {
@@ -367,10 +375,29 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* ===== 統合グラフ（体重の推移＋計画＋カロリー収支） ===== */}
+          {/* ===== インタラクティブチャート（ピンチ/パン/スクラブ・系列切替） ===== */}
           <div className="card">
-            <h2>体重の推移と計画 <span className="muted" style={{ fontWeight: 400 }}>— 背景＝カロリー収支の積み上げ</span></h2>
-            <ProgressChart goal={goal} weights={wpoints} points={diffPoints} events={events} today={todayJST()} />
+            <h2>推移</h2>
+            <div className="chips" style={{ marginBottom: 10 }}>
+              {([['weight', '体重'], ['waist', 'ウエスト'], ['bf', '体脂肪率'], ['intake', '摂取kcal']] as const).map(([k, l]) => (
+                <button key={k} className={`chip ${serie === k ? 'on' : ''}`} onClick={() => setSerie(k)}>{l}</button>
+              ))}
+            </div>
+            {(() => {
+              const conf = {
+                weight: { data: rows.filter((r) => r.weight != null).map((r) => ({ date: r.date, value: r.weight as number })), unit: 'kg', decimals: 1, minSpan: 2 },
+                waist: { data: rows.filter((r) => r.waist != null).map((r) => ({ date: r.date, value: r.waist as number })), unit: 'cm', decimals: 1, minSpan: 2 },
+                bf: { data: bfPoints, unit: '%', decimals: 1, minSpan: 2 },
+                intake: { data: rows.filter((r) => r.intake != null).map((r) => ({ date: r.date, value: r.intake as number })), unit: 'kcal', decimals: 0, minSpan: 400 },
+              }[serie];
+              const planLine = serie === 'weight' && goal?.target_weight != null
+                ? [{ date: goal.start_date, value: goal.start_weight }, { date: goal.target_date, value: goal.target_weight }]
+                : undefined;
+              return (
+                <InteractiveChart key={serie} series={conf.data} today={todayJST()}
+                                  unit={conf.unit} decimals={conf.decimals} minSpan={conf.minSpan} plan={planLine} />
+              );
+            })()}
           </div>
 
           {/* ===== カレンダー（日タップで詳細・編集） ===== */}

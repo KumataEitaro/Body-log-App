@@ -1,14 +1,15 @@
-/* ===== BodyLog iOS-native design system（ライトテーマ） =====
-   bg #f8fafc (slate-50) / surface #ffffff / accent #059669 (emerald-600) / alert #f43f5e (rose) */
+/* ===== BodyLog design system「Editorial」（C案・ライト固定） =====
+   紙白 #fbfbfa / 墨 #0e1116 / 罫線 #e9eae7 / アクセントは emerald #059669 の1点のみ。
+   例外として「データの意味を持つ色」（判定5色・PFC3色）だけ許可。装飾色は禁止。 */
 :root {
-  --bg: #f8fafc; --panel: #ffffff; --ink: #0f172a; --sub: #64748b; --line: #e2e8f0;
-  --navy: #0f1b2a;
-  --teal: #059669; --teal-weak: #ecfdf5;
-  --green: #059669; --green-weak: #d1fae5;
-  --amber: #d97706; --amber-weak: #fef3c7;
-  --coral: #e11d48; --coral-weak: #ffe4e6;
-  --blue: #0284c7; --blue-weak: #e0f2fe;
-  --blur-bg: rgba(248, 250, 252, 0.85);
+  --bg: #fbfbfa; --panel: #ffffff; --ink: #0e1116; --sub: #6a7280; --faint: #9aa1ab; --line: #e9eae7;
+  --navy: #0e1116;
+  --teal: #059669; --teal-weak: #e7f6f0;
+  --green: #059669; --green-weak: #e2f3ec;
+  --amber: #b45309; --amber-weak: #f7efdd;
+  --coral: #dc2648; --coral-weak: #fbe7ec;
+  --blue: #0369a1; --blue-weak: #e3eff7;
+  --blur-bg: rgba(251, 251, 250, 0.92);
   --tabbar-h: 62px;
   --sa-b: env(safe-area-inset-bottom, 0px);
   --sa-t: env(safe-area-inset-top, 0px);
@@ -33,8 +34,8 @@ a { color: var(--teal); }
   -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
   border-bottom: 0.5px solid rgba(15, 23, 42, 0.08);
 }
-.topbar .bar { width: 4px; height: 18px; background: var(--teal); border-radius: 2px; }
-.topbar h1 { font-size: 17px; margin: 0; font-weight: 800; letter-spacing: -0.01em; line-height: 1; }
+.topbar .bar { width: 4px; height: 15px; background: var(--teal); border-radius: 1px; }
+.topbar h1 { font-size: 14px; margin: 0; font-weight: 800; letter-spacing: 0.03em; line-height: 1; }
 .topbar .spacer { flex: 1; }
 .topbar button.link { background: none; border: none; color: var(--sub); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 8px; }
 /* プロフィールアイコン（イニシャル円） */
@@ -56,12 +57,14 @@ a { color: var(--teal); }
 }
 .tabbar-inner { display: flex; max-width: 780px; margin: 0 auto; height: var(--tabbar-h); }
 .tab {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  color: var(--sub); font-size: 10px; font-weight: 700; text-decoration: none;
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: #b9bfc7; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-decoration: none;
   -webkit-tap-highlight-color: transparent; position: relative;
 }
-.tab svg { width: 23px; height: 23px; }
-.tab.active { color: var(--teal); }
+.tab svg { width: 22px; height: 22px; }
+.tab.active { color: var(--ink); }
+/* アクティブはエメラルドの点で示す（C案） */
+.tab.active::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--teal); margin-top: 1px; }
 .tab-dot {
   position: absolute; top: 9px; margin-left: 26px;
   width: 8px; height: 8px; border-radius: 50%; background: var(--coral);
@@ -91,16 +94,15 @@ a { color: var(--teal); }
 .nudge-cta.ghost { background: var(--teal-weak); color: var(--teal); }
 .nudge-later { background: none; border: none; color: var(--sub); font-size: 13px; padding: 8px; }
 
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 12px;
-  box-shadow: 0 1px 2px rgba(15,23,42,.06); }
-h2 { font-size: 14px; margin: 0 0 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+h2 { font-size: 12px; margin: 0 0 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--sub); }
 .muted { color: var(--sub); font-size: 13px; }
 
 /* ===== forms ===== */
 label { display: block; font-size: 12px; color: var(--sub); font-weight: 700; margin: 10px 0 4px; }
 input, select, textarea {
-  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--bg); color: var(--ink); font-family: inherit;
+  width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 8px;
+  background: #fff; color: var(--ink); font-family: inherit;
   font-size: 16px; /* 16px未満だとiOSがフォーカス時に自動ズームしてレイアウトがずれる */
   min-height: 44px;
 }
@@ -114,11 +116,11 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-button { cursor: pointer; border: none; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 700; font-family: inherit;
+button { cursor: pointer; border: none; border-radius: 8px; padding: 11px 16px; font-size: 13.5px; font-weight: 800; letter-spacing: 0.04em; font-family: inherit;
   -webkit-tap-highlight-color: transparent; }
-.btn-primary { background: var(--teal); color: #fff; width: 100%; }
+.btn-primary { background: var(--ink); color: #fff; width: 100%; }
 .btn-primary:active { transform: scale(0.98); }
-.btn-ghost { background: var(--teal-weak); color: var(--teal); }
+.btn-ghost { background: #fff; border: 1.5px solid var(--line); color: var(--ink); }
 button:disabled { opacity: .5; cursor: default; }
 .msg { margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-weight: 700; font-size: 13px; }
 .msg.ok { background: var(--green-weak); color: var(--green); }
@@ -133,6 +135,35 @@ button:disabled { opacity: .5; cursor: default; }
   background: var(--panel); border: 1px solid var(--line); color: var(--sub); font-size: 16px; }
 .datenav .today-chip { min-height: 40px; padding: 0 12px; border-radius: 12px;
   background: var(--teal-weak); color: var(--teal); font-size: 12px; white-space: nowrap; }
+
+/* ===== C案ヒーロー（巨大数字＋水平プログレスライン） ===== */
+.hero2 { padding: 16px 6px 6px; margin-bottom: 6px; }
+.hero2-label { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; color: var(--faint); }
+.hero2-num { font-size: clamp(60px, 19vw, 84px); font-weight: 700; letter-spacing: -0.05em; line-height: 1.06; margin-top: 2px; }
+.hero2-num small { font-size: 15px; font-weight: 600; color: var(--faint); letter-spacing: 0; }
+.hero2-num.over { color: var(--coral); }
+.hline { height: 4px; background: var(--line); position: relative; margin-top: 14px; }
+.hline i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--teal); }
+.hline b { position: absolute; top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--teal); border: 3px solid var(--bg); transform: translateX(-7px); }
+.hline i.over, .hline b.over { background: var(--coral); }
+.hero2-meta { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--sub); }
+.hero2-pfc { margin-top: 12px; font-size: 13.5px; font-weight: 600; color: var(--sub); }
+.hero2-pfc span { margin-right: 16px; }
+.hero2-pfc b { color: var(--ink); font-weight: 700; }
+.hero2-pfc b.over { color: var(--coral); }
+
+/* ===== インタラクティブチャート ===== */
+.ichart-wrap { position: relative; }
+.ichart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ichart-trend { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.ichart-trend small { font-size: 11px; color: var(--faint); font-weight: 600; letter-spacing: 0.04em; display: block; }
+.ichart-range { font-size: 11px; color: var(--faint); font-weight: 600; }
+.ichart-svg { touch-action: none; user-select: none; -webkit-user-select: none; display: block; width: 100%; }
+.ichart-tip { position: absolute; transform: translateX(-50%); background: var(--ink); color: #fff;
+  border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; z-index: 5;
+  text-align: center; }
+.ichart-tip small { display: block; font-size: 10px; font-weight: 600; opacity: 0.7; }
+.ichart-empty { padding: 34px 0; text-align: center; }
 
 /* ===== 円形プログレスリング（残りkcal） ===== */
 .ring-wrap { position: relative; width: 188px; height: 188px; margin: 8px auto 4px; }
@@ -209,9 +240,9 @@ button:disabled { opacity: .5; cursor: default; }
   color: var(--sub); font-size: 18px;
 }
 .dock-send {
-  height: 42px; min-height: 42px; flex: none; padding: 0 16px;
-  border-radius: 21px; background: var(--teal); color: #fff;
-  font-size: 14px; font-weight: 800; white-space: nowrap;
+  height: 42px; min-height: 42px; flex: none; padding: 0 18px;
+  border-radius: 8px; background: var(--ink); color: #fff;
+  font-size: 13px; font-weight: 800; letter-spacing: 0.06em; white-space: nowrap;
 }
 .dock-send:active { transform: scale(0.97); }
 .dock-hint { font-size: 10.5px; color: var(--sub); text-align: center; margin-top: 5px; opacity: .8; }
@@ -221,8 +252,9 @@ button:disabled { opacity: .5; cursor: default; }
 .chip-strip { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 2px;
   -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .chip-strip::-webkit-scrollbar { display: none; }
-.chip { background: var(--teal-weak); color: var(--teal); border: none; border-radius: 999px;
+.chip { background: #fff; color: var(--sub); border: 1.5px solid var(--line); border-radius: 999px;
   padding: 7px 13px; font-size: 12.5px; font-weight: 700; white-space: nowrap; flex: none; }
+.chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 /* 保存前の記録に戻るピル */
 .resume-pill { display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
   background: var(--panel); border: 1px solid var(--teal); color: var(--teal);
@@ -332,10 +364,10 @@ th { color: var(--sub); font-size: 11px; font-weight: 700; }
 .chart-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; }
 .chart-bar.OK { background: var(--green); } .chart-bar.tri { background: var(--teal); }
 .chart-bar.x { background: var(--amber); } .chart-bar.low { background: var(--blue); } .chart-bar.NG { background: var(--coral); }
-/* 期間切替セグメント */
-.seg { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 3px; width: max-content; margin: 0 auto 10px; }
-.seg button { padding: 6px 14px; font-size: 12.5px; font-weight: 700; border-radius: 9px; background: none; color: var(--sub); }
-.seg button.active { background: var(--teal); color: #fff; }
+/* 期間切替セグメント（C案: 白地・墨のアクティブ） */
+.seg { display: flex; gap: 2px; background: #fff; border: 1.5px solid var(--line); border-radius: 8px; padding: 2px; width: max-content; margin: 0 auto 10px; }
+.seg button { padding: 6px 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; border-radius: 5px; background: none; color: var(--faint); }
+.seg button.active { background: var(--ink); color: #fff; }
 
 .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12.5px; color: var(--sub); }
 .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
