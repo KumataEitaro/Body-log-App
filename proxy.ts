@@ -28,7 +28,8 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path === '/login';
   const isPublicPage = path === '/terms' || path === '/privacy' // 規約類は未ログインでも閲覧可（審査要件）
-    || (path.startsWith('/dev-preview') && process.env.NODE_ENV !== 'production'); // UI確認用（開発時のみ）
+    || (path.startsWith('/dev-preview') && process.env.NODE_ENV !== 'production') // UI確認用（開発時のみ）
+    || path.startsWith('/dev-preview/concept'); // UIコンセプト比較モック（静的・データなし・実機確認用に公開）
 
   if (isPublicPage) return response;
   if (!user && !isAuthPage) {
