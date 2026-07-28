@@ -18,7 +18,8 @@
 html, body { margin: 0; padding: 0; }
 html { color-scheme: light; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+  /* B案: 欧文・数字=Inter Tight / 日本語=Noto Sans JP（next/fontのCSS変数）。未読込時はシステムへフォールバック */
+  font-family: var(--font-latin), var(--font-jp), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
   background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
