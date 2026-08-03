@@ -1,19 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 
+// 日本のユーザーが主のため東京リージョンで実行（画像アップロードとSupabase往復を短縮）
+export const preferredRegion = 'hnd1';
+
 const MAX_IMAGES = 4;
 const MAX_IMAGE_BYTES = 1_500_000; // base64後~2MB
 
 export async function POST(req: Request) {
-  // ログイン済みユーザーのみ利用可
+  const t0 = Date.now();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  // 認証確認とリクエストボディ読込を並列に
+  const [{ data: { user } }, bodyRaw] = await Promise.all([
+    supabase.auth.getUser(),
+    req.json().catch(() => null),
+  ]);
   if (!user) {
     return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
+  }
+  if (!bodyRaw) {
+    return NextResponse.json({ ok: false, error: '不正なリクエストです。' }, { status: 400 });
   }
 
   const key = process.env.GEMINI_API_KEY;
@@ -21,32 +32,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'サーバーにAI用のAPIキーが未設定です（管理者向け: GEMINI_API_KEY）。' }, { status: 500 });
   }
 
-  // ===== 1日の使用回数チェック（無制限アカウントは上限チェックのみスキップ。記録等は共通） =====
-  const unlimited = isUnlimited(user.email);
-  const today = todayJST();
-  const { data: usage } = await supabase.from('ai_usage')
-    .select('count').eq('user_id', user.id).eq('date', today).maybeSingle();
-  const used = usage?.count ?? 0;
-  if (!unlimited && used >= AI_DAILY_LIMIT) {
-    return NextResponse.json({
-      ok: false, remaining: 0,
-      error: `本日のAI解析回数（${AI_DAILY_LIMIT}回）を使い切りました。明日また使えます。`,
-    }, { status: 429 });
-  }
-  // 全体上限（課金の安全弁）。管理者もコスト保護のため対象
-  if (await globalCapReached()) {
-    return NextResponse.json({
-      ok: false, remaining: unlimited ? null : AI_DAILY_LIMIT - used,
-      error: '本日はサービス全体のAI利用上限に達しました。明日また使えます。',
-    }, { status: 429 });
-  }
-
   // ===== 入力 =====
   let text = '';
   let images: { data: string; mime: string }[] = [];
   let outLang = '';
-  try {
-    const body = await req.json();
+  {
+    const body = bodyRaw as { text?: unknown; lang?: unknown; images?: unknown };
     text = String(body.text || '').slice(0, 3000);
     const l = findLang(String(body.lang || ''));
     if (l && l.code !== 'ja') outLang = `${l.name}（${l.native}）`;
@@ -57,16 +48,36 @@ export async function POST(req: Request) {
           /^image\/(jpeg|png|webp)$/.test(String(im?.mime)))
         .map((im: { data: string; mime: string }) => ({ data: im.data, mime: im.mime }));
     }
-  } catch {
-    return NextResponse.json({ ok: false, error: '不正なリクエストです。' }, { status: 400 });
   }
   if (!text.trim() && images.length === 0) {
     return NextResponse.json({ ok: false, error: 'テキストか写真のどちらかを入れてください。' }, { status: 400 });
   }
 
+  // ===== 使用回数チェック・全体上限・マイ食品辞書を並列取得（直列3往復→1往復分の時間に） =====
+  const unlimited = isUnlimited(user.email);
+  const today = todayJST();
+  const [usageRes, capReached, myFoodsRes] = await Promise.all([
+    supabase.from('ai_usage').select('count').eq('user_id', user.id).eq('date', today).maybeSingle(),
+    globalCapReached(),
+    supabase.from('my_foods').select('name,kind,unit,kcal,p,f,c,note,serving_label,serving_ratio').limit(60),
+  ]);
+  const used = usageRes.data?.count ?? 0;
+  if (!unlimited && used >= AI_DAILY_LIMIT) {
+    return NextResponse.json({
+      ok: false, remaining: 0,
+      error: `本日のAI解析回数（${AI_DAILY_LIMIT}回）を使い切りました。明日また使えます。`,
+    }, { status: 429 });
+  }
+  // 全体上限（課金の安全弁）。管理者もコスト保護のため対象
+  if (capReached) {
+    return NextResponse.json({
+      ok: false, remaining: unlimited ? null : AI_DAILY_LIMIT - used,
+      error: '本日はサービス全体のAI利用上限に達しました。明日また使えます。',
+    }, { status: 429 });
+  }
+
   // ユーザー登録のマイ食品・レシピを辞書としてプロンプトに注入
-  const { data: myFoods } = await supabase.from('my_foods')
-    .select('name,kind,unit,kcal,p,f,c,note,serving_label,serving_ratio').limit(60);
+  const myFoods = myFoodsRes.data;
   let dictBlock = '';
   if (myFoods && myFoods.length > 0) {
     const lines = myFoods.map((fd) => {
@@ -113,7 +124,9 @@ export async function POST(req: Request) {
   }
 
   try {
+    const tSetup = Date.now() - t0;
     const r = await callGemini(key, parts, 0);
+    const tAi = Date.now() - t0 - tSetup;
     if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
     let parsed;
     try {
@@ -121,9 +134,17 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ ok: false, error: 'AIの応答を解釈できませんでした。もう一度お試しください。' }, { status: 502 });
     }
-    // 使用回数をカウントアップ（成功時のみ・無制限アカウントも記録は共通）
-    await supabase.from('ai_usage').upsert({ user_id: user.id, date: today, count: used + 1 });
-    return NextResponse.json({ ok: true, result: parsed, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1 });
+    // 使用回数のカウントアップは応答を返した後に実行（ユーザーを待たせない）
+    const bumpUsage = async () => {
+      try { await supabase.from('ai_usage').upsert({ user_id: user.id, date: today, count: used + 1 }); } catch { /* 計上失敗は無視 */ }
+    };
+    try { after(bumpUsage); } catch { void bumpUsage(); } // after非対応環境（テスト等）は即時実行
+    const totalMs = Date.now() - t0;
+    console.log(`[parse-food] setup=${tSetup}ms ai=${tAi}ms total=${totalMs}ms imgs=${images.length} textLen=${text.length}`);
+    return NextResponse.json({
+      ok: true, result: parsed, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1,
+      timings: { setupMs: tSetup, aiMs: tAi, totalMs },
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, error: '解析に失敗しました: ' + (e instanceof Error ? e.message : String(e)) }, { status: 500 });
   }

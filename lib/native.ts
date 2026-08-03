@@ -92,7 +92,7 @@ export async function pickPhotoNative(): Promise<PickPhotoResult> {
     const photo = await cam.getPhoto({
       resultType: 'base64',
       source: 'PROMPT', // 撮影 or ライブラリを選ばせる
-      quality: 80,
+      quality: 70,
       width: 1024,
       correctOrientation: true,
     });

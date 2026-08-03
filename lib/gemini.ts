@@ -71,45 +71,66 @@ export function parseJsonLoose(text: string): unknown {
 export async function callGemini(
   key: string, parts: Part[], temperature = 0
 ): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string }> {
-  if (!cachedModels) cachedModels = await discover(key);
+  // モデル発見は待たない（コールドスタート時の+数百msを削減）。
+  // キャッシュが無ければ静的リストで即開始し、発見は裏で走らせて次回以降に反映する。
+  if (!cachedModels) {
+    discover(key).then((m) => { if (m.length) cachedModels = m; }).catch(() => { /* 無視 */ });
+  }
   const discovered = cachedModels && cachedModels.length ? cachedModels.slice(0, 4) : [];
   const list = [...new Set([...discovered, ...STATIC_FALLBACK])];
 
   let lastErr = '';
   let sawStale = false;
   for (const model of list) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 20000); // 1モデル20秒で打ち切り
-    let res: Response;
-    try {
-      res = await fetch(`${BASE}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature, responseMimeType: 'application/json' } }),
-        signal: ctrl.signal,
-      });
-    } catch {
+    // 2.5系/latest系は「思考(thinking)」がデフォルト有効で数秒〜10秒消費するため無効化する（速度最優先）。
+    // thinkingConfig非対応モデルで400が返ったら、外して同モデルで1回だけ再試行。
+    let includeThinking = /2\.5|latest/.test(model);
+    let attempt = 0;
+    while (attempt < 2) {
+      attempt++;
+      const genCfg: Record<string, unknown> = {
+        temperature,
+        responseMimeType: 'application/json',
+        maxOutputTokens: 2048, // 出力を必要十分に制限（無制限だと遅延・コストが伸びる）
+        ...(includeThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      };
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 20000); // 1モデル20秒で打ち切り
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts }], generationConfig: genCfg }),
+          signal: ctrl.signal,
+        });
+      } catch {
+        clearTimeout(timer);
+        lastErr = `${model}: タイムアウト(20秒)`;
+        break; // 次のモデルへ
+      }
       clearTimeout(timer);
-      lastErr = `${model}: タイムアウト(20秒)`;
-      continue;
-    }
-    clearTimeout(timer);
 
-    if (!res.ok) {
-      const t = await res.text();
-      lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 100)}`;
-      if (res.status === 404) sawStale = true;                 // モデル廃止 → 次へ
-      // 429=枠上限 / 404=廃止 / 500,503=そのモデルが過負荷・不調 → いずれも次のモデルで続行
-      if (res.status === 429 || res.status === 404 || res.status === 500 || res.status === 503) continue;
-      if (sawStale) cachedModels = null;
-      return { ok: false, status: 502, error: `AI APIエラー(${res.status}): ${t.slice(0, 180)}` };
+      if (!res.ok) {
+        const t = await res.text();
+        lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 100)}`;
+        if (res.status === 400 && includeThinking && /think/i.test(t)) {
+          includeThinking = false; // thinking未対応 → 外して再試行
+          continue;
+        }
+        if (res.status === 404) sawStale = true;                 // モデル廃止 → 次へ
+        // 429=枠上限 / 404=廃止 / 500,503=そのモデルが過負荷・不調 → いずれも次のモデルで続行
+        if (res.status === 429 || res.status === 404 || res.status === 500 || res.status === 503) break;
+        if (sawStale) cachedModels = null;
+        return { ok: false, status: 502, error: `AI APIエラー(${res.status}): ${t.slice(0, 180)}` };
+      }
+      const j = await res.json();
+      // thinking系モデルは複数パーツで返すことがあるため全テキストを連結
+      const partsArr: Array<{ text?: string }> = j.candidates?.[0]?.content?.parts || [];
+      const out = partsArr.map((p) => p.text || '').join('');
+      if (!out) { lastErr = `${model}: 空応答`; break; }
+      return { ok: true, text: out };
     }
-    const j = await res.json();
-    // thinking系モデルは複数パーツで返すことがあるため全テキストを連結
-    const partsArr: Array<{ text?: string }> = j.candidates?.[0]?.content?.parts || [];
-    const out = partsArr.map((p) => p.text || '').join('');
-    if (!out) { lastErr = `${model}: 空応答`; continue; }
-    return { ok: true, text: out };
   }
   if (sawStale) cachedModels = null; // 全滅時は次回再発見
   return { ok: false, status: 502, error: `AIが一時的に使えませんでした。少し待って再試行してください。（${lastErr}）` };

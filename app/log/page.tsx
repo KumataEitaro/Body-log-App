@@ -7,7 +7,7 @@ import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DA
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
-import { servingOf } from '@/lib/foods';
+import { servingOf, matchFoodsLocally } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
 import { cacheGet, cacheSet } from '@/lib/cache';
@@ -54,8 +54,8 @@ async function resizeImage(file: File): Promise<NewPhoto> {
   canvas.width = Math.round(img.width * scale);
   canvas.height = Math.round(img.height * scale);
   canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const outUrl = canvas.toDataURL('image/jpeg', 0.82);
-  const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.82));
+  const outUrl = canvas.toDataURL('image/jpeg', 0.72);
+  const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.72));
   return { blob, dataUrl: outUrl, base64: outUrl.split(',')[1], mime: 'image/jpeg' };
 }
 
@@ -105,6 +105,7 @@ export default function LogPage() {
   const [eEx, setEEx] = useState<ExLevel>('オフ'); const [eAdj, setEAdj] = useState('0'); const [eWeight, setEWeight] = useState(''); const [eWaist, setEWaist] = useState(''); const [eMood, setEMood] = useState('');
 
   const [parsing, setParsing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false); // シート内スケルトン表示用（解析待ち）
   const [saving, setSaving] = useState(false);
   const [parseMsg, setParseMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ cls: 'ok' | 'err'; text: string } | null>(null);
@@ -301,13 +302,30 @@ export default function LogPage() {
       setParseMsg({ cls: 'err', text: 'メモを書くか写真を追加してください。' });
       return;
     }
+
+    // ===== ① 辞書ローカル即答（0秒）: 写真なし＆テキストがマイ食品辞書だけで完全に解ける場合、AIを使わない =====
+    if (photos.length === 0) {
+      const local = matchFoodsLocally(chat, myFoods);
+      if (local) {
+        hapticTap();
+        setParsed({ items: local, total: sumItems(local), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
+        setEditMode(false); setParseMsg(null);
+        setSheetOpen(true);
+        return; // AI枠も消費しない
+      }
+    }
+
+    // ===== ② AI解析: シートを即開いてスケルトン表示（体感待ち時間を削減） =====
     setParsing(true); setParseMsg(null);
+    setAnalyzing(true); setSheetOpen(true);
     try {
+      const t0 = performance.now();
       const res = await fetch('/api/parse-food', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: chat, images: photos.map((p) => ({ data: p.base64, mime: p.mime })), lang: localStorage.getItem('bodylog-lang') || 'ja' }),
       });
       const j = await res.json();
+      if (j.timings) console.log(`[AI] client=${Math.round(performance.now() - t0)}ms server:`, j.timings);
       if (typeof j.remaining === 'number') setRemaining(j.remaining);
       if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
       setParsed({
@@ -321,12 +339,13 @@ export default function LogPage() {
         questions: Array.isArray(j.result.questions) ? j.result.questions.filter((q: unknown) => typeof q === 'string') : [],
       });
       setEditMode(false);
-      setSheetOpen(true); // 結果はボトムシートで確認
       setParseMsg(null);
     } catch (e) {
+      setSheetOpen(false); // 失敗時はシートを閉じてドックにエラー表示
       setParseMsg({ cls: 'err', text: e instanceof Error ? e.message : String(e) });
     } finally {
       setParsing(false);
+      setAnalyzing(false);
     }
   }
 
@@ -780,7 +799,26 @@ export default function LogPage() {
       })()}
 
       {/* ===== 解析結果（保存前の確認）— iOSボトムシート ===== */}
-      <Sheet open={sheetOpen && !!parsed} onClose={() => (editingLog ? cancelEditLog() : setSheetOpen(false))}>
+      <Sheet open={sheetOpen && (!!parsed || analyzing)} onClose={() => (editingLog ? cancelEditLog() : setSheetOpen(false))}>
+        {!parsed && analyzing && (
+          <div>
+            <h2>AIが解析中… <span className="muted" style={{ fontWeight: 400 }}>— 数秒で品目が出ます</span></h2>
+            {photos.length > 0 && (
+              <div className="photo-row" style={{ marginBottom: 10 }}>
+                {photos.map((p, i) => (
+                  <div className="thumb" key={i}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.dataUrl} alt="" />
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="skel-row" style={{ width: '82%' }} />
+            <div className="skel-row" style={{ width: '64%' }} />
+            <div className="skel-row" style={{ width: '73%' }} />
+            <div className="skel-row" style={{ width: '38%', height: 28, marginTop: 14 }} />
+          </div>
+        )}
         {parsed && (
         <div>
           <h2>

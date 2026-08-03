@@ -22,7 +22,7 @@ export async function resizeImage(file: File | Blob): Promise<ResizedImage> {
   canvas.width = Math.round(img.width * scale);
   canvas.height = Math.round(img.height * scale);
   canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const outUrl = canvas.toDataURL('image/jpeg', 0.82);
-  const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.82));
+  const outUrl = canvas.toDataURL('image/jpeg', 0.72);
+  const blob: Blob = await new Promise((res) => canvas.toBlob((b) => res(b!), 'image/jpeg', 0.72));
   return { blob, dataUrl: outUrl, base64: outUrl.split(',')[1], mime: 'image/jpeg' };
 }

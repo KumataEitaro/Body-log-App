@@ -414,6 +414,12 @@ td .item-input.num-cell { width: 64px; text-align: right; }
 /* file input を視覚的に隠す（hidden/display:none だと iOS WKWebView が programmatic click を無視することがある） */
 .file-hidden { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; min-height: 0; padding: 0; border: none; }
 
+/* 解析待ちスケルトン（シマー） */
+.skel-row { height: 40px; border-radius: 8px; margin-bottom: 8px;
+  background: linear-gradient(90deg, #f0f1ef 25%, #e6e7e5 37%, #f0f1ef 63%);
+  background-size: 400% 100%; animation: skel 1.2s ease infinite; }
+@keyframes skel { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
 @keyframes sp { to { transform: rotate(360deg); } }
 .hidden { display: none; }
