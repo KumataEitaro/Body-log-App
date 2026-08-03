@@ -80,14 +80,19 @@ export default function DevPreviewPage() {
       </div>
 
       <div className="card">
-        <h2>今日 の記録 <span className="muted" style={{ fontWeight: 400 }}>3件</span></h2>
-        {feed.map((f, i) => (
+        <h2>今日の記録<span className="muted" style={{ fontWeight: 400, letterSpacing: 0 }}> — 3件</span></h2>
+        {[
+          { time: '08:12', title: 'プロテイン ×1、ゆで卵 ×2', sub: '', kcal: '320', green: false },
+          { time: '12:30', title: '牛丼並盛 1杯、サラダ 1皿', sub: '昼は牛丼並盛とサラダ', kcal: '800', green: false },
+          { time: '18:40', title: '運動 通常', sub: 'ジムで筋トレ1時間 ・ 体重 73.5kg', kcal: '+150', green: true },
+        ].map((f, i) => (
           <div className="feed-row" key={i}>
-            <div className="feed-icon">{f.icon}</div>
+            <span className="feed-time num">{f.time}</span>
             <div className="feed-body">
-              <div>{f.main.replace(' ⏳', '')}{f.main.includes('⏳') && <span className="pending-tag">⏳未同期</span>}</div>
-              <div className="muted feed-text"><span className="num">{f.time}</span>{f.text ? `　${f.text}` : ''}</div>
+              <div className="feed-title">{f.title}</div>
+              {f.sub && <div className="feed-sub muted">{f.sub}</div>}
             </div>
+            <b className={`feed-kcal num ${f.green ? 'pos' : ''}`}>{f.kcal}{!f.green && <small> kcal</small>}</b>
             <button className="item-edit">✎</button>
             <button className="item-del">×</button>
           </div>

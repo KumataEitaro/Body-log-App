@@ -727,20 +727,44 @@ export default function LogPage() {
     return Math.max(0, plan.requiredDailyWithEvents - loosened.requiredDailyWithEvents);
   })();
 
-  function logSummaryText(l: LogRow): string {
-    const parts: string[] = [];
+  // フィード1行の表示内容（主タイトル＝品目を分量つきで、右端＝kcal、補足＝運動/体重/気分）
+  function feedLine(l: LogRow): { title: string; right: string | null; rightUnit: string; rightGreen: boolean; extras: string[] } {
     const items = (l.items as ParsedItem[]) || [];
+    const extras: string[] = [];
+    let title = '';
+    let right: string | null = null;
+    let rightUnit = '';
+    let rightGreen = false;
+
+    const exKcal = (EX_ADD[(l.ex as ExLevel) || 'オフ'] ?? 0) + (Number(l.adj) || 0);
+    const exText = l.ex && l.ex !== 'オフ' ? `運動${l.ex} +${exKcal}` : Number(l.adj) ? `補正${Number(l.adj) > 0 ? '+' : ''}${l.adj}` : null;
+
     if (l.kcal != null) {
-      const names = items.slice(0, 3).map((it) => it.name).filter(Boolean).join('、');
-      parts.push(`🍽 ${names || '食事'}${items.length > 3 ? ' ほか' : ''} ${Math.round(Number(l.kcal)).toLocaleString()}kcal`);
+      // 品目は分量つきで表示（例: プロテイン ×2、ごはん 180g）
+      const names = items.slice(0, 3)
+        .map((it) => (it.qty && String(it.qty).trim() && String(it.qty).trim() !== '×1' ? `${it.name} ${it.qty}` : it.name))
+        .filter(Boolean).join('、');
+      title = names || '食事';
+      if (items.length > 3) title += ` ほか${items.length - 3}品`;
+      right = Math.round(Number(l.kcal)).toLocaleString();
+      rightUnit = 'kcal';
+      if (exText) extras.push(exText);
+    } else if (exText) {
+      title = l.ex && l.ex !== 'オフ' ? `運動 ${l.ex}` : '運動補正';
+      right = `${exKcal > 0 ? '+' : ''}${exKcal}`;
+      rightGreen = true;
     }
-    if (l.ex && l.ex !== 'オフ') parts.push(`🏃 ${l.ex}(+${EX_ADD[l.ex as ExLevel] + (Number(l.adj) || 0)})`);
-    else if (Number(l.adj)) parts.push(`🏃 補正${Number(l.adj) > 0 ? '+' : ''}${l.adj}`);
-    if (l.weight != null) parts.push(`⚖ ${Number(l.weight).toFixed(1)}kg`);
-    if (l.waist != null) parts.push(`📏 ${Number(l.waist).toFixed(1)}cm`);
-    if (l.mood) parts.push(`😊 ${l.mood}`);
-    if (parts.length === 0) parts.push(String(l.text || '').slice(0, 30) || '記録');
-    return parts.join('　');
+    if (l.weight != null) {
+      const s = `体重 ${Number(l.weight).toFixed(1)}kg`;
+      if (!title) title = s; else extras.push(s);
+    }
+    if (l.waist != null) {
+      const s = `ウエスト ${Number(l.waist).toFixed(1)}cm`;
+      if (!title) title = s; else extras.push(s);
+    }
+    if (l.mood) extras.push(String(l.mood));
+    if (!title) title = String(l.text || '記録').slice(0, 40);
+    return { title, right, rightUnit, rightGreen, extras };
   }
 
   return (
@@ -960,38 +984,42 @@ export default function LogPage() {
 
       {/* ===== この日の記録フィード ===== */}
       <div className="card">
-        <h2>{date === todayJST() ? '今日' : date} の記録 <span className="muted" style={{ fontWeight: 400 }}>{dayLogs.length + (legacyEntry ? 1 : 0)}件</span></h2>
+        <h2>{date === todayJST() ? '今日の記録' : `${date.replace(/-/g, '/')}の記録`}<span className="muted" style={{ fontWeight: 400, letterSpacing: 0 }}> — {dayLogs.length + (legacyEntry ? 1 : 0)}件</span></h2>
         {legacyEntry && (
           <div className="feed-row">
-            <div className="feed-time num">まとめ</div>
+            <span className="feed-time num">まとめ</span>
             <div className="feed-body">
-              <div>
-                {legacyEntry.intake != null ? `🍽 ${Math.round(Number(legacyEntry.intake)).toLocaleString()}kcal　` : ''}
-                {legacyEntry.ex && legacyEntry.ex !== 'オフ' ? `🏃 ${String(legacyEntry.ex)}　` : ''}
-                {legacyEntry.weight != null ? `⚖ ${Number(legacyEntry.weight).toFixed(1)}kg　` : ''}
-                {legacyEntry.mood ? `😊 ${String(legacyEntry.mood)}` : ''}
+              <div className="feed-title">
+                {[
+                  legacyEntry.intake != null ? `${Math.round(Number(legacyEntry.intake)).toLocaleString()}kcal` : '',
+                  legacyEntry.ex && legacyEntry.ex !== 'オフ' ? `運動${String(legacyEntry.ex)}` : '',
+                  legacyEntry.weight != null ? `体重 ${Number(legacyEntry.weight).toFixed(1)}kg` : '',
+                  legacyEntry.mood ? String(legacyEntry.mood) : '',
+                ].filter(Boolean).join(' ・ ')}
               </div>
-              <div className="muted feed-text">この日の1日まとめ記録（新しく追記すると自動でフィード形式に移行されます）</div>
+              <div className="feed-sub muted">この日の1日まとめ記録（新しく追記すると自動でフィード形式に移行されます）</div>
             </div>
           </div>
         )}
         {dayLogs.length === 0 && !legacyEntry && (
-          <p className="muted">まだ記録がありません。上から1回分ずつ記録していきましょう。</p>
+          <p className="muted">まだ記録がありません。下の入力欄から1回分ずつ記録していきましょう。</p>
         )}
-        {dayLogs.map((l) => (
-          <div className="feed-row" key={l.id}>
-            <div className="feed-icon">{l.kcal != null ? '🍽' : (l.ex && l.ex !== 'オフ') || Number(l.adj) ? '🏃' : l.weight != null ? '⚖️' : '📝'}</div>
-            <div className="feed-body">
-              <div>{logSummaryText(l)}{l.id.startsWith('local-') && <span className="pending-tag" title="通信回復後に自動同期されます">⏳未同期</span>}</div>
-              <div className="muted feed-text">
-                <span className="num">{timeJST(l.at)}</span>
-                {l.text ? <>　{String(l.text).slice(0, 60)}</> : null}
+        {dayLogs.map((l) => {
+          const f = feedLine(l);
+          const sub = [...f.extras, l.text ? String(l.text).slice(0, 40) : ''].filter(Boolean).join(' ・ ');
+          return (
+            <div className="feed-row" key={l.id}>
+              <span className="feed-time num">{timeJST(l.at)}</span>
+              <div className="feed-body">
+                <div className="feed-title">{f.title}{l.id.startsWith('local-') && <span className="pending-tag" title="通信回復後に自動同期されます">⏳未同期</span>}</div>
+                {sub && <div className="feed-sub muted">{sub}</div>}
               </div>
+              {f.right && <b className={`feed-kcal num ${f.rightGreen ? 'pos' : ''}`}>{f.right}{f.rightUnit ? <small> {f.rightUnit}</small> : null}</b>}
+              {!l.id.startsWith('local-') && <button className="item-edit" onClick={() => startEditLog(l)} title="この記録を編集">✎</button>}
+              <button className="item-del" onClick={() => deleteLog(l)} title={l.id.startsWith('local-') ? 'この未同期記録を取り消す' : 'この記録を削除'}>×</button>
             </div>
-            {!l.id.startsWith('local-') && <button className="item-edit" onClick={() => startEditLog(l)} title="この記録を編集">✎</button>}
-            <button className="item-del" onClick={() => deleteLog(l)} title={l.id.startsWith('local-') ? 'この未同期記録を取り消す' : 'この記録を削除'}>×</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ===== 体写真（日々の入力はこのタブに統一） ===== */}

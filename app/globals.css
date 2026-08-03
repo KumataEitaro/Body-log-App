@@ -20,7 +20,7 @@ html { color-scheme: light; }
 body {
   /* B案: 欧文・数字=Inter Tight / 日本語=Noto Sans JP（next/fontのCSS変数）。未読込時はシステムへフォールバック */
   font-family: var(--font-latin), var(--font-jp), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
-  background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.55;
+  background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; /* 日本語本文の可読行間 */
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--teal); }
@@ -96,7 +96,8 @@ a { color: var(--teal); }
 .nudge-later { background: none; border: none; color: var(--sub); font-size: 13px; padding: 8px; }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-h2 { font-size: 12px; margin: 0 0 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--sub); }
+/* 日本語見出しに過剰なトラッキングは可読性を落とすため控えめに */
+h2 { font-size: 12.5px; margin: 0 0 12px; font-weight: 800; letter-spacing: 0.05em; color: var(--sub); }
 .muted { color: var(--sub); font-size: 13px; }
 
 /* ===== forms ===== */
@@ -207,13 +208,18 @@ button:disabled { opacity: .5; cursor: default; }
 .daybar-sub b { color: var(--ink); font-size: 15px; }
 .daybar-fine { font-size: 11px; color: var(--sub); opacity: 0.75; margin-top: 6px; line-height: 1.5; }
 
-/* ===== 記録フィード（タイムライン） ===== */
-.feed-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid var(--line); }
+/* ===== 記録フィード（帳簿型: 時刻｜品目×分量｜kcal右揃え） ===== */
+.feed-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .feed-row:last-child { border-bottom: none; }
 .feed-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none;
   border-radius: 12px; background: var(--teal-weak); font-size: 16px; }
-.feed-time { color: var(--sub); font-size: 12px; font-weight: 700; padding-top: 2px; min-width: 40px; }
-.feed-body { flex: 1; font-size: 14.5px; }
+.feed-time { color: var(--faint); font-size: 11px; font-weight: 700; padding-top: 3.5px; min-width: 38px; flex: none; }
+.feed-body { flex: 1; min-width: 0; font-size: 14.5px; }
+.feed-title { font-size: 15px; font-weight: 500; line-height: 1.45; }
+.feed-sub { font-size: 12px; margin-top: 2px; line-height: 1.5; }
+.feed-kcal { flex: none; font-size: 15px; font-weight: 700; padding-top: 1.5px; }
+.feed-kcal small { font-size: 10px; color: var(--faint); font-weight: 600; }
+.feed-kcal.pos { color: var(--teal); }
 .feed-text { font-size: 12.5px; margin-top: 2px; }
 
 /* ===== フローティング入力ドック（タブバーの上・メッセージアプリ風） ===== */
