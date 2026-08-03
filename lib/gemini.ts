@@ -19,7 +19,8 @@ export function _setModelsForTest(models: string[] | null): void {
 // モデル名のスコアリング（flash優先・新しいバージョン優先・埋め込み等は除外）
 function rank(nameRaw: string): number {
   const n = nameRaw.replace('models/', '');
-  if (/embedding|aqa|imagen|veo|tts|image-generation|learnlm|gemma/i.test(n)) return -1;
+  // テキスト生成以外（画像生成系の gemini-2.5-flash-image 等も含めて）除外
+  if (/embedding|aqa|imagen|veo|tts|image|learnlm|gemma|audio|live/i.test(n)) return -1;
   let s = 0;
   if (n.includes('flash')) s += 50;
   if (n.includes('pro')) s += 20;
@@ -113,16 +114,15 @@ export async function callGemini(
 
       if (!res.ok) {
         const t = await res.text();
-        lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 100)}`;
-        if (res.status === 400 && includeThinking && /think/i.test(t)) {
-          includeThinking = false; // thinking未対応 → 外して再試行
+        lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 160)}`;
+        console.log(`[gemini] ${lastErr}`); // 失敗理由をサーバログに必ず残す
+        if (res.status === 400 && includeThinking) {
+          includeThinking = false; // 400はまずthinkingConfig非互換を疑い、外して同モデルで再試行
           continue;
         }
-        if (res.status === 404) sawStale = true;                 // モデル廃止 → 次へ
-        // 429=枠上限 / 404=廃止 / 500,503=そのモデルが過負荷・不調 → いずれも次のモデルで続行
-        if (res.status === 429 || res.status === 404 || res.status === 500 || res.status === 503) break;
-        if (sawStale) cachedModels = null;
-        return { ok: false, status: 502, error: `AI APIエラー(${res.status}): ${t.slice(0, 180)}` };
+        if (res.status === 404) sawStale = true; // モデル廃止 → 次へ
+        // どのエラーでも1モデルの非互換で全体を落とさず、次のモデルで続行する
+        break;
       }
       const j = await res.json();
       // thinking系モデルは複数パーツで返すことがあるため全テキストを連結

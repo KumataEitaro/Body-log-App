@@ -143,11 +143,14 @@ describe('POST /api/parse-food', () => {
     expect(j.result.total.kcal).toBe(50);
   });
 
-  it('429/404/503以外のAPIエラー(400等)は即座に502で返す', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(GEMINI_FAIL(400));
+  it('400エラーはthinkingを外して同モデル再試行→それでも駄目なら次モデルへ（1モデルの非互換で全体を落とさない）', async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(GEMINI_FAIL(400))  // 1回目: thinkingあり→400
+      .mockResolvedValueOnce(GEMINI_FAIL(400))  // 2回目: thinkingなし再試行→400
+      .mockResolvedValueOnce(GEMINI_OK({ items: [], total: { kcal: 100, p: 1, f: 1, c: 1 } })); // 次モデルで成功
     const res = await POST(req({ text: 'バナナ' }));
-    expect(res.status).toBe(502);
-    expect(fetch).toHaveBeenCalledTimes(1); // フォールバックしない
+    expect(res.status).toBe(200);
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 
   it('2回目の利用でremainingが正しく減る', async () => {
