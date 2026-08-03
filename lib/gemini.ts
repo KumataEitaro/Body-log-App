@@ -81,6 +81,7 @@ export async function callGemini(
   const list = [...new Set([...discovered, ...STATIC_FALLBACK])];
 
   let lastErr = '';
+  const errs: string[] = []; // 失敗理由の履歴（診断用）
   let sawStale = false;
   for (const model of list) {
     // 2.5系/latest系は「思考(thinking)」がデフォルト有効で数秒〜10秒消費するため無効化する（速度最優先）。
@@ -92,7 +93,8 @@ export async function callGemini(
       const genCfg: Record<string, unknown> = {
         temperature,
         responseMimeType: 'application/json',
-        maxOutputTokens: 2048, // 出力を必要十分に制限（無制限だと遅延・コストが伸びる）
+        // 注意: 上限を小さくすると thinking が枠を食い潰して本文が空になるモデルがあるため大きめに
+        maxOutputTokens: 8192,
         ...(includeThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       };
       const ctrl = new AbortController();
