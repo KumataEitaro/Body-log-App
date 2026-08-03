@@ -14,7 +14,8 @@ import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 import Sheet from '@/components/Sheet';
 import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
-import { healthPushDay, healthPullLatest, isHealthEnabled } from '@/lib/health';
+import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDays } from '@/lib/health';
+import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -248,7 +249,27 @@ export default function LogPage() {
   const bmr = profile ? mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) : 0;
   const baseKcal = profile ? Math.round(bmr * Number(profile.life_factor)) : 0;
   const exTotal = Math.round(dayExerciseKcal(effectiveLogs));
-  const target = baseKcal + exTotal;
+  const manualTarget = baseKcal + exTotal; // 従来式: 基礎代謝×生活係数＋手動運動加算
+
+  // ===== ヘルスケアの実測消費から目安を推計（連携ON・データがある日のみ） =====
+  // 今日=「当日実測 vs 直近7日平均」の大きい方 / 過去日=その日の実測。無ければ従来式へフォールバック
+  const [hkInfo, setHkInfo] = useState<{ actual: number | null; avg: number | null } | null>(null);
+  useEffect(() => {
+    let dead = false;
+    setHkInfo(null);
+    if (!isHealthEnabled()) return;
+    (async () => {
+      const dates = Array.from({ length: 8 }, (_, i) => shiftDate(date, -i)); // 当日＋過去7日
+      const vals = await healthActiveEnergyDays(dates);
+      if (dead) return;
+      setHkInfo({ actual: vals[0] != null ? Math.round(vals[0]) : null, avg: averageActive(vals.slice(1)) });
+    })();
+    return () => { dead = true; };
+  }, [date]);
+  const hkActive = profile ? resolveActiveKcal(hkInfo?.actual ?? null, hkInfo?.avg ?? null, date === todayJST()) : null;
+  const targetFromHealth = hkActive != null;
+  const target = targetFromHealth ? tdeeFromHealth(bmr, hkActive) : manualTarget;
+
   const eaten = Math.round(summary.intake ?? 0);
   const left = target - eaten;
   const dayVerdict = summary.intake != null ? judge(eaten - target) : null;
@@ -725,6 +746,7 @@ export default function LogPage() {
           <div className="hero2">
             <div className="hero2-label">
               {over ? 'オーバー' : 'あと食べられる'}{plan ? '（計画）' : '（維持）'}
+              {targetFromHealth && <span className="pill tri" title="ヘルスケアの実測消費に基づく推計">⌚実測</span>}
               {dayVerdict && <span className={`pill ${verdictClass(dayVerdict)}`}>{dayVerdict}</span>}
             </div>
             <div className={`hero2-num num ${over ? 'over' : ''}`}>{Math.abs(heroLeft).toLocaleString()}<small> kcal</small></div>
@@ -744,7 +766,9 @@ export default function LogPage() {
               </div>
             )}
             <div className="daybar-fine">
-              基礎代謝{Math.round(bmr).toLocaleString()}×{Number(profile.life_factor)}＋運動{exTotal.toLocaleString()}＝目安{target.toLocaleString()}
+              {targetFromHealth
+                ? `ヘルスケア実測: 基礎代謝${Math.round(bmr).toLocaleString()}＋活動${(hkActive ?? 0).toLocaleString()}＝消費${target.toLocaleString()}${hkInfo?.actual == null || (hkInfo.avg != null && hkInfo.avg > (hkInfo.actual ?? 0)) ? '（直近7日平均ベース）' : ''}`
+                : `基礎代謝${Math.round(bmr).toLocaleString()}×${Number(profile.life_factor)}＋運動${exTotal.toLocaleString()}＝目安${target.toLocaleString()}`}
               {plan && ` ／ 必要赤字${plan.requiredDailyWithEvents.toLocaleString()}/日`}
               {plan && plan.mode === 'spread' && plan.absorbToday > 0 &&
                 `（チートデイ+${plan.eventsExtra.toLocaleString()}を残り${plan.remainingDays}日で吸収 +${plan.absorbToday}/日）`}

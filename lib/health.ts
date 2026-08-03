@@ -134,6 +134,21 @@ export async function healthActiveEnergy(date: string): Promise<number | null> {
   try { return (await p.readActiveEnergy({ date })).kcal; } catch { return null; }
 }
 
+// 複数日の消費エネルギーをまとめて取得（日次消費推計用）。取得不可の日は null
+export async function healthActiveEnergyDays(dates: string[]): Promise<(number | null)[]> {
+  if (!isHealthEnabled()) return dates.map(() => null);
+  const p = getPlugin();
+  if (!p) return dates.map(() => null);
+  return Promise.all(dates.map(async (d) => {
+    try {
+      const r = await withTimeout(p.readActiveEnergy({ date: d }), 8000, { kcal: -1 });
+      return r.kcal >= 0 ? r.kcal : null; // -1=タイムアウト
+    } catch {
+      return null;
+    }
+  }));
+}
+
 // その日の指標をヘルスケアへ書き出す（連携ONのときだけ・失敗しても無害）
 export async function healthPushDay(w: HealthWrite): Promise<number> {
   if (!isHealthEnabled()) return 0;
