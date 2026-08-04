@@ -80,6 +80,20 @@ export async function hapticTap(): Promise<void> {
 // ネイティブカメラの結果。photo=取得成功 / error=失敗理由（表示用） / 両方null=ユーザーキャンセル
 export type PickPhotoResult = { photo: NativePhoto | null; error: string | null };
 
+// カメラ/写真まわりの失敗を端末に記録する（設定画面の診断で表示。原因調査を推測に頼らないため）
+export function recordDiag(entry: string): void {
+  try {
+    const k = 'bodylog-diag';
+    const arr: string[] = JSON.parse(localStorage.getItem(k) || '[]');
+    arr.unshift(`${new Date().toISOString().slice(5, 16).replace('T', ' ')} ${entry}`);
+    localStorage.setItem(k, JSON.stringify(arr.slice(0, 10)));
+  } catch { /* 無視 */ }
+}
+
+export function readDiag(): string[] {
+  try { return JSON.parse(localStorage.getItem('bodylog-diag') || '[]'); } catch { return []; }
+}
+
 // base64文字列 → NativePhoto（blob/dataUrl込み）変換の共通ヘルパー
 export function base64ToPhoto(base64: string, mime = 'image/jpeg'): NativePhoto {
   const bin = atob(base64);
@@ -96,6 +110,7 @@ export async function pickPhotoNative(source: 'CAMERA' | 'PHOTOS' = 'PHOTOS'): P
   const cam = nativePlugin<{ getPhoto: (o: Record<string, unknown>) => Promise<{ base64String?: string }> }>('Camera');
   if (!cam) {
     cameraBrokenRuntime = true;
+    recordDiag('camera: プラグイン取得失敗');
     return { photo: null, error: 'カメラプラグインを取得できませんでした' };
   }
   try {
@@ -113,6 +128,7 @@ export async function pickPhotoNative(source: 'CAMERA' | 'PHOTOS' = 'PHOTOS'): P
     const msg = e instanceof Error ? (e.message || e.name) : String(e);
     if (/cancel/i.test(msg)) return { photo: null, error: null }; // ユーザーキャンセルはエラー扱いしない
     if (/not implemented|unimplemented/i.test(msg)) cameraBrokenRuntime = true; // 以降はファイル選択へ直行
+    recordDiag(`camera(${source}): ${msg.slice(0, 120)}`);
     return { photo: null, error: msg };
   }
 }

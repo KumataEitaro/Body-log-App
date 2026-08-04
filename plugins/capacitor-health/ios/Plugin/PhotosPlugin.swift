@@ -22,8 +22,18 @@ public class PhotosPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getPhoto", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pickPhoto", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "presentLimitedPicker", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "presentLimitedPicker", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "binaryInfo", returnType: CAPPluginReturnPromise)
     ]
+
+    // バイナリのバージョン情報（診断用: どのビルドが入っているかをアプリ内で確認できるようにする）
+    @objc func binaryInfo(_ call: CAPPluginCall) {
+        let info = Bundle.main.infoDictionary
+        call.resolve([
+            "version": (info?["CFBundleShortVersionString"] as? String) ?? "?",
+            "build": (info?["CFBundleVersion"] as? String) ?? "?",
+        ])
+    }
 
     private var pickerDelegate: PhotosPickerDelegate?
 
@@ -165,7 +175,8 @@ class PhotosPickerDelegate: NSObject, PHPickerViewControllerDelegate {
             call.resolve(["cancelled": true])
             return
         }
-        provider.loadObject(ofClass: UIImage.self) { [call] obj, err in
+        provider.loadObject(ofClass: UIImage.self) { obj, err in
+            let call = self.call
             guard let img = obj as? UIImage else {
                 call.reject(err?.localizedDescription ?? "写真の読み込みに失敗しました")
                 return

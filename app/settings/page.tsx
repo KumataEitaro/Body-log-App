@@ -7,7 +7,8 @@ import { friendlyError } from '@/lib/errmsg';
 import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc';
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
-import { getIsNative, setDailyReminder } from '@/lib/native';
+import { getIsNative, setDailyReminder, isNativeSync, isNativeCameraAvailable, readDiag } from '@/lib/native';
+import { isNativePhotosAvailable, photosAuthStatus, photosBinaryInfo } from '@/lib/photos';
 import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthPullHistory } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 
@@ -47,6 +48,30 @@ export default function SettingsPage() {
     setRemindOn(on); setRemindTime(time);
     localStorage.setItem('bodylog-reminder', JSON.stringify({ on, time }));
     setRemindMsg({ cls: 'ok', text: on ? `毎日 ${time} にアプリ通知でお知らせします。` : 'アプリ通知を停止しました。' });
+  }
+
+  // ===== カメラ/写真の診断（不具合調査を推測に頼らないための可視化） =====
+  const [photoDiag, setPhotoDiag] = useState<string[] | null>(null);
+  async function runPhotoDiag() {
+    const lines: string[] = [];
+    lines.push(`ネイティブアプリ: ${isNativeSync() ? 'はい' : 'いいえ（ブラウザ）'}`);
+    lines.push(`カメラ機能: ${isNativeCameraAvailable() ? '利用可能' : '利用不可'}`);
+    if (isNativePhotosAvailable()) {
+      const info = await photosBinaryInfo();
+      lines.push(`写真機能: 利用可能（アプリ v${info?.version ?? '?'} ビルド${info?.build ?? '?'}）`);
+      const authLabel: Record<string, string> = {
+        granted: '許可済み（フルアクセス）', limited: '限定アクセス（選択した写真のみ）',
+        denied: '拒否（設定から変更できます）', notDetermined: '未確認（まだ許可を求めていません）',
+        unavailable: '取得できませんでした',
+      };
+      const st = await photosAuthStatus();
+      lines.push(`写真へのアクセス: ${authLabel[st] ?? st}`);
+    } else {
+      lines.push(isNativeSync() ? '写真機能: このアプリの版には未搭載（最新版へ更新してください）' : '写真機能: ブラウザ版では診断対象外');
+    }
+    const diag = readDiag();
+    if (diag.length) lines.push(...diag.slice(0, 5).map((d) => `記録: ${d}`));
+    setPhotoDiag(lines);
   }
 
   // ===== Apple ヘルスケア連携 =====
@@ -422,6 +447,21 @@ export default function SettingsPage() {
           <p className="muted" style={{ fontSize: 11, marginTop: 8, marginBottom: 0 }}>
             連携をオンにすると、記録の保存時に体重・ウエスト・摂取カロリー・PFCが自動でヘルスケアへ書き出されます。
           </p>
+        </div>
+      )}
+
+      {nativeApp && (
+        <div className="card">
+          <h2>📷 カメラ・写真の診断</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            写真が選べない・カメラが起動しない時は、ここで状態を確認できます。
+          </p>
+          <button className="btn-ghost" style={{ width: '100%' }} onClick={runPhotoDiag}>診断を実行</button>
+          {photoDiag && (
+            <div className="msg ok" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              {photoDiag.join('\n')}
+            </div>
+          )}
         </div>
       )}
 

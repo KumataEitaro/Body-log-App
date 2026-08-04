@@ -9,7 +9,7 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { servingOf, matchFoodsLocally } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
-import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
+import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
@@ -1216,8 +1216,18 @@ export default function LogPage() {
                 <span className="pick-ico">⋯</span><span>すべて</span>
               </button>
             )}
-            {/* Photosプラグイン非搭載（Web / 旧バイナリ）は従来のアルバムタイルへ */}
-            {(photoAuth === 'unavailable' || photoAuth === null) && (
+            {/* ネイティブなのにPhotosプラグインが無い＝旧バイナリ → 更新を明示（壊れた旧経路に流さない） */}
+            {photoAuth === 'unavailable' && isNativeSync() && (
+              <div className="pick-wide" style={{ borderStyle: 'solid' }}>
+                <span className="pick-ico">⬆️</span>
+                <span className="pick-wide-t">
+                  <b>アプリの更新が必要です</b>
+                  <small>TestFlight/App Storeで最新版に更新すると写真機能が使えます</small>
+                </span>
+              </div>
+            )}
+            {/* Web版は従来のアルバムタイル（ファイル選択）へ */}
+            {(photoAuth === 'unavailable' || photoAuth === null) && !isNativeSync() && (
               <button className="pick-tile" onClick={pickFromLibrary}>
                 <span className="pick-ico">🖼️</span><span>アルバム</span>
               </button>

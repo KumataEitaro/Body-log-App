@@ -4,7 +4,7 @@
 // 静的 registerPlugin ＋ モジュールキャッシュで同期取得する（lib/native.ts / lib/health.ts と同じ方式）。
 
 import { registerPlugin } from '@capacitor/core';
-import { base64ToPhoto, type NativePhoto, type PickPhotoResult } from '@/lib/native';
+import { base64ToPhoto, recordDiag, type NativePhoto, type PickPhotoResult } from '@/lib/native';
 
 export type PhotoAuth = 'granted' | 'limited' | 'denied' | 'notDetermined' | 'unavailable';
 export type RecentPhoto = { id: string; thumbUrl: string };
@@ -17,6 +17,7 @@ type PhotosPluginT = {
   pickPhoto(): Promise<{ base64?: string; mime?: string; cancelled?: boolean }>;
   openSettings(): Promise<{ opened: boolean }>;
   presentLimitedPicker(): Promise<void>;
+  binaryInfo(): Promise<{ version: string; build: string }>;
 };
 
 type CapGlobal = {
@@ -86,9 +87,22 @@ export async function photosRecents(count = 24, size = 160): Promise<RecentPhoto
   if (!p) return [];
   try {
     const r = await withTimeout(p.getRecents({ count, size }), 12000);
+    if (!r) recordDiag('photos.getRecents: タイムアウト(12秒)');
     return (r?.photos || []).map((x) => ({ id: x.id, thumbUrl: `data:image/jpeg;base64,${x.thumb}` }));
-  } catch {
+  } catch (e) {
+    recordDiag(`photos.getRecents: ${e instanceof Error ? e.message : String(e)}`.slice(0, 140));
     return [];
+  }
+}
+
+// バイナリのバージョン情報（設定画面の診断で「どのビルドが入っているか」を確認する用）
+export async function photosBinaryInfo(): Promise<{ version: string; build: string } | null> {
+  const p = plugin();
+  if (!p) return null;
+  try {
+    return await withTimeout(p.binaryInfo(), 5000);
+  } catch {
+    return null;
   }
 }
 
@@ -98,9 +112,10 @@ export async function photosFull(id: string): Promise<NativePhoto | null> {
   if (!p) return null;
   try {
     const r = await withTimeout(p.getPhoto({ id, maxSize: 1280 }), 30000);
-    if (!r?.base64) return null;
+    if (!r?.base64) { recordDiag('photos.getPhoto: 空応答/タイムアウト'); return null; }
     return base64ToPhoto(r.base64, r.mime || 'image/jpeg');
-  } catch {
+  } catch (e) {
+    recordDiag(`photos.getPhoto: ${e instanceof Error ? e.message : String(e)}`.slice(0, 140));
     return null;
   }
 }
