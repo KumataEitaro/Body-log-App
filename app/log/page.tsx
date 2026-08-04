@@ -10,6 +10,7 @@ import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal
 import { servingOf, matchFoodsLocally } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
+import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 import Sheet from '@/components/Sheet';
@@ -102,6 +103,56 @@ export default function LogPage() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false); // 解析結果ボトムシートの開閉
   const [composerOpen, setComposerOpen] = useState(false); // 入力コンポーザー（下から立ち上がる大きな入力欄）
+
+  // ===== カメラロール直選択（アプリ内サムネイルグリッド） =====
+  const [photoAuth, setPhotoAuth] = useState<PhotoAuth | null>(null);
+  const [recents, setRecents] = useState<RecentPhoto[]>([]);
+  const [thumbLoading, setThumbLoading] = useState<string | null>(null); // フルサイズ取得中のサムネイルid
+  const recentsAt = useRef(0); // 直近読込時刻（60秒キャッシュ）
+
+  async function loadRecents(force = false) {
+    if (!isNativePhotosAvailable()) { setPhotoAuth('unavailable'); return; }
+    const st = await photosAuthStatus();
+    setPhotoAuth(st);
+    if (st !== 'granted' && st !== 'limited') return;
+    if (!force && Date.now() - recentsAt.current < 60000 && recents.length > 0) return;
+    const list = await photosRecents(24, 160);
+    recentsAt.current = Date.now();
+    setRecents(list);
+  }
+
+  // コンポーザーを開いた時にカメラロールのサムネイルを用意する
+  useEffect(() => {
+    if (composerOpen) loadRecents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerOpen]);
+
+  async function requestPhotoAccess() {
+    const st = await photosRequestAccess();
+    setPhotoAuth(st);
+    if (st === 'granted' || st === 'limited') loadRecents(true);
+  }
+
+  // サムネイルをタップ → フルサイズを取得して添付
+  async function addFromRecent(r: RecentPhoto) {
+    if (thumbLoading || photos.length >= 4) return;
+    hapticTap();
+    setThumbLoading(r.id);
+    try {
+      const full = await photosFull(r.id);
+      if (full) setPhotos((arr) => (arr.length < 4 ? [...arr, full] : arr));
+      else setParseMsg({ cls: 'err', text: 'この写真を読み込めませんでした（iCloudの取得に失敗した可能性）' });
+    } finally {
+      setThumbLoading(null);
+    }
+  }
+
+  // 「すべて」→ OSの写真グリッド（PHPicker・権限不要・プロンプトなし）
+  async function openAllPhotos() {
+    const r = await photosPick();
+    if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
+    if (r.error) setParseMsg({ cls: 'err', text: `写真を開けませんでした（${r.error}）` });
+  }
   const [editingLog, setEditingLog] = useState<(LogRow & { id: string; at: string }) | null>(null); // 保存済み記録の編集中
   const [editMode, setEditMode] = useState(false);
   const [eKcal, setEKcal] = useState(''); const [eP, setEP] = useState(''); const [eF, setEF] = useState(''); const [eC, setEC] = useState('');
@@ -1081,67 +1132,84 @@ export default function LogPage() {
       {/* ドックに隠れないための余白 */}
       <div className="dock-spacer" />
 
-      {/* ===== 入力コンポーザー（下から立ち上がる・大きな自由入力＋写真＋マイ食品） ===== */}
+      {/* ===== 入力コンポーザー（下から立ち上がる・入力欄基準のコンパクトな高さ） ===== */}
       <Sheet open={composerOpen} onClose={() => setComposerOpen(false)}>
-        <div>
-          <h2>記録する <span className="muted" style={{ fontWeight: 400 }}>— 自由な言葉でOK・写真だけでもOK</span></h2>
+        <div className="composer">
+          {/* 入力欄が主役（この高さを基準にシート全体が決まる） */}
+          <textarea ref={composerTaRef} className="composer-ta" autoFocus rows={3} value={chat}
+                    placeholder={'食事・体重・気分を自由に…\n例）昼は牛丼並盛とサラダ。体重73.5kg'}
+                    onChange={(e) => {
+                      setChat(e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = Math.min(180, Math.max(88, e.target.scrollHeight)) + 'px';
+                    }} />
 
-          <textarea ref={composerTaRef} className="composer-ta" autoFocus rows={4} value={chat}
-                    placeholder={'例）昼は牛丼並盛とサラダ。体重73.5kg。\nジムで筋トレ1時間、ちょっと疲れた'}
-                    onChange={(e) => setChat(e.target.value)} />
-
-          {/* 写真: カメラは直接起動・アルバムは写真グリッドが即開く（選択プロンプトなし） */}
+          {/* 写真トレイ: カメラ直接起動＋直近のカメラロールをそのまま選択（プロンプトなし） */}
           <div className="pick-strip">
             <button className="pick-tile" onClick={takePhoto}>
               <span className="pick-ico">📷</span><span>カメラ</span>
             </button>
-            <button className="pick-tile" onClick={pickFromLibrary}>
-              <span className="pick-ico">🖼️</span><span>アルバム</span>
-            </button>
             {photos.map((p, i) => (
-              <div className="thumb pick-thumb" key={i}>
+              <div className="thumb pick-thumb sel" key={`sel-${i}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.dataUrl} alt="" />
                 <button className="thumb-x" onClick={() => setPhotos((arr) => arr.filter((_, j) => j !== i))}>×</button>
               </div>
             ))}
+            {photoAuth === 'notDetermined' && (
+              <button className="pick-tile" onClick={requestPhotoAccess}>
+                <span className="pick-ico">🖼️</span><span>写真を許可</span>
+              </button>
+            )}
+            {photoAuth === 'denied' && (
+              <button className="pick-tile" onClick={() => setParseMsg({ cls: 'err', text: 'iPhoneの設定 → BodyLog → 写真 でアクセスを許可してください。' })}>
+                <span className="pick-ico">🔒</span><span>設定で許可</span>
+              </button>
+            )}
+            {recents.map((r) => (
+              <button className="pick-thumb-btn" key={r.id} onClick={() => addFromRecent(r)} disabled={!!thumbLoading}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.thumbUrl} alt="" />
+                {thumbLoading === r.id && <span className="pick-thumb-spin"><span className="spin" /></span>}
+              </button>
+            ))}
+            {(photoAuth === 'granted' || photoAuth === 'limited') && (
+              <button className="pick-tile" onClick={openAllPhotos}>
+                <span className="pick-ico">⋯</span><span>すべて</span>
+              </button>
+            )}
+            {/* Photosプラグイン非搭載（Web / 旧バイナリ）は従来のアルバムタイルへ */}
+            {(photoAuth === 'unavailable' || photoAuth === null) && (
+              <button className="pick-tile" onClick={pickFromLibrary}>
+                <span className="pick-ico">🖼️</span><span>アルバム</span>
+              </button>
+            )}
           </div>
 
-          {/* チップで追加済みの品目（AI解析してもこのまま残る） */}
-          {!editingLog && parsed && parsed.items.length > 0 && (
-            <div className="composer-added">
-              <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>
-                追加済み {parsed.items.length}品 ・ {Math.round(parsed.total.kcal).toLocaleString()}kcal
-              </div>
-              <div className="chips">
-                {parsed.items.map((it, i) => (
-                  <span className="chip on" key={i}>
-                    {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''}
-                    <b className="chip-x" onClick={() => removeItem(i)}>×</b>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* マイ食品チップ */}
-          {myFoods.length > 0 && (
-            <div className="chip-strip" style={{ marginTop: 10 }}>
+          {/* 追加済み品目（ダーク）＋マイ食品（ライト）を1行に。AI解析しても追加分は残る */}
+          {(myFoods.length > 0 || (parsed && parsed.items.length > 0 && !editingLog)) && (
+            <div className="chip-strip" style={{ marginTop: 8, marginBottom: 0 }}>
+              {!editingLog && parsed?.items.map((it, i) => (
+                <button className="chip on" key={`added-${i}`} onClick={() => removeItem(i)}
+                        title="タップで取り消し">
+                  {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} ×
+                </button>
+              ))}
               {myFoods.map((fd) => (
                 <button key={fd.id} className="chip" onClick={() => addFromFood(fd, true)}>＋ {fd.name}</button>
               ))}
             </div>
           )}
 
-          {parseMsg && <div className={`msg ${parseMsg.cls}`}>{parseMsg.text}</div>}
+          {parseMsg && <div className={`msg ${parseMsg.cls}`} style={{ marginBottom: 0 }}>{parseMsg.text}</div>}
 
           {chat.trim() || photos.length > 0 ? (
-            <button className="btn-primary" style={{ marginTop: 12 }} onClick={parse}
+            <button className="btn-primary" style={{ marginTop: 10 }} onClick={parse}
                     disabled={parsing || (!unlimited && remaining === 0)}>
               {parsing ? <><span className="spin" />解析中…</> : '✨ AI解析'}
             </button>
           ) : (
-            <button className="btn-primary" style={{ marginTop: 12 }} disabled={!parsed || parsed.items.length === 0}
+            <button className="btn-primary" style={{ marginTop: 10 }} disabled={!parsed || parsed.items.length === 0}
                     onClick={() => { setComposerOpen(false); setSheetOpen(true); }}>
               {parsed && parsed.items.length > 0 ? '内容を確認して保存へ' : '✨ AI解析'}
             </button>
@@ -1197,8 +1265,8 @@ export default function LogPage() {
           {parseMsg && !composerOpen && <div className={`msg ${parseMsg.cls}`} style={{ marginTop: 0, marginBottom: 8 }}>{parseMsg.text}</div>}
 
           <div className="dock-row">
-            {/* 📷=アルバムの写真グリッドを直接開く（判定は同期。awaitを挟むとclick()がユーザー操作扱いされず無反応になる） */}
-            <button className="dock-cam" title="写真を追加" onClick={() => { pickFromLibrary(); }}>📷</button>
+            {/* 📷=コンポーザーを開く（直近のカメラロールがそのまま選べる写真トレイ付き） */}
+            <button className="dock-cam" title="写真を追加" onClick={() => setComposerOpen(true)}>📷</button>
             {/* タップでコンポーザーが立ち上がる（大きな入力欄で書ける） */}
             <button className="dock-fake" onClick={() => setComposerOpen(true)}>
               {chat.trim() ? <span className="dock-fake-text">{chat}</span> : '食事・体重・気分を自由に…'}

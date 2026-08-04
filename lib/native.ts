@@ -80,6 +80,14 @@ export async function hapticTap(): Promise<void> {
 // ネイティブカメラの結果。photo=取得成功 / error=失敗理由（表示用） / 両方null=ユーザーキャンセル
 export type PickPhotoResult = { photo: NativePhoto | null; error: string | null };
 
+// base64文字列 → NativePhoto（blob/dataUrl込み）変換の共通ヘルパー
+export function base64ToPhoto(base64: string, mime = 'image/jpeg'): NativePhoto {
+  const bin = atob(base64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return { blob: new Blob([arr], { type: mime }), dataUrl: `data:${mime};base64,${base64}`, base64, mime };
+}
+
 // ネイティブのカメラ/フォトピッカーで1枚取得（1024px・JPEG圧縮済み）。
 // source='PHOTOS' はOSの写真グリッド（PHPicker）が直接開き、'CAMERA' はカメラが直接起動する。
 // 「撮影orライブラリ」を選ばせるPROMPTは使わない（選択画面を1段減らす）。
@@ -100,11 +108,7 @@ export async function pickPhotoNative(source: 'CAMERA' | 'PHOTOS' = 'PHOTOS'): P
     });
     const base64 = photo.base64String;
     if (!base64) return { photo: null, error: '写真データを取得できませんでした' };
-    const mime = 'image/jpeg';
-    const bin = atob(base64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return { photo: { blob: new Blob([arr], { type: mime }), dataUrl: `data:${mime};base64,${base64}`, base64, mime }, error: null };
+    return { photo: base64ToPhoto(base64), error: null };
   } catch (e) {
     const msg = e instanceof Error ? (e.message || e.name) : String(e);
     if (/cancel/i.test(msg)) return { photo: null, error: null }; // ユーザーキャンセルはエラー扱いしない

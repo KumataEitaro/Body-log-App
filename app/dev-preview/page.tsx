@@ -139,29 +139,26 @@ export default function DevPreviewPage() {
         </div>
       </div>
 
-      {/* 入力コンポーザーのモック（/log実装と同じクラス構成） */}
+      {/* 入力コンポーザーのモック（/log実装と同じクラス構成・コンパクト版） */}
       <Sheet open={composerOpen} onClose={() => setComposerOpen(false)}>
-        <div>
-          <h2>記録する <span className="muted" style={{ fontWeight: 400 }}>— 自由な言葉でOK・写真だけでもOK</span></h2>
-          <textarea className="composer-ta" rows={4} defaultValue=""
-                    placeholder={'例）昼は牛丼並盛とサラダ。体重73.5kg。\nジムで筋トレ1時間、ちょっと疲れた'} />
+        <div className="composer">
+          <textarea className="composer-ta" rows={3} defaultValue=""
+                    placeholder={'食事・体重・気分を自由に…\n例）昼は牛丼並盛とサラダ。体重73.5kg'} />
           <div className="pick-strip">
             <button className="pick-tile"><span className="pick-ico">📷</span><span>カメラ</span></button>
-            <button className="pick-tile"><span className="pick-ico">🖼️</span><span>アルバム</span></button>
+            {['#dbe4dd', '#e4dbd6', '#d6dde4', '#e0d6e4', '#e4e2d6', '#d6e4e0'].map((c, i) => (
+              <button className="pick-thumb-btn" key={i} style={{ background: c }} />
+            ))}
+            <button className="pick-tile"><span className="pick-ico">⋯</span><span>すべて</span></button>
           </div>
-          <div className="composer-added">
-            <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>追加済み 2品 ・ 405kcal</div>
-            <div className="chips">
-              <span className="chip on">プロテイン <b className="chip-x">×</b></span>
-              <span className="chip on">ゆで卵 ×2 <b className="chip-x">×</b></span>
-            </div>
-          </div>
-          <div className="chip-strip" style={{ marginTop: 10 }}>
-            {['プロテイン', 'サラダチキン', '野菜鍋', 'ゆで卵', 'オートミール'].map((n) => (
+          <div className="chip-strip" style={{ marginTop: 8, marginBottom: 0 }}>
+            <button className="chip on">プロテイン ×</button>
+            <button className="chip on">ゆで卵 ×2 ×</button>
+            {['サラダチキン', '野菜鍋', 'オートミール'].map((n) => (
               <button key={n} className="chip">＋ {n}</button>
             ))}
           </div>
-          <button className="btn-primary" style={{ marginTop: 12 }}>✨ AI解析</button>
+          <button className="btn-primary" style={{ marginTop: 10 }}>✨ AI解析</button>
           <div className="dock-hint num">マイ食品＋自由入力の併用もOK （今日あと12回）</div>
         </div>
       </Sheet>

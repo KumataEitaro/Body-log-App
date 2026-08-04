@@ -27,7 +27,7 @@ export default function Sheet({
           <motion.div
             className="sheet-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             onClick={onClose}
           />
           <motion.div
@@ -35,7 +35,8 @@ export default function Sheet({
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 32, stiffness: 380 }}
+            // iOSのシートと同じ曲線（vaul/Ionic採用の cubic-bezier(0.32,0.72,0,1)×0.5s）
+            transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
             drag="y"
             dragControls={dragControls}
             dragListener={false}
