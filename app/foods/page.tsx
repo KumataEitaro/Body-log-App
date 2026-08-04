@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errmsg';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { rescaleByQty, sumItems, emptyItem, type FoodItem } from '@/lib/items';
 import { resizeImage, type ResizedImage } from '@/lib/image';
@@ -146,7 +147,7 @@ export default function FoodsPage() {
       serving_label: '', serving_ratio: ratio,
     }, { onConflict: 'user_id,name' });
     setBusy(false);
-    if (error) { setMsg({ cls: 'err', text: error.message }); return; }
+    if (error) { setMsg({ cls: 'err', text: friendlyError(new Error(error.message), '登録に失敗しました。もう一度お試しください。') }); return; }
     hapticSuccess();
     setMsg({ cls: 'ok', text: `「${fName.trim()}」を登録しました。入力画面のチップとAI辞書に反映されます。` });
     setChat(''); setPhotos([]); setItems(null); setManual(null); setFName(''); setFRatio('1');
@@ -196,7 +197,8 @@ export default function FoodsPage() {
                 const r = await pickPhotoNative();
                 if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
                 if (!r.error) return; // ユーザーキャンセル
-                setMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。` });
+                console.log('[camera] error:', r.error);
+                setMsg({ cls: 'err', text: 'カメラを起動できませんでした。ファイル選択に切り替えます。' });
                 fileRef.current?.click();
               } else {
                 fileRef.current?.click();

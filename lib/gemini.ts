@@ -71,7 +71,7 @@ export function parseJsonLoose(text: string): unknown {
 
 export async function callGemini(
   key: string, parts: Part[], temperature = 0
-): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string }> {
+): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string; detail?: string }> {
   // モデル発見は待たない（コールドスタート時の+数百msを削減）。
   // キャッシュが無ければ静的リストで即開始し、発見は裏で走らせて次回以降に反映する。
   if (!cachedModels) {
@@ -135,5 +135,6 @@ export async function callGemini(
     }
   }
   if (sawStale) cachedModels = null; // 全滅時は次回再発見
-  return { ok: false, status: 502, error: `AIが一時的に使えませんでした。少し待って再試行してください。（${lastErr}）` };
+  // ユーザー向けは日本語のみ（選択言語へはDOM翻訳が担当）。技術詳細はdetailに分離してログ用に返す
+  return { ok: false, status: 502, error: 'AIが一時的に使えませんでした。少し待って再試行してください。', detail: lastErr };
 }

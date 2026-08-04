@@ -20,7 +20,9 @@ public class PhotosPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestAccess", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getRecents", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPhoto", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "pickPhoto", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "pickPhoto", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "presentLimitedPicker", returnType: CAPPluginReturnPromise)
     ]
 
     private var pickerDelegate: PhotosPickerDelegate?
@@ -100,6 +102,32 @@ public class PhotosPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             call.resolve(["base64": data.base64EncodedString(), "mime": "image/jpeg"])
+        }
+    }
+
+    // アプリの設定画面（写真アクセスの変更ができる場所）を開く
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                call.reject("設定URLを生成できませんでした")
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { ok in
+                call.resolve(["opened": ok])
+            }
+        }
+    }
+
+    // 限定アクセス時: 「選択した写真」を追加・変更するOSシートを開く（閉じたらresolve）
+    @objc func presentLimitedPicker(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let vc = self.bridge?.viewController else {
+                call.reject("画面を取得できませんでした")
+                return
+            }
+            PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: vc) { _ in
+                call.resolve()
+            }
         }
     }
 

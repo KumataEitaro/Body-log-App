@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyAuthError } from '@/lib/errmsg';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,8 +34,8 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      const m = err instanceof Error ? err.message : String(err);
-      setMsg({ cls: 'err', text: m.includes('Invalid login') ? 'メールまたはパスワードが違います。' : m });
+      
+      setMsg({ cls: 'err', text: friendlyAuthError(err) });
     } finally {
       setBusy(false);
     }

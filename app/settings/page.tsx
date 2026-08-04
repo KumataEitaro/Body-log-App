@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errmsg';
 import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc';
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
@@ -163,7 +164,7 @@ export default function SettingsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { error } = await supabase.from('profiles').update({ mail_opt_out: next }).eq('id', user.id);
-    if (error) { setMailMsg({ cls: 'err', text: `保存に失敗しました: ${error.message}` }); return; }
+    if (error) { setMailMsg({ cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') }); return; }
     setMailOptOut(next);
     setMailMsg({ cls: 'ok', text: next ? 'リマインドメールを停止しました。' : 'リマインドメールを受け取ります。' });
   }
@@ -212,7 +213,7 @@ export default function SettingsPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.ok || !j.map || Object.keys(j.map).length === 0) {
-        setLangMsg({ cls: 'err', text: `翻訳の初期化に失敗しました: ${j.error || `HTTP ${res.status}`}` });
+        setLangMsg({ cls: 'err', text: friendlyError(new Error(String(j.error || res.status)), '翻訳の初期化に失敗しました。もう一度お試しください。') });
         return;
       }
       localStorage.setItem(LANG_KEY, code);
@@ -261,7 +262,7 @@ export default function SettingsPage() {
       display_name: name, sex, height_cm: Number(height), age: Number(age), life_factor: Number(life),
     }).eq('id', user.id);
     setBusy(false);
-    setMsg(error ? { cls: 'err', text: error.message } : { cls: 'ok', text: '保存しました。' });
+    setMsg(error ? { cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') } : { cls: 'ok', text: '保存しました。' });
   }
 
   // 過去データ一括取込: [{date:'2026-06-27', ex:'通常', adj:0, intake:2855, p:null, f:null, c:null, weight:86.5, mood:'', note:''}]

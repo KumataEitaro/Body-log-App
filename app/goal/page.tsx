@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errmsg';
 import Link from 'next/link';
 import { todayJST, mifflinBMR } from '@/lib/calc';
 import { lifeFactorFor } from '@/lib/adaptive';
@@ -126,7 +127,7 @@ export default function GoalPage() {
       ({ error } = await supabase.from('goals').upsert(base));
     }
     setBusy(false);
-    if (error) { setGoalMsg({ cls: 'err', text: error.message }); return; }
+    if (error) { setGoalMsg({ cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') }); return; }
     hapticSuccess();
     const isFirstGoal = !goal;
     await loadAll();
@@ -172,7 +173,7 @@ export default function GoalPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { error } = await supabase.from('profiles').update({ life_factor: lifeFactorFor(clamped, bmrNow) }).eq('id', user.id);
-    if (error) { setMaintMsg({ cls: 'err', text: `保存に失敗しました: ${error.message}` }); return; }
+    if (error) { setMaintMsg({ cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') }); return; }
     hapticSuccess();
     setMaintInput(String(clamped));
     await loadAll();

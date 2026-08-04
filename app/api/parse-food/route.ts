@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     const tSetup = Date.now() - t0;
     const r = await callGemini(key, parts, 0);
     const tAi = Date.now() - t0 - tSetup;
-    if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
+    if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
     let parsed;
     try {
       parsed = parseJsonLoose(r.text);
@@ -146,6 +146,9 @@ export async function POST(req: Request) {
       timings: { setupMs: tSetup, aiMs: tAi, totalMs },
     });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: '解析に失敗しました: ' + (e instanceof Error ? e.message : String(e)) }, { status: 500 });
+    // ユーザー向けは日本語のみ。技術詳細はdetailとサーバログへ
+    const detail = e instanceof Error ? e.message : String(e);
+    console.log(`[parse-food] unhandled: ${detail}`);
+    return NextResponse.json({ ok: false, error: '解析に失敗しました。もう一度お試しください。', detail }, { status: 500 });
   }
 }

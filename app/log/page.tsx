@@ -10,13 +10,14 @@ import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal
 import { servingOf, matchFoodsLocally } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge } from '@/lib/native';
-import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
+import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
 import Sheet from '@/components/Sheet';
 import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
 import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDays } from '@/lib/health';
 import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
+import { friendlyError, JA_TEXT_RE } from '@/lib/errmsg';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -133,6 +134,18 @@ export default function LogPage() {
     if (st === 'granted' || st === 'limited') loadRecents(true);
   }
 
+  // アクセス拒否済み → iOSの設定画面へ（写真 → すべての写真 に変更してもらう）
+  async function openPhotoSettings() {
+    const ok = await photosOpenSettings();
+    if (!ok) setParseMsg({ cls: 'err', text: '設定を開けませんでした。iPhoneの設定 → BodyLog → 写真 から許可できます。' });
+  }
+
+  // 限定アクセス中 → 「選択した写真」を追加・変更するOSシートを開き、閉じたら一覧を更新
+  async function manageLimitedPhotos() {
+    await photosPresentLimitedPicker();
+    loadRecents(true);
+  }
+
   // サムネイルをタップ → フルサイズを取得して添付
   async function addFromRecent(r: RecentPhoto) {
     if (thumbLoading || photos.length >= 4) return;
@@ -141,7 +154,7 @@ export default function LogPage() {
     try {
       const full = await photosFull(r.id);
       if (full) setPhotos((arr) => (arr.length < 4 ? [...arr, full] : arr));
-      else setParseMsg({ cls: 'err', text: 'この写真を読み込めませんでした（iCloudの取得に失敗した可能性）' });
+      else setParseMsg({ cls: 'err', text: 'この写真を読み込めませんでした。もう一度お試しください。' });
     } finally {
       setThumbLoading(null);
     }
@@ -151,7 +164,7 @@ export default function LogPage() {
   async function openAllPhotos() {
     const r = await photosPick();
     if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
-    if (r.error) setParseMsg({ cls: 'err', text: `写真を開けませんでした（${r.error}）` });
+    if (r.error) { console.log('[photos] pick error:', r.error); setParseMsg({ cls: 'err', text: '写真を開けませんでした。もう一度お試しください。' }); }
   }
   const [editingLog, setEditingLog] = useState<(LogRow & { id: string; at: string }) | null>(null); // 保存済み記録の編集中
   const [editMode, setEditMode] = useState(false);
@@ -357,7 +370,8 @@ export default function LogPage() {
       const r = await pickPhotoNative('PHOTOS');
       if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
       if (!r.error) return; // ユーザーキャンセル
-      setParseMsg({ cls: 'err', text: `写真を開けませんでした（${r.error}）。ファイル選択に切り替えます。` });
+      console.log('[photos] library error:', r.error);
+      setParseMsg({ cls: 'err', text: '写真を開けませんでした。ファイル選択に切り替えます。' });
       fileRef.current?.click();
     } else {
       fileRef.current?.click();
@@ -370,7 +384,8 @@ export default function LogPage() {
       const r = await pickPhotoNative('CAMERA');
       if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
       if (!r.error) return; // ユーザーキャンセル
-      setParseMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。` });
+      console.log('[camera] error:', r.error);
+      setParseMsg({ cls: 'err', text: 'カメラを起動できませんでした。ファイル選択に切り替えます。' });
       camFileRef.current?.click();
     } else {
       camFileRef.current?.click();
@@ -417,6 +432,7 @@ export default function LogPage() {
       });
       const j = await res.json();
       if (j.timings) console.log(`[AI] client=${Math.round(performance.now() - t0)}ms server:`, j.timings);
+      if (j.detail) console.log('[AI] fail detail:', j.detail); // 技術詳細は画面に出さずログのみ
       if (typeof j.remaining === 'number') setRemaining(j.remaining);
       if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
       const aiItems: ParsedItem[] = j.result.items || [];
@@ -435,7 +451,7 @@ export default function LogPage() {
       setParseMsg(null);
     } catch (e) {
       setSheetOpen(false); setComposerOpen(true); // 失敗時はコンポーザーに戻してエラー表示（書いた内容は残る）
-      setParseMsg({ cls: 'err', text: e instanceof Error ? e.message : String(e) });
+      setParseMsg({ cls: 'err', text: friendlyError(e, '通信に失敗しました。電波状況を確認して再試行してください。') });
     } finally {
       setParsing(false);
       setAnalyzing(false);
@@ -736,7 +752,8 @@ export default function LogPage() {
       if (!editingLog && (/fetch|network|load failed/i.test(msg) || !navigator.onLine)) {
         queueOfflineSave(user.id);
       } else {
-        setSaveMsg({ cls: 'err', text: '保存失敗: ' + msg });
+        console.log('[save] error:', msg);
+        setSaveMsg({ cls: 'err', text: JA_TEXT_RE.test(msg) ? `保存に失敗しました: ${msg}` : '保存に失敗しました。もう一度お試しください。' });
       }
     } finally {
       setSaving(false);
@@ -813,7 +830,7 @@ export default function LogPage() {
     if (!uid) return;
     const newDate = shiftDate(goal.target_date, 7);
     const { error } = await supabase.from('goals').update({ target_date: newDate }).eq('user_id', uid);
-    if (error) { setSaveMsg({ cls: 'err', text: '更新に失敗しました: ' + error.message }); return; }
+    if (error) { setSaveMsg({ cls: 'err', text: friendlyError(new Error(error.message), '更新に失敗しました。もう一度お試しください。') }); return; }
     hapticSuccess();
     setGoal({ ...goal, target_date: newDate });
     snoozeStruggle();
@@ -1156,14 +1173,24 @@ export default function LogPage() {
                 <button className="thumb-x" onClick={() => setPhotos((arr) => arr.filter((_, j) => j !== i))}>×</button>
               </div>
             ))}
+            {/* 初回: 許可のお願いカード（フルアクセス推奨の説明つき） */}
             {photoAuth === 'notDetermined' && (
-              <button className="pick-tile" onClick={requestPhotoAccess}>
-                <span className="pick-ico">🖼️</span><span>写真を許可</span>
+              <button className="pick-wide" onClick={requestPhotoAccess}>
+                <span className="pick-ico">🖼️</span>
+                <span className="pick-wide-t">
+                  <b>カメラロールをここに表示</b>
+                  <small>「すべての写真へのアクセスを許可」がおすすめです</small>
+                </span>
               </button>
             )}
+            {/* 拒否済み: 設定への導線カード */}
             {photoAuth === 'denied' && (
-              <button className="pick-tile" onClick={() => setParseMsg({ cls: 'err', text: 'iPhoneの設定 → BodyLog → 写真 でアクセスを許可してください。' })}>
-                <span className="pick-ico">🔒</span><span>設定で許可</span>
+              <button className="pick-wide" onClick={openPhotoSettings}>
+                <span className="pick-ico">🔒</span>
+                <span className="pick-wide-t">
+                  <b>写真へのアクセスがオフです</b>
+                  <small>タップして設定を開き「すべての写真」を選んでください</small>
+                </span>
               </button>
             )}
             {recents.map((r) => (
@@ -1173,7 +1200,18 @@ export default function LogPage() {
                 {thumbLoading === r.id && <span className="pick-thumb-spin"><span className="spin" /></span>}
               </button>
             ))}
-            {(photoAuth === 'granted' || photoAuth === 'limited') && (
+            {/* 限定アクセス: 選択した写真の追加＋フルアクセスへの導線 */}
+            {photoAuth === 'limited' && (
+              <button className="pick-tile" onClick={manageLimitedPhotos}>
+                <span className="pick-ico">＋</span><span>写真を追加</span>
+              </button>
+            )}
+            {photoAuth === 'limited' && (
+              <button className="pick-tile" onClick={openPhotoSettings}>
+                <span className="pick-ico">🔓</span><span>全て表示</span>
+              </button>
+            )}
+            {photoAuth === 'granted' && (
               <button className="pick-tile" onClick={openAllPhotos}>
                 <span className="pick-ico">⋯</span><span>すべて</span>
               </button>
@@ -1185,6 +1223,9 @@ export default function LogPage() {
               </button>
             )}
           </div>
+          {photoAuth === 'limited' && (
+            <div className="muted" style={{ fontSize: 10.5, marginTop: 4 }}>選択した写真のみ表示中。「全て表示」からフルアクセスに変更できます</div>
+          )}
 
           {/* 追加済み品目（ダーク）＋マイ食品（ライト）を1行に。AI解析しても追加分は残る */}
           {(myFoods.length > 0 || (parsed && parsed.items.length > 0 && !editingLog)) && (

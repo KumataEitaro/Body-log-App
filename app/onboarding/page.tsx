@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/errmsg';
 import { mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 
 export default function OnboardingPage() {
@@ -38,7 +39,7 @@ export default function OnboardingPage() {
       life_factor: LIFE_FACTOR_DEFAULT,
     });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。')); return; }
     router.push('/goal'); // ステップ2: 目標設定へ誘導
     router.refresh();
   }

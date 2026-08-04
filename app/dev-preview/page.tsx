@@ -146,6 +146,13 @@ export default function DevPreviewPage() {
                     placeholder={'食事・体重・気分を自由に…\n例）昼は牛丼並盛とサラダ。体重73.5kg'} />
           <div className="pick-strip">
             <button className="pick-tile"><span className="pick-ico">📷</span><span>カメラ</span></button>
+            <button className="pick-wide">
+              <span className="pick-ico">🖼️</span>
+              <span className="pick-wide-t">
+                <b>カメラロールをここに表示</b>
+                <small>「すべての写真へのアクセスを許可」がおすすめです</small>
+              </span>
+            </button>
             {['#dbe4dd', '#e4dbd6', '#d6dde4', '#e0d6e4', '#e4e2d6', '#d6e4e0'].map((c, i) => (
               <button className="pick-thumb-btn" key={i} style={{ background: c }} />
             ))}

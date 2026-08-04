@@ -15,6 +15,8 @@ type PhotosPluginT = {
   getRecents(o: { count?: number; size?: number }): Promise<{ photos: { id: string; thumb: string }[]; status: string }>;
   getPhoto(o: { id: string; maxSize?: number }): Promise<{ base64: string; mime: string }>;
   pickPhoto(): Promise<{ base64?: string; mime?: string; cancelled?: boolean }>;
+  openSettings(): Promise<{ opened: boolean }>;
+  presentLimitedPicker(): Promise<void>;
 };
 
 type CapGlobal = {
@@ -101,6 +103,27 @@ export async function photosFull(id: string): Promise<NativePhoto | null> {
   } catch {
     return null;
   }
+}
+
+// アプリの設定画面を開く（写真アクセスが「なし/限定」の時にフルアクセスへ誘導する）
+export async function photosOpenSettings(): Promise<boolean> {
+  const p = plugin();
+  if (!p) return false;
+  try {
+    const r = await withTimeout(p.openSettings(), 8000);
+    return !!r?.opened;
+  } catch {
+    return false;
+  }
+}
+
+// 限定アクセス時に「選択した写真」を追加・変更するOSシートを開く（閉じるまで待つ）
+export async function photosPresentLimitedPicker(): Promise<void> {
+  const p = plugin();
+  if (!p) return;
+  try {
+    await withTimeout(p.presentLimitedPicker(), 300000); // シート操作待ち
+  } catch { /* 無視 */ }
 }
 
 // OSの写真グリッド（PHPicker）を直接開く。権限不要・選択プロンプトなし

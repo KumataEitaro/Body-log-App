@@ -297,6 +297,17 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .pick-tile:active { transform: scale(0.96); }
 .pick-ico { font-size: 21px; line-height: 1; }
+/* 許可のお願い・設定導線などの横長カード */
+.pick-wide {
+  height: 62px; flex: none; padding: 0 14px;
+  display: flex; align-items: center; gap: 10px;
+  border-radius: 14px; border: 1.5px dashed var(--line); background: var(--panel);
+  text-align: left;
+}
+.pick-wide:active { transform: scale(0.98); }
+.pick-wide-t { display: flex; flex-direction: column; gap: 2px; }
+.pick-wide-t b { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.pick-wide-t small { font-size: 10.5px; color: var(--sub); }
 /* 選択済み写真（×付き）と直近サムネイル */
 .pick-thumb { width: 62px; height: 62px; flex: none; }
 .pick-thumb.sel { outline: 2px solid var(--teal); outline-offset: -2px; }
