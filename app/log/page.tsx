@@ -81,7 +81,9 @@ function shiftDate(d: string, n: number): string {
 
 export default function LogPage() {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);      // アルバム用（Webフォールバック）
+  const camFileRef = useRef<HTMLInputElement>(null);   // カメラ直接起動用（Webフォールバック: capture属性）
+  const composerTaRef = useRef<HTMLTextAreaElement>(null);
   const [userName, setUserName] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
@@ -99,6 +101,7 @@ export default function LogPage() {
 
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false); // 解析結果ボトムシートの開閉
+  const [composerOpen, setComposerOpen] = useState(false); // 入力コンポーザー（下から立ち上がる大きな入力欄）
   const [editingLog, setEditingLog] = useState<(LogRow & { id: string; at: string }) | null>(null); // 保存済み記録の編集中
   const [editMode, setEditMode] = useState(false);
   const [eKcal, setEKcal] = useState(''); const [eP, setEP] = useState(''); const [eF, setEF] = useState(''); const [eC, setEC] = useState('');
@@ -121,7 +124,7 @@ export default function LogPage() {
   const loadDay = useCallback(async (d: string) => {
     const supabase = createClient();
     setParsed(null); setEditMode(false); setPhotos([]); setChat('');
-    setParseMsg(null); setSaveMsg(null); setEditingLog(null); setSheetOpen(false);
+    setParseMsg(null); setSaveMsg(null); setEditingLog(null); setSheetOpen(false); setComposerOpen(false);
 
     // ① まずキャッシュを即表示（オフライン・低速回線でも前回の状態が見える）
     const { data: { session } } = await supabase.auth.getSession();
@@ -297,19 +300,56 @@ export default function LogPage() {
     setPhotos((p) => [...p, ...resized]);
   }
 
+  // アルバムを直接開く（ネイティブ=OSの写真グリッドが即表示。プロンプトは挟まない）
+  async function pickFromLibrary() {
+    if (isNativeCameraAvailable()) {
+      const r = await pickPhotoNative('PHOTOS');
+      if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
+      if (!r.error) return; // ユーザーキャンセル
+      setParseMsg({ cls: 'err', text: `写真を開けませんでした（${r.error}）。ファイル選択に切り替えます。` });
+      fileRef.current?.click();
+    } else {
+      fileRef.current?.click();
+    }
+  }
+
+  // カメラを直接起動する（撮影orライブラリの選択画面は出さない）
+  async function takePhoto() {
+    if (isNativeCameraAvailable()) {
+      const r = await pickPhotoNative('CAMERA');
+      if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
+      if (!r.error) return; // ユーザーキャンセル
+      setParseMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。` });
+      camFileRef.current?.click();
+    } else {
+      camFileRef.current?.click();
+    }
+  }
+
   async function parse() {
     if (!chat.trim() && photos.length === 0) {
       setParseMsg({ cls: 'err', text: 'メモを書くか写真を追加してください。' });
       return;
     }
 
+    // マイ食品チップで先に追加した品目は消さず、解析結果を「追記」する。
+    // 記録の編集中だけは従来どおり全置換（同じテキストの再解析で品目が二重になるのを防ぐ）。
+    const baseItems = editingLog ? [] : (parsed?.items ?? []);
+    const prev = editingLog ? null : parsed;
+
     // ===== ① 辞書ローカル即答（0秒）: 写真なし＆テキストがマイ食品辞書だけで完全に解ける場合、AIを使わない =====
     if (photos.length === 0) {
       const local = matchFoodsLocally(chat, myFoods);
       if (local) {
         hapticTap();
-        setParsed({ items: local, total: sumItems(local), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
+        const items = [...baseItems, ...local];
+        setParsed({
+          items, total: sumItems(items),
+          weight: prev?.weight ?? null, waist: prev?.waist ?? null,
+          ex: prev?.ex ?? null, adj: prev?.adj ?? 0, mood: prev?.mood ?? null, questions: [],
+        });
         setEditMode(false); setParseMsg(null);
+        setComposerOpen(false);
         setSheetOpen(true);
         return; // AI枠も消費しない
       }
@@ -317,7 +357,7 @@ export default function LogPage() {
 
     // ===== ② AI解析: シートを即開いてスケルトン表示（体感待ち時間を削減） =====
     setParsing(true); setParseMsg(null);
-    setAnalyzing(true); setSheetOpen(true);
+    setAnalyzing(true); setComposerOpen(false); setSheetOpen(true);
     try {
       const t0 = performance.now();
       const res = await fetch('/api/parse-food', {
@@ -328,20 +368,22 @@ export default function LogPage() {
       if (j.timings) console.log(`[AI] client=${Math.round(performance.now() - t0)}ms server:`, j.timings);
       if (typeof j.remaining === 'number') setRemaining(j.remaining);
       if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const aiItems: ParsedItem[] = j.result.items || [];
+      const items = [...baseItems, ...aiItems];
       setParsed({
-        items: j.result.items || [],
-        total: j.result.total || { kcal: 0, p: 0, f: 0, c: 0 },
-        weight: j.result.weight ?? null,
-        waist: j.result.waist ?? null,
-        ex: EX_LEVELS.includes(j.result.ex) ? j.result.ex : null,
-        adj: Number(j.result.adj) || 0,
-        mood: j.result.mood ?? null,
+        items,
+        total: items.length > 0 ? sumItems(items) : (j.result.total || { kcal: 0, p: 0, f: 0, c: 0 }),
+        weight: j.result.weight ?? prev?.weight ?? null,
+        waist: j.result.waist ?? prev?.waist ?? null,
+        ex: EX_LEVELS.includes(j.result.ex) ? j.result.ex : (prev?.ex ?? null),
+        adj: (Number(j.result.adj) || 0) || (prev?.adj ?? 0),
+        mood: j.result.mood ?? prev?.mood ?? null,
         questions: Array.isArray(j.result.questions) ? j.result.questions.filter((q: unknown) => typeof q === 'string') : [],
       });
       setEditMode(false);
       setParseMsg(null);
     } catch (e) {
-      setSheetOpen(false); // 失敗時はシートを閉じてドックにエラー表示
+      setSheetOpen(false); setComposerOpen(true); // 失敗時はコンポーザーに戻してエラー表示（書いた内容は残る）
       setParseMsg({ cls: 'err', text: e instanceof Error ? e.message : String(e) });
     } finally {
       setParsing(false);
@@ -423,7 +465,9 @@ export default function LogPage() {
     setSheetOpen(false);
   }
 
-  function addFromFood(fd: MyFood) {
+  // toComposer=true: ドック/コンポーザーのチップから → コンポーザーを開いたまま追記できる
+  // toComposer=false: 解析結果シート内のクイック追加 → シートに留まる
+  function addFromFood(fd: MyFood, toComposer = false) {
     hapticTap();
     // よく使う量が設定されていればその量で追加（例: 全量1800kcalの鍋→丼1杯300kcal）
     const sv = servingOf(fd);
@@ -433,7 +477,12 @@ export default function LogPage() {
     } else {
       setParsed({ items: [item], total: sumItems([item]), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
     }
-    setSheetOpen(true); // 追加内容をシートで確認
+    if (toComposer) {
+      setSheetOpen(false);
+      setComposerOpen(true); // 続けて自由入力・写真も足せる
+    } else {
+      setSheetOpen(true); // 追加内容をシートで確認
+    }
   }
 
   // 日次サマリーをentriesへ反映（ダッシュボードはこの行を見る）
@@ -824,9 +873,12 @@ export default function LogPage() {
 
       {/* ===== 解析結果（保存前の確認）— iOSボトムシート ===== */}
       <Sheet open={sheetOpen && (!!parsed || analyzing)} onClose={() => (editingLog ? cancelEditLog() : setSheetOpen(false))}>
-        {!parsed && analyzing && (
+        {analyzing && (
           <div>
             <h2>AIが解析中… <span className="muted" style={{ fontWeight: 400 }}>— 数秒で品目が出ます</span></h2>
+            {parsed && parsed.items.length > 0 && (
+              <p className="muted" style={{ margin: '0 0 8px' }}>追加済みの{parsed.items.length}品（{parsed.items.map((it) => it.name).slice(0, 3).join('、')}{parsed.items.length > 3 ? ' ほか' : ''}）はそのまま残り、解析結果が追記されます</p>
+            )}
             {photos.length > 0 && (
               <div className="photo-row" style={{ marginBottom: 10 }}>
                 {photos.map((p, i) => (
@@ -843,7 +895,7 @@ export default function LogPage() {
             <div className="skel-row" style={{ width: '38%', height: 28, marginTop: 14 }} />
           </div>
         )}
-        {parsed && (
+        {!analyzing && parsed && (
         <div>
           <h2>
             {editingLog ? <>✎ 記録を編集中 <span className="muted" style={{ fontWeight: 400 }}>— {timeJST(editingLog.at)}の記録</span></> : <>解析結果 <span className="muted" style={{ fontWeight: 400 }}>— 確認して保存</span></>}
@@ -1029,14 +1081,89 @@ export default function LogPage() {
       {/* ドックに隠れないための余白 */}
       <div className="dock-spacer" />
 
+      {/* ===== 入力コンポーザー（下から立ち上がる・大きな自由入力＋写真＋マイ食品） ===== */}
+      <Sheet open={composerOpen} onClose={() => setComposerOpen(false)}>
+        <div>
+          <h2>記録する <span className="muted" style={{ fontWeight: 400 }}>— 自由な言葉でOK・写真だけでもOK</span></h2>
+
+          <textarea ref={composerTaRef} className="composer-ta" autoFocus rows={4} value={chat}
+                    placeholder={'例）昼は牛丼並盛とサラダ。体重73.5kg。\nジムで筋トレ1時間、ちょっと疲れた'}
+                    onChange={(e) => setChat(e.target.value)} />
+
+          {/* 写真: カメラは直接起動・アルバムは写真グリッドが即開く（選択プロンプトなし） */}
+          <div className="pick-strip">
+            <button className="pick-tile" onClick={takePhoto}>
+              <span className="pick-ico">📷</span><span>カメラ</span>
+            </button>
+            <button className="pick-tile" onClick={pickFromLibrary}>
+              <span className="pick-ico">🖼️</span><span>アルバム</span>
+            </button>
+            {photos.map((p, i) => (
+              <div className="thumb pick-thumb" key={i}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.dataUrl} alt="" />
+                <button className="thumb-x" onClick={() => setPhotos((arr) => arr.filter((_, j) => j !== i))}>×</button>
+              </div>
+            ))}
+          </div>
+
+          {/* チップで追加済みの品目（AI解析してもこのまま残る） */}
+          {!editingLog && parsed && parsed.items.length > 0 && (
+            <div className="composer-added">
+              <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>
+                追加済み {parsed.items.length}品 ・ {Math.round(parsed.total.kcal).toLocaleString()}kcal
+              </div>
+              <div className="chips">
+                {parsed.items.map((it, i) => (
+                  <span className="chip on" key={i}>
+                    {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''}
+                    <b className="chip-x" onClick={() => removeItem(i)}>×</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* マイ食品チップ */}
+          {myFoods.length > 0 && (
+            <div className="chip-strip" style={{ marginTop: 10 }}>
+              {myFoods.map((fd) => (
+                <button key={fd.id} className="chip" onClick={() => addFromFood(fd, true)}>＋ {fd.name}</button>
+              ))}
+            </div>
+          )}
+
+          {parseMsg && <div className={`msg ${parseMsg.cls}`}>{parseMsg.text}</div>}
+
+          {chat.trim() || photos.length > 0 ? (
+            <button className="btn-primary" style={{ marginTop: 12 }} onClick={parse}
+                    disabled={parsing || (!unlimited && remaining === 0)}>
+              {parsing ? <><span className="spin" />解析中…</> : '✨ AI解析'}
+            </button>
+          ) : (
+            <button className="btn-primary" style={{ marginTop: 12 }} disabled={!parsed || parsed.items.length === 0}
+                    onClick={() => { setComposerOpen(false); setSheetOpen(true); }}>
+              {parsed && parsed.items.length > 0 ? '内容を確認して保存へ' : '✨ AI解析'}
+            </button>
+          )}
+          <div className="dock-hint num">
+            {!unlimited && remaining === 0
+              ? `本日のAI解析（${AI_DAILY_LIMIT}回）を使い切りました。明日リセットされます`
+              : `マイ食品＋自由入力の併用もOK ${remainLabel}`}
+          </div>
+        </div>
+      </Sheet>
+
       {/* ===== フローティングAI入力ドック（タブバーの上・メッセージアプリ風） ===== */}
       <div className="dock">
         <div className="dock-inner">
           <input ref={fileRef} type="file" accept="image/*" multiple className="file-hidden"
                  onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} />
+          <input ref={camFileRef} type="file" accept="image/*" capture="environment" className="file-hidden"
+                 onChange={(e) => { addPhotos(e.target.files); e.target.value = ''; }} />
 
           {/* 添付済み写真 */}
-          {photos.length > 0 && (
+          {photos.length > 0 && !composerOpen && (
             <div className="dock-photos">
               {photos.map((p, i) => (
                 <div className="thumb" key={i}>
@@ -1049,47 +1176,35 @@ export default function LogPage() {
           )}
 
           {/* 保存前の内容があるのに閉じている時は戻れるピルを出す */}
-          {parsed && !sheetOpen && (
+          {parsed && !sheetOpen && !composerOpen && (
             <button className="resume-pill" onClick={() => setSheetOpen(true)}>
               📋 保存前の記録があります — タップして確認・保存
             </button>
           )}
 
-          {/* マイ食品チップ（横スクロール・1タップで記録開始） */}
+          {/* マイ食品チップ（横スクロール・1タップで記録開始→コンポーザーが開く） */}
           {(myFoods.length > 0 || healthEnabled) && !parsed && (
             <div className="chip-strip">
               {healthEnabled && (
                 <button className="chip" style={{ background: 'var(--coral-weak)', color: 'var(--coral)' }} onClick={pullFromHealth}>❤️ ヘルスケアから取り込み</button>
               )}
               {myFoods.map((fd) => (
-                <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>＋ {fd.name}</button>
+                <button key={fd.id} className="chip" onClick={() => addFromFood(fd, true)}>＋ {fd.name}</button>
               ))}
             </div>
           )}
 
-          {parseMsg && <div className={`msg ${parseMsg.cls}`} style={{ marginTop: 0, marginBottom: 8 }}>{parseMsg.text}</div>}
+          {parseMsg && !composerOpen && <div className={`msg ${parseMsg.cls}`} style={{ marginTop: 0, marginBottom: 8 }}>{parseMsg.text}</div>}
 
           <div className="dock-row">
-            <button className="dock-cam" title="写真を追加" onClick={async () => {
-              // 判定は同期で行う（awaitを挟むとclick()がユーザー操作扱いされず無反応になる）
-              if (isNativeCameraAvailable()) {
-                const r = await pickPhotoNative();
-                if (r.photo) { const ph = r.photo; setPhotos((arr) => (arr.length < 4 ? [...arr, ph] : arr)); return; }
-                if (!r.error) return; // ユーザーキャンセル
-                // 失敗理由を表示しつつ、Webのファイル選択にフォールバック（無反応をなくす）
-                setParseMsg({ cls: 'err', text: `カメラを起動できませんでした（${r.error}）。ファイル選択に切り替えます。もう一度押しても直らない場合はそのままファイル選択が開きます。` });
-                fileRef.current?.click();
-              } else {
-                fileRef.current?.click();
-              }
-            }}>📷</button>
-            <textarea rows={1} value={chat} placeholder="食事・体重・気分を自由に…"
-                      onChange={(e) => {
-                        setChat(e.target.value);
-                        e.target.style.height = 'auto';
-                        e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
-                      }} />
-            <button className="dock-send" onClick={parse} disabled={parsing || (!unlimited && remaining === 0)}>
+            {/* 📷=アルバムの写真グリッドを直接開く（判定は同期。awaitを挟むとclick()がユーザー操作扱いされず無反応になる） */}
+            <button className="dock-cam" title="写真を追加" onClick={() => { pickFromLibrary(); }}>📷</button>
+            {/* タップでコンポーザーが立ち上がる（大きな入力欄で書ける） */}
+            <button className="dock-fake" onClick={() => setComposerOpen(true)}>
+              {chat.trim() ? <span className="dock-fake-text">{chat}</span> : '食事・体重・気分を自由に…'}
+            </button>
+            <button className="dock-send" onClick={() => { if (chat.trim() || photos.length) { parse(); } else { setComposerOpen(true); } }}
+                    disabled={parsing || (!unlimited && remaining === 0)}>
               {parsing ? <><span className="spin" />解析中</> : '✨ AI解析'}
             </button>
           </div>

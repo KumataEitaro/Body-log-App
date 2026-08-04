@@ -8,6 +8,7 @@ import Sheet from '@/components/Sheet';
 
 export default function DevPreviewPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   if (process.env.NODE_ENV === 'production') notFound();
 
   const macros = [
@@ -115,7 +116,7 @@ export default function DevPreviewPage() {
         <h2>📸 体の写真（進捗チェック）</h2>
         <p className="muted">アップするとAIが体脂肪率を推定し、前回との変化を比較できます。</p>
         <div className="row2" style={{ marginTop: 8 }}>
-          <button className="btn-primary">📷 写真を選ぶ</button>
+          <button className="btn-primary" onClick={() => setComposerOpen(true)}>✏️ コンポーザーを開く(検証)</button>
           <button className="btn-ghost" onClick={() => setSheetOpen(true)}>🔍 シートを開く(検証)</button>
         </div>
       </div>
@@ -137,6 +138,33 @@ export default function DevPreviewPage() {
           <div className="dock-hint num">写真だけでもOK・自由な言葉で （今日あと12回）</div>
         </div>
       </div>
+
+      {/* 入力コンポーザーのモック（/log実装と同じクラス構成） */}
+      <Sheet open={composerOpen} onClose={() => setComposerOpen(false)}>
+        <div>
+          <h2>記録する <span className="muted" style={{ fontWeight: 400 }}>— 自由な言葉でOK・写真だけでもOK</span></h2>
+          <textarea className="composer-ta" rows={4} defaultValue=""
+                    placeholder={'例）昼は牛丼並盛とサラダ。体重73.5kg。\nジムで筋トレ1時間、ちょっと疲れた'} />
+          <div className="pick-strip">
+            <button className="pick-tile"><span className="pick-ico">📷</span><span>カメラ</span></button>
+            <button className="pick-tile"><span className="pick-ico">🖼️</span><span>アルバム</span></button>
+          </div>
+          <div className="composer-added">
+            <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>追加済み 2品 ・ 405kcal</div>
+            <div className="chips">
+              <span className="chip on">プロテイン <b className="chip-x">×</b></span>
+              <span className="chip on">ゆで卵 ×2 <b className="chip-x">×</b></span>
+            </div>
+          </div>
+          <div className="chip-strip" style={{ marginTop: 10 }}>
+            {['プロテイン', 'サラダチキン', '野菜鍋', 'ゆで卵', 'オートミール'].map((n) => (
+              <button key={n} className="chip">＋ {n}</button>
+            ))}
+          </div>
+          <button className="btn-primary" style={{ marginTop: 12 }}>✨ AI解析</button>
+          <div className="dock-hint num">マイ食品＋自由入力の併用もOK （今日あと12回）</div>
+        </div>
+      </Sheet>
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)}>
         <div>

@@ -81,8 +81,10 @@ export async function hapticTap(): Promise<void> {
 export type PickPhotoResult = { photo: NativePhoto | null; error: string | null };
 
 // ネイティブのカメラ/フォトピッカーで1枚取得（1024px・JPEG圧縮済み）。
+// source='PHOTOS' はOSの写真グリッド（PHPicker）が直接開き、'CAMERA' はカメラが直接起動する。
+// 「撮影orライブラリ」を選ばせるPROMPTは使わない（選択画面を1段減らす）。
 // 失敗は握り潰さず理由を返す（呼び出し側でエラー表示＋ファイル選択へフォールバックする）。
-export async function pickPhotoNative(): Promise<PickPhotoResult> {
+export async function pickPhotoNative(source: 'CAMERA' | 'PHOTOS' = 'PHOTOS'): Promise<PickPhotoResult> {
   const cam = nativePlugin<{ getPhoto: (o: Record<string, unknown>) => Promise<{ base64String?: string }> }>('Camera');
   if (!cam) {
     cameraBrokenRuntime = true;
@@ -91,7 +93,7 @@ export async function pickPhotoNative(): Promise<PickPhotoResult> {
   try {
     const photo = await cam.getPhoto({
       resultType: 'base64',
-      source: 'PROMPT', // 撮影 or ライブラリを選ばせる
+      source,
       quality: 70,
       width: 1024,
       correctOrientation: true,

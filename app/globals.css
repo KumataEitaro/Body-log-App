@@ -266,8 +266,40 @@ button:disabled { opacity: .5; cursor: default; }
 .resume-pill { display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
   background: var(--panel); border: 1px solid var(--teal); color: var(--teal);
   border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700; width: 100%; justify-content: center; }
+/* 入力欄に見えるタップ領域（押すとコンポーザーが立ち上がる） */
+.dock-fake {
+  flex: 1; min-height: 42px; padding: 10px 14px; text-align: left;
+  border-radius: 21px; background: var(--panel); border: 1px solid var(--line);
+  font-size: 13px; color: var(--sub); overflow: hidden;
+}
+.dock-fake-text { display: block; color: var(--ink); font-size: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* ドックの高さぶんコンテンツ下部を空ける（/logのみ） */
 .dock-spacer { height: 130px; }
+
+/* ===== 入力コンポーザー（下から立ち上がる大きな入力） ===== */
+.composer-ta {
+  width: 100%; min-height: 118px; max-height: 38dvh; padding: 12px 14px;
+  border-radius: 14px; background: var(--bg); border: 1px solid var(--line);
+  font-size: 16px; line-height: 1.55; resize: none;
+}
+.composer-ta::placeholder { font-size: 13px; color: var(--sub); opacity: .85; }
+/* 写真ピッカー行: カメラ直接起動タイル＋アルバムタイル＋選択済みサムネイル */
+.pick-strip { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.pick-strip::-webkit-scrollbar { display: none; }
+.pick-tile {
+  width: 64px; height: 64px; flex: none; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 14px; border: 1.5px dashed var(--line); background: var(--panel);
+  font-size: 10px; font-weight: 700; color: var(--sub);
+}
+.pick-tile:active { transform: scale(0.96); }
+.pick-ico { font-size: 22px; line-height: 1; }
+.pick-thumb { width: 64px; height: 64px; flex: none; }
+/* チップで追加済みの品目表示 */
+.composer-added { margin-top: 12px; }
+.chip-x { margin-left: 6px; font-weight: 800; opacity: .7; cursor: pointer; }
 
 /* ===== iOSボトムシート ===== */
 .sheet-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.55); }
