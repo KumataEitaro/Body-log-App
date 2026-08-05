@@ -797,6 +797,58 @@ export default function LogPage() {
   const [healthEnabled, setHealthEnabled] = useState(false);
   useEffect(() => { setHealthEnabled(isHealthEnabled()); }, []);
 
+  // ===== 体重の自動取込: 起動時＋アプリに戻った時、ヘルスケアの今日の体重を自動で記録する =====
+  // （スマート体重計→ヘルスケア→BodyLogを開いた瞬間に記録済み、という体験。チップ操作は不要に）
+  useEffect(() => {
+    if (!healthEnabled) return;
+    let busy = false;
+    const isoToJstDate = (iso: string) =>
+      new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' })
+        .format(new Date(iso)); // sv-SE = yyyy-MM-dd形式
+    const pull = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const latest = await healthPullLatest();
+        const w = latest?.weight;
+        if (w == null || !latest?.weightDate) return;
+        const today = todayJST();
+        if (isoToJstDate(latest.weightDate) !== today) return; // 今日測った体重だけを対象にする
+        const wr = Math.round(w * 10) / 10;
+        // 同じサンプルを二重登録しない（手動修正との喧嘩も防ぐ）
+        const dedupeKey = `${today}:${wr}`;
+        try { if (localStorage.getItem('bl-auto-weight') === dedupeKey) return; } catch { /* 無視 */ }
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        if (!uid) return;
+        const { data: e } = await supabase.from('entries').select('weight').eq('date', today).maybeSingle();
+        const cur = e?.weight != null ? Number(e.weight) : null;
+        if (cur != null && Math.abs(cur - wr) < 0.05) { // 既に同じ値が記録済み
+          try { localStorage.setItem('bl-auto-weight', dedupeKey); } catch { /* 無視 */ }
+          return;
+        }
+        const { error } = await supabase.from('logs').insert({
+          user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
+          weight: wr, ex: 'オフ', adj: 0, mood: '', text: '（ヘルスケアから自動取込）', photo_urls: [],
+        });
+        if (error) return; // 失敗しても静かに（次のフォアグラウンドで再試行される）
+        try { localStorage.setItem('bl-auto-weight', dedupeKey); } catch { /* 無視 */ }
+        await syncDaySummary(uid, today, dateRef.current === today);
+        setLatestWeight(wr);
+        hapticTap();
+        setSaveMsg({ cls: 'ok', text: `⌚ ヘルスケアから体重 ${wr.toFixed(1)}kg を自動で取り込みました。` });
+      } finally {
+        busy = false;
+      }
+    };
+    pull();
+    const onVis = () => { if (document.visibilityState === 'visible') pull(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [healthEnabled]);
+
   // ヘルスケアの最新の体重・ウエストを取り込んで保存前シートに反映
   async function pullFromHealth() {
     const latest = await healthPullLatest();
