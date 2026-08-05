@@ -7,7 +7,7 @@ import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DA
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
-import { servingOf, matchFoodsLocally } from '@/lib/foods';
+import { matchFoodsLocally, addServing, servingCount } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
@@ -534,15 +534,14 @@ export default function LogPage() {
 
   // toComposer=true: ドック/コンポーザーのチップから → コンポーザーを開いたまま追記できる
   // toComposer=false: 解析結果シート内のクイック追加 → シートに留まる
+  // 同じチップの連打は行を増やさず既存行に1回分ずつ積み増す（×1→×2→×3…）
   function addFromFood(fd: MyFood, toComposer = false) {
     hapticTap();
-    // よく使う量が設定されていればその量で追加（例: 全量1800kcalの鍋→丼1杯300kcal）
-    const sv = servingOf(fd);
-    const item: ParsedItem = { name: fd.name, qty: sv.qty, kcal: sv.kcal, p: sv.p, f: sv.f, c: sv.c };
+    const items = addServing(parsed?.items ?? [], fd);
     if (parsed) {
-      setItems([...parsed.items, item]);
+      setItems(items);
     } else {
-      setParsed({ items: [item], total: sumItems([item]), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
+      setParsed({ items, total: sumItems(items), weight: null, waist: null, ex: null, adj: 0, mood: null, questions: [] });
     }
     if (toComposer) {
       setSheetOpen(false);
@@ -781,6 +780,17 @@ export default function LogPage() {
   }
 
   const remainLabel = unlimited ? '' : remaining == null ? '' : `（今日あと${Math.max(0, remaining)}回）`;
+
+  // マイ食品チップ（追加済みなら「×2」バッジを表示。タップで1回分ずつ積み増し）
+  function foodChip(fd: MyFood, toComposer: boolean) {
+    const cnt = parsed ? servingCount(parsed.items, fd) : null;
+    const label = cnt != null ? `×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : null;
+    return (
+      <button key={fd.id} className={`chip ${label ? 'counted' : ''}`} onClick={() => addFromFood(fd, toComposer)}>
+        {label ? '' : '＋ '}{fd.name}{label && <b className="chip-count num">{label}</b>}
+      </button>
+    );
+  }
 
   // ヘルスケア連携（ONのとき入力ドックに取り込みチップを出す）
   const [healthEnabled, setHealthEnabled] = useState(false);
@@ -1178,9 +1188,7 @@ export default function LogPage() {
             <div style={{ marginTop: 12 }}>
               <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>⚡ よく使う品目を追加</div>
               <div className="chips">
-                {myFoods.slice(0, 8).map((fd) => (
-                  <button key={fd.id} className="chip" onClick={() => addFromFood(fd)}>＋ {fd.name}</button>
-                ))}
+                {myFoods.slice(0, 8).map((fd) => foodChip(fd, false))}
               </div>
             </div>
           )}
@@ -1355,9 +1363,7 @@ export default function LogPage() {
                   {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} ×
                 </button>
               ))}
-              {myFoods.map((fd) => (
-                <button key={fd.id} className="chip" onClick={() => addFromFood(fd, true)}>＋ {fd.name}</button>
-              ))}
+              {myFoods.map((fd) => foodChip(fd, true))}
             </div>
           )}
 

@@ -262,6 +262,10 @@ button:disabled { opacity: .5; cursor: default; }
 .chip { background: #fff; color: var(--sub); border: 1.5px solid var(--line); border-radius: 999px;
   padding: 7px 13px; font-size: 12.5px; font-weight: 700; white-space: nowrap; flex: none; }
 .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+/* チップ連打のカウントバッジ（×2 = 2回分） */
+.chip.counted { border-color: var(--ink); color: var(--ink); }
+.chip-count { margin-left: 5px; font-size: 10px; font-weight: 800;
+  background: var(--ink); color: #fff; border-radius: 999px; padding: 1.5px 6px; }
 /* 保存前の記録に戻るピル */
 .resume-pill { display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
   background: var(--panel); border: 1px solid var(--teal); color: var(--teal);

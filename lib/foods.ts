@@ -1,4 +1,5 @@
 // マイ食品の「よく使う量」まわりのロジック
+import { qtyNumber, rescaleByQty } from '@/lib/items';
 
 export type MyFoodRow = {
   id: string; name: string; unit: string;
@@ -68,6 +69,35 @@ export function matchFoodsLocally(text: string, foods: MyFoodRow[]): LocalItem[]
   // 残りが区切り・接続詞だけなら「完全に説明できた」とみなす
   if (!/^[、。,.・+＋&と\s]*$/.test(rest)) return null;
   return items;
+}
+
+function ratioOf(fd: MyFoodRow): number {
+  return fd.serving_ratio != null && Number(fd.serving_ratio) > 0 ? Number(fd.serving_ratio) : 1;
+}
+
+// チップ連打対応: 同じ食品のチップをもう一度タップしたら、行を増やさず既存行に「1回分」を積み増す。
+// 対象は qty が「×倍率」形式の行だけ（gや杯に手編集済みの行は別物として触らない）。無ければ新規追加。
+export function addServing(items: LocalItem[], fd: MyFoodRow): LocalItem[] {
+  const r = ratioOf(fd);
+  const idx = items.findIndex((it) => it.name === fd.name && /^×\d/.test(String(it.qty)));
+  if (idx === -1) {
+    const sv = servingOf(fd);
+    return [...items, { name: fd.name, ...sv }];
+  }
+  const cur = items[idx];
+  const curMult = qtyNumber(cur.qty) ?? 0;
+  const newMult = Math.round((curMult + r) * 100) / 100;
+  const next = rescaleByQty(cur, `×${newMult}`);
+  return items.map((it, i) => (i === idx ? next : it));
+}
+
+// その食品が今「何回分」入っているか（チップのカウントバッジ用）。未追加ならnull
+export function servingCount(items: LocalItem[], fd: MyFoodRow): number | null {
+  const it = items.find((x) => x.name === fd.name && /^×\d/.test(String(x.qty)));
+  if (!it) return null;
+  const mult = qtyNumber(it.qty);
+  if (mult == null) return null;
+  return Math.round((mult / ratioOf(fd)) * 10) / 10;
 }
 
 // チップで追加するときの1回分。

@@ -86,3 +86,47 @@ describe('matchFoodsLocally (辞書だけで解ける入力のローカル即答
     expect(matchFoodsLocally('', foods)).toBeNull();
   });
 });
+
+import { addServing, servingCount } from '../lib/foods';
+
+describe('addServing / servingCount（チップ連打のカウントアップ）', () => {
+  const protein: MyFoodRow = { id: 'p', name: 'プロテイン', unit: '1杯', kcal: 120, p: 24, f: 2, c: 3 };
+
+  it('初回タップ → 新規1行（×1）', () => {
+    const items = addServing([], protein);
+    expect(items).toHaveLength(1);
+    expect(items[0].qty).toBe('×1');
+    expect(items[0].kcal).toBe(120);
+    expect(servingCount(items, protein)).toBe(1);
+  });
+  it('2回目タップ → 行は増えず ×2 に積み増し', () => {
+    const items = addServing(addServing([], protein), protein);
+    expect(items).toHaveLength(1);
+    expect(items[0].qty).toBe('×2');
+    expect(items[0].kcal).toBe(240);
+    expect(items[0].p).toBe(48);
+    expect(servingCount(items, protein)).toBe(2);
+  });
+  it('serving_ratio付き（1/6の鍋）は 0.17→0.33 と1回分ずつ増え、回数は2', () => {
+    const items = addServing(addServing([], nabe), nabe);
+    expect(items).toHaveLength(1);
+    expect(servingCount(items, nabe)).toBe(2);
+    // kcalは1回分×2相当（丸め誤差は±数kcal許容）
+    expect(items[0].kcal).toBeGreaterThan(580);
+    expect(items[0].kcal).toBeLessThan(640);
+  });
+  it('gに手編集済みの行は触らず別行を追加する', () => {
+    const edited = [{ name: 'プロテイン', qty: '30g', kcal: 110, p: 22, f: 2, c: 3 }];
+    const items = addServing(edited, protein);
+    expect(items).toHaveLength(2);
+    expect(items[1].qty).toBe('×1');
+    expect(servingCount(items, protein)).toBe(1); // ×形式の行だけ数える
+  });
+  it('別の食品は別行', () => {
+    const items = addServing(addServing([], protein), nabe);
+    expect(items).toHaveLength(2);
+  });
+  it('未追加の食品のカウントはnull', () => {
+    expect(servingCount([], protein)).toBeNull();
+  });
+});
