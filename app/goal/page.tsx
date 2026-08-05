@@ -69,13 +69,13 @@ export default function GoalPage() {
     }
 
     // ② 裏で最新を取得
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (!user) {
-      if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+      if ((authErr || !navigator.onLine) && cachedUid) return; // 一時失敗はキャッシュ表示のまま
       router.push('/login'); return;
     }
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-    if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
+    const { data: prof, error: profErr } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    if (!prof) { if (profErr || !navigator.onLine) return; router.push('/onboarding'); return; }
     setProfile(prof);
     setUserName(prof.display_name || user.email || '');
 

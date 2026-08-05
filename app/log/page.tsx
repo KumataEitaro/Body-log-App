@@ -247,13 +247,15 @@ export default function LogPage() {
       }
 
       // ② 裏で最新を取得
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
       if (!user) {
-        if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+        // 通信・認証の一時失敗はログアウト扱いにしない（キャッシュ表示のまま次回に任せる）
+        if ((authErr || !navigator.onLine) && cachedUid) return;
         router.push('/login'); return;
       }
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
+      const { data: prof, error: profErr } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      // 取得失敗（瞬断・トークン更新中）を「未作成」と誤判定しない: 確定的に行が無い時だけオンボーディングへ
+      if (!prof) { if (profErr || !navigator.onLine) return; router.push('/onboarding'); return; }
       setProfile(prof);
       setUserName(prof.display_name || user.email || '');
       const { data: w } = await supabase.from('entries').select('weight,date').not('weight', 'is', null)

@@ -262,10 +262,10 @@ export default function SettingsPage() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!prof) { router.push('/onboarding'); return; }
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
+      if (!user) { if (authErr || !navigator.onLine) return; router.push('/login'); return; }
+      const { data: prof, error: profErr } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (!prof) { if (profErr || !navigator.onLine) return; router.push('/onboarding'); return; }
       setUserName(prof.display_name || user.email || '');
       setName(prof.display_name || '');
       setSex(prof.sex); setHeight(String(prof.height_cm)); setAge(String(prof.age));

@@ -88,13 +88,13 @@ export default function DashboardPage() {
       }
 
       // ② 裏で最新を取得して差し替え
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
       if (!user) {
-        if (!navigator.onLine && cachedUid) return; // オフラインはキャッシュ表示のまま
+        if ((authErr || !navigator.onLine) && cachedUid) return; // 一時失敗はキャッシュ表示のまま
         router.push('/login'); return;
       }
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!prof) { if (!navigator.onLine) return; router.push('/onboarding'); return; }
+      const { data: prof, error: profErr } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (!prof) { if (profErr || !navigator.onLine) return; router.push('/onboarding'); return; }
       setUserName(prof.display_name || user.email || '');
 
       const [{ data: entries }, { data: g }, { data: evs }, { data: phDates }] = await Promise.all([
