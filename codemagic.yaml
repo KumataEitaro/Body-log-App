@@ -23,8 +23,8 @@ workflows:
       vars:
         BUNDLE_ID: com.gotcha.bodylog
         # ウィジェットのビルドスイッチ。Apple Developer portalでApp Group
-        # (group.com.gotcha.bodylog) を両Bundle IDに設定し終えたら "true" にする
-        ENABLE_WIDGET: "false"
+        # (group.com.gotcha.bodylog) を両Bundle IDに設定済み（2026-08-05完了）
+        ENABLE_WIDGET: "true"
       ios_signing:
         # bundle_identifierは拡張（com.gotcha.bodylog.*）のプロファイルにも自動マッチする
         distribution_type: app_store
