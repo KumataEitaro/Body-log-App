@@ -79,7 +79,9 @@ public class PhotosPlugin: CAPPlugin, CAPBridgedPlugin {
             reqOpts.resizeMode = .fast
             reqOpts.isNetworkAccessAllowed = false // サムネイルは端末内のみ（iCloud待ちで固まらせない）
             var out: [[String: String]] = []
-            assets.enumerateObjects { asset, _, _ in
+            // enumerateObjectsはXcode 26で同名オーバーロードと曖昧になるため、単純なforループで回す
+            for i in 0..<assets.count {
+                let asset = assets.object(at: i)
                 autoreleasepool {
                     mgr.requestImage(for: asset, targetSize: CGSize(width: size, height: size),
                                      contentMode: .aspectFill, options: reqOpts) { img, _ in
