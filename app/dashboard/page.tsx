@@ -12,7 +12,7 @@ import Calendar, { type DayMark } from '@/components/Calendar';
 import Sheet from '@/components/Sheet';
 import Link from 'next/link';
 import { cacheGet, cacheSet } from '@/lib/cache';
-import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, type MaintReview } from '@/lib/adaptive';
+import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, KCAL_PER_KG, type MaintReview } from '@/lib/adaptive';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
@@ -27,12 +27,19 @@ type Kpi = {
   waistNow: number | null; waistDelta: number | null;
   sum7: number; std7: number; range7: string;
   sumAll: number; fatKg: number; base: number; bmr: number;
+  unrecorded: number; // 開始日〜昨日のうち食事が未記録の日数（±0換算されている日）
 };
 
 type DayPhoto = { id: string; path: string; bf_est: number | null; assessment: string; url?: string };
 
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+function addDays(d: string, n: number): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 export default function DashboardPage() {
@@ -43,7 +50,11 @@ export default function DashboardPage() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<(ChartEvent & PlanEvent)[]>([]);
   // 2週間ごとのメンテナンスカロリー見直し提案
-  const [maintCard, setMaintCard] = useState<{ review: Exclude<MaintReview, { status: 'insufficient' }>; base: number; bmr: number; uid: string } | null>(null);
+  const [maintCard, setMaintCard] = useState<{
+    review: Exclude<MaintReview, { status: 'insufficient' }>; base: number; bmr: number; uid: string;
+    // 記録漏れの疑い（未記録日が多い＋実測が理論より悪い）。この時はメンテ下方修正ではなく記録の穴埋めを促す
+    leak: { unrecorded14: number; gapPerDay: number } | null;
+  } | null>(null);
   const [maintBusy, setMaintBusy] = useState(false);
   // カレンダー日別詳細
   const [daySel, setDaySel] = useState<string | null>(null);
@@ -128,15 +139,19 @@ export default function DashboardPage() {
       const today = todayJST();
       const withDiff = computed.filter((r) => r.diff != null) as (Row & { diff: number })[];
       const byDate = new Map(computed.map((r) => [r.date, r]));
-      const addDays = (d: string, n: number) => {
-        const dt = new Date(d + 'T00:00:00');
-        dt.setDate(dt.getDate() + n);
-        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-      };
       const cal7 = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6)); // 今日までの暦7日
       const sum7 = Math.round(cal7.reduce((a, d) => a + (byDate.get(d)?.diff ?? 0), 0));
       const sumAll = Math.round(withDiff.reduce((a, r) => a + r.diff, 0));
       const mdLabel = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+      // 開始日〜昨日のうち「食事が未記録」の日数（＝累計収支に写っていない日）
+      let unrecorded = 0;
+      if (computed.length > 0) {
+        const yest = addDays(today, -1);
+        for (let d = computed[0].date; d <= yest; d = addDays(d, 1)) {
+          const r = byDate.get(d);
+          if (!r || r.intake == null) unrecorded++;
+        }
+      }
       const weights = computed.filter((r) => r.weight != null) as (Row & { weight: number })[];
       const latestWeight = weights.length ? weights[weights.length - 1].weight : null;
       const firstWeight = weights.length ? weights[0].weight : null;
@@ -154,6 +169,7 @@ export default function DashboardPage() {
         sumAll, fatKg: Math.round((sumAll / FAT_KCAL_PER_KG) * 100) / 100,
         base: Math.round(bmrNow * Number(prof.life_factor)),
         bmr: Math.round(bmrNow),
+        unrecorded,
       };
       setKpi(kpiObj);
       cacheSet(`dash:${user.id}`, {
@@ -183,7 +199,13 @@ export default function DashboardPage() {
           });
           const review = reviewMaintenance(period, kpiObj.base, kpiObj.bmr);
           if (review.status !== 'insufficient') {
-            setMaintCard({ review, base: kpiObj.base, bmr: kpiObj.bmr, uid: user.id });
+            // 実測が理論より悪い方向のズレ＋未記録日が多い場合は「代謝が低い」ではなく「記録漏れ」を第一仮説にする
+            // （未記録の爆食をメンテナンスカロリー低下と誤帰属すると、目標がどんどんきつくなり挫折を招く）
+            const unrecorded14 = period.filter((d) => d.intake == null).length;
+            const gapPerDay = Math.round(((review.actualDelta - review.expectedDelta) * KCAL_PER_KG) / REVIEW_INTERVAL_DAYS / 10) * 10;
+            const leak = review.status === 'change' && review.newBase < kpiObj.base && unrecorded14 >= 3 && gapPerDay >= 100
+              ? { unrecorded14, gapPerDay } : null;
+            setMaintCard({ review, base: kpiObj.base, bmr: kpiObj.bmr, uid: user.id, leak });
           }
         }
       } catch { /* 見直しは失敗しても本体に影響させない */ }
@@ -248,7 +270,14 @@ export default function DashboardPage() {
   const goalStatus = goal && kpi.latestWeight != null ? progressStatus(goal, todayJST(), kpi.latestWeight) : null;
   const plan = goal && kpi.latestWeight != null ? computePlan(goal, todayJST(), kpi.latestWeight, events, goal.absorb_days) : null;
   const recommendedIntake = plan ? Math.max(kpi.base - plan.requiredDailyWithEvents, kpi.bmr) : null;
-  const marks = new Map<string, DayMark>(rows.map((r) => [r.date, { logged: true, over: r.verdict === 'NG' }]));
+  // 食事が未記録の日は「?」で可視化する（未記録の爆食が収支を静かに壊すのを隠さない）
+  const marks = new Map<string, DayMark>(rows.map((r) => [r.date, { logged: r.intake != null, over: r.verdict === 'NG', unknown: r.intake == null }]));
+  if (rows.length > 0) {
+    const yest = addDays(todayJST(), -1);
+    for (let d = rows[0].date; d <= yest; d = addDays(d, 1)) {
+      if (!marks.has(d)) marks.set(d, { logged: false, over: false, unknown: true });
+    }
+  }
   // 写真のある日にマークを付ける（記録が無い日でも写真だけあれば表示）
   for (const d of photoDates) {
     const m = marks.get(d);
@@ -269,7 +298,31 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* ===== 2週間レビュー: メンテナンスカロリー再校正の提案 ===== */}
-          {maintCard && (
+          {maintCard && maintCard.leak && maintCard.review.status === 'change' && (
+            <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
+              <h2>🔍 記録に写っていないカロリーがありそうです</h2>
+              <p className="muted" style={{ margin: '0 0 8px' }}>
+                直近2週間、記録上は{maintCard.review.expectedDelta > 0 ? '+' : ''}{maintCard.review.expectedDelta}kgのはずが、
+                実測は{maintCard.review.actualDelta > 0 ? '+' : ''}{maintCard.review.actualDelta}kgでした。
+                体重計から逆算すると、<b className="num">1日あたり約+{maintCard.leak.gapPerDay.toLocaleString()}kcal</b>ぶんが記録に載っていない可能性があります
+                （この期間の食事未記録は<b>{maintCard.leak.unrecorded14}日</b>）。
+              </p>
+              <p className="muted" style={{ margin: '0 0 8px' }}>
+                責める話ではありません——未記録の日を埋めるだけで、数字と現実のズレは解消します。
+                このままメンテナンスカロリーを下げると「記録漏れ」を「代謝が低い」と誤解して、目標が必要以上にきつくなります。
+              </p>
+              <div className="row2" style={{ marginTop: 10 }}>
+                <Link href="/log" className="btn-primary" style={{ textAlign: 'center', display: 'block' }}>📝 未記録の日を埋める</Link>
+                <button className="btn-ghost" disabled={maintBusy} onClick={() => resolveMaintReview(false)}>今回は見送る</button>
+              </div>
+              <p className="center" style={{ margin: '8px 0 0', fontSize: 12 }}>
+                <a href="#" className="muted" onClick={(e) => { e.preventDefault(); resolveMaintReview(true); }}>
+                  記録は正確なはず → メンテナンスカロリーを{maintCard.review.newBase.toLocaleString()}kcalに更新する
+                </a>
+              </p>
+            </div>
+          )}
+          {maintCard && !maintCard.leak && (
             <div className="card" style={{ border: '1.5px solid var(--teal)' }}>
               <h2>🎉 2週間継続おめでとうございます！</h2>
               {maintCard.review.status === 'change' ? (
@@ -357,7 +410,9 @@ export default function DashboardPage() {
               <div className="s-stat">
                 <div className="s-lbl">累計収支</div>
                 <div className="s-val num" style={{ color: kpi.sumAll <= 0 ? 'var(--green)' : 'var(--coral)' }}>{kpi.sumAll > 0 ? '+' : ''}{(kpi.sumAll / 1000).toFixed(1)}<small>k kcal</small></div>
-                <div className="s-delta muted" style={{ fontWeight: 400 }}>脂肪 約{kpi.fatKg}kg・未記録日は±0</div>
+                <div className="s-delta muted" style={{ fontWeight: 400 }}>
+                  脂肪 約{kpi.fatKg}kg{(kpi.unrecorded ?? 0) > 0 && <>・<span style={{ color: 'var(--amber)' }}>未記録{kpi.unrecorded}日=±0扱い</span></>}
+                </div>
               </div>
               <div className="s-stat">
                 <div className="s-lbl">直近7日 収支 <span style={{ fontWeight: 400 }}>({kpi.range7})</span></div>

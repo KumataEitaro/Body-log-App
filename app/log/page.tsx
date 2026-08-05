@@ -804,6 +804,80 @@ export default function LogPage() {
     setSheetOpen(true);
   }
 
+  // ===== 昨日の穴埋め（ダイエット失敗の主因＝未記録の爆食日を、翌日に低摩擦で回収する） =====
+  const [backfill, setBackfill] = useState<{ date: string; binge: boolean } | null>(null);
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const [backfillMore, setBackfillMore] = useState(false); // 「食べすぎた…」展開
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const t = todayJST();
+        if (localStorage.getItem('bl-backfill-snooze') === t) return; // 今日は「あとで」済み
+        const y = shiftDate(t, -1);
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+        const [{ data: e }, { data: first }] = await Promise.all([
+          supabase.from('entries').select('intake,mood,food_text').eq('date', y).maybeSingle(),
+          supabase.from('entries').select('date').order('date', { ascending: true }).limit(1),
+        ]);
+        if (!first || first.length === 0 || first[0].date > y) return; // 昨日以前に記録がない（始めたばかり）
+        if (e?.intake != null) return; // 昨日の食事は記録済み
+        // 昨日に気分・メモだけ残っていて爆食サインがある場合はコピーを変える
+        const binge = detectStruggle([String(e?.mood || ''), String(e?.food_text || '')]) === 'binge';
+        setBackfill({ date: y, binge });
+      } catch { /* 無視（穴埋めは本体機能に影響させない） */ }
+    })();
+  }, []);
+
+  // ±0確定 or ざっくり食べすぎ(+extra)で昨日を1行記録する
+  async function backfillSave(extra: number) {
+    if (!backfill || !profile || backfillBusy) return;
+    setBackfillBusy(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const baseEst = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+      const { error } = await supabase.from('logs').insert({
+        user_id: uid, date: backfill.date, at: `${backfill.date}T21:00:00+09:00`,
+        items: [], kcal: baseEst + extra, p: null, f: null, c: null, weight: null,
+        ex: 'オフ', adj: 0, mood: '',
+        text: extra > 0 ? `（あとから概算: 食べすぎ +${extra}kcal）` : '（あとから確定: だいたい目安どおり）',
+        photo_urls: [],
+      });
+      if (error) { setSaveMsg({ cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') }); return; }
+      await syncDaySummary(uid, backfill.date, false);
+      hapticSuccess();
+      setSaveMsg({
+        cls: 'ok',
+        text: extra > 0
+          ? `昨日を「食べすぎ +${extra.toLocaleString()}kcal」として記録しました。1日の失敗は挽回できます。今日から立て直しましょう！`
+          : '昨日を「目安どおり（±0）」で確定しました。',
+      });
+      setBackfill(null);
+    } finally {
+      setBackfillBusy(false);
+    }
+  }
+
+  // ちゃんと思い出して入力: 昨日の日付に切り替えてコンポーザーを開く
+  function backfillRecall() {
+    if (!backfill) return;
+    const d = backfill.date;
+    setBackfill(null);
+    setDate(d);
+    loadDay(d);
+    setComposerOpen(true);
+  }
+
+  function backfillSnooze() {
+    try { localStorage.setItem('bl-backfill-snooze', todayJST()); } catch { /* 無視 */ }
+    setBackfill(null);
+  }
+
   // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
   const [struggle, setStruggle] = useState<StruggleKind>(null);
   useEffect(() => {
@@ -895,6 +969,41 @@ export default function LogPage() {
           <button className="today-chip" onClick={() => { const d = todayJST(); setDate(d); loadDay(d); }}>今日へ</button>
         )}
       </div>
+
+      {/* ===== 昨日の穴埋めカード（未記録の爆食日を翌日に回収する・責めないトーン） ===== */}
+      {backfill && date === todayJST() && !editingLog && (
+        <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
+          <h2>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : '📝 昨日の記録がありません'}</h2>
+          <p className="muted" style={{ margin: '0 0 8px' }}>
+            {backfill.binge
+              ? '食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。'
+              : 'ざっくりでOKです。未記録の日が続くと、収支の数字と現実が少しずつズレていきます。'}
+          </p>
+          {!backfillMore ? (
+            <div className="row2">
+              <button className="btn-primary" disabled={backfillBusy} onClick={() => backfillSave(0)}>
+                {backfillBusy ? <><span className="spin" />保存中…</> : 'だいたい目安どおり（±0）'}
+              </button>
+              <button className="btn-ghost" disabled={backfillBusy} onClick={() => setBackfillMore(true)}>食べすぎた…</button>
+            </div>
+          ) : (
+            <>
+              <p className="muted" style={{ fontSize: 11.5, margin: '0 0 6px' }}>どれくらいオーバーした感覚ですか？（あとから直せます）</p>
+              <div className="chips">
+                {[500, 1000, 2000].map((n) => (
+                  <button key={n} className="chip" disabled={backfillBusy} onClick={() => backfillSave(n)}>+{n.toLocaleString()}kcal くらい</button>
+                ))}
+                <button className="chip" onClick={backfillRecall}>思い出して入力する</button>
+              </div>
+            </>
+          )}
+          <p className="center" style={{ margin: '8px 0 0', fontSize: 12 }}>
+            <a href="#" className="muted" onClick={(e) => { e.preventDefault(); backfillRecall(); }}>ちゃんと思い出して入力する</a>
+            <span className="muted"> ・ </span>
+            <a href="#" className="muted" onClick={(e) => { e.preventDefault(); backfillSnooze(); }}>あとで</a>
+          </p>
+        </div>
+      )}
 
       {/* ===== C案ヒーロー: 巨大数字＋水平プログレスライン ===== */}
       {profile && (() => {

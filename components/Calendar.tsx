@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 
-export type DayMark = { logged: boolean; over: boolean; photo?: boolean };
+export type DayMark = { logged: boolean; over: boolean; photo?: boolean; unknown?: boolean };
 
 function keyOf(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -56,7 +56,9 @@ export default function Calendar({
             <button key={k} className={`cal-cell ${isSel ? 'sel' : ''} ${future ? 'future' : ''}`} onClick={() => onSelect(k)} disabled={future}>
               {mk?.photo && <span className="cal-photo">📷</span>}
               <span className={`cal-num ${isToday ? 'today' : ''}`}>{day}</span>
-              <span className={`cal-dot ${!mk?.logged ? 'none' : mk.over ? 'over' : 'ok'}`} />
+              {mk?.unknown && !future && !isToday
+                ? <span className="cal-dot cal-q">?</span>
+                : <span className={`cal-dot ${!mk?.logged ? 'none' : mk.over ? 'over' : 'ok'}`} />}
             </button>
           );
         })}
@@ -64,6 +66,7 @@ export default function Calendar({
       <div className="chart-legend" style={{ justifyContent: 'center', marginTop: 4 }}>
         <span><i style={{ background: 'var(--green)', borderRadius: '50%' }} />記録あり</span>
         <span><i style={{ background: 'var(--coral)', borderRadius: '50%' }} />目標超過</span>
+        <span><b style={{ color: 'var(--faint)' }}>?</b> 食事が未記録</span>
         <span>📷 写真あり</span>
         <span className="muted">日付をタップで詳細・編集</span>
       </div>

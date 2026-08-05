@@ -390,6 +390,8 @@ button:disabled { opacity: .5; cursor: default; }
 .cal-dot.ok { background: var(--green); }
 .cal-dot.over { background: var(--coral); }
 .cal-dot.none { background: transparent; }
+/* 食事が未記録の日（＝収支に写っていない日）を「?」で可視化 */
+.cal-q { width: auto; height: 6px; line-height: 6px; font-size: 9px; font-weight: 800; color: var(--faint); }
 
 /* 日別詳細シート内 */
 .day-detail-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
