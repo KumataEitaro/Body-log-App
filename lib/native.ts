@@ -133,8 +133,11 @@ export async function pickPhotoNative(source: 'CAMERA' | 'PHOTOS' = 'PHOTOS'): P
   }
 }
 
-// 毎日のリマインド通知（端末内で完結）
-export async function setDailyReminder(enabled: boolean, hour = 20, minute = 0): Promise<boolean> {
+// 「未入力の日だけ」のリマインド通知。
+// 仕組み: 今日〜6日後の指定時刻に単発通知を予約し、記録が入るたびに当日分を外して組み直す。
+// （その日に記録済みなら通知は来ない。アプリを7日以上開かないと止まるが、開けば再開する）
+const REMINDER_IDS = [1, 101, 102, 103, 104, 105, 106, 107]; // 1=旧方式（毎日繰り返し）の掃除用
+export async function scheduleSmartReminder(enabled: boolean, hour = 20, minute = 0, todayLogged = false): Promise<boolean> {
   const ln = nativePlugin<{
     cancel: (o: unknown) => Promise<void>;
     requestPermissions: () => Promise<{ display: string }>;
@@ -142,18 +145,26 @@ export async function setDailyReminder(enabled: boolean, hour = 20, minute = 0):
   }>('LocalNotifications');
   if (!ln) return false;
   try {
-    await ln.cancel({ notifications: [{ id: 1 }] }).catch(() => { /* 未登録なら無視 */ });
+    await ln.cancel({ notifications: REMINDER_IDS.map((id) => ({ id })) }).catch(() => { /* 未登録なら無視 */ });
     if (!enabled) return true;
     const perm = await ln.requestPermissions();
     if (perm.display !== 'granted') return false;
-    await ln.schedule({
-      notifications: [{
-        id: 1,
+    const now = new Date();
+    const list: unknown[] = [];
+    for (let i = 0; i < 7; i++) {
+      const at = new Date(now);
+      at.setDate(now.getDate() + i);
+      at.setHours(hour, minute, 0, 0);
+      if (at <= now) continue;                 // 今日の時刻を過ぎていたら明日から
+      if (i === 0 && todayLogged) continue;    // 今日はもう記録済み → 今日は通知しない
+      list.push({
+        id: 101 + i,
         title: 'BodyLog',
-        body: '今日の記録はまだですか？📝 続けることが一番の近道です',
-        schedule: { on: { hour, minute } },
-      }],
-    });
+        body: '今日の記録がまだです📝 ざっくりでOK、30秒で残しましょう',
+        schedule: { at },
+      });
+    }
+    if (list.length > 0) await ln.schedule({ notifications: list });
     return true;
   } catch {
     return false;

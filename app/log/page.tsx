@@ -9,7 +9,7 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { matchFoodsLocally, addServing, servingCount } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
-import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync } from '@/lib/native';
+import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync, scheduleSmartReminder } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { getQueue, enqueueLog, removeFromQueue } from '@/lib/offlineQueue';
@@ -299,10 +299,19 @@ export default function LogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ネイティブアプリ: 今日未記録ならアイコンにバッジを付ける
+  // ネイティブアプリ: 今日未記録ならアイコンにバッジを付ける＋リマインド通知を組み直す
+  // （記録が入った瞬間に「今日の通知」が外れる＝未入力の日だけ通知が来る）
   useEffect(() => {
     if (date === todayJST()) {
-      setTodayRecordedBadge(dayLogs.length > 0 || !!legacyEntry);
+      const logged = dayLogs.length > 0 || !!legacyEntry;
+      setTodayRecordedBadge(logged);
+      try {
+        const saved = JSON.parse(localStorage.getItem('bodylog-reminder') || 'null');
+        if (saved?.on) {
+          const [h, m] = String(saved.time || '20:00').split(':').map(Number);
+          scheduleSmartReminder(true, h, m, logged);
+        }
+      } catch { /* 無視 */ }
     }
   }, [dayLogs, legacyEntry, date]);
 
@@ -869,6 +878,53 @@ export default function LogPage() {
     setSheetOpen(true);
   }
 
+  // ===== 体重・ウエストの直接入力シート（AI自由記述を経由しない専用UI） =====
+  const [bodySheetOpen, setBodySheetOpen] = useState(false);
+  const [wWeight, setWWeight] = useState('');
+  const [wWaist, setWWaist] = useState('');
+  const [bodySaving, setBodySaving] = useState(false);
+
+  function openBodySheet() {
+    hapticTap();
+    setWWeight(latestWeight != null ? latestWeight.toFixed(1) : '');
+    setWWaist('');
+    setBodySheetOpen(true);
+  }
+
+  async function saveBody() {
+    const w = wWeight === '' ? null : Number(wWeight);
+    const wa = wWaist === '' ? null : Number(wWaist);
+    if (w == null && wa == null) { setBodySheetOpen(false); return; }
+    if ((w != null && (!(w > 20) || w > 300)) || (wa != null && (!(wa > 30) || wa > 200))) {
+      setSaveMsg({ cls: 'err', text: '数値を確認してください（体重20〜300kg・ウエスト30〜200cm）。' });
+      return;
+    }
+    setBodySaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) { router.push('/login'); return; }
+      const row = {
+        user_id: uid, date,
+        items: [], kcal: null, p: null, f: null, c: null,
+        weight: w, waist: wa, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
+      };
+      let { error } = await supabase.from('logs').insert(row);
+      if (error && isMissingWaist(error.message)) {
+        ({ error } = await supabase.from('logs').insert(stripWaist(row)));
+      }
+      if (error) { setSaveMsg({ cls: 'err', text: friendlyError(new Error(error.message), '保存に失敗しました。もう一度お試しください。') }); return; }
+      await syncDaySummary(uid, date);
+      if (w != null) setLatestWeight(Math.round(w * 10) / 10);
+      hapticSuccess();
+      setSaveMsg({ cls: 'ok', text: `保存しました（${[w != null ? `体重 ${w.toFixed(1)}kg` : '', wa != null ? `ウエスト ${wa.toFixed(1)}cm` : ''].filter(Boolean).join('・')}）。` });
+      setBodySheetOpen(false);
+    } finally {
+      setBodySaving(false);
+    }
+  }
+
   // ===== 昨日の穴埋め（ダイエット失敗の主因＝未記録の爆食日を、翌日に低摩擦で回収する） =====
   const [backfill, setBackfill] = useState<{ date: string; binge: boolean } | null>(null);
   const [backfillBusy, setBackfillBusy] = useState(false);
@@ -1376,6 +1432,31 @@ export default function LogPage() {
       {/* ドックに隠れないための余白 */}
       <div className="dock-spacer" />
 
+      {/* ===== 体重・ウエスト直接入力シート ===== */}
+      <Sheet open={bodySheetOpen} onClose={() => setBodySheetOpen(false)}>
+        <div>
+          <h2>⚖️ 体重・ウエスト{date !== todayJST() && <span className="muted" style={{ fontWeight: 400 }}> — {date.replace(/-/g, '/')}の記録</span>}</h2>
+          <div className="row2">
+            <div>
+              <label>体重(kg)</label>
+              <input type="number" step="0.1" inputMode="decimal" className="num" autoFocus
+                     value={wWeight} onChange={(e) => setWWeight(e.target.value)} placeholder="73.5" />
+            </div>
+            <div>
+              <label>ウエスト(cm)</label>
+              <input type="number" step="0.1" inputMode="decimal" className="num"
+                     value={wWaist} onChange={(e) => setWWaist(e.target.value)} placeholder="82.0" />
+            </div>
+          </div>
+          <p className="muted" style={{ fontSize: 11, margin: '6px 0 0' }}>
+            どちらか一方だけでもOK{healthEnabled ? '。ヘルスケア連携中は体重計の値も自動で取り込まれます' : ''}
+          </p>
+          <button className="btn-primary" style={{ marginTop: 12 }} onClick={saveBody} disabled={bodySaving}>
+            {bodySaving ? <><span className="spin" />保存中…</> : '保存する'}
+          </button>
+        </div>
+      </Sheet>
+
       {/* ===== 入力コンポーザー（下から立ち上がる・入力欄基準のコンパクトな高さ） ===== */}
       <Sheet open={composerOpen} onClose={() => setComposerOpen(false)}>
         <div className="composer">
@@ -1543,6 +1624,8 @@ export default function LogPage() {
           <div className="dock-row">
             {/* 📷=コンポーザーを開く（直近のカメラロールがそのまま選べる写真トレイ付き） */}
             <button className="dock-cam" title="写真を追加" onClick={() => setComposerOpen(true)}>📷</button>
+            {/* ⚖️=体重・ウエストの直接入力（AI自由記述を使わない専用UI） */}
+            <button className="dock-cam" title="体重・ウエストを記録" onClick={openBodySheet}>⚖️</button>
             {/* タップでコンポーザーが立ち上がる（大きな入力欄で書ける） */}
             <button className="dock-fake" onClick={() => setComposerOpen(true)}>
               {chat.trim() ? <span className="dock-fake-text">{chat}</span> : '食事・体重・気分を自由に…'}

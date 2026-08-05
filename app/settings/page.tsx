@@ -7,7 +7,7 @@ import { friendlyError } from '@/lib/errmsg';
 import { mifflinBMR, LIFE_FACTOR_DEFAULT, EX_LEVELS, todayJST } from '@/lib/calc';
 import { LANGS, findLang } from '@/lib/langs';
 import { LANG_KEY } from '@/components/DomTranslator';
-import { getIsNative, setDailyReminder, isNativeSync, isNativeCameraAvailable, readDiag } from '@/lib/native';
+import { getIsNative, scheduleSmartReminder, isNativeSync, isNativeCameraAvailable, readDiag } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosBinaryInfo } from '@/lib/photos';
 import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthPullHistory } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
@@ -40,14 +40,21 @@ export default function SettingsPage() {
   async function applyReminder(on: boolean, time: string) {
     setRemindMsg(null);
     const [h, m] = time.split(':').map(Number);
-    const ok = await setDailyReminder(on, h, m);
+    // 今日すでに記録済みなら、今日の分は最初から予約しない
+    let todayLogged = false;
+    try {
+      const supabase = createClient();
+      const { data: e } = await supabase.from('entries').select('date').eq('date', todayJST()).maybeSingle();
+      todayLogged = !!e;
+    } catch { /* 判定できなければ通知する側に倒す */ }
+    const ok = await scheduleSmartReminder(on, h, m, todayLogged);
     if (on && !ok) {
       setRemindMsg({ cls: 'err', text: '通知が許可されていません。iOSの設定 > BodyLog > 通知 を許可してください。' });
       return;
     }
     setRemindOn(on); setRemindTime(time);
     localStorage.setItem('bodylog-reminder', JSON.stringify({ on, time }));
-    setRemindMsg({ cls: 'ok', text: on ? `毎日 ${time} にアプリ通知でお知らせします。` : 'アプリ通知を停止しました。' });
+    setRemindMsg({ cls: 'ok', text: on ? `未入力の日だけ、${time} に通知します（記録済みの日は通知されません）。` : 'アプリ通知を停止しました。' });
   }
 
   // ===== カメラ/写真の診断（不具合調査を推測に頼らないための可視化） =====
