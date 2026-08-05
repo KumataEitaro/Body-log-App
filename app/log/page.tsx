@@ -18,7 +18,7 @@ import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
 import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDays } from '@/lib/health';
 import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
 import { friendlyError, JA_TEXT_RE } from '@/lib/errmsg';
-import { widgetSync } from '@/lib/widget';
+import { widgetSync, type WidgetDay } from '@/lib/widget';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -892,6 +892,39 @@ export default function LogPage() {
   // ===== ホーム画面ウィジェットへ今日のサマリーを書き出す（ネイティブ＆対応バイナリのみ） =====
   const widgetGoal = planIntake ?? target;
   const widgetPGoal = macros?.p ?? 0;
+
+  // 中サイズ用: 昨日までの6日分の収支（±kcal・未記録=null）。日別の「正直な鏡」に使う
+  const [widgetWeek, setWidgetWeek] = useState<{ days: WidgetDay[]; sum: number; unknown: number } | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const today = todayJST();
+        const from = shiftDate(today, -6);
+        const { data } = await supabase.from('entries').select('date,intake,ex,adj')
+          .gte('date', from).lt('date', today);
+        const byDate = new Map((data || []).map((r) => [String(r.date), r]));
+        const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+        const base = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+        const days: WidgetDay[] = [];
+        let sum = 0, unknown = 0;
+        for (let i = 6; i >= 1; i--) {
+          const d = shiftDate(today, -i);
+          const r = byDate.get(d);
+          const label = DOW[new Date(d + 'T00:00:00').getDay()];
+          if (r?.intake == null) { days.push({ l: label, v: null }); unknown++; continue; }
+          const dayTarget = base + (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0);
+          const diff = Math.round(Number(r.intake) - dayTarget);
+          days.push({ l: label, v: diff });
+          sum += diff;
+        }
+        setWidgetWeek({ days, sum: Math.round(sum), unknown });
+      } catch { /* 週データはベストエフォート */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, dayLogs.length]);
+
   useEffect(() => {
     if (!profile || date !== todayJST()) return;
     const t = setTimeout(() => {
@@ -902,11 +935,14 @@ export default function LogPage() {
         todayLogged: dayLogs.some((l) => l.kcal != null),
         yUnrec: !!backfill,
         asOf: new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
+        days: widgetWeek?.days,
+        weekSum: widgetWeek?.sum,
+        weekUnknown: widgetWeek?.unknown,
       });
     }, 800); // 連続更新をまとめる
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, date, eaten, widgetGoal, eatenP, widgetPGoal, dayLogs, backfill]);
+  }, [profile, date, eaten, widgetGoal, eatenP, widgetPGoal, dayLogs, backfill, widgetWeek]);
 
   // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
   const [struggle, setStruggle] = useState<StruggleKind>(null);

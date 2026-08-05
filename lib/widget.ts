@@ -5,6 +5,9 @@
 
 import { registerPlugin } from '@capacitor/core';
 
+// 中サイズ用: 過去の1日分の収支（v=null は未記録日）
+export type WidgetDay = { l: string; v: number | null };
+
 export type WidgetData = {
   date: string;        // yyyy-MM-dd (JST)
   eaten: number;
@@ -15,6 +18,9 @@ export type WidgetData = {
   todayLogged: boolean;
   yUnrec: boolean;     // 昨日が未記録
   asOf: string;        // "12:34"
+  days?: WidgetDay[];  // 昨日までの6日（古い順・曜日ラベル＋収支）
+  weekSum?: number;    // 上記の合計（記録日のみ）
+  weekUnknown?: number; // 未記録日数
 };
 
 type WidgetPluginT = { sync(o: { json: string }): Promise<{ ok: boolean }> };
