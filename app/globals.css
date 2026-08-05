@@ -19,12 +19,16 @@ html, body { margin: 0; padding: 0; }
 html { color-scheme: light; }
 body {
   /* B案: 欧文・数字=Inter Tight / 日本語=Noto Sans JP（next/fontのCSS変数）。未読込時はシステムへフォールバック */
-  font-family: var(--font-latin), var(--font-jp), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+  /* Aパターン（ネイティブ仕様）: iOS=SF Pro＋ヒラギノ / Android=Roboto＋Noto。
+     lang="ja"と併せて中国語グリフへのフォールバックを防ぐ */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
   background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; /* 日本語本文の可読行間 */
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--teal); }
-.num { font-variant-numeric: tabular-nums; }
+/* 数字の桁揃え: 等幅数字（tnum）。kcal・PFC・体重などの数値表示で桁が縦に揃う */
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
 /* ===== chrome: 上部バー（ブラー・セーフエリア対応） ===== */
 .topbar {
