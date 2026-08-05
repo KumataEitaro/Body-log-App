@@ -52,7 +52,23 @@ workflows:
       - name: Build ipa
         script: |
           xcode-project use-profiles
+          set +e
           xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+          RC=$?
+          if [ $RC -ne 0 ]; then
+            # 失敗時: 生のxcodebuildログからエラー行を抜き出してこのステップのログに直接出す
+            echo "=================== xcodebuild エラー抜粋 ==================="
+            LOG=$(ls -t /tmp/xcodebuild_logs/*.log 2>/dev/null | head -1)
+            if [ -n "$LOG" ]; then
+              grep -nE "(: error:|error generated|❌|fatal error:)" "$LOG" | head -60
+              echo "-------------------- ログ末尾200行 --------------------"
+              tail -200 "$LOG"
+            else
+              echo "xcodebuildログが見つかりません"
+            fi
+            echo "============================================================"
+          fi
+          exit $RC
       - name: Verify entitlements (診断)
         script: |
           set +e
@@ -79,6 +95,7 @@ workflows:
           set -e
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
