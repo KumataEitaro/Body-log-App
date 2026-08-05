@@ -123,10 +123,20 @@ export default function DashboardPage() {
       });
       setRows(computed);
 
+      // 収支の原則: 記録しなかった日は「目安どおり食べた＝±0」として扱う
+      // （累計は0加算なので記録日の合計と一致する。「直近7日」は暦の7日間で数える）
+      const today = todayJST();
       const withDiff = computed.filter((r) => r.diff != null) as (Row & { diff: number })[];
-      const last7 = withDiff.slice(-7);
-      const sum7 = Math.round(last7.reduce((a, r) => a + r.diff, 0));
+      const byDate = new Map(computed.map((r) => [r.date, r]));
+      const addDays = (d: string, n: number) => {
+        const dt = new Date(d + 'T00:00:00');
+        dt.setDate(dt.getDate() + n);
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      };
+      const cal7 = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6)); // 今日までの暦7日
+      const sum7 = Math.round(cal7.reduce((a, d) => a + (byDate.get(d)?.diff ?? 0), 0));
       const sumAll = Math.round(withDiff.reduce((a, r) => a + r.diff, 0));
+      const mdLabel = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
       const weights = computed.filter((r) => r.weight != null) as (Row & { weight: number })[];
       const latestWeight = weights.length ? weights[weights.length - 1].weight : null;
       const firstWeight = weights.length ? weights[0].weight : null;
@@ -140,7 +150,7 @@ export default function DashboardPage() {
         waistNow,
         waistDelta: waistNow != null && waistFirst != null ? Math.round((waistNow - waistFirst) * 10) / 10 : null,
         sum7, std7: sum7 - WEEKLY_STD,
-        range7: last7.length ? `${last7[0].label}〜${last7[last7.length - 1].label}` : '',
+        range7: `${mdLabel(cal7[0])}〜${mdLabel(cal7[6])}`,
         sumAll, fatKg: Math.round((sumAll / FAT_KCAL_PER_KG) * 100) / 100,
         base: Math.round(bmrNow * Number(prof.life_factor)),
         bmr: Math.round(bmrNow),
@@ -154,7 +164,6 @@ export default function DashboardPage() {
 
       // ===== 2週間ごとのメンテナンスカロリー見直し =====
       try {
-        const today = todayJST();
         const key = `blmr:${user.id}`;
         let last: string | null = null;
         try { last = (JSON.parse(localStorage.getItem(key) || 'null') as { last?: string } | null)?.last ?? null; } catch { /* 無視 */ }
@@ -164,11 +173,14 @@ export default function DashboardPage() {
         }
         const daysSince = last ? Math.floor((new Date(today + 'T00:00:00').getTime() - new Date(last + 'T00:00:00').getTime()) / 86400000) : 0;
         if (last && daysSince >= REVIEW_INTERVAL_DAYS) {
-          const cutoff = new Date(today + 'T00:00:00');
-          cutoff.setDate(cutoff.getDate() - (REVIEW_INTERVAL_DAYS - 1));
-          const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
-          const period = computed.filter((r) => r.date >= cutoffKey)
-            .map((r) => ({ date: r.date, intake: r.intake, target: Math.round(r.target), weight: r.weight }));
+          // 暦の14日間をすべて渡す。記録が無い日は「目安どおり食べた(±0)」として埋める
+          const period = Array.from({ length: REVIEW_INTERVAL_DAYS }, (_, i) => {
+            const d = addDays(today, i - (REVIEW_INTERVAL_DAYS - 1));
+            const r = byDate.get(d);
+            return r
+              ? { date: d, intake: r.intake, target: Math.round(r.target), weight: r.weight }
+              : { date: d, intake: null, target: kpiObj.base, weight: null };
+          });
           const review = reviewMaintenance(period, kpiObj.base, kpiObj.bmr);
           if (review.status !== 'insufficient') {
             setMaintCard({ review, base: kpiObj.base, bmr: kpiObj.bmr, uid: user.id });
@@ -345,10 +357,10 @@ export default function DashboardPage() {
               <div className="s-stat">
                 <div className="s-lbl">累計収支</div>
                 <div className="s-val num" style={{ color: kpi.sumAll <= 0 ? 'var(--green)' : 'var(--coral)' }}>{kpi.sumAll > 0 ? '+' : ''}{(kpi.sumAll / 1000).toFixed(1)}<small>k kcal</small></div>
-                <div className="s-delta muted" style={{ fontWeight: 400 }}>脂肪 約{kpi.fatKg}kg</div>
+                <div className="s-delta muted" style={{ fontWeight: 400 }}>脂肪 約{kpi.fatKg}kg・未記録日は±0</div>
               </div>
               <div className="s-stat">
-                <div className="s-lbl">直近7日 収支</div>
+                <div className="s-lbl">直近7日 収支 <span style={{ fontWeight: 400 }}>({kpi.range7})</span></div>
                 <div className="s-val num" style={{ color: kpi.sum7 <= 0 ? 'var(--green)' : 'var(--coral)' }}>{kpi.sum7 > 0 ? '+' : ''}{kpi.sum7.toLocaleString()}</div>
                 <div className="s-delta muted" style={{ fontWeight: 400 }}>標準比 {kpi.std7 > 0 ? '+' : ''}{kpi.std7.toLocaleString()}</div>
               </div>
