@@ -18,6 +18,7 @@ import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
 import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDays } from '@/lib/health';
 import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
 import { friendlyError, JA_TEXT_RE } from '@/lib/errmsg';
+import { widgetSync } from '@/lib/widget';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
 type Parsed = {
@@ -887,6 +888,25 @@ export default function LogPage() {
     try { localStorage.setItem('bl-backfill-snooze', todayJST()); } catch { /* 無視 */ }
     setBackfill(null);
   }
+
+  // ===== ホーム画面ウィジェットへ今日のサマリーを書き出す（ネイティブ＆対応バイナリのみ） =====
+  const widgetGoal = planIntake ?? target;
+  const widgetPGoal = macros?.p ?? 0;
+  useEffect(() => {
+    if (!profile || date !== todayJST()) return;
+    const t = setTimeout(() => {
+      widgetSync({
+        date: todayJST(),
+        eaten, goal: widgetGoal, left: widgetGoal - eaten,
+        pEaten: eatenP, pGoal: widgetPGoal,
+        todayLogged: dayLogs.some((l) => l.kcal != null),
+        yUnrec: !!backfill,
+        asOf: new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date()),
+      });
+    }, 800); // 連続更新をまとめる
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, date, eaten, widgetGoal, eatenP, widgetPGoal, dayLogs, backfill]);
 
   // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
   const [struggle, setStruggle] = useState<StruggleKind>(null);

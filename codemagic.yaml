@@ -22,7 +22,11 @@ workflows:
       node: 22
       vars:
         BUNDLE_ID: com.gotcha.bodylog
+        # ウィジェットのビルドスイッチ。Apple Developer portalでApp Group
+        # (group.com.gotcha.bodylog) を両Bundle IDに設定し終えたら "true" にする
+        ENABLE_WIDGET: "false"
       ios_signing:
+        # bundle_identifierは拡張（com.gotcha.bodylog.*）のプロファイルにも自動マッチする
         distribution_type: app_store
         bundle_identifier: com.gotcha.bodylog
     scripts:
@@ -30,6 +34,17 @@ workflows:
         script: npm install
       - name: Capacitor sync
         script: npx cap sync ios
+      - name: Add widget extension target (ENABLE_WIDGET=true のみ)
+        script: |
+          if [ "$ENABLE_WIDGET" != "true" ]; then
+            echo "ENABLE_WIDGET != true → ウィジェットなしでビルド"
+            exit 0
+          fi
+          # 本体アプリのentitlementsにApp Groupを注入（ビルド時のみ・リポジトリは汚さない）
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" ios/App/App/App.entitlements || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.gotcha.bodylog" ios/App/App/App.entitlements || true
+          gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
+          ruby scripts/add-widget-target.rb
       - name: Set build number
         script: |
           cd ios/App
