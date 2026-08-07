@@ -130,3 +130,18 @@ describe('addServing / servingCount（チップ連打のカウントアップ）
     expect(servingCount([], protein)).toBeNull();
   });
 });
+
+import { sortByFreq } from '../lib/foods';
+
+describe('sortByFreq（使用頻度順の並び替え）', () => {
+  const foods = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+  it('頻度の多い順に並ぶ', () => {
+    expect(sortByFreq(foods, { c: 5, a: 2 }).map((f) => f.id)).toEqual(['c', 'a', 'b', 'd']);
+  });
+  it('同数は元の順序を維持（安定）', () => {
+    expect(sortByFreq(foods, { b: 3, d: 3 }).map((f) => f.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+  it('頻度データが空なら元の順のまま', () => {
+    expect(sortByFreq(foods, {}).map((f) => f.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});

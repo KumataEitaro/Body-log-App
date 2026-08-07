@@ -71,6 +71,30 @@ export function matchFoodsLocally(text: string, foods: MyFoodRow[]): LocalItem[]
   return items;
 }
 
+// ===== 使用頻度によるチップの並び替え（端末内カウント・DB不要） =====
+const FREQ_KEY = 'bl-food-freq';
+
+export function readFoodFreq(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(FREQ_KEY) || '{}'); } catch { return {}; }
+}
+
+// チップ使用時に呼ぶ（タップ1回=1カウント）
+export function bumpFoodFreq(id: string): void {
+  try {
+    const f = readFoodFreq();
+    f[id] = (Number(f[id]) || 0) + 1;
+    localStorage.setItem(FREQ_KEY, JSON.stringify(f));
+  } catch { /* 無視 */ }
+}
+
+// 頻度の多い順に並び替え（同数は元の順序を維持＝安定ソート）
+export function sortByFreq<T extends { id: string }>(foods: T[], freq: Record<string, number>): T[] {
+  return foods
+    .map((f, i) => ({ f, i, c: Number(freq[f.id]) || 0 }))
+    .sort((a, b) => (b.c - a.c) || (a.i - b.i))
+    .map((x) => x.f);
+}
+
 function ratioOf(fd: MyFoodRow): number {
   return fd.serving_ratio != null && Number(fd.serving_ratio) > 0 ? Number(fd.serving_ratio) : 1;
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
@@ -7,7 +7,7 @@ import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DA
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
-import { matchFoodsLocally, addServing, servingCount } from '@/lib/foods';
+import { matchFoodsLocally, addServing, servingCount, sortByFreq, readFoodFreq, bumpFoodFreq } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync, scheduleSmartReminder } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
@@ -549,6 +549,7 @@ export default function LogPage() {
   // 同じチップの連打は行を増やさず既存行に1回分ずつ積み増す（×1→×2→×3…）
   function addFromFood(fd: MyFood, toComposer = false) {
     hapticTap();
+    bumpFoodFreq(fd.id); // 使用頻度をカウント（次回表示から頻度順に並ぶ）
     const items = addServing(parsed?.items ?? [], fd);
     if (parsed) {
       setItems(items);
@@ -792,6 +793,9 @@ export default function LogPage() {
   }
 
   const remainLabel = unlimited ? '' : remaining == null ? '' : `（今日あと${Math.max(0, remaining)}回）`;
+
+  // マイ食品チップは使用頻度の多い順に表示（並びはセッション中固定＝タップ中にチップが動かない）
+  const sortedFoods = useMemo(() => sortByFreq(myFoods, readFoodFreq()), [myFoods]);
 
   // マイ食品チップ（追加済みなら「×2」バッジを表示。タップで1回分ずつ積み増し）
   function foodChip(fd: MyFood, toComposer: boolean) {
@@ -1354,7 +1358,7 @@ export default function LogPage() {
             <div style={{ marginTop: 12 }}>
               <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>⚡ よく使う品目を追加</div>
               <div className="chips">
-                {myFoods.slice(0, 8).map((fd) => foodChip(fd, false))}
+                {sortedFoods.slice(0, 8).map((fd) => foodChip(fd, false))}
               </div>
             </div>
           )}
@@ -1554,7 +1558,7 @@ export default function LogPage() {
                   {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} ×
                 </button>
               ))}
-              {myFoods.map((fd) => foodChip(fd, true))}
+              {sortedFoods.map((fd) => foodChip(fd, true))}
             </div>
           )}
 
@@ -1613,7 +1617,7 @@ export default function LogPage() {
               {healthEnabled && (
                 <button className="chip" style={{ background: 'var(--coral-weak)', color: 'var(--coral)' }} onClick={pullFromHealth}>❤️ ヘルスケアから取り込み</button>
               )}
-              {myFoods.map((fd) => (
+              {sortedFoods.map((fd) => (
                 <button key={fd.id} className="chip" onClick={() => addFromFood(fd, true)}>＋ {fd.name}</button>
               ))}
             </div>
