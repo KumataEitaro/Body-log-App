@@ -13,6 +13,7 @@ import Sheet from '@/components/Sheet';
 import Link from 'next/link';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, KCAL_PER_KG, type MaintReview } from '@/lib/adaptive';
+import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
@@ -64,6 +65,8 @@ export default function DashboardPage() {
   const [bfPoints, setBfPoints] = useState<{ date: string; value: number }[]>([]);
   // チャートの表示系列
   const [serie, setSerie] = useState<'weight' | 'waist' | 'bf' | 'intake'>('weight');
+  // 食材×翌日体重の傾向（品目DBから算出。データが揃うまでは非表示）
+  const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
@@ -97,11 +100,12 @@ export default function DashboardPage() {
       if (!prof) { if (profErr || !navigator.onLine) return; router.push('/onboarding'); return; }
       setUserName(prof.display_name || user.email || '');
 
-      const [{ data: entries }, { data: g }, { data: evs }, { data: phDates }] = await Promise.all([
+      const [{ data: entries }, { data: g }, { data: evs }, { data: phDates }, { data: itemRows }] = await Promise.all([
         supabase.from('entries').select('*').order('date', { ascending: true }),
         supabase.from('goals').select('*').maybeSingle(),
         supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
         supabase.from('body_photos').select('date,bf_est').order('date', { ascending: true }),
+        supabase.from('logs').select('date,items').order('date', { ascending: true }).limit(2000),
       ]);
       // オフライン等でentriesが取れなかった場合はキャッシュ表示を維持
       if (entries === null && !navigator.onLine) return;
@@ -133,6 +137,13 @@ export default function DashboardPage() {
         };
       });
       setRows(computed);
+
+      // 食材×翌日体重の傾向（品目DB×体重系列。入力を変えずに貯まったデータの分析）
+      try {
+        const weightPts = computed.filter((r) => r.weight != null).map((r) => ({ date: r.date, weight: Number(r.weight) }));
+        const fx = foodWeightEffects(buildItemDays((itemRows as { date: string; items?: { name?: string }[] }[]) || []), weightPts);
+        setFoodFx(fx);
+      } catch { /* 分析はベストエフォート */ }
 
       // 収支の原則: 記録しなかった日は「目安どおり食べた＝±0」として扱う
       // （累計は0加算なので記録日の合計と一致する。「直近7日」は暦の7日間で数える）
@@ -472,6 +483,49 @@ export default function DashboardPage() {
             <h2>📅 カレンダー</h2>
             <Calendar today={todayJST()} marks={marks} selected={daySel} onSelect={openDay} />
           </div>
+
+          {/* ===== 食材×あなたの体の傾向（品目DBの分析・ベータ） ===== */}
+          {foodFx.length >= 3 && (() => {
+            const down = foodFx.filter((f) => f.effect < -0.02).slice(0, 3);
+            const up = [...foodFx].reverse().filter((f) => f.effect > 0.02).slice(0, 3);
+            if (down.length === 0 && up.length === 0) return null;
+            const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
+            return (
+              <div className="card">
+                <h2>🔬 食材とあなたの体の傾向<span className="muted" style={{ fontWeight: 400, letterSpacing: 0 }}> — ベータ</span></h2>
+                <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+                  よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。
+                </p>
+                {down.length > 0 && (
+                  <>
+                    <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, margin: '8px 0 2px', color: 'var(--green)' }}>▼ 食べた翌日、下がりやすい</div>
+                    {down.map((f) => (
+                      <div className="feed-row" key={f.name}>
+                        <div className="feed-body"><div className="feed-title">{f.name}</div>
+                          <div className="feed-sub muted">食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</div></div>
+                        <b className="feed-kcal num pos">{g(f.effect)}</b>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {up.length > 0 && (
+                  <>
+                    <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, margin: '8px 0 2px', color: 'var(--coral)' }}>▲ 食べた翌日、上がりやすい</div>
+                    {up.map((f) => (
+                      <div className="feed-row" key={f.name}>
+                        <div className="feed-body"><div className="feed-title">{f.name}</div>
+                          <div className="feed-sub muted">食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</div></div>
+                        <b className="feed-kcal num" style={{ color: 'var(--coral)' }}>{g(f.effect)}</b>
+                      </div>
+                    ))}
+                  </>
+                )}
+                <p className="muted" style={{ fontSize: 10.5, marginTop: 8, marginBottom: 0 }}>
+                  ※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。
+                </p>
+              </div>
+            );
+          })()}
         </>
       )}
 

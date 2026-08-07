@@ -18,7 +18,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "readLatest", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readHistory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readActiveEnergy", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readWorkouts", returnType: CAPPluginReturnPromise)
     ]
 
     private let store = HKHealthStore()
@@ -37,7 +38,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         [weightType, bodyFatType, waistType, energyType, proteinType, fatType, carbsType]
     }
     private var readTypes: Set<HKObjectType> {
-        [weightType, bodyFatType, waistType, activeEnergyType, energyType, proteinType, fatType, carbsType]
+        [weightType, bodyFatType, waistType, activeEnergyType, energyType, proteinType, fatType, carbsType,
+         HKObjectType.workoutType()]
     }
 
     // MARK: - メソッド
@@ -181,4 +183,51 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         f.timeZone = TimeZone.current
         return f
     }()
+
+    // MARK: - ワークアウト読み取り（運動記録の連携・分析用）
+
+    private func workoutName(_ t: HKWorkoutActivityType) -> String {
+        switch t {
+        case .running: return "ランニング"
+        case .walking: return "ウォーキング"
+        case .cycling: return "サイクリング"
+        case .swimming: return "水泳"
+        case .traditionalStrengthTraining, .functionalStrengthTraining: return "筋トレ"
+        case .highIntensityIntervalTraining: return "HIIT"
+        case .yoga: return "ヨガ"
+        case .hiking: return "ハイキング"
+        case .elliptical: return "エリプティカル"
+        case .rowing: return "ローイング"
+        case .coreTraining: return "体幹トレ"
+        case .pilates: return "ピラティス"
+        case .stairClimbing: return "階段"
+        default: return "ワークアウト"
+        }
+    }
+
+    // 直近daysBack日のワークアウト一覧（開始時刻・分数・消費kcal・種目）
+    @objc func readWorkouts(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["workouts": []]); return }
+        let daysBack = call.getInt("daysBack") ?? 30
+        let end = Date()
+        let start = Calendar.current.date(byAdding: .day, value: -daysBack, to: end) ?? end
+        let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)
+        let q = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: pred, limit: 500, sortDescriptors: [sort]) { _, samples, _ in
+            let iso = ISO8601DateFormatter()
+            let list: [[String: Any]] = (samples as? [HKWorkout] ?? []).map { w in
+                let kcal = w.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0
+                return [
+                    "start": iso.string(from: w.startDate),
+                    "minutes": Int(w.duration / 60),
+                    "kcal": Int(kcal.rounded()),
+                    "type": self.workoutName(w.workoutActivityType),
+                ]
+            }
+            DispatchQueue.main.async {
+                call.resolve(["workouts": list])
+            }
+        }
+        store.execute(q)
+    }
 }

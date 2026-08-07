@@ -18,6 +18,7 @@ import { detectStruggle, type StruggleKind } from '@/lib/adaptive';
 import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDays } from '@/lib/health';
 import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
 import { friendlyError, JA_TEXT_RE } from '@/lib/errmsg';
+import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 import { widgetSync, type WidgetDay } from '@/lib/widget';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
@@ -1058,6 +1059,60 @@ export default function LogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, date, eaten, widgetGoal, eatenP, widgetPGoal, dayLogs, backfill, widgetWeek]);
 
+  // ===== 過食リスクの事前検知（昨日までの傾向から今日のリスクを判定・理由つき） =====
+  const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    try { if (localStorage.getItem('bl-risk-snooze') === todayJST()) return; } catch { /* 無視 */ }
+    (async () => {
+      try {
+        const supabase = createClient();
+        const today = todayJST();
+        const { data } = await supabase.from('entries')
+          .select('date,intake,p,ex,adj,mood,food_text')
+          .gte('date', shiftDate(today, -28)).lt('date', today)
+          .order('date', { ascending: true });
+        if (!data || data.length < 5) return; // データが薄いうちは主張しない
+        const base = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+        const days: InsightDay[] = data.map((r) => {
+          const dayTarget = base + (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0);
+          const intake = r.intake == null ? null : Number(r.intake);
+          return {
+            date: String(r.date), intake,
+            p: r.p == null ? null : Number(r.p),
+            diff: intake == null ? null : Math.round(intake - dayTarget),
+            mood: r.mood as string | null, text: r.food_text as string | null,
+          };
+        });
+        const risk = assessBingeRisk(days, new Date(today + 'T00:00:00').getDay());
+        if (risk.level !== 'low') setBingeRisk(risk);
+      } catch { /* ベストエフォート */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  function snoozeRisk() {
+    try { localStorage.setItem('bl-risk-snooze', todayJST()); } catch { /* 無視 */ }
+    setBingeRisk(null);
+  }
+
+  // 1タップ予防: 今日だけ目標を+200kcal緩める（計画のチートデイ吸収の仕組みに乗せる）
+  async function addRecoveryEvent() {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const today = todayJST();
+    const { data: ev, error } = await supabase.from('events')
+      .insert({ user_id: uid, date: today, title: '🕊 リカバリー枠', extra_kcal: 200 })
+      .select('id,date,title,extra_kcal').single();
+    if (error) { setSaveMsg({ cls: 'err', text: friendlyError(new Error(error.message), '設定に失敗しました。もう一度お試しください。') }); return; }
+    hapticSuccess();
+    setFutureEvents((prev) => [...prev, ev as PlanEvent & { id: string }]);
+    snoozeRisk();
+    setSaveMsg({ cls: 'ok', text: '🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。計画は自動で吸収されます。' });
+  }
+
   // ===== 「つらい」「爆食」のサイン検知 → 目標カロリー緩和のリコメンド =====
   const [struggle, setStruggle] = useState<StruggleKind>(null);
   useEffect(() => {
@@ -1182,6 +1237,29 @@ export default function LogPage() {
             <span className="muted"> ・ </span>
             <a href="#" className="muted" onClick={(e) => { e.preventDefault(); backfillSnooze(); }}>あとで</a>
           </p>
+        </div>
+      )}
+
+      {/* ===== 過食リスクの事前アラート（理由つき・責めないトーン・1タップ予防つき） ===== */}
+      {bingeRisk && date === todayJST() && !editingLog && (
+        <div className="card" style={{ border: `1.5px solid ${bingeRisk.level === 'high' ? 'var(--coral)' : 'var(--amber)'}` }}>
+          <h2>{bingeRisk.level === 'high' ? '🌪 今日は食欲が爆発しやすい状態です' : '🌤 今日は食欲が乱れやすいかも'}</h2>
+          <div style={{ margin: '2px 0 8px' }}>
+            {bingeRisk.reasons.map((r) => (
+              <div key={r.key} className="muted" style={{ fontSize: 12.5, lineHeight: 1.7 }}>・{r.text}</div>
+            ))}
+          </div>
+          <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>
+            これは失敗のサインではなく、準備のサインです。たんぱく質多めの食事と「我慢しすぎない設定」が効きます。
+          </p>
+          {plan && !todayEvent ? (
+            <div className="row2">
+              <button className="btn-primary" onClick={addRecoveryEvent}>🕊 今日は+200kcal緩める</button>
+              <button className="btn-ghost" onClick={snoozeRisk}>大丈夫、気をつける</button>
+            </div>
+          ) : (
+            <button className="btn-ghost" style={{ width: '100%' }} onClick={snoozeRisk}>OK、気をつける</button>
+          )}
         </div>
       )}
 

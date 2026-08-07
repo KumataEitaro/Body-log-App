@@ -17,6 +17,8 @@ export type HealthWrite = {
 export type HealthSample = { date: string; value: number };
 export type HealthHistory = { weight: HealthSample[]; bodyFat: HealthSample[]; waist: HealthSample[] };
 
+export type HealthWorkout = { start: string; minutes: number; kcal: number; type: string };
+
 type HealthPlugin = {
   isAvailable(): Promise<{ available: boolean }>;
   requestAuthorization(): Promise<{ granted: boolean }>;
@@ -24,6 +26,7 @@ type HealthPlugin = {
   readHistory(): Promise<HealthHistory>;
   readActiveEnergy(o: { date: string }): Promise<{ kcal: number }>;
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
+  readWorkouts(o: { daysBack?: number }): Promise<{ workouts: HealthWorkout[] }>;
 };
 
 // 静的import：呼び出し時の動的フェッチが無く固まらない。
@@ -120,6 +123,18 @@ export async function healthPullLatest(): Promise<HealthLatest | null> {
 }
 
 // 全期間の体重/体脂肪/ウエスト履歴を取得（過去データ一括取込用）
+// 直近のワークアウト一覧（運動記録の連携。旧ビルド・未許可時は空配列）
+export async function healthReadWorkouts(daysBack = 30): Promise<HealthWorkout[]> {
+  const p = getPlugin();
+  if (!p || !isHealthEnabled()) return [];
+  try {
+    const r = await withTimeout(p.readWorkouts({ daysBack }), 15000, null as { workouts: HealthWorkout[] } | null);
+    return r?.workouts || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function healthPullHistory(): Promise<HealthHistory | null> {
   const p = getPlugin();
   if (!p) return null;
