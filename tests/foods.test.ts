@@ -145,3 +145,26 @@ describe('sortByFreq（使用頻度順の並び替え）', () => {
     expect(sortByFreq(foods, {}).map((f) => f.id)).toEqual(['a', 'b', 'c', 'd']);
   });
 });
+
+import { removeServing } from '../lib/foods';
+
+describe('removeServing（チップの−で1回分減らす）', () => {
+  const protein: MyFoodRow = { id: 'p', name: 'プロテイン', unit: '1杯', kcal: 120, p: 24, f: 2, c: 3 };
+  it('×3 → ×2 に減り、kcalも比例して減る', () => {
+    const items = addServing(addServing(addServing([], protein), protein), protein);
+    const r = removeServing(items, protein);
+    expect(r[0].qty).toBe('×2');
+    expect(r[0].kcal).toBe(240);
+  });
+  it('×1 から減らすと行ごと削除', () => {
+    const items = addServing([], protein);
+    expect(removeServing(items, protein)).toHaveLength(0);
+  });
+  it('対象が無ければ何もしない', () => {
+    expect(removeServing([], protein)).toEqual([]);
+  });
+  it('g編集済みの行は触らない', () => {
+    const edited = [{ name: 'プロテイン', qty: '30g', kcal: 110, p: 22, f: 2, c: 3 }];
+    expect(removeServing(edited, protein)).toEqual(edited);
+  });
+});

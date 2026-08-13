@@ -7,7 +7,7 @@ import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DA
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
-import { matchFoodsLocally, addServing, servingCount, sortByFreq, readFoodFreq, bumpFoodFreq } from '@/lib/foods';
+import { matchFoodsLocally, addServing, removeServing, servingCount, sortByFreq, readFoodFreq, bumpFoodFreq } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync, scheduleSmartReminder } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
@@ -798,14 +798,30 @@ export default function LogPage() {
   // マイ食品チップは使用頻度の多い順に表示（並びはセッション中固定＝タップ中にチップが動かない）
   const sortedFoods = useMemo(() => sortByFreq(myFoods, readFoodFreq()), [myFoods]);
 
-  // マイ食品チップ（追加済みなら「×2」バッジを表示。タップで1回分ずつ積み増し）
+  // チップの「−」: 1回分減らす（0になったら行ごと削除）
+  function decFromFood(fd: MyFood) {
+    if (!parsed) return;
+    hapticTap();
+    const items = removeServing(parsed.items, fd);
+    if (items.length === 0 && parsed.weight == null && parsed.waist == null && !parsed.ex && !parsed.mood) {
+      setParsed(null); // 全部消えたら未入力状態に戻す
+    } else {
+      setItems(items);
+    }
+  }
+
+  // マイ食品チップ。「追加ボタン」と「追加済み表示」を1つに統合:
+  // 未追加=「＋ 名前」/ 追加済み=「名前 ×2 | −」（本体タップで+1回・−で1回減らす）
   function foodChip(fd: MyFood, toComposer: boolean) {
     const cnt = parsed ? servingCount(parsed.items, fd) : null;
     const label = cnt != null ? `×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : null;
     return (
-      <button key={fd.id} className={`chip ${label ? 'counted' : ''}`} onClick={() => addFromFood(fd, toComposer)}>
-        {label ? '' : '＋ '}{fd.name}{label && <b className="chip-count num">{label}</b>}
-      </button>
+      <span key={fd.id} className={`chip food-chip ${label ? 'counted' : ''}`}>
+        <button className="food-chip-add" onClick={() => addFromFood(fd, toComposer)}>
+          {label ? '' : '＋ '}{fd.name}{label && <b className="chip-count num">{label}</b>}
+        </button>
+        {label && <button className="food-chip-minus" title="1回分減らす" onClick={() => decFromFood(fd)}>−</button>}
+      </span>
     );
   }
 
@@ -1627,15 +1643,18 @@ export default function LogPage() {
             <div className="muted" style={{ fontSize: 10.5, marginTop: 4 }}>選択した写真のみ表示中。「全て表示」からフルアクセスに変更できます</div>
           )}
 
-          {/* 追加済み品目（ダーク）＋マイ食品（ライト）を1行に。AI解析しても追加分は残る */}
+          {/* マイ食品チップ（追加済みはバッジ＋−で同じチップ内に表示）。AI解析しても追加分は残る */}
           {(myFoods.length > 0 || (parsed && parsed.items.length > 0 && !editingLog)) && (
             <div className="chip-strip" style={{ marginTop: 8, marginBottom: 0 }}>
-              {!editingLog && parsed?.items.map((it, i) => (
-                <button className="chip on" key={`added-${i}`} onClick={() => removeItem(i)}
-                        title="タップで取り消し">
-                  {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} ×
-                </button>
-              ))}
+              {/* マイ食品以外の品目（AI解析由来・分量手編集済み）だけダークチップで表示 */}
+              {!editingLog && parsed?.items.map((it, i) => ({ it, i }))
+                .filter(({ it }) => !(myFoods.some((f) => f.name === it.name) && /^×\d/.test(String(it.qty))))
+                .map(({ it, i }) => (
+                  <button className="chip on" key={`added-${i}`} onClick={() => removeItem(i)}
+                          title="タップで取り消し">
+                    {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} ×
+                  </button>
+                ))}
               {sortedFoods.map((fd) => foodChip(fd, true))}
             </div>
           )}

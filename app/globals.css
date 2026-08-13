@@ -271,6 +271,19 @@ button:disabled { opacity: .5; cursor: default; }
 .chip.counted { border-color: var(--ink); color: var(--ink); }
 .chip-count { margin-left: 5px; font-size: 10px; font-weight: 800;
   background: var(--ink); color: #fff; border-radius: 999px; padding: 1.5px 6px; }
+/* マイ食品チップ: 追加(本体タップ)と減らす(−)を1チップに統合。タップ領域は広めに */
+.chip.food-chip { padding: 0; display: inline-flex; align-items: stretch; overflow: hidden; }
+.food-chip-add {
+  background: none; border: none; border-radius: 0; padding: 9px 13px;
+  font-size: 12.5px; font-weight: 700; color: inherit; letter-spacing: 0;
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.food-chip-minus {
+  background: none; border: none; border-radius: 0; border-left: 1.5px solid var(--line);
+  padding: 9px 13px; font-size: 15px; font-weight: 800; color: var(--coral); line-height: 1;
+  display: inline-flex; align-items: center;
+}
+.chip.counted .food-chip-minus { border-left-color: var(--ink); }
 /* 保存前の記録に戻るピル */
 .resume-pill { display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
   background: var(--panel); border: 1px solid var(--teal); color: var(--teal);

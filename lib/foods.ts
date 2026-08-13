@@ -115,6 +115,18 @@ export function addServing(items: LocalItem[], fd: MyFoodRow): LocalItem[] {
   return items.map((it, i) => (i === idx ? next : it));
 }
 
+// チップの「−」: 1回分減らす。1回分未満になったら行ごと削除
+export function removeServing(items: LocalItem[], fd: MyFoodRow): LocalItem[] {
+  const r = ratioOf(fd);
+  const idx = items.findIndex((it) => it.name === fd.name && /^×\d/.test(String(it.qty)));
+  if (idx === -1) return items;
+  const cur = items[idx];
+  const curMult = qtyNumber(cur.qty) ?? 0;
+  const newMult = Math.round((curMult - r) * 100) / 100;
+  if (newMult < r * 0.5) return items.filter((_, i) => i !== idx); // 実質0回分 → 削除
+  return items.map((it, i) => (i === idx ? rescaleByQty(cur, `×${newMult}`) : it));
+}
+
 // その食品が今「何回分」入っているか（チップのカウントバッジ用）。未追加ならnull
 export function servingCount(items: LocalItem[], fd: MyFoodRow): number | null {
   const it = items.find((x) => x.name === fd.name && /^×\d/.test(String(x.qty)));
