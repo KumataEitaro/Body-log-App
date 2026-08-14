@@ -71,18 +71,48 @@ export function matchFoodsLocally(text: string, foods: MyFoodRow[]): LocalItem[]
   return items;
 }
 
-// ===== 使用頻度によるチップの並び替え（端末内カウント・DB不要） =====
-const FREQ_KEY = 'bl-food-freq';
+// ===== 使用頻度によるチップの並び替え（端末内・DB不要） =====
+// 単純な累積カウントではなく「半減期つき移動平均」を使う:
+// タップで+1点、スコアは14日で半減。毎日使う定番は高スコアを維持し、
+// たまたま1回タップした食品（1点）は定番を追い越せず、数週間で自然に沈む。
+const FREQ_KEY = 'bl-food-freq-v2';
+const FREQ_KEY_V1 = 'bl-food-freq';
+const HALF_LIFE_DAYS = 14;
 
-export function readFoodFreq(): Record<string, number> {
-  try { return JSON.parse(localStorage.getItem(FREQ_KEY) || '{}'); } catch { return {}; }
+export type FreqEntry = { s: number; t: number }; // s=スコア, t=最終更新(epoch ms)
+
+function decayedScore(e: FreqEntry, now: number): number {
+  const days = Math.max(0, (now - Number(e.t)) / 86400000);
+  return (Number(e.s) || 0) * Math.pow(0.5, days / HALF_LIFE_DAYS);
 }
 
-// チップ使用時に呼ぶ（タップ1回=1カウント）
+export function readFoodFreq(): Record<string, FreqEntry> {
+  try {
+    const v2 = localStorage.getItem(FREQ_KEY);
+    if (v2) return JSON.parse(v2);
+    // 旧形式（累積カウント）からの移行。過去の積み上げを引きずり過ぎないよう5点でキャップ
+    const v1: Record<string, number> = JSON.parse(localStorage.getItem(FREQ_KEY_V1) || '{}');
+    const now = Date.now();
+    const out: Record<string, FreqEntry> = {};
+    for (const [id, c] of Object.entries(v1)) out[id] = { s: Math.min(Number(c) || 0, 5), t: now };
+    return out;
+  } catch { return {}; }
+}
+
+// 現在時点の実効スコア（減衰適用後）に変換する
+export function foodScores(freq: Record<string, FreqEntry>, now = Date.now()): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [id, e] of Object.entries(freq)) out[id] = decayedScore(e, now);
+  return out;
+}
+
+// チップ使用時に呼ぶ（減衰させてから+1点）
 export function bumpFoodFreq(id: string): void {
   try {
     const f = readFoodFreq();
-    f[id] = (Number(f[id]) || 0) + 1;
+    const now = Date.now();
+    const s = (f[id] ? decayedScore(f[id], now) : 0) + 1;
+    f[id] = { s: Math.round(s * 1000) / 1000, t: now };
     localStorage.setItem(FREQ_KEY, JSON.stringify(f));
   } catch { /* 無視 */ }
 }

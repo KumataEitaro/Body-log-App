@@ -168,3 +168,32 @@ describe('removeServing（チップの−で1回分減らす）', () => {
     expect(removeServing(edited, protein)).toEqual(edited);
   });
 });
+
+import { foodScores, type FreqEntry } from '../lib/foods';
+
+describe('foodScores（半減期14日の移動平均）', () => {
+  const DAY = 86400000;
+  it('14日経過でスコアが半減する', () => {
+    const now = 1_750_000_000_000;
+    const freq: Record<string, FreqEntry> = { a: { s: 8, t: now - 14 * DAY } };
+    expect(foodScores(freq, now).a).toBeCloseTo(4, 5);
+  });
+  it('たまたま1回のタップ（1点）は常用食品を追い越さない', () => {
+    const now = 1_750_000_000_000;
+    const freq: Record<string, FreqEntry> = {
+      regular: { s: 6, t: now - 3 * DAY }, // 毎日使いの定番（3日前更新でスコア6）
+      oneoff: { s: 1, t: now },            // さっき1回だけタップ
+    };
+    const sc = foodScores(freq, now);
+    expect(sc.regular).toBeGreaterThan(sc.oneoff);
+  });
+  it('未使用が続くと自然に沈む（60日前の3点 < 今日の1点）', () => {
+    const now = 1_750_000_000_000;
+    const freq: Record<string, FreqEntry> = {
+      old: { s: 3, t: now - 60 * DAY },
+      recent: { s: 1, t: now },
+    };
+    const sc = foodScores(freq, now);
+    expect(sc.recent).toBeGreaterThan(sc.old);
+  });
+});

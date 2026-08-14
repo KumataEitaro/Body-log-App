@@ -7,7 +7,7 @@ import { EX_LEVELS, EX_ADD, type ExLevel, mifflinBMR, judge, verdictClass, AI_DA
 import { rescaleByQty, sumItems, emptyItem } from '@/lib/items';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
-import { matchFoodsLocally, addServing, removeServing, servingCount, sortByFreq, readFoodFreq, bumpFoodFreq } from '@/lib/foods';
+import { matchFoodsLocally, addServing, removeServing, servingCount, sortByFreq, readFoodFreq, foodScores, bumpFoodFreq } from '@/lib/foods';
 import BodyPhotos from '@/components/BodyPhotos';
 import { hapticSuccess, hapticTap, pickPhotoNative, isNativeCameraAvailable, setTodayRecordedBadge, isNativeSync, scheduleSmartReminder } from '@/lib/native';
 import { isNativePhotosAvailable, photosAuthStatus, photosRequestAccess, photosRecents, photosFull, photosPick, photosOpenSettings, photosPresentLimitedPicker, type PhotoAuth, type RecentPhoto } from '@/lib/photos';
@@ -795,8 +795,9 @@ export default function LogPage() {
 
   const remainLabel = unlimited ? '' : remaining == null ? '' : `（今日あと${Math.max(0, remaining)}回）`;
 
-  // マイ食品チップは使用頻度の多い順に表示（並びはセッション中固定＝タップ中にチップが動かない）
-  const sortedFoods = useMemo(() => sortByFreq(myFoods, readFoodFreq()), [myFoods]);
+  // マイ食品チップは「最近の使用傾向（半減期14日の移動平均）」順に表示
+  //（並びはセッション中固定＝タップ中にチップが動かない）
+  const sortedFoods = useMemo(() => sortByFreq(myFoods, foodScores(readFoodFreq())), [myFoods]);
 
   // チップの「−」: 1回分減らす（0になったら行ごと削除）
   function decFromFood(fd: MyFood) {
@@ -1452,7 +1453,10 @@ export default function LogPage() {
             <div style={{ marginTop: 12 }}>
               <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>⚡ よく使う品目を追加</div>
               <div className="chips">
-                {sortedFoods.slice(0, 8).map((fd) => foodChip(fd, false))}
+                {/* 上位8件＋「追加済みの食品」は件数制限を無視して必ず表示（バッジ・−操作が消えないように） */}
+                {sortedFoods
+                  .filter((fd, i) => i < 8 || servingCount(parsed.items, fd) != null)
+                  .map((fd) => foodChip(fd, false))}
               </div>
             </div>
           )}
