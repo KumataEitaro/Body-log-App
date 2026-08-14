@@ -40,12 +40,14 @@ export async function proxy(request: NextRequest) {
   }
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = '/log'; // 起動タブ＝入力に合わせる
     return NextResponse.redirect(url);
   }
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
+  // sw.js・manifest・アイコン等の静的公開ファイルは認証チェックを通さない
+  // （sw.jsがリダイレクトされるとService Workerの登録自体が失敗する）
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|apple-touch-icon|api/).*)'],
 };

@@ -1,58 +1,92 @@
-// BodyLog Service Worker — 資産キャッシュ＋オフライン時のページ表示
-const VERSION = 'v1';
-const STATIC_CACHE = `bl-static-${VERSION}`;
-const PAGE_CACHE = `bl-pages-${VERSION}`;
+// BodyLog オフラインシェル（機内モード対応）。
+// 設計原則（過去にSW+動的importでネイティブ機能が固まった事故の再発防止）:
+//  1. ネットワーク優先: オンライン時の挙動を一切変えない（4秒待って失敗した時だけキャッシュ）
+//  2. 介入は最小限: API(/api/*)・外部オリジン(Supabase等)・GET以外・RSCフェッチには触らない
+//  3. キャッシュ優先はハッシュ付き静的アセット(/_next/static/*)のみ（内容不変なので安全）
+const CACHE = 'bl-shell-v2';
+const NAV_TIMEOUT_MS = 4000;
+const PRECACHE = ['/log', '/dashboard', '/goal', '/settings'];
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+// リダイレクト経由のレスポンスはそのままキャッシュするとオフライン表示時にブラウザが拒否するため、
+// 素のレスポンスに包み直してから保存する
+async function putSafe(cache, key, res) {
+  if (res.redirected) {
+    const body = await res.clone().blob();
+    await cache.put(key, new Response(body, { status: 200, statusText: 'OK', headers: res.headers }));
+  } else {
+    await cache.put(key, res.clone());
+  }
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await Promise.all(PRECACHE.map(async (p) => {
+      try {
+        const r = await fetch(p, { cache: 'no-store' });
+        if (r.ok) await putSafe(c, p, r);
+      } catch { /* オフライン中のインストールでは諦める */ }
+    }));
+    await self.skipWaiting();
+  })());
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil((async () => {
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(
-      keys.filter((k) => k.startsWith('bl-') && !k.endsWith(VERSION)).map((k) => caches.delete(k))
-    );
+    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
 
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
+function timeoutFetch(req, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('nav-timeout')), ms);
+    fetch(req).then(
+      (r) => { clearTimeout(t); resolve(r); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return;      // Supabase等の外部通信には触らない
-  if (url.pathname.startsWith('/api/')) return;     // APIは常にネットワーク
+  if (url.origin !== self.location.origin) return;   // Supabase等の外部は素通し
+  if (url.pathname.startsWith('/api/')) return;      // APIは素通し
+  if (req.headers.get('RSC') || req.headers.get('Next-Router-State-Tree')) return; // Next内部フェッチは素通し
 
-  // ページ遷移: ネットワーク優先→失敗したらキャッシュ（オフライン起動の要）
-  if (req.mode === 'navigate') {
-    e.respondWith((async () => {
-      try {
-        const res = await fetch(req);
-        const cache = await caches.open(PAGE_CACHE);
-        cache.put(req, res.clone());
-        return res;
-      } catch {
-        const cached = await caches.match(req);
-        if (cached) return cached;
-        const fallback = await caches.match('/log');
-        return fallback || Response.error();
-      }
+  // ① ハッシュ付き静的アセット: キャッシュ優先
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith((async () => {
+      const hit = await caches.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) { const c = await caches.open(CACHE); c.put(req, res.clone()); }
+      return res;
     })());
     return;
   }
 
-  // ハッシュ付き静的資産: キャッシュ優先（変更されない前提のファイル群）
-  if (url.pathname.startsWith('/_next/static/') || /\.(js|css|woff2?|png|jpe?g|svg|ico|webp)$/.test(url.pathname)) {
-    e.respondWith((async () => {
-      const cached = await caches.match(req);
-      if (cached) return cached;
-      const res = await fetch(req);
-      if (res.ok) {
-        const cache = await caches.open(STATIC_CACHE);
-        cache.put(req, res.clone());
+  // ② ページ遷移: ネットワーク優先（4秒）→ キャッシュ → /logのキャッシュ → 案内ページ
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const res = await timeoutFetch(req, NAV_TIMEOUT_MS);
+        if (res.ok) { const c = await caches.open(CACHE); putSafe(c, req, res); }
+        return res;
+      } catch {
+        const hit = await caches.match(req, { ignoreSearch: true });
+        if (hit) return hit;
+        const home = await caches.match('/log');
+        if (home) return home;
+        return new Response(
+          '<!doctype html><html lang="ja"><body style="font-family:sans-serif;padding:48px 24px;text-align:center;color:#0e1116"><h2>オフラインです</h2><p style="color:#6a7280">一度オンラインでアプリを開くと、以後はオフラインでも表示できます。</p></body></html>',
+          { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+        );
       }
-      return res;
     })());
   }
+  // ③ それ以外のGETは素通し（介入しない）
 });
