@@ -81,6 +81,35 @@ export default function SettingsPage() {
     setPhotoDiag(lines);
   }
 
+  // ===== オフライン診断（機内モードで白画面になる問題の切り分け用） =====
+  const [swDiag, setSwDiag] = useState<string[] | null>(null);
+  async function runSwDiag() {
+    const lines: string[] = [];
+    if (!('serviceWorker' in navigator)) {
+      lines.push('オフライン機能: この環境では利用できません');
+    } else {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        lines.push(`オフライン機能の登録: ${regs.length > 0 ? '済み' : 'まだ（オンラインで開き直してください）'}`);
+        lines.push(`この画面を制御中: ${navigator.serviceWorker.controller ? 'はい（オフライン表示OK）' : 'いいえ（アプリを完全終了→オンラインでもう一度開くと有効になります）'}`);
+      } catch (e) {
+        lines.push(`オフライン機能の確認に失敗: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    try {
+      if ('caches' in window) {
+        const has = await caches.has('bl-shell-v2');
+        if (has) {
+          const c = await caches.open('bl-shell-v2');
+          lines.push(`オフライン用キャッシュ: ${(await c.keys()).length}件`);
+        } else {
+          lines.push('オフライン用キャッシュ: なし（オンラインで開き直すと作られます）');
+        }
+      }
+    } catch { lines.push('キャッシュの確認に失敗しました'); }
+    setSwDiag(lines);
+  }
+
   // ===== Apple ヘルスケア連携 =====
   const [healthOn, setHealthOn] = useState(false);   // 連携ON/OFF
   const [healthBusy, setHealthBusy] = useState(false);
@@ -456,6 +485,19 @@ export default function SettingsPage() {
           </p>
         </div>
       )}
+
+      <div className="card">
+        <h2>📡 オフライン診断</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          機内モード・圏外で画面が表示されない時は、ここで状態を確認できます。
+        </p>
+        <button className="btn-ghost" style={{ width: '100%' }} onClick={runSwDiag}>診断を実行</button>
+        {swDiag && (
+          <div className="msg ok" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {swDiag.join('\n')}
+          </div>
+        )}
+      </div>
 
       {nativeApp && (
         <div className="card">
