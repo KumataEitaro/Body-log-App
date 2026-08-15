@@ -339,13 +339,18 @@ export default function LogPage() {
     let dead = false;
     setHkInfo(null);
     if (!isHealthEnabled()) return;
-    (async () => {
+    const pull = async () => {
       const dates = Array.from({ length: 8 }, (_, i) => shiftDate(date, -i)); // 当日＋過去7日
       const vals = await healthActiveEnergyDays(dates);
       if (dead) return;
       setHkInfo({ actual: vals[0] != null ? Math.round(vals[0]) : null, avg: averageActive(vals.slice(1)) });
-    })();
-    return () => { dead = true; };
+    };
+    pull();
+    // 画面を開いた瞬間の1回だけだと、運動後にアプリへ戻っても朝の低い値のまま固定される。
+    // アプリに戻るたびに再取得して「今日ここまでの実測消費」を常に最新に保つ
+    const onVis = () => { if (document.visibilityState === 'visible') pull(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { dead = true; document.removeEventListener('visibilitychange', onVis); };
   }, [date]);
   const hkActive = profile ? resolveActiveKcal(hkInfo?.actual ?? null, hkInfo?.avg ?? null, date === todayJST()) : null;
   const targetFromHealth = hkActive != null;
