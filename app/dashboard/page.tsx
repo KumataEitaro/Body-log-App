@@ -14,11 +14,12 @@ import Link from 'next/link';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, KCAL_PER_KG, type MaintReview } from '@/lib/adaptive';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
+import { healthActiveEnergyDays, isHealthEnabled } from '@/lib/health';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
   intake: number | null; weight: number | null; waist: number | null;
-  target: number; diff: number | null; verdict: Verdict | null;
+  target: number; bmrDay?: number; diff: number | null; verdict: Verdict | null;
 };
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
@@ -64,11 +65,31 @@ export default function DashboardPage() {
   const [photoDates, setPhotoDates] = useState<string[]>([]);
   const [bfPoints, setBfPoints] = useState<{ date: string; value: number }[]>([]);
   // チャートの表示系列
-  const [serie, setSerie] = useState<'weight' | 'waist' | 'bf' | 'intake'>('weight');
+  const [serie, setSerie] = useState<'weight' | 'waist' | 'bf' | 'intake' | 'burn'>('weight');
+  // 消費カロリー系列: 直近30日はヘルスケア実測（基礎代謝＋活動）で上書き（対応ビルド・連携ONのみ）
+  const [hkBurn, setHkBurn] = useState<Map<string, number>>(new Map());
   // 食材×翌日体重の傾向（品目DBから算出。データが揃うまでは非表示）
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
 
   // AIコーチ相談は専用の「相談」タブ（/coach）へ移設した
+
+  // 消費カロリーの実測（ヘルスケア・直近30日）を裏で取得して系列に重ねる
+  useEffect(() => {
+    if (!isHealthEnabled()) return;
+    (async () => {
+      try {
+        const today = todayJST();
+        const dates = Array.from({ length: 30 }, (_, i) => addDays(today, -i));
+        const vals = await healthActiveEnergyDays(dates);
+        const m = new Map<string, number>();
+        dates.forEach((d, i) => {
+          const v = vals[i];
+          if (v != null && v >= 50) m.set(d, Math.round(v)); // 50kcal未満はノイズ扱い
+        });
+        if (m.size > 0) setHkBurn(m);
+      } catch { /* 実測なしでも推計で描ける */ }
+    })();
+  }, []);
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
@@ -132,7 +153,7 @@ export default function DashboardPage() {
         const d = new Date(e.date + 'T00:00:00');
         return {
           date: e.date, label: `${d.getMonth() + 1}/${d.getDate()}`, day: DOW[d.getDay()],
-          ex: e.ex as ExLevel, adj: Number(e.adj) || 0,
+          ex: e.ex as ExLevel, adj: Number(e.adj) || 0, bmrDay: Math.round(bmr),
           intake, weight: e.weight == null ? null : Number(e.weight),
           waist: e.waist == null ? null : Number(e.waist),
           target, diff, verdict: diff == null ? null : judge(diff),
@@ -459,7 +480,7 @@ export default function DashboardPage() {
           <div className="card">
             <h2>推移</h2>
             <div className="chips" style={{ marginBottom: 10 }}>
-              {([['weight', '体重'], ['waist', 'ウエスト'], ['bf', '体脂肪率'], ['intake', '摂取kcal']] as const).map(([k, l]) => (
+              {([['weight', '体重'], ['waist', 'ウエスト'], ['bf', '体脂肪率'], ['intake', '摂取kcal'], ['burn', '消費kcal']] as const).map(([k, l]) => (
                 <button key={k} className={`chip ${serie === k ? 'on' : ''}`} onClick={() => setSerie(k)}>{l}</button>
               ))}
             </div>
@@ -469,6 +490,8 @@ export default function DashboardPage() {
                 waist: { data: rows.filter((r) => r.waist != null).map((r) => ({ date: r.date, value: r.waist as number })), unit: 'cm', decimals: 1, minSpan: 2 },
                 bf: { data: bfPoints, unit: '%', decimals: 1, minSpan: 2 },
                 intake: { data: rows.filter((r) => r.intake != null).map((r) => ({ date: r.date, value: r.intake as number })), unit: 'kcal', decimals: 0, minSpan: 400 },
+                // 消費 = 実測(基礎代謝+活動)があればそれ、無ければ推計(基礎代謝×係数+運動)
+                burn: { data: rows.map((r) => ({ date: r.date, value: hkBurn.has(r.date) ? (r.bmrDay ?? (kpi?.bmr ?? 0)) + hkBurn.get(r.date)! : r.target })), unit: 'kcal', decimals: 0, minSpan: 400 },
               }[serie];
               const planLine = serie === 'weight' && goal?.target_weight != null
                 ? [{ date: goal.start_date, value: goal.start_weight }, { date: goal.target_date, value: goal.target_weight }]
