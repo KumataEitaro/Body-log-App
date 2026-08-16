@@ -3,10 +3,11 @@
 // モデル名がGoogle側で変わっても自動追従する（404が全滅したらキャッシュを捨てて再発見）。
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-// 発見に失敗した時の保険（新しめの候補を広めに）
+// 発見に失敗した時の保険（-latest系を先頭に。旧世代IDはGoogle側で随時廃止されるため保険は薄く）
 const STATIC_FALLBACK = [
-  'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-  'gemini-2.0-flash-001', 'gemini-2.0-flash', 'gemini-pro-latest', 'gemini-2.5-pro',
+  'gemini-flash-latest', 'gemini-pro-latest',
+  'gemini-3-flash', 'gemini-3.0-flash', 'gemini-3-pro',
+  'gemini-2.5-flash', 'gemini-2.5-pro',
 ];
 
 let cachedModels: string[] | null = null;
@@ -25,8 +26,8 @@ function rank(nameRaw: string): number {
   if (n.includes('flash')) s += 50;
   if (n.includes('pro')) s += 20;
   if (n.includes('latest')) s += 15;
-  const m = n.match(/(\d+\.\d+)/);
-  if (m) s += parseFloat(m[1]) * 3; // 新バージョンを少し優先
+  const m = n.match(/(\d+(?:\.\d+)?)/);
+  if (m) s += parseFloat(m[1]) * 3; // 新バージョンを少し優先（"gemini-3-flash"のような小数なし表記にも対応）
   if (n.includes('lite')) s -= 6;   // 品質重視でliteは後回し（保険には残す）
   if (/preview|exp/i.test(n)) s -= 4;
   return s;
@@ -72,10 +73,15 @@ export function parseJsonLoose(text: string): unknown {
 export async function callGemini(
   key: string, parts: Part[], temperature = 0
 ): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string; detail?: string }> {
-  // モデル発見は待たない（コールドスタート時の+数百msを削減）。
-  // キャッシュが無ければ静的リストで即開始し、発見は裏で走らせて次回以降に反映する。
+  // モデル発見: キャッシュが無ければ最大2秒だけ発見を待つ。
+  // （静的リストはGoogleの世代交代でいずれ必ず古びる。2026-08に2.x系が全404になり
+  //   AIが全断した事故の再発防止として、発見を最優先にする）
   if (!cachedModels) {
-    discover(key).then((m) => { if (m.length) cachedModels = m; }).catch(() => { /* 無視 */ });
+    const found = await Promise.race([
+      discover(key),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
+    ]);
+    if (found.length) cachedModels = found;
   }
   const discovered = cachedModels && cachedModels.length ? cachedModels.slice(0, 4) : [];
   const list = [...new Set([...discovered, ...STATIC_FALLBACK])];
@@ -86,7 +92,7 @@ export async function callGemini(
   for (const model of list) {
     // 2.5系/latest系は「思考(thinking)」がデフォルト有効で数秒〜10秒消費するため無効化する（速度最優先）。
     // thinkingConfig非対応モデルで400が返ったら、外して同モデルで1回だけ再試行。
-    let includeThinking = /2\.5|latest/.test(model);
+    let includeThinking = /2\.5|latest|-3|3\./.test(model); // 2.5系・3系・latest系は思考を無効化して高速化
     let attempt = 0;
     while (attempt < 2) {
       attempt++;
@@ -116,10 +122,14 @@ export async function callGemini(
 
       if (!res.ok) {
         const t = await res.text();
-        lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 160)}`;
+        lastErr = `${model}: HTTP ${res.status} ${t.slice(0, 240)}`;
         console.log(`[gemini] ${lastErr}`); // 失敗理由をサーバログに必ず残す
         if (res.status === 400 && includeThinking) {
           includeThinking = false; // 400はまずthinkingConfig非互換を疑い、外して同モデルで再試行
+          continue;
+        }
+        if ((res.status === 503 || res.status === 429) && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 800)); // 過負荷は同モデルで1回だけ再試行
           continue;
         }
         if (res.status === 404) sawStale = true; // モデル廃止 → 次へ

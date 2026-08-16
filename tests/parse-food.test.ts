@@ -124,6 +124,7 @@ describe('POST /api/parse-food', () => {
     expect(j.result.total.kcal).toBe(100);
   });
 
+  // 429/503は同一モデルで1回リトライ（800ms待ち）するため、全滅ケースは時間がかかる → タイムアウト延長
   it('全モデルが429なら502・回数は消費しない', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(GEMINI_FAIL(429));
     const res = await POST(req({ text: 'バナナ' }));
@@ -131,7 +132,7 @@ describe('POST /api/parse-food', () => {
     const j = await res.json();
     expect(j.error).toContain('再試行');
     expect(state.upserted.length).toBe(0);
-  });
+  }, 30000);
 
   it('503(モデル過負荷)もスキップして次のモデルで成功する', async () => {
     (fetch as ReturnType<typeof vi.fn>)
