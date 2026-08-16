@@ -57,7 +57,7 @@ function IconRefresh() {
 const TABS = [
   { href: '/log', label: '食事', icon: <IconPencil />, dotKey: 'photo' },
   { href: '/training', label: 'トレ', icon: <IconDumbbell />, dotKey: null },
-  { href: '/dashboard', label: '分析', icon: <IconChart />, dotKey: null },
+  { href: '/dashboard', label: '身体の変化', icon: <IconChart />, dotKey: null },
   { href: '/goal', label: '目標', icon: <IconTarget />, dotKey: 'goal' },
   { href: '/settings', label: '設定', icon: <IconGear />, dotKey: null },
 ] as const;
