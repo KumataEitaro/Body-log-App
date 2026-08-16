@@ -20,7 +20,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "readActiveEnergy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readWorkouts", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "readSteps", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "readSteps", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readSleep", returnType: CAPPluginReturnPromise)
     ]
 
     private let store = HKHealthStore()
@@ -35,13 +36,14 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
     private var carbsType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates)! }
     private var activeEnergyType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)! }
     private var stepType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .stepCount)! }
+    private var sleepType: HKCategoryType { HKObjectType.categoryType(forIdentifier: .sleepAnalysis)! }
 
     private var shareTypes: Set<HKSampleType> {
         [weightType, bodyFatType, waistType, energyType, proteinType, fatType, carbsType]
     }
     private var readTypes: Set<HKObjectType> {
         [weightType, bodyFatType, waistType, activeEnergyType, stepType, energyType, proteinType, fatType, carbsType,
-         HKObjectType.workoutType()]
+         HKObjectType.workoutType(), sleepType]
     }
 
     // MARK: - メソッド
@@ -156,6 +158,28 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         let q = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, _ in
             let steps = stats?.sumQuantity()?.doubleValue(for: .count()) ?? 0
             call.resolve(["steps": Int(steps.rounded())])
+        }
+        store.execute(q)
+    }
+
+    // 指定日の睡眠時間（分）。「その日の睡眠」＝前日18時〜当日12時の入眠サンプル合計
+    @objc func readSleep(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["minutes": 0]); return }
+        let dateStr = call.getString("date") ?? ""
+        guard let day = Self.dayFormatter.date(from: dateStr) else { call.resolve(["minutes": 0]); return }
+        let dayStart = Calendar.current.startOfDay(for: day)
+        let start = Calendar.current.date(byAdding: .hour, value: -6, to: dayStart)!
+        let end = Calendar.current.date(byAdding: .hour, value: 12, to: dayStart)!
+        let pred = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+        let q = HKSampleQuery(sampleType: sleepType, predicate: pred, limit: 300, sortDescriptors: nil) { _, samples, _ in
+            var total: TimeInterval = 0
+            for s in (samples as? [HKCategorySample] ?? []) {
+                // 1=asleepUnspecified / 3=core / 4=deep / 5=REM（0=inBed, 2=awake は除外）
+                if s.value == 1 || s.value == 3 || s.value == 4 || s.value == 5 {
+                    total += s.endDate.timeIntervalSince(s.startDate)
+                }
+            }
+            call.resolve(["minutes": Int(total / 60)])
         }
         store.execute(q)
     }

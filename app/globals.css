@@ -341,8 +341,16 @@ button:disabled { opacity: .5; cursor: default; }
 .pick-thumb-btn:active { transform: scale(0.96); }
 .pick-thumb-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,.55); }
+/* 目標ハブ（体重/筋トレの2カード分岐） */
+.hub-card:active { background: var(--bg); }
+.hub-arrow { float: right; color: var(--faint); font-size: 18px; line-height: 1; }
+.hub-bar { height: 6px; background: #eceeeb; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.hub-bar i { display: block; height: 100%; background: var(--teal); border-radius: 3px; }
+.hub-bar.big { height: 8px; }
+
 /* AIコーチ相談チャット */
 .chat-log { max-height: 46dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 0; }
+.chat-log.coach-page { min-height: 38dvh; max-height: 52dvh; }
 .chat-b { padding: 10px 14px; border-radius: 16px; margin: 6px 0; font-size: 14px; line-height: 1.75;
   white-space: pre-wrap; word-break: break-word; }
 .chat-b.user { background: var(--ink); color: #fff; margin-left: 18%; border-bottom-right-radius: 6px; }

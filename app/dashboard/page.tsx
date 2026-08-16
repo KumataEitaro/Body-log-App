@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { cacheGet, cacheSet } from '@/lib/cache';
 import { reviewMaintenance, lifeFactorFor, REVIEW_INTERVAL_DAYS, KCAL_PER_KG, type MaintReview } from '@/lib/adaptive';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
-import { friendlyError } from '@/lib/errmsg';
 
 type Row = {
   date: string; label: string; day: string; ex: ExLevel; adj: number;
@@ -69,39 +68,7 @@ export default function DashboardPage() {
   // 食材×翌日体重の傾向（品目DBから算出。データが揃うまでは非表示）
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
 
-  // ===== AIコーチ相談チャット（本人データを根拠に回答） =====
-  type CoachMsg = { role: 'user' | 'ai'; text: string };
-  const [coachOpen, setCoachOpen] = useState(false);
-  const [coachMsgs, setCoachMsgs] = useState<CoachMsg[]>([]);
-  const [coachInput, setCoachInput] = useState('');
-  const [coachBusy, setCoachBusy] = useState(false);
-  const chatLogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
-  }, [coachMsgs, coachBusy]);
-
-  async function sendCoach(q: string) {
-    const question = q.trim();
-    if (!question || coachBusy) return;
-    const hist = coachMsgs.slice(-6);
-    setCoachMsgs((m) => [...m, { role: 'user', text: question }]);
-    setCoachInput('');
-    setCoachBusy(true);
-    try {
-      const res = await fetch('/api/coach', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history: hist }),
-      });
-      const j = await res.json();
-      if (j.detail) console.log('[coach] detail:', j.detail);
-      if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      setCoachMsgs((m) => [...m, { role: 'ai', text: String(j.answer) }]);
-    } catch (e) {
-      setCoachMsgs((m) => [...m, { role: 'ai', text: friendlyError(e, 'うまく答えられませんでした。通信環境を確認して、もう一度お試しください。') }]);
-    } finally {
-      setCoachBusy(false);
-    }
-  }
+  // AIコーチ相談は専用の「相談」タブ（/coach）へ移設した
 
   type DashCache = {
     userName: string; rows: Row[]; kpi: Kpi;
@@ -513,15 +480,6 @@ export default function DashboardPage() {
             })()}
           </div>
 
-          {/* ===== AIコーチ相談（本人データを根拠に回答） ===== */}
-          <div className="card">
-            <h2>🧠 AIコーチに相談<span className="muted" style={{ fontWeight: 400, letterSpacing: 0 }}> — ベータ</span></h2>
-            <p className="muted" style={{ marginTop: 0 }}>
-              「気分がすぐれない」「過食しちゃった」——あなたの摂取カロリー・栄養素・体重・メモの推移を根拠に答えます。
-            </p>
-            <button className="btn-primary" onClick={() => setCoachOpen(true)}>相談してみる</button>
-          </div>
-
           {/* ===== カレンダー（日タップで詳細・編集） ===== */}
           <div className="card">
             <h2>📅 カレンダー</h2>
@@ -572,39 +530,6 @@ export default function DashboardPage() {
           })()}
         </>
       )}
-
-      {/* ===== AIコーチ相談チャット ===== */}
-      <Sheet open={coachOpen} onClose={() => setCoachOpen(false)}>
-        <div>
-          <h2>🧠 AIコーチ<span className="muted" style={{ fontWeight: 400 }}> — あなたの記録が根拠</span></h2>
-          <div className="chat-log" ref={chatLogRef}>
-            {coachMsgs.length === 0 && (
-              <p className="muted" style={{ fontSize: 12.5 }}>
-                直近28日の摂取・収支・栄養素・体重・気分・メモを見た上で答えます。下の例をタップするか、自由に書いてください。
-              </p>
-            )}
-            {coachMsgs.map((m, i) => (
-              <div key={i} className={`chat-b ${m.role}`}>{m.text}</div>
-            ))}
-            {coachBusy && <div className="chat-b ai"><span className="spin" />データを確認しています…</div>}
-          </div>
-          {coachMsgs.length === 0 && (
-            <div className="chips" style={{ margin: '8px 0' }}>
-              {['気分がすぐれないんだけど、何が原因かな', '過食しちゃった…', '体重が減らなくなってきた'].map((q) => (
-                <button key={q} className="chip" onClick={() => sendCoach(q)}>{q}</button>
-              ))}
-            </div>
-          )}
-          <div className="chat-inrow">
-            <textarea rows={1} value={coachInput} placeholder="相談してみる…"
-                      onChange={(e) => setCoachInput(e.target.value)} />
-            <button className="dock-send" onClick={() => sendCoach(coachInput)} disabled={coachBusy || !coachInput.trim()}>送信</button>
-          </div>
-          <p className="muted" style={{ fontSize: 10.5, marginTop: 6, marginBottom: 0 }}>
-            医療的な診断はできません。深刻な不調が続く場合は医療機関にご相談ください。
-          </p>
-        </div>
-      </Sheet>
 
       {/* ===== 日別詳細シート ===== */}
       <Sheet open={daySel != null} onClose={() => setDaySel(null)}>

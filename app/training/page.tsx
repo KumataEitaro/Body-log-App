@@ -33,6 +33,7 @@ export default function TrainingPage() {
   const [history, setHistory] = useState<HistRow[]>([]);
   const [workouts, setWorkouts] = useState<HealthWorkout[]>([]);
   const [activity, setActivity] = useState<{ kcal: number | null; steps: number | null }>({ kcal: null, steps: null });
+  const [goalKgMap, setGoalKgMap] = useState<Map<string, number>>(new Map()); // 種目→目標重量（グラフの目標線）
 
   const setTRow = (i: number, patch: Partial<TRow>) =>
     setTRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -48,6 +49,9 @@ export default function TrainingPage() {
       const { data } = await supabase.from('logs').select('id,date,text')
         .like('text', '🏋️%').order('at', { ascending: false }).limit(40);
       setHistory((data as HistRow[]) || []);
+      // 筋トレ重量目標（テーブル未作成でも静かに無視）
+      const { data: tg } = await supabase.from('training_goals').select('name,target_kg');
+      if (tg) setGoalKgMap(new Map(tg.map((g: { name: string; target_kg: number }) => [g.name, Number(g.target_kg)])));
       // ヘルスケア（対応ビルド・連携ONのみ。失敗は静かに無視）
       if (isHealthEnabled()) {
         healthReadWorkouts(14).then(setWorkouts).catch(() => { /* 無視 */ });
@@ -157,6 +161,9 @@ export default function TrainingPage() {
               key={`${activeEx}-${chartMode}`}
               series={exPoints.map((p) => ({ date: p.date, value: chartMode === 'kg' ? p.maxKg : p.volume }))}
               today={todayJST()} unit={chartMode === 'kg' ? 'kg' : 'kg·回'} decimals={0} minSpan={chartMode === 'kg' ? 5 : 200}
+              plan={chartMode === 'kg' && activeEx && goalKgMap.has(activeEx)
+                ? [{ date: exPoints[0].date, value: goalKgMap.get(activeEx)! }, { date: todayJST(), value: goalKgMap.get(activeEx)! }]
+                : undefined}
             />
           ) : (
             <p className="muted">「{activeEx}」の記録が2回以上たまるとグラフが描かれます。</p>

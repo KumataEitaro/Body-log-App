@@ -28,6 +28,7 @@ type HealthPlugin = {
   writeMetrics(o: Record<string, unknown>): Promise<{ written: number }>;
   readWorkouts(o: { daysBack?: number }): Promise<{ workouts: HealthWorkout[] }>;
   readSteps(o: { date: string }): Promise<{ steps: number }>;
+  readSleep(o: { date: string }): Promise<{ minutes: number }>;
 };
 
 // 静的import：呼び出し時の動的フェッチが無く固まらない。
@@ -174,6 +175,21 @@ export async function healthStepsDays(dates: string[]): Promise<(number | null)[
     try {
       const r = await withTimeout(p.readSteps({ date: d }), 8000, { steps: -1 });
       return r.steps >= 0 ? r.steps : null; // -1=タイムアウト
+    } catch {
+      return null;
+    }
+  }));
+}
+
+// 複数日の睡眠時間（分）をまとめて取得。取得不可の日は null
+export async function healthSleepDays(dates: string[]): Promise<(number | null)[]> {
+  if (!isHealthEnabled()) return dates.map(() => null);
+  const p = getPlugin();
+  if (!p) return dates.map(() => null);
+  return Promise.all(dates.map(async (d) => {
+    try {
+      const r = await withTimeout(p.readSleep({ date: d }), 8000, { minutes: -1 });
+      return r.minutes >= 0 ? r.minutes : null; // -1=タイムアウト
     } catch {
       return null;
     }

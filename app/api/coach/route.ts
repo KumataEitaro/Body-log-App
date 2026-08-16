@@ -37,6 +37,10 @@ export async function POST(req: Request) {
   const question = String(bodyRaw.question ?? '').slice(0, 500).trim();
   if (!question) return NextResponse.json({ ok: false, error: '質問を入力してください。' }, { status: 400 });
   const history: { role: string; text: string }[] = Array.isArray(bodyRaw.history) ? bodyRaw.history.slice(-6) : [];
+  // 睡眠はHealthKit＝端末でしか読めないため、クライアントが取得して添えてくる
+  const sleep: { date: string; min: number }[] = Array.isArray(bodyRaw.sleep)
+    ? bodyRaw.sleep.filter((s: { date?: unknown; min?: unknown }) => typeof s?.date === 'string' && typeof s?.min === 'number' && s.min > 0).slice(0, 7)
+    : [];
 
   // 使用回数（食事AI解析と同じ日次上限を共有）
   const today = todayJST();
@@ -120,6 +124,9 @@ export async function POST(req: Request) {
     `その前3週間: 平均摂取${avg(prev21.map((d) => d.intake)) ?? '記録なし'}kcal・平均収支${avg(prev21.map((d) => d.diff)) ?? '-'}kcal\n` +
     (wDelta != null ? `体重: 28日間で${Number(wDelta) > 0 ? '+' : ''}${wDelta}kg（現在${latestW}kg）\n` : '') +
     `栄養素の推定平均: ${nutLines}\n` +
+    (sleep.length > 0
+      ? `睡眠(ヘルスケア実測): ${sleep.map((s) => `${s.date.slice(5)}=${Math.round(s.min / 6) / 10}h`).join(' ')}（平均${Math.round(sleep.reduce((a, s) => a + s.min, 0) / sleep.length / 6) / 10}h）\n`
+      : '睡眠: データなし\n') +
     `直近7日の日別:\n${dayLines || '（記録なし）'}`;
 
   const historyBlock = history.length

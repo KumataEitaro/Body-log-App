@@ -23,6 +23,13 @@ function IconDumbbell() {
     </svg>
   );
 }
+function IconChat() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-9 8.35 8.5 8.5 0 0 1-3.4-.7L3 21l1.85-4.6A8.38 8.38 0 0 1 3.5 11.5a8.5 8.5 0 0 1 8.75-8.5 8.5 8.5 0 0 1 8.75 8.5Z" />
+    </svg>
+  );
+}
 function IconChart() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -53,11 +60,12 @@ function IconRefresh() {
   );
 }
 
-// 食事＝入力タブ / 筋トレ＝トレタブ に分離（5タブ）
+// 食事/トレ/身体の変化/相談/目標/設定 の6タブ
 const TABS = [
   { href: '/log', label: '食事', icon: <IconPencil />, dotKey: 'photo' },
   { href: '/training', label: 'トレ', icon: <IconDumbbell />, dotKey: null },
   { href: '/dashboard', label: '身体の変化', icon: <IconChart />, dotKey: null },
+  { href: '/coach', label: '相談', icon: <IconChat />, dotKey: null },
   { href: '/goal', label: '目標', icon: <IconTarget />, dotKey: 'goal' },
   { href: '/settings', label: '設定', icon: <IconGear />, dotKey: null },
 ] as const;
@@ -151,7 +159,8 @@ export default function AppShell({
       <nav className="tabbar">
         <div className="tabbar-inner">
           {TABS.map((t) => (
-            <Link key={t.href} href={t.href} className={`tab ${pathname === t.href ? 'active' : ''}`}>
+            <Link key={t.href} href={t.href}
+                  className={`tab ${pathname === t.href || pathname.startsWith(t.href + '/') ? 'active' : ''}`}>
               {hasDot(t.dotKey) && <span className="tab-dot" />}
               {t.icon}
               <span>{t.label}</span>
