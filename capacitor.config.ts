@@ -23,6 +23,10 @@ const config: CapacitorConfig = {
       backgroundColor: '#f8fafc',
       launchAutoHide: true,
     },
+    Keyboard: {
+      // キーボード表示時のWebView縮小方式。閉じた後の復元はViewportFix+keyboardDidHideで矯正
+      resize: 'native',
+    },
     LocalNotifications: {
       // アプリを開いている間もバナー・通知センター・サウンド・バッジで通知を出す
       // （iOSはこの指定が無いとフォアグラウンド中の通知が画面に出ない）

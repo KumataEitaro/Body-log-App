@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import DomTranslator from '@/components/DomTranslator';
 import SWRegister from '@/components/SWRegister';
+import ViewportFix from '@/components/ViewportFix';
 
 // フォントはAパターン（ネイティブ仕様）: OS標準フォントに全面委任（globals.cssのスタック参照）。
 // iOS=SF Pro＋ヒラギノ、Android=Roboto＋Noto Sans CJK JP。Webフォント配信なし＝軽量・中華フォールバック防止。
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body><SWRegister /><DomTranslator />{children}</body>
+      <body><SWRegister /><DomTranslator /><ViewportFix />{children}</body>
     </html>
   );
 }
