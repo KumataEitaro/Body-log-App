@@ -12,19 +12,22 @@ import { isNativePhotosAvailable, photosAuthStatus, photosBinaryInfo } from '@/l
 import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthPullHistory } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
 import BackBar from '@/components/BackBar';
+import { User, Utensils, Bell, HeartPulse, Globe, Download, Wrench, FileText, Lock, Trash2 } from 'lucide-react';
 
 // 設定メニュー（ハブ→各サブ画面）。1ファイル内で切替え、URLの?s=で状態を保持（戻るキー対応）
+// アイコンはiOS設定アプリ風: カラー角丸スクエア背景＋白のLucideアイコン（ストローク幅統一）
+const ICO = { size: 17, strokeWidth: 2, color: '#fff' } as const;
 const MENU = [
-  { key: 'profile', ico: '👤', label: 'プロフィール' },
-  { key: 'foods', ico: '🍲', label: 'マイ食品', href: '/foods' },
-  { key: 'notify', ico: '🔔', label: '通知' },
-  { key: 'health', ico: '❤️', label: 'ヘルスケア連携', native: true },
-  { key: 'language', ico: '🌐', label: '言語 / Language' },
-  { key: 'import', ico: '📥', label: '過去データの取り込み' },
-  { key: 'diag', ico: '🛠', label: '診断（オフライン・カメラ）' },
-  { key: 'terms', ico: '📄', label: '利用規約', href: '/terms' },
-  { key: 'privacy', ico: '🔒', label: 'プライバシーポリシー', href: '/privacy' },
-  { key: 'danger', ico: '⚠️', label: 'アカウント削除', danger: true },
+  { key: 'profile', icon: <User {...ICO} />, bg: '#3b82f6', label: 'プロフィール' },
+  { key: 'foods', icon: <Utensils {...ICO} />, bg: '#f97316', label: 'マイ食品', href: '/foods' },
+  { key: 'notify', icon: <Bell {...ICO} />, bg: '#ef4444', label: '通知' },
+  { key: 'health', icon: <HeartPulse {...ICO} />, bg: '#ec4899', label: 'ヘルスケア連携', native: true },
+  { key: 'language', icon: <Globe {...ICO} />, bg: '#0ea5e9', label: '言語 / Language' },
+  { key: 'import', icon: <Download {...ICO} />, bg: '#a855f7', label: '過去データの取り込み' },
+  { key: 'diag', icon: <Wrench {...ICO} />, bg: '#6b7280', label: '診断（オフライン・カメラ）' },
+  { key: 'terms', icon: <FileText {...ICO} />, bg: '#64748b', label: '利用規約', href: '/terms' },
+  { key: 'privacy', icon: <Lock {...ICO} />, bg: '#14b8a6', label: 'プライバシーポリシー', href: '/privacy' },
+  { key: 'danger', icon: <Trash2 {...ICO} />, bg: '#dc2626', label: 'アカウント削除', danger: true },
 ] as const;
 
 export default function SettingsPage() {
@@ -401,11 +404,11 @@ export default function SettingsPage() {
           {MENU.filter((m) => !('native' in m && m.native) || nativeApp).map((m) =>
             'href' in m && m.href ? (
               <a key={m.key} className="menu-row" href={m.href}>
-                <span className="menu-row-ico">{m.ico}</span>{m.label}<span className="menu-row-arrow">›</span>
+                <span className="menu-ico" style={{ background: m.bg }}>{m.icon}</span>{m.label}<span className="menu-row-arrow">›</span>
               </a>
             ) : (
               <button key={m.key} className={`menu-row ${'danger' in m && m.danger ? 'danger' : ''}`} onClick={() => openSection(m.key)}>
-                <span className="menu-row-ico">{m.ico}</span>{m.label}<span className="menu-row-arrow">›</span>
+                <span className="menu-ico" style={{ background: m.bg }}>{m.icon}</span>{m.label}<span className="menu-row-arrow">›</span>
               </button>
             ))}
         </div>

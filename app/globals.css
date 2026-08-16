@@ -362,7 +362,12 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .menu-list > .menu-row:last-child { border-bottom: none; }
 .menu-row:active { background: var(--bg); }
-.menu-row-ico { font-size: 19px; width: 26px; text-align: center; flex: none; }
+/* iOS設定風のカラー角丸アイコン（白のストロークアイコンを中央配置） */
+.menu-ico {
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.menu-ico svg { display: block; }
 .menu-row-arrow { margin-left: auto; color: var(--faint); font-size: 18px; flex: none; }
 .menu-row.danger { color: var(--coral); }
 
