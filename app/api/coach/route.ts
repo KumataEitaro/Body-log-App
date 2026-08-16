@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel } from '@/lib/calc';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
@@ -23,9 +23,8 @@ const NUTRIENT_LABEL: Record<string, [string, string, number]> = {
 };
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const [{ data: { user } }, bodyRaw] = await Promise.all([
-    supabase.auth.getUser(),
+  const [{ supabase, user }, bodyRaw] = await Promise.all([
+    getApiAuth(req),
     req.json().catch(() => null),
   ]);
   if (!user) return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });

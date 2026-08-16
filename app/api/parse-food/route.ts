@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
@@ -13,11 +13,9 @@ const MAX_IMAGE_BYTES = 1_500_000; // base64後~2MB
 
 export async function POST(req: Request) {
   const t0 = Date.now();
-  const supabase = await createClient();
-
-  // 認証確認とリクエストボディ読込を並列に
-  const [{ data: { user } }, bodyRaw] = await Promise.all([
-    supabase.auth.getUser(),
+  // 認証確認（Web=Cookie / ネイティブ=Bearer 両対応）とボディ読込を並列に
+  const [{ supabase, user }, bodyRaw] = await Promise.all([
+    getApiAuth(req),
     req.json().catch(() => null),
   ]);
   if (!user) {
