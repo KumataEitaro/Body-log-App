@@ -15,9 +15,11 @@ vi.mock('@/lib/supabase/server', () => ({
     auth: {
       getUser: async () => ({ data: { user: state.user } }),
     },
-    from: (_table: string) => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
+          // profiles.premium_until 取得（eq 1段+maybeSingle）
+          maybeSingle: async () => ({ data: table === 'profiles' ? null : state.usage }),
           eq: () => ({
             maybeSingle: async () => ({ data: state.usage }),
           }),
