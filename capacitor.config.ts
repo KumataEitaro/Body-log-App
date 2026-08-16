@@ -12,7 +12,10 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   ios: {
-    contentInset: 'always', // ノッチ・ステータスバーと重ならないように
+    // セーフエリアはCSSのenv(safe-area-inset-*)で処理する（globals.cssの--sa-t/--sa-b）。
+    // 'always'はネイティブ側の余白が二重管理になり、キーボード後にinsetが狂ったまま残る
+    // 「タブバーが浮く・上に空白」バグの発生源だったため'never'に変更（2026-08-09）
+    contentInset: 'never',
     backgroundColor: '#f8fafc',
     // Service Worker（オフラインキャッシュ）をWKWebViewで有効化するために必要
     limitsNavigationsToAppBoundDomains: true,
