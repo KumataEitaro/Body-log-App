@@ -24,6 +24,14 @@ const fmtYMD = (idx: number) => {
   const d = dateOf(idx);
   return `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 };
+// X軸目盛り: 表示期間に応じて年を含める（長期・年またぎで「いつの話か」迷子にならないように）
+const fmtTick = (idx: number, viewDays: number, crossesYear: boolean) => {
+  const d = dateOf(idx);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
+  if (viewDays > 150) return `${y}/${m}`;                       // 半年〜全期間: 年/月
+  if (crossesYear) return `${String(y).slice(2)}/${m}/${day}`;  // 年またぎ: YY/M/D
+  return `${m}/${day}`;                                         // 短期: M/D
+};
 
 function fmtVal(v: number, decimals: number): string {
   return v.toLocaleString('ja-JP', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -300,8 +308,9 @@ export default function InteractiveChart({
     { l: '週', d: 7 }, { l: '月', d: 30 }, { l: '6M', d: 183 }, { l: '年', d: 365 }, { l: '全', d: totalSpan },
   ];
   const activeSeg = segs.reduce((best, s) => (Math.abs(Math.log(view.days / s.d)) < Math.abs(Math.log(view.days / best.d)) ? s : best), segs[0]);
-  // X軸目盛り: 窓を4等分
+  // X軸目盛り: 窓を4等分（年またぎ・長期は年入りラベル）
   const xTicks = [0.125, 0.375, 0.625, 0.875].map((f) => Math.round(start + view.days * f));
+  const crossesYear = dateOf(Math.round(start)).getUTCFullYear() !== dateOf(Math.round(view.end)).getUTCFullYear();
 
   return (
     <div className="ichart-wrap" ref={wrapRef}>
@@ -313,7 +322,9 @@ export default function InteractiveChart({
             <>{trend != null ? `${trend > 0 ? '+' : ''}${fmtVal(trend, decimals)} ${unit}` : '—'}<small>この期間の変化</small></>
           )}
         </div>
-        <div className="ichart-range num">{fmtYMD(Math.round(start))}〜{fmtMD(Math.round(view.end))}</div>
+        <div className="ichart-range num">
+          {fmtYMD(Math.round(start))}〜{dateOf(Math.round(start)).getUTCFullYear() !== dateOf(Math.round(view.end)).getUTCFullYear() ? fmtYMD(Math.round(view.end)) : fmtMD(Math.round(view.end))}
+        </div>
       </div>
 
       <svg className="ichart-svg" height={H} viewBox={`0 0 ${w} ${H}`}
@@ -327,7 +338,7 @@ export default function InteractiveChart({
         ))}
         {/* X目盛り */}
         {xTicks.map((d) => (
-          <text key={d} x={xOf(d)} y={H - 8} fontSize="10" fill="var(--faint)" textAnchor="middle" className="num">{fmtMD(d)}</text>
+          <text key={d} x={xOf(d)} y={H - 8} fontSize="10" fill="var(--faint)" textAnchor="middle" className="num">{fmtTick(d, view.days, crossesYear)}</text>
         ))}
         {/* 今日ライン */}
         {todayIdx >= start && todayIdx <= view.end && (
