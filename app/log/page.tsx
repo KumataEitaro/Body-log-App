@@ -905,23 +905,38 @@ export default function LogPage() {
     setSheetOpen(true);
   }
 
-  // ===== 体重・ウエストの直接入力シート（AI自由記述を経由しない専用UI） =====
+  // ===== 体重・ウエスト・筋トレの直接入力シート（AI自由記述を経由しない専用UI） =====
   const [bodySheetOpen, setBodySheetOpen] = useState(false);
   const [wWeight, setWWeight] = useState('');
   const [wWaist, setWWaist] = useState('');
   const [bodySaving, setBodySaving] = useState(false);
+  // 挙上重量（筋トレ）: 種目×重量×回数×セット。保存時は安定フォーマットのテキストにして蓄積
+  type TRow = { name: string; kg: string; reps: string; sets: string };
+  const [tRows, setTRows] = useState<TRow[]>([]);
+  const setTRow = (i: number, patch: Partial<TRow>) =>
+    setTRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   function openBodySheet() {
     hapticTap();
     setWWeight(latestWeight != null ? latestWeight.toFixed(1) : '');
     setWWaist('');
+    setTRows([]);
     setBodySheetOpen(true);
+  }
+
+  // 「🏋️ ベンチプレス 80kg×8×3」形式（後で分析エンジンが機械的にパースできる安定フォーマット）
+  function trainingText(): string {
+    const parts = tRows
+      .filter((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0)
+      .map((r) => `${r.name.trim()} ${Number(r.kg)}kg×${Number(r.reps)}${Number(r.sets) > 1 ? `×${Number(r.sets)}` : ''}`);
+    return parts.length > 0 ? `🏋️ ${parts.join('、')}` : '';
   }
 
   async function saveBody() {
     const w = wWeight === '' ? null : Number(wWeight);
     const wa = wWaist === '' ? null : Number(wWaist);
-    if (w == null && wa == null) { setBodySheetOpen(false); return; }
+    const tr = trainingText();
+    if (w == null && wa == null && !tr) { setBodySheetOpen(false); return; }
     if ((w != null && (!(w > 20) || w > 300)) || (wa != null && (!(wa > 30) || wa > 200))) {
       setSaveMsg({ cls: 'err', text: '数値を確認してください（体重20〜300kg・ウエスト30〜200cm）。' });
       return;
@@ -935,7 +950,7 @@ export default function LogPage() {
       const row = {
         user_id: uid, date,
         items: [], kcal: null, p: null, f: null, c: null,
-        weight: w, waist: wa, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
+        weight: w, waist: wa, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
       };
       let { error } = await supabase.from('logs').insert(row);
       if (error && isMissingWaist(error.message)) {
@@ -945,7 +960,7 @@ export default function LogPage() {
       await syncDaySummary(uid, date);
       if (w != null) setLatestWeight(Math.round(w * 10) / 10);
       hapticSuccess();
-      setSaveMsg({ cls: 'ok', text: `保存しました（${[w != null ? `体重 ${w.toFixed(1)}kg` : '', wa != null ? `ウエスト ${wa.toFixed(1)}cm` : ''].filter(Boolean).join('・')}）。` });
+      setSaveMsg({ cls: 'ok', text: `保存しました（${[w != null ? `体重 ${w.toFixed(1)}kg` : '', wa != null ? `ウエスト ${wa.toFixed(1)}cm` : '', tr ? `筋トレ${tRows.filter((r) => r.name.trim()).length}種目` : ''].filter(Boolean).join('・')}）。` });
       setBodySheetOpen(false);
     } finally {
       setBodySaving(false);
@@ -1542,7 +1557,7 @@ export default function LogPage() {
       {/* ===== 体重・ウエスト直接入力シート ===== */}
       <Sheet open={bodySheetOpen} onClose={() => setBodySheetOpen(false)}>
         <div>
-          <h2>⚖️ 体重・ウエスト{date !== todayJST() && <span className="muted" style={{ fontWeight: 400 }}> — {date.replace(/-/g, '/')}の記録</span>}</h2>
+          <h2>⚖️ 体重・ウエスト・筋トレ{date !== todayJST() && <span className="muted" style={{ fontWeight: 400 }}> — {date.replace(/-/g, '/')}の記録</span>}</h2>
           <div className="row2">
             <div>
               <label>体重(kg)</label>
@@ -1556,8 +1571,29 @@ export default function LogPage() {
             </div>
           </div>
           <p className="muted" style={{ fontSize: 11, margin: '6px 0 0' }}>
-            どちらか一方だけでもOK{healthEnabled ? '。ヘルスケア連携中は体重計の値も自動で取り込まれます' : ''}
+            どれか1つだけでもOK{healthEnabled ? '。ヘルスケア連携中は体重計の値も自動で取り込まれます' : ''}
           </p>
+
+          {/* 挙上重量（筋トレ）: 種目・kg・回数・セット */}
+          <div style={{ marginTop: 12 }}>
+            {tRows.length > 0 && (
+              <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>🏋️ 筋トレ（挙上重量）</div>
+            )}
+            {tRows.map((r, i) => (
+              <div className="train-row" key={i}>
+                <input placeholder="種目（ベンチプレス）" value={r.name} onChange={(e) => setTRow(i, { name: e.target.value })} />
+                <input type="number" inputMode="decimal" className="num" placeholder="kg" value={r.kg} onChange={(e) => setTRow(i, { kg: e.target.value })} />
+                <input type="number" inputMode="numeric" className="num" placeholder="回" value={r.reps} onChange={(e) => setTRow(i, { reps: e.target.value })} />
+                <input type="number" inputMode="numeric" className="num" placeholder="set" value={r.sets} onChange={(e) => setTRow(i, { sets: e.target.value })} />
+                <button className="item-del" onClick={() => setTRows((rs) => rs.filter((_, j) => j !== i))}>×</button>
+              </div>
+            ))}
+            <button className="btn-ghost" style={{ width: '100%', marginTop: tRows.length ? 6 : 0 }}
+                    onClick={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])}>
+              🏋️ {tRows.length === 0 ? '筋トレを記録する' : '種目を追加'}
+            </button>
+          </div>
+
           <button className="btn-primary" style={{ marginTop: 12 }} onClick={saveBody} disabled={bodySaving}>
             {bodySaving ? <><span className="spin" />保存中…</> : '保存する'}
           </button>

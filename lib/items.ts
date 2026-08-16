@@ -1,6 +1,14 @@
 // 品目リストの編集・再計算ロジック
 
-export type FoodItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
+// 分析用の追加栄養素（AI解析から蓄積。UIには表示せずDBに貯める）
+// salt=食塩相当量g / fib=食物繊維g / sug=糖類g / k=カリウムmg / ca=カルシウムmg /
+// mg=マグネシウムmg / fe=鉄mg / zn=亜鉛mg / vd=ビタミンDμg / vc=ビタミンCmg
+export const NUTRIENT_KEYS = ['salt', 'fib', 'sug', 'k', 'ca', 'mg', 'fe', 'zn', 'vd', 'vc'] as const;
+export type NutrientKey = typeof NUTRIENT_KEYS[number];
+
+export type FoodItem = {
+  name: string; qty: string; kcal: number; p: number; f: number; c: number;
+} & Partial<Record<NutrientKey, number>>;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -16,8 +24,13 @@ export function rescaleByQty(item: FoodItem, newQty: string): FoodItem {
   const newN = qtyNumber(newQty);
   if (oldN != null && newN != null && oldN > 0) {
     const r = newN / oldN;
+    const scaled: Partial<Record<NutrientKey, number>> = {};
+    for (const key of NUTRIENT_KEYS) {
+      const v = item[key];
+      if (typeof v === 'number') scaled[key] = round1(v * r);
+    }
     return {
-      ...item, qty: newQty,
+      ...item, ...scaled, qty: newQty,
       kcal: round1(item.kcal * r), p: round1(item.p * r), f: round1(item.f * r), c: round1(item.c * r),
     };
   }

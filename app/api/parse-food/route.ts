@@ -99,6 +99,8 @@ export async function POST(req: Request) {
   const prompt =
     'あなたは日本の管理栄養士 兼 トレーニング記録係です。ユーザーの1日の記録メモ（と食事写真）を解析してください。\n' +
     '\n【タスク1: 食事】メモと写真に写っている食事の各品目と合計の kcal・たんぱく質P(g)・脂質F(g)・炭水化物C(g) を推定する。\n' +
+    '- 分析用に各品目で次の栄養素も推定する（不明・微量は0。大まかな推定でよい）:\n' +
+    '  salt=食塩相当量(g,小数1) fib=食物繊維(g,小数1) sug=糖類(g) k=カリウム(mg) ca=カルシウム(mg) mg=マグネシウム(mg) fe=鉄(mg,小数1) zn=亜鉛(mg,小数1) vd=ビタミンD(μg,小数1) vc=ビタミンC(mg)\n' +
     '- 数量不明の調味料は大さじ1として計算\n' +
     '- 肉・魚・米などのグラム数は生の重量とみなす\n' +
     '- 写真は写っている量から標準的な1人前を推定\n' +
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
     (outLang ? `\n出力言語: items[].name・qty・mood・questionsの文字列は${outLang}で書くこと。\n` : '') +
     '\n【禁止事項】疾病名の指摘・医療的な診断・治療の提案は行わないこと（本サービスは医療機器ではない）。\n' +
     '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
-    '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0}],' +
+    '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,"salt":0,"fib":0,"sug":0,"k":0,"ca":0,"mg":0,"fe":0,"zn":0,"vd":0,"vc":0}],' +
     '"total":{"kcal":0,"p":0,"f":0,"c":0},' +
     '"weight":null,"waist":null,"ex":null,"adj":0,"mood":null,"questions":[]}\n' +
     '\n記録メモ:\n' + (text.trim() || '(写真のみ)');

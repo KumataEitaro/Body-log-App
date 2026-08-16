@@ -19,7 +19,8 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "readHistory", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readActiveEnergy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "writeMetrics", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "readWorkouts", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "readWorkouts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readSteps", returnType: CAPPluginReturnPromise)
     ]
 
     private let store = HKHealthStore()
@@ -33,12 +34,13 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
     private var fatType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .dietaryFatTotal)! }
     private var carbsType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .dietaryCarbohydrates)! }
     private var activeEnergyType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)! }
+    private var stepType: HKQuantityType { HKQuantityType.quantityType(forIdentifier: .stepCount)! }
 
     private var shareTypes: Set<HKSampleType> {
         [weightType, bodyFatType, waistType, energyType, proteinType, fatType, carbsType]
     }
     private var readTypes: Set<HKObjectType> {
-        [weightType, bodyFatType, waistType, activeEnergyType, energyType, proteinType, fatType, carbsType,
+        [weightType, bodyFatType, waistType, activeEnergyType, stepType, energyType, proteinType, fatType, carbsType,
          HKObjectType.workoutType()]
     }
 
@@ -139,6 +141,21 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
         let q = HKStatisticsQuery(quantityType: activeEnergyType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, _ in
             let kcal = stats?.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
             call.resolve(["kcal": Int(kcal.rounded())])
+        }
+        store.execute(q)
+    }
+
+    // 指定日の歩数合計
+    @objc func readSteps(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable() else { call.resolve(["steps": 0]); return }
+        let dateStr = call.getString("date") ?? ""
+        guard let day = Self.dayFormatter.date(from: dateStr) else { call.resolve(["steps": 0]); return }
+        let start = Calendar.current.startOfDay(for: day)
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let q = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, stats, _ in
+            let steps = stats?.sumQuantity()?.doubleValue(for: .count()) ?? 0
+            call.resolve(["steps": Int(steps.rounded())])
         }
         store.execute(q)
     }
