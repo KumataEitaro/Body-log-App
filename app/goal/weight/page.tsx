@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/errmsg';
 import Link from 'next/link';
+import BackBar from '@/components/BackBar';
 import { todayJST, mifflinBMR } from '@/lib/calc';
 import { lifeFactorFor } from '@/lib/adaptive';
 import { type Goal, type PlanEvent } from '@/lib/goal';
@@ -182,7 +183,7 @@ export default function GoalPage() {
 
   return (
     <AppShell userName={userName}>
-      <p style={{ margin: '0 0 10px' }}><Link href="/goal" className="muted">‹ 目標一覧へ</Link></p>
+      <BackBar label="目標" href="/goal" />
       {goal ? (
         <p className="muted" style={{ margin: '0 0 10px' }}>
           進捗（標準進捗 vs 実績・グラフ）は<Link href="/dashboard">ダッシュボード</Link>、日々の入力（食事・体重・写真）は<Link href="/log">入力タブ</Link>。ここでは目標とチートデイを設定します。

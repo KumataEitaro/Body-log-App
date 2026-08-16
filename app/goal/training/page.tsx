@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import BackBar from '@/components/BackBar';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
 import { cacheGet } from '@/lib/cache';
@@ -83,7 +83,7 @@ export default function TrainingGoalPage() {
 
   return (
     <AppShell userName={userName}>
-      <p style={{ margin: '0 0 10px' }}><Link href="/goal" className="muted">‹ 目標一覧へ</Link></p>
+      <BackBar label="目標" href="/goal" />
 
       {tableMissing && (
         <div className="card" style={{ border: '1.5px solid var(--amber)' }}>

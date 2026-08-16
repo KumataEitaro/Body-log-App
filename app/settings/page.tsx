@@ -11,6 +11,21 @@ import { getIsNative, scheduleSmartReminder, isNativeSync, isNativeCameraAvailab
 import { isNativePhotosAvailable, photosAuthStatus, photosBinaryInfo } from '@/lib/photos';
 import { healthSelfTest, isHealthEnabled, setHealthEnabled, healthPullLatest, healthPushDay, healthPullHistory } from '@/lib/health';
 import { summarizeDay, type LogRow } from '@/lib/day';
+import BackBar from '@/components/BackBar';
+
+// 設定メニュー（ハブ→各サブ画面）。1ファイル内で切替え、URLの?s=で状態を保持（戻るキー対応）
+const MENU = [
+  { key: 'profile', ico: '👤', label: 'プロフィール' },
+  { key: 'foods', ico: '🍲', label: 'マイ食品', href: '/foods' },
+  { key: 'notify', ico: '🔔', label: '通知' },
+  { key: 'health', ico: '❤️', label: 'ヘルスケア連携', native: true },
+  { key: 'language', ico: '🌐', label: '言語 / Language' },
+  { key: 'import', ico: '📥', label: '過去データの取り込み' },
+  { key: 'diag', ico: '🛠', label: '診断（オフライン・カメラ）' },
+  { key: 'terms', ico: '📄', label: '利用規約', href: '/terms' },
+  { key: 'privacy', ico: '🔒', label: 'プライバシーポリシー', href: '/privacy' },
+  { key: 'danger', ico: '⚠️', label: 'アカウント削除', danger: true },
+] as const;
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -360,8 +375,45 @@ export default function SettingsPage() {
 
   const bmrPreview = mifflinBMR(sex, 70, Number(height) || 0, Number(age) || 0);
 
+  // ===== ハブ⇄サブ画面の切替（?s=キーで保持・端末の戻るキーにも追従） =====
+  const [section, setSection] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setSection(new URLSearchParams(window.location.search).get('s'));
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, []);
+  function openSection(s: string) {
+    setSection(s);
+    try { window.history.pushState(null, '', `/settings?s=${s}`); } catch { /* 無視 */ }
+  }
+  function backToMenu() {
+    setSection(null);
+    try { window.history.pushState(null, '', '/settings'); } catch { /* 無視 */ }
+  }
+  const menuLabel = MENU.find((m) => m.key === section)?.label;
+
   return (
     <AppShell userName={userName}>
+      {/* ===== ハブ: メニュー一覧 ===== */}
+      {section === null && (
+        <div className="card menu-list">
+          {MENU.filter((m) => !('native' in m && m.native) || nativeApp).map((m) =>
+            'href' in m && m.href ? (
+              <a key={m.key} className="menu-row" href={m.href}>
+                <span className="menu-row-ico">{m.ico}</span>{m.label}<span className="menu-row-arrow">›</span>
+              </a>
+            ) : (
+              <button key={m.key} className={`menu-row ${'danger' in m && m.danger ? 'danger' : ''}`} onClick={() => openSection(m.key)}>
+                <span className="menu-row-ico">{m.ico}</span>{m.label}<span className="menu-row-arrow">›</span>
+              </button>
+            ))}
+        </div>
+      )}
+
+      {section !== null && <BackBar label={`設定${menuLabel ? ` — ${menuLabel}` : ''}`} onClick={backToMenu} />}
+
+      {section === 'profile' && (
       <div className="card">
         <h2>プロフィール</h2>
         <label>表示名</label>
@@ -382,7 +434,9 @@ export default function SettingsPage() {
         <button className="btn-primary" style={{ marginTop: 10 }} onClick={saveProfile} disabled={busy}>保存</button>
         {msg && <div className={`msg ${msg.cls}`}>{msg.text}</div>}
       </div>
+      )}
 
+      {section === 'language' && (
       <div className="card">
         <h2>🌐 言語 / Language</h2>
         <p className="muted">
@@ -404,7 +458,9 @@ export default function SettingsPage() {
         {langMsg && <div className={`msg ${langMsg.cls}`}>{langMsg.text}</div>}
         <p className="muted" style={{ marginTop: 6 }}>全{LANGS.length}言語。AIの解析コメントも選択言語で返るようになります。</p>
       </div>
+      )}
 
+      {false && (
       <div className="card">
         <h2>🍲 マイ食品登録</h2>
         <p className="muted">
@@ -413,7 +469,9 @@ export default function SettingsPage() {
         </p>
         <a className="btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 8 }} href="/foods">マイ食品を登録・管理する</a>
       </div>
+      )}
 
+      {section === 'import' && (
       <div className="card">
         <h2>過去データの一括取込（JSON）</h2>
         <p className="muted">
@@ -423,7 +481,9 @@ export default function SettingsPage() {
         <button className="btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={runImport} disabled={busy || !importJson.trim()}>取り込む</button>
         {importMsg && <div className={`msg ${importMsg.cls}`}>{importMsg.text}</div>}
       </div>
+      )}
 
+      {section === 'notify' && (
       <div className="card">
         <h2>🔔 通知</h2>
         <label className="switch-row">
@@ -454,8 +514,9 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+      )}
 
-      {nativeApp && (
+      {section === 'health' && nativeApp && (
         <div className="card">
           <h2>❤️ Apple ヘルスケア連携</h2>
           <p className="muted" style={{ marginTop: 0 }}>
@@ -486,6 +547,7 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {section === 'diag' && (<>
       <div className="card">
         <h2>📡 オフライン診断</h2>
         <p className="muted" style={{ marginTop: 0 }}>
@@ -513,14 +575,18 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+      </>)}
 
+      {false && (
       <div className="card">
         <h2>📄 規約・ポリシー</h2>
         <p className="muted">
           <a href="/terms">利用規約</a> ／ <a href="/privacy">プライバシーポリシー</a>
         </p>
       </div>
+      )}
 
+      {section === 'danger' && (
       <div className="card" style={{ borderColor: 'var(--coral)' }}>
         <h2 style={{ color: 'var(--coral)' }}>⚠ アカウント削除</h2>
         <p className="muted">
@@ -534,6 +600,7 @@ export default function SettingsPage() {
         </button>
         {delMsg && <div className="msg err">{delMsg}</div>}
       </div>
+      )}
     </AppShell>
   );
 }
