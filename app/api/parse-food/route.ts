@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
+import { isPremiumActive } from '@/lib/premium';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
@@ -52,13 +53,15 @@ export async function POST(req: Request) {
   }
 
   // ===== 使用回数チェック・全体上限・マイ食品辞書を並列取得（直列3往復→1往復分の時間に） =====
-  const unlimited = isUnlimited(user.email);
   const today = todayJST();
-  const [usageRes, capReached, myFoodsRes] = await Promise.all([
+  const [usageRes, capReached, myFoodsRes, premRes] = await Promise.all([
     supabase.from('ai_usage').select('count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
     supabase.from('my_foods').select('name,kind,unit,kcal,p,f,c,note,serving_label,serving_ratio').limit(60),
+    supabase.from('profiles').select('premium_until').eq('id', user.id).maybeSingle(), // 列未作成でもerror→無料扱いで安全
   ]);
+  // プレミアム会員はAI無制限（管理者メールも従来どおり無制限）
+  const unlimited = isUnlimited(user.email) || isPremiumActive(premRes.data?.premium_until as string | null | undefined);
   const used = usageRes.data?.count ?? 0;
   if (!unlimited && used >= AI_DAILY_LIMIT) {
     return NextResponse.json({

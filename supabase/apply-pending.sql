@@ -47,3 +47,6 @@ alter table public.training_goals enable row level security;
 drop policy if exists "training_goals_own" on public.training_goals;
 create policy "training_goals_own" on public.training_goals
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- v15: プレミアム課金（この日時まで有効。RevenueCat Webhookが更新する。NULL=無料）
+alter table public.profiles add column if not exists premium_until timestamptz;

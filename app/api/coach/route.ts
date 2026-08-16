@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel } from '@/lib/calc';
+import { isPremiumActive } from '@/lib/premium';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
@@ -43,11 +44,12 @@ export async function POST(req: Request) {
 
   // 使用回数（食事AI解析と同じ日次上限を共有）
   const today = todayJST();
-  const unlimited = isUnlimited(user.email);
-  const [usageRes, capReached] = await Promise.all([
+  const [usageRes, capReached, premRes] = await Promise.all([
     supabase.from('ai_usage').select('count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
+    supabase.from('profiles').select('premium_until').eq('id', user.id).maybeSingle(),
   ]);
+  const unlimited = isUnlimited(user.email) || isPremiumActive(premRes.data?.premium_until as string | null | undefined);
   const used = usageRes.data?.count ?? 0;
   if (!unlimited && used >= AI_DAILY_LIMIT) {
     return NextResponse.json({ ok: false, error: `本日のAI利用回数（${AI_DAILY_LIMIT}回）を使い切りました。明日また使えます。` }, { status: 429 });
