@@ -160,7 +160,17 @@ export default function AppShell({
         <div className="tabbar-inner">
           {TABS.map((t) => (
             <Link key={t.href} href={t.href}
-                  className={`tab ${pathname === t.href || pathname.startsWith(t.href + '/') ? 'active' : ''}`}>
+                  className={`tab ${pathname === t.href || pathname.startsWith(t.href + '/') ? 'active' : ''}`}
+                  onClick={(e) => {
+                    // iOS標準のタブ挙動: 既にそのタブ内にいる時の再タップは「タブのトップへ戻る」
+                    // （サブページ・?s=状態を解除。トップにいるなら最上部へスクロール）
+                    const withinTab = pathname === t.href || pathname.startsWith(t.href + '/');
+                    if (!withinTab) return;
+                    e.preventDefault();
+                    const atRoot = pathname === t.href && !window.location.search;
+                    if (atRoot) window.scrollTo({ top: 0, behavior: 'smooth' });
+                    else router.push(t.href);
+                  }}>
               {hasDot(t.dotKey) && <span className="tab-dot" />}
               {t.icon}
               <span>{t.label}</span>

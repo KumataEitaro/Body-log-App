@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/errmsg';
@@ -30,7 +30,7 @@ const MENU = [
   { key: 'danger', icon: <Trash2 {...ICO} />, bg: '#dc2626', label: 'アカウント削除', danger: true },
 ] as const;
 
-export default function SettingsPage() {
+function SettingsInner() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [name, setName] = useState('');
@@ -378,22 +378,12 @@ export default function SettingsPage() {
 
   const bmrPreview = mifflinBMR(sex, 70, Number(height) || 0, Number(age) || 0);
 
-  // ===== ハブ⇄サブ画面の切替（?s=キーで保持・端末の戻るキーにも追従） =====
-  const [section, setSection] = useState<string | null>(null);
-  useEffect(() => {
-    const read = () => setSection(new URLSearchParams(window.location.search).get('s'));
-    read();
-    window.addEventListener('popstate', read);
-    return () => window.removeEventListener('popstate', read);
-  }, []);
-  function openSection(s: string) {
-    setSection(s);
-    try { window.history.pushState(null, '', `/settings?s=${s}`); } catch { /* 無視 */ }
-  }
-  function backToMenu() {
-    setSection(null);
-    try { window.history.pushState(null, '', '/settings'); } catch { /* 無視 */ }
-  }
+  // ===== ハブ⇄サブ画面の切替 =====
+  // ?s=キーをNextのルーター経由で読む（タブ再タップの/settings遷移・戻るキー・Link遷移すべてに確実に同期）
+  const searchParams = useSearchParams();
+  const section = searchParams.get('s');
+  function openSection(s: string) { router.push(`/settings?s=${s}`); }
+  function backToMenu() { router.push('/settings'); }
   const menuLabel = MENU.find((m) => m.key === section)?.label;
 
   return (
@@ -606,4 +596,9 @@ export default function SettingsPage() {
       )}
     </AppShell>
   );
+}
+
+
+export default function SettingsPage() {
+  return <Suspense fallback={null}><SettingsInner /></Suspense>;
 }
