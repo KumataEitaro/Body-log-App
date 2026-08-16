@@ -19,6 +19,7 @@ import { healthPushDay, healthPullLatest, isHealthEnabled, healthActiveEnergyDay
 import { averageActive, resolveActiveKcal, tdeeFromHealth } from '@/lib/energy';
 import { friendlyError, JA_TEXT_RE } from '@/lib/errmsg';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
+import { syncEntriesForDate, stripWaist, isMissingWaist } from '@/lib/daysync';
 import { widgetSync, type WidgetDay } from '@/lib/widget';
 
 type ParsedItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
@@ -65,15 +66,6 @@ async function resizeImage(file: File): Promise<NewPhoto> {
 
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
-}
-
-// waist列がまだ無い環境（migration-13未適用）でも壊れないよう、waistを除いたコピーを返す
-function stripWaist<T extends Record<string, unknown>>(o: T): T {
-  const { waist: _w, ...rest } = o;
-  return rest as T;
-}
-function isMissingWaist(msg: string | undefined): boolean {
-  return !!msg && /waist/i.test(msg);
 }
 
 function shiftDate(d: string, n: number): string {
@@ -570,30 +562,10 @@ export default function LogPage() {
     }
   }
 
-  // 日次サマリーをentriesへ反映（ダッシュボードはこの行を見る）
+  // 日次サマリーをentriesへ反映（本体はlib/daysyncと共用。ダッシュボードはentriesを見る）
   async function syncDaySummary(userId: string, d: string, updateState = true) {
     const supabase = createClient();
-    const { data: logs } = await supabase.from('logs').select('*').eq('date', d).order('at', { ascending: true });
-    const rows = (logs as (LogRow & { id: string; at: string })[]) || [];
-    if (rows.length === 0) {
-      await supabase.from('entries').delete().eq('user_id', userId).eq('date', d);
-    } else {
-      const s = summarizeDay(rows);
-      const entryRow = {
-        user_id: userId, date: d,
-        ex: s.ex, adj: s.adj,
-        intake: s.intake, p: s.p, f: s.f, c: s.c,
-        weight: s.weight, waist: s.waist, mood: s.mood, note: '',
-        food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
-      };
-      let { error: eErr } = await supabase.from('entries').upsert(entryRow, { onConflict: 'user_id,date' });
-      if (eErr && isMissingWaist(eErr.message)) {
-        ({ error: eErr } = await supabase.from('entries').upsert(stripWaist(entryRow), { onConflict: 'user_id,date' }));
-      }
-      // ヘルスケア連携がONなら、その日のサマリーを書き出す（ネイティブ・許可時のみ・無害）
-      healthPushDay({ date: d, weight: s.weight, waist: s.waist, energy: s.intake, protein: s.p, fat: s.f, carbs: s.c });
-    }
-    if (logs !== null) cacheSet(`logs:${userId}:${d}`, { logs: rows, entry: null });
+    const rows = await syncEntriesForDate(supabase, userId, d);
     if (updateState) setDayLogs(withPending(userId, d, rows));
     return rows;
   }
@@ -1096,6 +1068,42 @@ export default function LogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, date, eaten, widgetGoal, eatenP, widgetPGoal, dayLogs, backfill, widgetWeek]);
 
+  // ===== 気分チェックイン（1日1回・初回起動時に5段階を1タップ。分析の縦軸になる） =====
+  const [moodAsk, setMoodAsk] = useState(false);
+  useEffect(() => {
+    if (!profile) return;
+    try {
+      if (localStorage.getItem('bl-mood-asked') === todayJST()) return;
+    } catch { /* 無視 */ }
+    if (date !== todayJST()) return;
+    setMoodAsk(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  function skipMood() {
+    try { localStorage.setItem('bl-mood-asked', todayJST()); } catch { /* 無視 */ }
+    setMoodAsk(false);
+  }
+
+  async function saveMood(n: number) {
+    hapticTap();
+    skipMood(); // 先に閉じる（保存はバックグラウンドで）
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const today = todayJST();
+      // 「気分N/5」形式（分析エンジンが機械的にパースできる安定フォーマット）
+      const { error } = await supabase.from('logs').insert({
+        user_id: uid, date: today,
+        items: [], kcal: null, p: null, f: null, c: null,
+        weight: null, ex: 'オフ', adj: 0, mood: `気分${n}/5`, text: '', photo_urls: [],
+      });
+      if (!error) await syncDaySummary(uid, today, date === today);
+    } catch { /* 気分保存の失敗は静かに（明日また聞く） */ }
+  }
+
   // ===== 過食リスクの事前検知（昨日までの傾向から今日のリスクを判定・理由つき） =====
   const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
   useEffect(() => {
@@ -1225,8 +1233,8 @@ export default function LogPage() {
       const s = `ウエスト ${Number(l.waist).toFixed(1)}cm`;
       if (!title) title = s; else extras.push(s);
     }
-    if (l.mood) extras.push(String(l.mood));
-    if (!title) title = String(l.text || '記録').slice(0, 40);
+    if (!title) title = String(l.text || l.mood || '記録').slice(0, 40); // 気分だけの記録は気分をタイトルに
+    if (l.mood && l.mood !== title) extras.push(String(l.mood));
     return { title, right, rightUnit, rightGreen, extras };
   }
 
@@ -1553,6 +1561,24 @@ export default function LogPage() {
 
       {/* ドックに隠れないための余白 */}
       <div className="dock-spacer" />
+
+      {/* ===== 気分チェックイン（1日1回・1タップ） ===== */}
+      <Sheet open={moodAsk} onClose={skipMood}>
+        <div>
+          <h2>🌤 今日の調子は？</h2>
+          <p className="muted" style={{ marginTop: 0 }}>1タップだけ。過食予知や食材分析の精度が上がります。</p>
+          <div className="mood-row">
+            {([[1, '😫', 'つらい'], [2, '😕', 'いまいち'], [3, '😐', 'ふつう'], [4, '🙂', '良い'], [5, '😄', '最高']] as const).map(([n, e, l]) => (
+              <button key={n} className="mood-btn" onClick={() => saveMood(n)}>
+                <span>{e}</span><small>{l}</small>
+              </button>
+            ))}
+          </div>
+          <p className="center" style={{ margin: '10px 0 0', fontSize: 12 }}>
+            <a href="#" className="muted" onClick={(e) => { e.preventDefault(); skipMood(); }}>今日はスキップ</a>
+          </p>
+        </div>
+      </Sheet>
 
       {/* ===== 体重・ウエスト直接入力シート ===== */}
       <Sheet open={bodySheetOpen} onClose={() => setBodySheetOpen(false)}>

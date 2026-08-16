@@ -341,6 +341,16 @@ button:disabled { opacity: .5; cursor: default; }
 .pick-thumb-btn:active { transform: scale(0.96); }
 .pick-thumb-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,.55); }
+/* 気分チェックイン（1日1回の5段階） */
+.mood-row { display: flex; gap: 8px; }
+.mood-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 12px 0 9px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 16px;
+}
+.mood-btn span { font-size: 26px; line-height: 1; }
+.mood-btn small { font-size: 10px; font-weight: 700; color: var(--sub); }
+.mood-btn:active { transform: scale(0.94); background: var(--bg); }
+
 /* 筋トレ入力の行（種目・kg・回・set・削除） */
 .train-row { display: grid; grid-template-columns: 1fr 62px 52px 52px 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .train-row input { margin: 0; }

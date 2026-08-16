@@ -14,6 +14,15 @@ function IconPencil() {
     </svg>
   );
 }
+function IconDumbbell() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M6.5 6.5v11" /><path d="M17.5 6.5v11" />
+      <path d="M3.5 9v6" /><path d="M20.5 9v6" />
+      <path d="M6.5 12h11" />
+    </svg>
+  );
+}
 function IconChart() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -44,10 +53,11 @@ function IconRefresh() {
   );
 }
 
-// マイ食品登録は設定ページ内へ移動（タブは4つ）
+// 食事＝入力タブ / 筋トレ＝トレタブ に分離（5タブ）
 const TABS = [
-  { href: '/log', label: '入力', icon: <IconPencil />, dotKey: 'photo' },
-  { href: '/dashboard', label: 'ダッシュボード', icon: <IconChart />, dotKey: null },
+  { href: '/log', label: '食事', icon: <IconPencil />, dotKey: 'photo' },
+  { href: '/training', label: 'トレ', icon: <IconDumbbell />, dotKey: null },
+  { href: '/dashboard', label: '分析', icon: <IconChart />, dotKey: null },
   { href: '/goal', label: '目標', icon: <IconTarget />, dotKey: 'goal' },
   { href: '/settings', label: '設定', icon: <IconGear />, dotKey: null },
 ] as const;
