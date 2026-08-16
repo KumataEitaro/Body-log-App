@@ -16,6 +16,9 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* コンテンツが画面より短いページでWKWebViewのスクロール/インセット挙動が狂い、
+   タブバーが浮く・上に空白が出るバグの発生条件を消す（常に画面いっぱいの高さを確保） */
+html, body { min-height: 100dvh; }
 html { color-scheme: light; }
 body {
   /* B案: 欧文・数字=Inter Tight / 日本語=Noto Sans JP（next/fontのCSS変数）。未読込時はシステムへフォールバック */
