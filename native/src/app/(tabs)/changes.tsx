@@ -5,10 +5,13 @@ import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'r
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import SimpleChart, { type ChartPoint } from '@/components/SimpleChart';
-import { mifflinBMR, targetKcal, todayJST, type ExLevel } from '@/lib/calc';
+import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
+import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
+import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; target: number; diff: number | null };
+type DayDetail = { id: string; at: string | null; text: string; kcal: number | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
 
 const SERIES = [
@@ -31,14 +34,18 @@ export default function ChangesScreen() {
   const [serie, setSerie] = useState<typeof SERIES[number]['key']>('weight');
   const [range, setRange] = useState(30);
   const [refreshing, setRefreshing] = useState(false);
+  const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
+  const [daySel, setDaySel] = useState<string | null>(null);
+  const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-    const [profRes, entRes, goalRes] = await Promise.all([
+    const [profRes, entRes, goalRes, itemRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('entries').select('date,intake,weight,waist,ex,adj').order('date', { ascending: true }),
       supabase.from('goals').select('*').maybeSingle(),
+      supabase.from('logs').select('date,items').order('date', { ascending: true }).limit(2000),
     ]);
     const prof = profRes.data as Profile | null;
     if (goalRes.data) setGoal(goalRes.data as Goal);
@@ -56,8 +63,23 @@ export default function ChangesScreen() {
         target, diff: intake == null ? null : Math.round(intake - target),
       };
     }));
+    // 食材×翌日体重の傾向（Web版ダッシュボードと同一の分析・ベストエフォート）
+    try {
+      const weightPts = (entRes.data as { date: string; weight: number | null }[])
+        .filter((e) => e.weight != null).map((e) => ({ date: e.date, weight: Number(e.weight) }));
+      setFoodFx(foodWeightEffects(buildItemDays((itemRes.data as { date: string; items?: { name?: string }[] }[]) || []), weightPts));
+    } catch { /* 分析はベストエフォート */ }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // カレンダーの日タップ → その日の記録を取得して下に表示
+  async function openDay(dateKey: string) {
+    if (daySel === dateKey) { setDaySel(null); setDayDetail(null); return; }
+    setDaySel(dateKey); setDayDetail(null);
+    const { data } = await supabase.from('logs').select('id,at,text,kcal')
+      .eq('date', dateKey).order('at', { ascending: true });
+    setDayDetail((data as DayDetail) || []);
+  }
 
   const today = todayJST();
   const from = addDays(today, -range);
@@ -72,6 +94,18 @@ export default function ChangesScreen() {
     }
   })();
   const conf = SERIES.find((x) => x.key === serie)!;
+
+  // カレンダーのマーク（記録あり=緑 / 目標超過=赤 / 未記録=?）— Web版と同じ判定
+  const marks = new Map<string, DayMark>(rows.map((r) => [
+    r.date,
+    { logged: r.intake != null, over: r.diff != null && judge(r.diff) === 'NG', unknown: r.intake == null },
+  ]));
+  if (rows.length > 0) {
+    const yest = addDays(today, -1);
+    for (let d = rows[0].date; d <= yest; d = addDays(d, 1)) {
+      if (!marks.has(d)) marks.set(d, { logged: false, over: false, unknown: true });
+    }
+  }
 
   // KPI
   const weights = rows.filter((r) => r.weight != null);
@@ -143,7 +177,59 @@ export default function ChangesScreen() {
         )}
       </View>
 
-      <Text style={s.note}>カレンダー・食材の傾向・2週間レビューはPhase 3で移植予定（現行アプリで利用可）</Text>
+      {/* カレンダー（日タップで詳細） */}
+      <View style={s.card}>
+        <Text style={s.h2}>📅 カレンダー</Text>
+        <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
+        {daySel && (
+          <View style={s.dayBox}>
+            <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の記録</Text>
+            {dayDetail === null && <Text style={s.note}>読み込み中…</Text>}
+            {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>この日の記録はありません。</Text>}
+            {dayDetail?.map((l) => (
+              <View key={l.id} style={s.dayRow}>
+                <Text style={s.dayText}>{l.text || '（メモなし）'}</Text>
+                {l.kcal != null && <Text style={s.dayKcal}>{Math.round(Number(l.kcal))}kcal</Text>}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* 食材×体の傾向（データが揃うまで非表示・Web版と同じしきい値） */}
+      {foodFx.length >= 3 && (() => {
+        const down = foodFx.filter((f) => f.effect < -0.02).slice(0, 3);
+        const up = [...foodFx].reverse().filter((f) => f.effect > 0.02).slice(0, 3);
+        if (down.length === 0 && up.length === 0) return null;
+        const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
+        return (
+          <View style={s.card}>
+            <Text style={s.h2}>🔬 食材とあなたの体の傾向</Text>
+            <Text style={s.note}>よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。</Text>
+            {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>▼ 食べた翌日、下がりやすい</Text>}
+            {down.map((f) => (
+              <View key={f.name} style={s.fxRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.fxName}>{f.name}</Text>
+                  <Text style={s.note}>食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</Text>
+                </View>
+                <Text style={[s.fxVal, { color: C.teal }]}>{g(f.effect)}</Text>
+              </View>
+            ))}
+            {up.length > 0 && <Text style={[s.fxHead, { color: C.coral }]}>▲ 食べた翌日、上がりやすい</Text>}
+            {up.map((f) => (
+              <View key={f.name} style={s.fxRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.fxName}>{f.name}</Text>
+                  <Text style={s.note}>食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</Text>
+                </View>
+                <Text style={[s.fxVal, { color: C.coral }]}>{g(f.effect)}</Text>
+              </View>
+            ))}
+            <Text style={s.note}>※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。</Text>
+          </View>
+        );
+      })()}
     </ScrollView>
   );
 }
@@ -158,6 +244,16 @@ const s = StyleSheet.create({
   kpiU: { fontSize: 11, color: C.sub, fontWeight: '600' },
   kpiD: { fontSize: 10, color: C.sub, marginTop: 2 },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
+  h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
+  dayHead: { fontSize: 12.5, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
+  dayRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingVertical: 4 },
+  dayText: { flex: 1, fontSize: 13, color: C.ink, lineHeight: 19 },
+  dayKcal: { fontSize: 12.5, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  fxHead: { fontSize: 11.5, fontWeight: '800', marginTop: 8, marginBottom: 2 },
+  fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
+  fxName: { fontSize: 13.5, fontWeight: '700', color: C.ink },
+  fxVal: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },

@@ -5,11 +5,14 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
+import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
+import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
@@ -22,6 +25,12 @@ type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; 
 
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+function shiftDate(d: string, n: number): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 export default function LogScreen() {
@@ -158,6 +167,107 @@ export default function LogScreen() {
     }
   }
 
+  // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
+  const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    (async () => {
+      try {
+        if (await AsyncStorage.getItem('bl-risk-snooze') === todayJST()) return;
+        const t = todayJST();
+        const { data } = await supabase.from('entries')
+          .select('date,intake,p,ex,adj,mood,food_text')
+          .gte('date', shiftDate(t, -28)).lt('date', t)
+          .order('date', { ascending: true });
+        if (!data || data.length < 5) return; // データが薄いうちは主張しない
+        const base = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+        const days: InsightDay[] = data.map((r) => {
+          const dayTarget = base + (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0);
+          const intake = r.intake == null ? null : Number(r.intake);
+          return {
+            date: String(r.date), intake,
+            p: r.p == null ? null : Number(r.p),
+            diff: intake == null ? null : Math.round(intake - dayTarget),
+            mood: r.mood as string | null, text: r.food_text as string | null,
+          };
+        });
+        const risk = assessBingeRisk(days, new Date(t + 'T00:00:00').getDay());
+        if (risk.level !== 'low') setBingeRisk(risk);
+      } catch { /* ベストエフォート */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  async function snoozeRisk() {
+    try { await AsyncStorage.setItem('bl-risk-snooze', todayJST()); } catch { /* 無視 */ }
+    setBingeRisk(null);
+  }
+
+  // 1タップ予防: 今日だけ目標を+200kcal緩める（チートデイ吸収の仕組みに乗せる）
+  async function addRecoveryEvent() {
+    if (!uid) return;
+    const { data: ev, error } = await supabase.from('events')
+      .insert({ user_id: uid, date: today, title: '🕊 リカバリー枠', extra_kcal: 200 })
+      .select('id,date,title,extra_kcal').single();
+    if (error) { setMsg({ ok: false, text: '設定に失敗しました。もう一度お試しください。' }); return; }
+    setEvents((prev) => [...prev, ev as PlanEvent & { id: string }]);
+    await snoozeRisk();
+    setMsg({ ok: true, text: '🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。' });
+  }
+
+  // ===== 昨日の穴埋め（未記録の爆食日を翌日に低摩擦で回収する・Web版と同一） =====
+  const [backfill, setBackfill] = useState<{ date: string; binge: boolean } | null>(null);
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const [backfillMore, setBackfillMore] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const t = todayJST();
+        if (await AsyncStorage.getItem('bl-backfill-snooze') === t) return;
+        const y = shiftDate(t, -1);
+        const [{ data: e }, { data: first }] = await Promise.all([
+          supabase.from('entries').select('intake,mood,food_text').eq('date', y).maybeSingle(),
+          supabase.from('entries').select('date').order('date', { ascending: true }).limit(1),
+        ]);
+        if (!first || first.length === 0 || first[0].date > y) return; // 始めたばかり
+        if (e?.intake != null) return; // 昨日は記録済み
+        const binge = detectStruggle([String(e?.mood || ''), String(e?.food_text || '')]) === 'binge';
+        setBackfill({ date: y, binge });
+      } catch { /* 穴埋めは本体機能に影響させない */ }
+    })();
+  }, []);
+
+  async function backfillSave(extra: number) {
+    if (!backfill || !profile || !uid || backfillBusy) return;
+    setBackfillBusy(true);
+    try {
+      const baseEst = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+      const { error } = await supabase.from('logs').insert({
+        user_id: uid, date: backfill.date, at: `${backfill.date}T21:00:00+09:00`,
+        items: [], kcal: baseEst + extra, p: null, f: null, c: null, weight: null,
+        ex: 'オフ', adj: 0, mood: '',
+        text: extra > 0 ? `（あとから概算: 食べすぎ +${extra}kcal）` : '（あとから確定: だいたい目安どおり）',
+        photo_urls: [],
+      });
+      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      await syncEntriesForDate(uid, backfill.date);
+      setBackfill(null);
+      setMsg({
+        ok: true,
+        text: extra > 0
+          ? `昨日を「食べすぎ +${extra.toLocaleString()}kcal」として記録しました。今日から立て直しましょう！`
+          : '昨日を「目安どおり（±0）」で確定しました。',
+      });
+    } finally {
+      setBackfillBusy(false);
+    }
+  }
+
+  async function backfillSnooze() {
+    try { await AsyncStorage.setItem('bl-backfill-snooze', todayJST()); } catch { /* 無視 */ }
+    setBackfill(null);
+  }
+
   function feedTitle(l: DayLog): string {
     const items = (l.items as FoodItem[]) || [];
     if (l.kcal != null && items.length > 0) {
@@ -193,6 +303,66 @@ export default function LogScreen() {
               {macros && <Text style={s.metaT}>P {eatenP}/{macros.p}g</Text>}
               <Text style={s.metaT}>目標 {goalKcal.toLocaleString()}</Text>
             </View>
+          </View>
+        )}
+
+        {/* 昨日の穴埋めカード（責めないトーン） */}
+        {backfill && (
+          <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
+            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : '📝 昨日の記録がありません'}</Text>
+            <Text style={s.mutedT}>
+              {backfill.binge
+                ? '食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。'
+                : 'ざっくりでOKです。未記録の日が続くと、収支の数字と現実が少しずつズレていきます。'}
+            </Text>
+            {!backfillMore ? (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <Pressable style={[s.btnPrimary, { flex: 1, marginTop: 0 }]} disabled={backfillBusy} onPress={() => backfillSave(0)}>
+                  {backfillBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>だいたい目安どおり（±0）</Text>}
+                </Pressable>
+                <Pressable style={[s.btnGhost, { flex: 1 }]} disabled={backfillBusy} onPress={() => setBackfillMore(true)}>
+                  <Text style={s.btnGhostT}>食べすぎた…</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                {[500, 1000, 2000].map((n) => (
+                  <Pressable key={n} style={s.chipBtn} disabled={backfillBusy} onPress={() => backfillSave(n)}>
+                    <Text style={s.chipBtnT}>+{n.toLocaleString()}kcal くらい</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <Pressable onPress={backfillSnooze} style={{ marginTop: 8, alignSelf: 'center' }} hitSlop={8}>
+              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>あとで</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* 過食リスクの事前アラート（理由つき・1タップ予防） */}
+        {bingeRisk && (
+          <View style={[s.card, { borderColor: bingeRisk.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
+            <Text style={s.h2}>{bingeRisk.level === 'high' ? '🌪 今日は食欲が爆発しやすい状態です' : '🌤 今日は食欲が乱れやすいかも'}</Text>
+            {bingeRisk.reasons.map((r) => (
+              <Text key={r.key} style={[s.mutedT, { lineHeight: 20 }]}>・{r.text}</Text>
+            ))}
+            <Text style={[s.mutedT, { marginTop: 6 }]}>
+              これは失敗のサインではなく、準備のサインです。たんぱく質多めの食事と「我慢しすぎない設定」が効きます。
+            </Text>
+            {plan && !todayEvent ? (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <Pressable style={[s.btnPrimary, { flex: 1, marginTop: 0 }]} onPress={addRecoveryEvent}>
+                  <Text style={s.btnPrimaryT}>🕊 今日は+200kcal緩める</Text>
+                </Pressable>
+                <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={snoozeRisk}>
+                  <Text style={s.btnGhostT}>大丈夫、気をつける</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable style={[s.btnGhost, { marginTop: 10, flex: 0 }]} onPress={snoozeRisk}>
+                <Text style={s.btnGhostT}>OK、気をつける</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -323,6 +493,8 @@ const s = StyleSheet.create({
     padding: 10, fontSize: 16, color: C.ink, textAlign: 'center', fontVariant: ['tabular-nums'],
   },
   wUnit: { fontSize: 13, color: C.sub, fontWeight: '600' },
-  btnGhost: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  btnGhost: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
+  chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
+  chipBtnT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
 });
