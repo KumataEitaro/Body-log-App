@@ -1,12 +1,15 @@
-// 設定タブ（Phase 3）: プロフィール編集・アカウント削除（App Store審査必須 5.1.1(v)）・ログアウト
+// マイページ: プロフィール・ヘルスケア連携（取込アクションのみ）・マイ食品管理・アカウント削除（審査必須 5.1.1(v)）
+// 歩数・睡眠などのログ表示は「変化」タブへ移動済み（設定にログデータを混在させない）
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
-import { healthAvailable, requestHealthAuth, importWeights, readActivitySummary, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import StatusBarMask from '@/components/StatusBarMask';
+
+type MyFoodLite = { id: string; name: string; kcal: number };
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -20,7 +23,8 @@ export default function SettingsScreen() {
   const [delConfirm, setDelConfirm] = useState('');
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [foods, setFoods] = useState<MyFoodLite[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -28,7 +32,13 @@ export default function SettingsScreen() {
       const uid = session?.user?.id;
       if (!uid) return;
       setEmail(session?.user?.email ?? '');
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      const [{ data: prof }, wRes, fRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
+        supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
+        supabase.from('my_foods').select('id,name,kcal').order('created_at', { ascending: true }).limit(50),
+      ]);
+      if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
+      setFoods((fRes.data as MyFoodLite[]) || []);
       if (prof) {
         setName(prof.display_name || '');
         if (prof.sex) setSex(prof.sex);
@@ -89,23 +99,27 @@ export default function SettingsScreen() {
     } finally { setHealthBusy(false); }
   }
 
-  async function healthShowActivity() {
-    setHealthBusy(true); setHealthMsg(null);
-    try {
-      if (!(await requestHealthAuth())) { setHealthMsg({ ok: false, text: 'ヘルスケアへのアクセスが許可されませんでした。' }); return; }
-      const res = await readActivitySummary(7);
-      if ('error' in res) { setHealthMsg({ ok: false, text: res.error }); return; }
-      setActivity(res);
-      if (res.length === 0) setHealthMsg({ ok: true, text: '直近7日のデータが見つかりませんでした。' });
-    } finally { setHealthBusy(false); }
+  async function removeFood(id: string, name: string) {
+    Alert.alert(`「${name}」を削除しますか？`, '入力画面のチップから消えます（過去の記録は変わりません）。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除する', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('my_foods').delete().eq('id', id);
+          setFoods((prev) => prev.filter((f) => f.id !== id));
+        },
+      },
+    ]);
   }
 
-  const bmrPreview = mifflinBMR(sex, 70, Number(height) || 0, Number(age) || 0);
+  // 例示ではなく実測の最新体重で基礎代謝を出す（70kg固定の例は混乱のもと）
+  const bmrW = latestWeight ?? 70;
+  const bmrPreview = mifflinBMR(sex, bmrW, Number(height) || 0, Number(age) || 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-      <Text style={s.h}>設定</Text>
+      <Text style={s.h}>マイページ</Text>
 
       {/* プロフィール */}
       <View style={s.card}>
@@ -136,7 +150,7 @@ export default function SettingsScreen() {
             <TextInput style={s.input} keyboardType="decimal-pad" value={life} onChangeText={setLife} />
           </View>
         </View>
-        <Text style={s.note}>基礎代謝は最新の体重で自動計算されます（体重70kgなら約 {Math.round(bmrPreview)} kcal）</Text>
+        <Text style={s.note}>あなたの基礎代謝: 約 {Math.round(bmrPreview)} kcal{latestWeight != null ? `（最新体重 ${latestWeight.toFixed(1)}kg で計算）` : ''}</Text>
         <Pressable style={[s.btnPrimary, { marginTop: 12 }]} onPress={saveProfile} disabled={busy}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>保存する</Text>}
         </Pressable>
@@ -144,39 +158,36 @@ export default function SettingsScreen() {
 
       {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
 
-      {/* ヘルスケア連携（Expo Goでは案内のみ・TestFlight/dev clientで有効） */}
+      {/* ヘルスケア連携（取込アクションのみ。歩数・睡眠の閲覧は「変化」タブ） */}
       <View style={s.card}>
         <Text style={s.h2}>⌚ ヘルスケア連携</Text>
         {!healthAvailable() ? (
           <Text style={s.note}>この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。</Text>
         ) : (
           <>
-            <Text style={s.note}>Appleヘルスケアから体重を取り込み、歩数・睡眠を確認できます。データは機能提供のみに使用し、広告等には一切使用しません。</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-              <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={healthImportWeights} disabled={healthBusy}>
-                {healthBusy ? <ActivityIndicator color={C.ink} /> : <Text style={s.btnGhostT}>⚖️ 体重を取込（90日）</Text>}
-              </Pressable>
-              <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={healthShowActivity} disabled={healthBusy}>
-                <Text style={s.btnGhostT}>👟 歩数・睡眠を見る</Text>
-              </Pressable>
-            </View>
-            {activity && activity.length > 0 && (
-              <View style={{ marginTop: 10 }}>
-                {activity.map((a) => (
-                  <View key={a.date} style={s.actRow}>
-                    <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
-                    <Text style={s.actVal}>👟 {a.steps.toLocaleString()}歩</Text>
-                    <Text style={s.actVal}>😴 {a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            <Text style={s.note}>Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「変化」タブで見られます。</Text>
+            <Pressable style={[s.btnGhost, { marginTop: 10 }]} onPress={healthImportWeights} disabled={healthBusy}>
+              {healthBusy ? <ActivityIndicator color={C.ink} /> : <Text style={s.btnGhostT}>⚖️ 体重を取り込む（過去90日）</Text>}
+            </Pressable>
           </>
         )}
         {healthMsg && <Text style={[s.msg, { color: healthMsg.ok ? C.teal : C.coral, marginTop: 8 }]}>{healthMsg.text}</Text>}
       </View>
 
-      <Text style={s.note}>通知・マイ食品管理・言語切替は現行Web版で設定できます（データ共通）</Text>
+      {/* マイ食品の管理 */}
+      <View style={s.card}>
+        <Text style={s.h2}>🍱 マイ食品の管理</Text>
+        {foods.length === 0 && <Text style={s.note}>まだ登録がありません。食事タブでAI解析した品目が候補になります。</Text>}
+        {foods.map((f) => (
+          <View key={f.id} style={s.foodRow}>
+            <Text style={s.foodName} numberOfLines={1}>{f.name}</Text>
+            <Text style={s.foodKcal}>{Math.round(Number(f.kcal))}kcal</Text>
+            <Pressable onPress={() => removeFood(f.id, f.name)} hitSlop={6}>
+              <Text style={{ color: C.coral, fontWeight: '800', fontSize: 16 }}>×</Text>
+            </Pressable>
+          </View>
+        ))}
+      </View>
 
       {/* ログアウト */}
       <Pressable style={[s.btnGhost, { marginTop: 16 }]} onPress={() => supabase.auth.signOut()}>
@@ -218,7 +229,7 @@ const s = StyleSheet.create({
   btnDanger: { backgroundColor: C.coral, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
   note: { fontSize: 11.5, color: C.sub, lineHeight: 18, marginTop: 4 },
   msg: { fontSize: 13, fontWeight: '600', marginBottom: 8, paddingHorizontal: 4 },
-  actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
-  actDate: { fontSize: 11.5, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
-  actVal: { fontSize: 12.5, color: C.ink, fontVariant: ['tabular-nums'] },
+  foodRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line },
+  foodName: { flex: 1, fontSize: 13.5, color: C.ink, fontWeight: '600' },
+  foodKcal: { fontSize: 12, color: C.sub, fontVariant: ['tabular-nums'] },
 });

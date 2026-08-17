@@ -7,6 +7,8 @@ import { C } from '@/lib/ui';
 import SimpleChart, { type ChartPoint } from '@/components/SimpleChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
+import GoalPanel from '@/components/GoalPanel';
+import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
@@ -40,6 +42,10 @@ export default function ChangesScreen() {
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
+  const [topSeg, setTopSeg] = useState<'progress' | 'goal'>('progress');
+  const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthMsg, setHealthMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -82,6 +88,18 @@ export default function ChangesScreen() {
     const { data } = await supabase.from('logs').select('id,at,text,kcal,items,weight,ex,mood')
       .eq('date', dateKey).order('at', { ascending: true });
     setDayDetail((data as DayDetail) || []);
+  }
+
+  // 歩数・睡眠サマリー（ヘルスケア）— ログデータの置き場は設定ではなくこのタブ
+  async function loadActivity() {
+    setHealthBusy(true); setHealthMsg(null);
+    try {
+      if (!(await requestHealthAuth())) { setHealthMsg('ヘルスケアへのアクセスが許可されませんでした。'); return; }
+      const res = await readActivitySummary(7);
+      if ('error' in res) { setHealthMsg(res.error); return; }
+      setActivity(res);
+      if (res.length === 0) setHealthMsg('直近7日のデータが見つかりませんでした。');
+    } finally { setHealthBusy(false); }
   }
 
   const today = todayJST();
@@ -136,8 +154,21 @@ export default function ChangesScreen() {
       style={{ flex: 1 }} contentContainerStyle={s.scroll}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      <Text style={s.h}>身体の変化</Text>
+      <Text style={s.h}>変化</Text>
 
+      {/* トップセグメント: 記録の変化 ⇄ 目標（旧目標タブを統合） */}
+      <View style={s.topSegWrap}>
+        {([['progress', '📈 記録の変化'], ['goal', '🎯 目標']] as const).map(([k, l]) => (
+          <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
+            <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {topSeg === 'goal' && <GoalPanel />}
+
+      {topSeg === 'progress' && (
+      <>
       {/* KPI */}
       <View style={s.kpiRow}>
         <View style={s.kpi}>
@@ -242,6 +273,29 @@ export default function ChangesScreen() {
           </View>
         );
       })()}
+
+      {/* 歩数・睡眠（ヘルスケア連携が有効な環境のみ） */}
+      {healthAvailable() && (
+        <View style={s.card}>
+          <Text style={s.h2}>⌚ 歩数・睡眠（直近7日）</Text>
+          {activity === null ? (
+            <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
+              <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : 'ヘルスケアから読み込む'}</Text>
+            </Pressable>
+          ) : (
+            activity.map((a) => (
+              <View key={a.date} style={s.actRow}>
+                <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
+                <Text style={s.actVal}>👟 {a.steps.toLocaleString()}歩</Text>
+                <Text style={s.actVal}>😴 {a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text>
+              </View>
+            ))
+          )}
+          {healthMsg && <Text style={[s.note, { color: C.coral }]}>{healthMsg}</Text>}
+        </View>
+      )}
+      </>
+      )}
     </ScrollView>
     <StatusBarMask />
     </View>
@@ -251,6 +305,15 @@ export default function ChangesScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
+  topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
+  actBtnT: { fontSize: 12.5, fontWeight: '800', color: C.ink },
+  actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
+  actDate: { fontSize: 11.5, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
+  actVal: { fontSize: 12.5, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   kpi: { flex: 1, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12 },
   kpiL: { fontSize: 10, fontWeight: '700', color: C.sub },
