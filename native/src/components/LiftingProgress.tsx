@@ -1,5 +1,5 @@
-// 挙上重量の推移（「変化」タブ→筋トレの成長 用）
-// トレタブから移設: 種目切替・重量/ボリューム切替・目標線・ボリューム判定
+// 筋トレの成長（「概要」タブ）— サマリー/カレンダー/グラフを独立カードに分割
+// （1ブロックにまとめると並び替えで一緒に動いてしまうため、ドラッグ単位＝カード単位に揃える）
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,21 +19,10 @@ function shiftDate(d: string, n: number): string {
 
 type HistRow = { id: string; date: string; text: string };
 
-export default function LiftingProgress() {
+// 共有データフック（各カードが独立して使う）
+function useLifting() {
   const [history, setHistory] = useState<HistRow[]>([]);
   const [goalKg, setGoalKg] = useState<Map<string, number>>(new Map());
-  const [selEx, setSelEx] = useState<string | null>(null);
-  const [chartMode, setChartMode] = useState<'kg' | 'volume'>('kg');
-  const [exView, setExView] = useState<'chips' | 'list'>('chips');
-  const [daySel, setDaySel] = useState<string | null>(null);
-
-  useEffect(() => { AsyncStorage.getItem('bl-ex-view').then((v) => { if (v === 'list') setExView('list'); }).catch(() => {}); }, []);
-  function toggleExView() {
-    const v = exView === 'chips' ? 'list' : 'chips';
-    setExView(v);
-    AsyncStorage.setItem('bl-ex-view', v).catch(() => {});
-  }
-
   const load = useCallback(async () => {
     const [{ data }, { data: tg }] = await Promise.all([
       supabase.from('logs').select('id,date,text').like('text', '🏋️%').order('at', { ascending: false }).limit(120),
@@ -43,33 +32,20 @@ export default function LiftingProgress() {
     if (tg) setGoalKg(new Map(tg.map((g: { name: string; target_kg: number }) => [g.name, Number(g.target_kg)])));
   }, []);
   useEffect(() => { load(); }, [load]);
-
   const series = trainingSeries(history);
   const exercises = [...series.entries()].sort((a, b) => b[1].length - a[1].length).map(([n]) => n);
-  const activeEx = selEx && series.has(selEx) ? selEx : exercises[0] ?? null;
-  const exPoints = activeEx ? series.get(activeEx)! : [];
-  const verdict = volumeVerdict(exPoints);
+  return { history, goalKg, series, exercises };
+}
 
-  // サマリー＋カレンダー用（トレ実施日ベース）
+// ===== ① サマリーKPI =====
+export function LiftKpiCard() {
+  const { history, exercises } = useLifting();
+  if (history.length === 0) return null;
   const today = todayJST();
   const trainDates = [...new Set(history.map((h) => h.date))];
   const monthCount = trainDates.filter((d) => d.startsWith(today.slice(0, 7))).length;
   const last30 = trainDates.filter((d) => d >= shiftDate(today, -30)).length;
-  const marks = new Map<string, DayMark>(trainDates.map((d) => [d, { logged: true, over: false }]));
-  const dayItems = daySel ? history.filter((h) => h.date === daySel) : [];
-
-  if (exercises.length === 0) {
-    return (
-      <View style={s.card}>
-        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
-        <Text style={s.muted}>トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。</Text>
-      </View>
-    );
-  }
-
   return (
-    <View>
-    {/* サマリー */}
     <View style={s.kpiRow}>
       <View style={s.kpi}>
         <Text style={s.kpiL}>今月のトレ</Text>
@@ -84,8 +60,19 @@ export default function LiftingProgress() {
         <Text style={s.kpiV}>{exercises.length}<Text style={s.kpiU}>種目</Text></Text>
       </View>
     </View>
+  );
+}
 
-    {/* トレーニングカレンダー */}
+// ===== ② トレーニングカレンダー =====
+export function LiftCalendarCard() {
+  const { history } = useLifting();
+  const [daySel, setDaySel] = useState<string | null>(null);
+  if (history.length === 0) return null;
+  const today = todayJST();
+  const trainDates = [...new Set(history.map((h) => h.date))];
+  const marks = new Map<string, DayMark>(trainDates.map((d) => [d, { logged: true, over: false }]));
+  const dayItems = daySel ? history.filter((h) => h.date === daySel) : [];
+  return (
     <View style={s.card}>
       <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>トレーニングカレンダー</Text></View>
       <MonthCalendar today={today} marks={marks} selected={daySel} mode="training"
@@ -100,8 +87,37 @@ export default function LiftingProgress() {
         </View>
       )}
     </View>
+  );
+}
 
-    {/* 推移グラフ */}
+// ===== ③ 挙上重量グラフ =====
+export function LiftChartCard() {
+  const { history, goalKg, series, exercises } = useLifting();
+  const [selEx, setSelEx] = useState<string | null>(null);
+  const [chartMode, setChartMode] = useState<'kg' | 'volume'>('kg');
+  const [exView, setExView] = useState<'chips' | 'list'>('chips');
+
+  useEffect(() => { AsyncStorage.getItem('bl-ex-view').then((v) => { if (v === 'list') setExView('list'); }).catch(() => {}); }, []);
+  function toggleExView() {
+    const v = exView === 'chips' ? 'list' : 'chips';
+    setExView(v);
+    AsyncStorage.setItem('bl-ex-view', v).catch(() => {});
+  }
+
+  const activeEx = selEx && series.has(selEx) ? selEx : exercises[0] ?? null;
+  const exPoints = activeEx ? series.get(activeEx)! : [];
+  const verdict = volumeVerdict(exPoints);
+
+  if (exercises.length === 0) {
+    return (
+      <View style={s.card}>
+        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
+        <Text style={s.muted}>トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。</Text>
+      </View>
+    );
+  }
+
+  return (
     <View style={s.card}>
       <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
       <View style={s.chips}>
@@ -151,7 +167,6 @@ export default function LiftingProgress() {
       {activeEx && goalKg.has(activeEx) && chartMode === 'kg' && (
         <Text style={s.muted}>点線＝目標 {goalKg.get(activeEx)}kg</Text>
       )}
-    </View>
     </View>
   );
 }

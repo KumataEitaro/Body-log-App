@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
+import HeaderGear from '@/components/HeaderGear';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
@@ -189,6 +190,7 @@ export default function CoachScreen() {
         <Text style={s.disclaimer}>医療的な診断はできません。深刻な不調が続く場合は医療機関へ。</Text>
       </View>
       <StatusBarMask />
+      <HeaderGear />
     </KeyboardAvoidingView>
   );
 }

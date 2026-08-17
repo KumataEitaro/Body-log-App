@@ -6,8 +6,9 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell } from 'lucide-react-native';
 import { useGuide } from '@/components/GuideTour';
+import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
@@ -17,7 +18,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'profile' | 'foods' | 'health' | 'delete';
+type Sheet = null | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -171,6 +172,14 @@ export default function SettingsScreen() {
         <Row icon={<Salad color={C.teal} size={19} />} label="マイ食品の管理" sub={`${foods.length}件 登録済み`} onPress={() => openSheet('foods')} />
       </View>
 
+      {/* 目標 */}
+      <Text style={s.groupLabel}>目標</Text>
+      <View style={s.group}>
+        <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
+        <View style={s.sep} />
+        <Row icon={<Dumbbell color={C.teal} size={19} />} label="筋トレの目標" sub="種目ごとの目標重量" onPress={() => openSheet('goalT')} />
+      </View>
+
       {/* データ・連携 */}
       <Text style={s.groupLabel}>データ・連携</Text>
       <View style={s.group}>
@@ -270,6 +279,27 @@ export default function SettingsScreen() {
         )}
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
+    </Modal>
+
+    {/* ===== 体重目標モーダル ===== */}
+    <Modal visible={sheet === 'goalW'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+        <SheetHeader title="🎯 体重の目標" />
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <GoalPanel mode="weight" weightSections="goal" />
+          <Text style={s.note}>チートデイの登録は「概要」タブのカードから行えます。</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+
+    {/* ===== 筋トレ目標モーダル ===== */}
+    <Modal visible={sheet === 'goalT'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+        <SheetHeader title="🏋️ 筋トレの目標" />
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <GoalPanel mode="training" />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
 
     {/* ===== アカウント削除モーダル ===== */}

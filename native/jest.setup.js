@@ -81,6 +81,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({}),
+  useFocusEffect: (cb) => { const React = require('react'); React.useEffect(() => cb(), []); },
   Redirect: () => null,
   Tabs: () => null,
 }));

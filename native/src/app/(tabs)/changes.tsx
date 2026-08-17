@@ -1,6 +1,6 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -8,7 +8,8 @@ import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
 import { useGuideTarget } from '@/components/GuideTour';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { AppState } from 'react-native';
 import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
@@ -17,7 +18,7 @@ import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
-import LiftingProgress from '@/components/LiftingProgress';
+import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '@/components/LiftingProgress';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
@@ -39,10 +40,11 @@ const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['lifting', 'tgoal'];
+const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
-  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', goal: '目標設定',
-  trends: '食材の傾向', health: '歩数・睡眠', lifting: 'トレ実績・グラフ', tgoal: '種目別目標',
+  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', goal: 'チートデイ',
+  trends: '食材の傾向', health: '歩数・睡眠',
+  tkpi: 'トレのサマリー', tcal: 'トレーニングカレンダー', tchart: '挙上重量グラフ', tgoal: '種目別目標',
 };
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -89,13 +91,30 @@ export default function ChangesScreen() {
     })();
   }, []);
 
-  async function finishEditing() {
+  // 離脱時確定用に最新値をrefへ同期（AppState/blurリスナーの古いクロージャ対策）
+  const editStateRef = useRef({ editing: false, body: BODY_ORDER_DEFAULT, train: TRAIN_ORDER_DEFAULT });
+  editStateRef.current = { editing, body: orderBody, train: orderTrain };
+
+  const finishEditing = useCallback(async () => {
     setEditing(false);
     try {
-      await AsyncStorage.setItem('bl-order-body', JSON.stringify(orderBody));
-      await AsyncStorage.setItem('bl-order-train', JSON.stringify(orderTrain));
+      await AsyncStorage.setItem('bl-order-body', JSON.stringify(editStateRef.current.body));
+      await AsyncStorage.setItem('bl-order-train', JSON.stringify(editStateRef.current.train));
     } catch { /* 保存失敗はレイアウトが戻るだけ */ }
-  }
+  }, []);
+
+  // 編集中にホーム画面へ戻った（バックグラウンド化）ら、その時点の並びで確定する
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if ((st === 'background' || st === 'inactive') && editStateRef.current.editing) finishEditing();
+    });
+    return () => sub.remove();
+  }, [finishEditing]);
+
+  // 編集中に他タブへ移動した場合も確定する
+  useFocusEffect(
+    useCallback(() => () => { if (editStateRef.current.editing) finishEditing(); }, [finishEditing])
+  );
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
@@ -354,10 +373,12 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
-      case 'goal': return <GoalPanel mode="weight" />;
+      case 'goal': return <GoalPanel mode="weight" weightSections="cheat" />;
       case 'trends': return trendsCard;
       case 'health': return healthCard;
-      case 'lifting': return <LiftingProgress />;
+      case 'tkpi': return <LiftKpiCard />;
+      case 'tcal': return <LiftCalendarCard />;
+      case 'tchart': return <LiftChartCard />;
       case 'tgoal': return <GoalPanel mode="training" />;
       default: return null;
     }

@@ -9,6 +9,7 @@ import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
+import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
@@ -169,6 +170,7 @@ export default function TrainingScreen() {
     </ScrollView>
     <QuickLogFab />
     <StatusBarMask />
+    <HeaderGear />
     </View>
   );
 }

@@ -23,6 +23,8 @@ import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/f
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
+import ReorderableChips from '@/components/ReorderableChips';
+import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
@@ -62,7 +64,24 @@ export default function LogScreen() {
   const [pendingTexts, setPendingTexts] = useState<string[]>([]);
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
+  const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
   const [inputH, setInputH] = useState(40);
+
+  // マイ食品の並び順（保存済み順とサーバーの食品一覧をマージ・新規は末尾）
+  useEffect(() => {
+    (async () => {
+      let saved: string[] = [];
+      try { saved = JSON.parse((await AsyncStorage.getItem('bl-foods-order')) || '[]'); } catch { /* 初回 */ }
+      const ids = myFoods.map((f) => f.id);
+      const kept = saved.filter((id) => ids.includes(id));
+      setFoodsOrder([...kept, ...ids.filter((id) => !kept.includes(id))]);
+    })();
+  }, [myFoods]);
+
+  function persistFoodsOrder(next: string[]) {
+    setFoodsOrder(next);
+    AsyncStorage.setItem('bl-foods-order', JSON.stringify(next)).catch(() => {});
+  }
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -612,10 +631,9 @@ export default function LogScreen() {
             ))}
           </ScrollView>
         )}
-        {/* マイ食品チップ（連打で×2、−で減。1行スクロール⇄全展開グリッドを切替可能） */}
+        {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可） */}
         {myFoods.length > 0 && (() => {
-          // タップ=トレイに積む（×N=トレイ内の数量・−で減らす。保存は✓保存で確定）
-          const chipEls = myFoods.map((fd) => {
+          const chipEl = (fd: MyFood) => {
             const cnt = parsed ? servingCount(parsed.items, fd) : null;
             return (
               <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
@@ -631,16 +649,24 @@ export default function LogScreen() {
                 )}
               </View>
             );
-          });
+          };
+          const orderedFoods = foodsOrder.map((id) => myFoods.find((f) => f.id === id)).filter(Boolean) as MyFood[];
           return (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
               {foodsView === 'row' ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-                  {chipEls}
-                </ScrollView>
+                <View style={{ flex: 1 }}>
+                  <ReorderableChips
+                    order={foodsOrder}
+                    onOrderChange={persistFoodsOrder}
+                    renderChip={(id) => {
+                      const fd = myFoods.find((f) => f.id === id);
+                      return fd ? chipEl(fd) : null;
+                    }}
+                  />
+                </View>
               ) : (
                 <ScrollView style={{ flex: 1, maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{chipEls}</View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{orderedFoods.map(chipEl)}</View>
                 </ScrollView>
               )}
               <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
@@ -715,6 +741,7 @@ export default function LogScreen() {
         </Animated.View>
       </View>
       <StatusBarMask />
+      <HeaderGear />
     </KeyboardAvoidingView>
   );
 }

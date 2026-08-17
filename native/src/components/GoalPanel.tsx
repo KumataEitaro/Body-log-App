@@ -17,9 +17,11 @@ function fmt(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// mode='weight': 目標設定カード＋チートデイカード / mode='training': 種目別目標重量カード
-// （タブ切替は親=変化タブのセグメントに一本化。ここでは切替UIを持たない）
-export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
+// mode='weight': 体重目標＋チートデイ / mode='training': 種目別目標重量
+// weightSections: 'all'=両方 / 'goal'=目標フォームのみ（設定シート用） / 'cheat'=チートデイのみ（概要タブ用）
+export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'weight' | 'training'; weightSections?: 'all' | 'goal' | 'cheat' }) {
+  const showGoal = weightSections !== 'cheat';
+  const showCheat = weightSections !== 'goal';
   const [goal, setGoal] = useState<Goal | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [initWeight, setInitWeight] = useState<number | null>(null);
@@ -154,8 +156,9 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
   return (
     <View>
       {mode === 'weight' && (
-        <>
         <View style={s.card}>
+          {showGoal && (
+          <>
           <View style={s.h2Row}><Target size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>目標設定</Text></View>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
@@ -168,10 +171,19 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
               )}
             </View>
           )}
-          <Text style={s.label}>目標日</Text>
-          <Pressable style={s.input} onPress={() => setShowDatePicker((v) => !v)}>
-            <Text style={{ fontSize: 16, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : 'タップして選ぶ'}</Text>
-          </Pressable>
+          {/* 日付と体重は情報量が小さいので1行に並べる（縦積みはスペースの無駄） */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1.3 }}>
+              <Text style={s.label}>目標日</Text>
+              <Pressable style={s.input} onPress={() => setShowDatePicker((v) => !v)}>
+                <Text style={{ fontSize: 15, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : 'タップして選ぶ'}</Text>
+              </Pressable>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.label}>目標体重（kg）</Text>
+              <TextInput style={s.input} placeholder="82.0" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gWeight} onChangeText={setGWeight} />
+            </View>
+          </View>
           {showDatePicker && (
             <DateTimePicker
               value={gDate ? new Date(gDate + 'T00:00:00') : new Date()}
@@ -179,8 +191,6 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
               onChange={(_, d) => { if (d) setGDate(fmt(d)); setShowDatePicker(false); }}
             />
           )}
-          <Text style={s.label}>目標体重（kg）</Text>
-          <TextInput style={s.input} placeholder="82.0" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gWeight} onChangeText={setGWeight} />
 
           {/* PFC詳細（折りたたみ） */}
           <Pressable style={{ marginTop: 12 }} onPress={() => setPfcOpen((v) => !v)} hitSlop={6}>
@@ -206,10 +216,12 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
           <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={saveWeightGoal} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>目標を保存する</Text>}
           </Pressable>
-        </View>
+          </>
+          )}
 
-        {/* チートデイ */}
-        <View style={s.card}>
+          {showGoal && showCheat && <View style={s.divider} />}
+          {showCheat && (
+          <>
           <View style={s.h2Row}><Beef size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>チートデイ</Text></View>
           <Text style={s.note}>登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。</Text>
           {events.map((e) => (
@@ -244,8 +256,9 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
               onChange={(_, d) => { if (d) setEvDate(fmt(d)); setEvPicker(false); }}
             />
           )}
+          </>
+          )}
         </View>
-        </>
       )}
 
       {mode === 'training' && (
@@ -293,6 +306,7 @@ const s = StyleSheet.create({
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  divider: { height: 0.5, backgroundColor: C.line, marginVertical: 14 },
   statusRow: { marginBottom: 14 },
   statusBig: { fontSize: 24, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   statusSub: { fontSize: 13, fontWeight: '700', marginTop: 2 },
