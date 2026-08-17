@@ -22,6 +22,7 @@ import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
+import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
@@ -90,6 +91,17 @@ export default function LogScreen() {
   useEffect(() => {
     if (quick) setTimeout(() => inputRef.current?.focus(), 400);
   }, [quick]);
+
+  // 初回ガイドツアー: 未実施なら自動起動（完了/スキップでbl-guide-doneが立つ）
+  const guide = useGuide();
+  const heroTarget = useGuideTarget('hero');
+  const dockTarget = useGuideTarget('dock');
+  useEffect(() => {
+    AsyncStorage.getItem('bl-guide-done').then((v) => {
+      if (!v) setTimeout(() => guide.start(), 1200);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const today = todayJST();
 
@@ -411,7 +423,7 @@ export default function LogScreen() {
 
         {/* ヒーロー */}
         {profile && (
-          <View style={s.hero}>
+          <View style={s.hero} ref={heroTarget} collapsable={false}>
             <Text style={s.heroL}>{left < 0 ? 'オーバー' : 'あと食べられる'}{plan ? '（計画）' : '（維持）'}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
@@ -564,7 +576,7 @@ export default function LogScreen() {
       </ScrollView>
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
-      <View style={s.dockWrap}>
+      <View style={s.dockWrap} ref={dockTarget} collapsable={false}>
         {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
         {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;

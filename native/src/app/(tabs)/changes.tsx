@@ -7,6 +7,7 @@ import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
+import { useGuideTarget } from '@/components/GuideTour';
 import { useRouter } from 'expo-router';
 import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 
@@ -69,6 +70,8 @@ export default function ChangesScreen() {
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
+  const chartTarget = useGuideTarget('chart');
+  const gearTarget = useGuideTarget('gear');
   const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
   const [editing, setEditing] = useState(false);
   const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
@@ -246,7 +249,7 @@ export default function ChangesScreen() {
   );
 
   const chartCard = (
-      <View style={s.card}>
+      <View style={s.card} ref={chartTarget} collapsable={false}>
         <View style={s.chips}>
           {SERIES.map((x) => (
             <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
@@ -386,7 +389,7 @@ export default function ChangesScreen() {
           ) : (
             <>
               <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
-              <Pressable onPress={() => router.push('/settings')} hitSlop={8} style={s.gearBtn}>
+              <Pressable onPress={() => router.push('/settings')} hitSlop={8} style={s.gearBtn} ref={gearTarget} collapsable={false}>
                 <Settings size={16} color={C.sub} />
               </Pressable>
             </>

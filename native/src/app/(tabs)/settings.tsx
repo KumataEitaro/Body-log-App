@@ -6,7 +6,8 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp } from 'lucide-react-native';
+import { useGuide } from '@/components/GuideTour';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
+  const guide = useGuide();
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -175,6 +177,14 @@ export default function SettingsScreen() {
         <Row icon={<HeartPulse color={C.teal} size={19} />} label="ヘルスケア連携"
              sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : 'TestFlight版で有効になります'}
              onPress={() => openSheet('health')} />
+      </View>
+
+      {/* サポート */}
+      <Text style={s.groupLabel}>サポート</Text>
+      <View style={s.group}>
+        <Row icon={<CircleHelp color={C.teal} size={19} />} label="使い方ガイドをもう一度見る"
+             sub="各画面の説明と初期設定をやり直せます"
+             onPress={() => guide.start()} />
       </View>
 
       {/* アクション */}

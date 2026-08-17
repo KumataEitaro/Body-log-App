@@ -8,6 +8,7 @@ import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
+import { useGuideTarget } from '@/components/GuideTour';
 import QuickLogFab from '@/components/QuickLogFab';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
@@ -18,6 +19,7 @@ export default function TrainingScreen() {
   const [history, setHistory] = useState<HistRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒
+  const trainInputTarget = useGuideTarget('trainInput');
 
   // レストタイマーのカウントダウン
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function TrainingScreen() {
       )}
 
       {/* 入力 */}
-      <View style={s.card}>
+      <View style={s.card} ref={trainInputTarget} collapsable={false}>
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日のトレーニングを記録</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>

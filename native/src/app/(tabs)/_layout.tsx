@@ -1,10 +1,13 @@
 // ネイティブタブバー（4タブ構成）。設定は「概要」ヘッダーの⚙から（タブ非表示のルートとして残す）
+// GuideProviderで包み、初回ガイドのスポットライトがタブバーごと覆えるようにする
 import { Tabs } from 'expo-router';
 import { Utensils, Dumbbell, ChartLine, MessageCircle } from 'lucide-react-native';
 import { C } from '@/lib/ui';
+import { GuideProvider } from '@/components/GuideTour';
 
 export default function TabsLayout() {
   return (
+    <GuideProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -21,5 +24,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="goal" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
+    </GuideProvider>
   );
 }

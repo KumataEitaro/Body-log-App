@@ -12,6 +12,7 @@ import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
+import { useGuideTarget } from '@/components/GuideTour';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
@@ -57,6 +58,7 @@ export default function CoachScreen() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+  const welcomeTarget = useGuideTarget('welcome');
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -126,7 +128,7 @@ export default function CoachScreen() {
       <View style={s.wrap}>
         {empty ? (
           /* ===== Empty State: 中央寄せのウェルカムUI ===== */
-          <View style={s.welcomeWrap}>
+          <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}>
             <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
             <Text style={s.welcomeTitle}>AIコーチに相談する</Text>
             <Text style={s.welcomeSub}>直近の食事・体重・栄養ログをもとにアドバイスします</Text>
