@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 // アカウント削除（App Storeガイドライン5.1.1(v)対応）
 // 本人のみ実行可。写真の実ファイル→認証ユーザーの順に削除。
 // DBの各テーブルは auth.users への外部キー（on delete cascade）で連鎖削除される。
-export async function POST() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function POST(req: Request) {
+  // Web(Cookie)とネイティブ(Bearer)の両対応
+  const { user } = await getApiAuth(req);
   if (!user) return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
 
   const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
