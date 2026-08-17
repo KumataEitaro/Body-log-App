@@ -24,11 +24,12 @@ type Props = {
   height?: number;
   color?: string;
   fullscreenEnabled?: boolean; // 全画面内での再帰を防ぐ
+  onDaysChange?: (days: number, isFull: boolean) => void; // ピンチ/パン後に実際の表示日数を親へ通知（期間チップの追従用）
 };
 
 const PAD_L = 8, PAD_R = 44, PAD_T = 10, PAD_B = 22;
 
-function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true }: Props) {
+function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange }: Props) {
   const [width, setWidth] = useState(0);
   const [fs, setFs] = useState(false);
 
@@ -43,6 +44,8 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   useEffect(() => { setWin({ end: lastIdx + 1, days: Math.min(presetDays ?? span, span) }); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [presetDays, lastIdx]);
+
+  const reportDays = (days: number) => onDaysChange?.(Math.round(days), days >= span * 0.95);
 
   const plotW = Math.max(10, width - PAD_L - PAD_R);
   const plotH = height - PAD_T - PAD_B;
@@ -111,7 +114,8 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     .onUpdate((e) => {
       const shift = (-e.translationX / plotW) * g0.current.days;
       setWin(clampWin(g0.current.end + shift, g0.current.days));
-    });
+    })
+    .onEnd(() => reportDays(win.days));
   const pinch = Gesture.Pinch()
     .runOnJS(true)
     .onStart(() => { g0.current = { end: win.end, days: win.days }; })
@@ -127,9 +131,14 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
         end: prev.end + (target.end - prev.end) * 0.5,
         days: prev.days + (target.days - prev.days) * 0.5,
       }));
-    });
+    })
+    .onEnd(() => reportDays(win.days));
   const doubleTap = Gesture.Tap().numberOfTaps(2).runOnJS(true)
-    .onEnd(() => setWin({ end: lastIdx + 1, days: Math.min(presetDays ?? span, span) }));
+    .onEnd(() => {
+      const d = Math.min(presetDays ?? span, span);
+      setWin({ end: lastIdx + 1, days: d });
+      reportDays(d);
+    });
   const gesture = Gesture.Simultaneous(pinch, Gesture.Exclusive(doubleTap, pan));
 
   if (sorted.length < 2) {

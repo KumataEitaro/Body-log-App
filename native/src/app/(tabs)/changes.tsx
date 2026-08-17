@@ -10,15 +10,8 @@ import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, w
 import { useRouter } from 'expo-router';
 import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 
-// draggable-flatlistは旧reanimated APIに依存しておりreanimated 4環境ではimport時に
-// クラッシュし得るため、遅延ロード＋失敗時は↑↓ボタン並び替えへフォールバックする
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let DFL: any = null, ScaleDec: any = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const m = require('react-native-draggable-flatlist');
-  DFL = m.default; ScaleDec = m.ScaleDecorator;
-} catch { /* フォールバックUIを使用 */ }
+// 並び替えは↑↓ボタン方式（draggable-flatlistはreanimated 4非対応で描画時クラッシュ
+// するため完全撤去した。ドラッグ式が必要になったらGesture APIで自前実装する）
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
@@ -79,6 +72,9 @@ export default function ChangesScreen() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [serie, setSerie] = useState<typeof SERIES[number]['key']>('weight');
   const [range, setRange] = useState(30);
+  const [liveDays, setLiveDays] = useState<number | null>(null); // ピンチ/パン後の実表示日数
+  const [liveFull, setLiveFull] = useState(false);
+  const [chartNonce, setChartNonce] = useState(0); // 同じプリセット再タップでも窓をリセットするため
   const [refreshing, setRefreshing] = useState(false);
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
@@ -270,16 +266,36 @@ export default function ChangesScreen() {
           ))}
         </View>
         <InteractiveChart
+          key={chartNonce}
           points={points} unit={conf.unit} decimals={conf.decimals}
           planValue={serie === 'weight' && goal?.target_weight != null ? Number(goal.target_weight) : null}
           presetDays={range >= 9999 ? null : range}
+          onDaysChange={(d, isFull) => { setLiveDays(d); setLiveFull(isFull); }}
         />
+        {/* 期間チップ＝状態表示兼ショートカット。ピンチ後は実表示日数に追従し、どれにも該当しなければ実日数チップが出る */}
         <View style={s.chips}>
-          {RANGES.map((r) => (
-            <Pressable key={r.label} style={[s.chip, range === r.d && s.chipOn]} onPress={() => setRange(r.d)}>
-              <Text style={[s.chipT, range === r.d && { color: '#fff' }]}>{r.label}</Text>
-            </Pressable>
-          ))}
+          {(() => {
+            const isActive = (d: number) =>
+              liveDays == null
+                ? range === d
+                : d >= 9999 ? liveFull : (!liveFull && Math.abs(liveDays - d) / d <= 0.25);
+            const noneActive = liveDays != null && !RANGES.some((r) => isActive(r.d));
+            return (
+              <>
+                {RANGES.map((r) => (
+                  <Pressable key={r.label} style={[s.chip, isActive(r.d) && s.chipOn]}
+                             onPress={() => { setRange(r.d); setLiveDays(null); setChartNonce((n) => n + 1); }}>
+                    <Text style={[s.chipT, isActive(r.d) && { color: '#fff' }]}>{r.label}</Text>
+                  </Pressable>
+                ))}
+                {noneActive && (
+                  <View style={[s.chip, s.chipOn, { borderStyle: 'dashed' }]}>
+                    <Text style={[s.chipT, { color: '#fff' }]}>{liveDays}日</Text>
+                  </View>
+                )}
+              </>
+            );
+          })()}
         </View>
         {serie === 'weight' && goal?.target_weight != null && (
           <Text style={s.note}>点線＝目標 {Number(goal.target_weight).toFixed(1)}kg</Text>
@@ -398,51 +414,25 @@ export default function ChangesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {editing ? (
-        DFL ? (
-          /* ===== Jiggle Mode（編集）: ドラッグで並び替え・カード内操作は停止 ===== */
-          <DFL
-            data={order}
-            keyExtractor={(k: string) => k}
-            style={{ flex: 1 }}
-            contentContainerStyle={s.scroll}
-            ListHeaderComponent={headerJSX}
-            activationDistance={8}
-            onDragEnd={({ data }: { data: string[] }) => setOrder([...data])}
-            renderItem={({ item, drag, isActive }: { item: string; drag: () => void; isActive: boolean }) => (
-              <ScaleDec activeScale={1.04}>
-                <Jiggle on={!isActive}>
-                  <Pressable onLongPress={drag} delayLongPress={120} style={isActive ? s.lifted : undefined}>
-                    <View pointerEvents="none">
-                      {card(item) ?? (
-                        <View style={s.ghostCard}><Text style={s.ghostT}>{CARD_LABELS[item]}（データが揃うと表示されます）</Text></View>
-                      )}
-                    </View>
+        /* ===== 編集モード: ジグル＋↑↓で並び替え ===== */
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
+          {headerJSX}
+          {order.map((k, i) => (
+            <Jiggle key={k} on>
+              <View style={s.moveCard}>
+                <Text style={s.moveLabel}>{CARD_LABELS[k]}</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable style={[s.moveBtn, i === 0 && { opacity: 0.3 }]} disabled={i === 0} onPress={() => moveCard(i, -1)}>
+                    <Text style={s.moveBtnT}>↑</Text>
                   </Pressable>
-                </Jiggle>
-              </ScaleDec>
-            )}
-          />
-        ) : (
-          /* ===== フォールバック編集: ↑↓ボタンで並び替え（D&Dライブラリが使えない環境） ===== */
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
-            {headerJSX}
-            {order.map((k, i) => (
-              <Jiggle key={k} on>
-                <View style={s.moveCard}>
-                  <Text style={s.moveLabel}>{CARD_LABELS[k]}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable style={[s.moveBtn, i === 0 && { opacity: 0.3 }]} disabled={i === 0} onPress={() => moveCard(i, -1)}>
-                      <Text style={s.moveBtnT}>↑</Text>
-                    </Pressable>
-                    <Pressable style={[s.moveBtn, i === order.length - 1 && { opacity: 0.3 }]} disabled={i === order.length - 1} onPress={() => moveCard(i, 1)}>
-                      <Text style={s.moveBtnT}>↓</Text>
-                    </Pressable>
-                  </View>
+                  <Pressable style={[s.moveBtn, i === order.length - 1 && { opacity: 0.3 }]} disabled={i === order.length - 1} onPress={() => moveCard(i, 1)}>
+                    <Text style={s.moveBtnT}>↓</Text>
+                  </Pressable>
                 </View>
-              </Jiggle>
-            ))}
-          </ScrollView>
-        )
+              </View>
+            </Jiggle>
+          ))}
+        </ScrollView>
       ) : (
         /* ===== 通常モード（保存された順で表示・カード長押しで編集へ） ===== */
         <ScrollView
