@@ -6,7 +6,9 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, type LucideIcon } from 'lucide-react-native';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, type LucideIcon } from 'lucide-react-native';
+import { Keyboard } from 'react-native';
+import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -60,6 +62,7 @@ export default function CoachScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const welcomeTarget = useGuideTarget('welcome');
+  const kbVisible = useKeyboardVisible();
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -179,6 +182,11 @@ export default function CoachScreen() {
 
         {/* 入力ドック（下部固定・フィールド内右端にインライン送信アイコン） */}
         <View style={s.inRow}>
+          {kbVisible && (
+            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8} style={s.kbDismiss}>
+              <ChevronDown size={19} color={C.sub} strokeWidth={2.5} />
+            </Pressable>
+          )}
           <TextInput style={s.input} placeholder="相談してみる…" placeholderTextColor={C.faint}
                      value={input} onChangeText={setInput} multiline />
           <Pressable
@@ -230,5 +238,6 @@ const s = StyleSheet.create({
   },
   input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 16, color: C.ink, paddingTop: 6, paddingBottom: 6 },
   sendInline: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
+  kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 10, color: C.faint, marginTop: 5 },
 });

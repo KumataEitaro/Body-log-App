@@ -5,7 +5,9 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown } from 'lucide-react-native';
+import { Keyboard } from 'react-native';
+import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -84,6 +86,7 @@ export default function LogScreen() {
   }
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+  const kbVisible = useKeyboardVisible();
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
 
@@ -730,10 +733,16 @@ export default function LogScreen() {
           </View>
         )}
         <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow }]}>
-          {/* 「ここが入力欄」の直感サイン */}
-          <View style={s.pencilBadge}>
-            <Pencil color={C.teal} size={16} strokeWidth={2.5} />
-          </View>
+          {/* 通常時=「ここが入力欄」のペンサイン / キーボード表示中=しまうボタン */}
+          {kbVisible ? (
+            <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
+              <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />
+            </Pressable>
+          ) : (
+            <View style={s.pencilBadge}>
+              <Pencil color={C.teal} size={16} strokeWidth={2.5} />
+            </View>
+          )}
           <TextInput
             ref={inputRef} multiline
             style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
