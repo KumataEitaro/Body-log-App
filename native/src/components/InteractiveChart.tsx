@@ -3,7 +3,7 @@
 // - 生データ（薄グレー線＋点）の上に移動平均のベジェ曲線を重ねる二重レイヤー
 // - Y軸は表示範囲にniceフィット・X目盛りはズームに応じ日/月/年へ自動切替
 // - ⤢で全画面モーダル展開
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -49,7 +49,20 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   const startF = win.end - win.days;
 
   // ===== データ準備（ズームに応じたビン＋移動平均） =====
-  const binUnit = unitForDays(win.days);
+  // ビン単位はヒステリシス付きで切替（境界60日/400日ちょうどでの行き来チラつきを防ぐ）
+  const unitRef = useRef(unitForDays(win.days));
+  {
+    let u = unitRef.current;
+    for (let i = 0; i < 3; i++) {
+      if (u === 'day' && win.days > 68) u = 'week';
+      else if (u === 'week' && win.days > 430) u = 'month';
+      else if (u === 'month' && win.days < 370) u = 'week';
+      else if (u === 'week' && win.days < 52) u = 'day';
+      else break;
+    }
+    unitRef.current = u;
+  }
+  const binUnit = unitRef.current;
   const bins = useMemo(() => binPoints(sorted, binUnit), [sorted, binUnit]);
   const trend = useMemo(() => movingAvg(bins, MA_WINDOW[binUnit]), [bins, binUnit]);
 
@@ -100,7 +113,10 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     .onUpdate((e) => {
       const fx = Math.min(1, Math.max(0, ((e.focalX ?? plotW / 2) - PAD_L) / plotW));
       const focalIdx = (g0.end - g0.days) + fx * g0.days;
-      const newDays = Math.min(Math.max(7, g0.days / e.scale), span);
+      // 指数ダンピング: scaleの2D距離比（縦成分・狭い初期指間の暴れ）を減衰。
+      // k=0.65 → 自然なピンチ1回(scale≈2)で表示幅が約1/1.6＝「1ピンチ1段」基準に合わせる
+      const damped = Math.pow(Math.max(0.2, e.scale), 0.65);
+      const newDays = Math.min(Math.max(7, g0.days / damped), span);
       setWin(clampWin(focalIdx + (1 - fx) * newDays, newDays));
     });
   const doubleTap = Gesture.Tap().numberOfTaps(2).runOnJS(true)
