@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { quickLog } from '@/lib/quicklog';
+import { analyzeFood, saveParsed } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
@@ -19,7 +19,7 @@ import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights
 import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
-import { addServing, type MyFoodRow } from '@/lib/foods';
+import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
@@ -59,6 +59,7 @@ export default function LogScreen() {
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
   const [pendingTexts, setPendingTexts] = useState<string[]>([]);
+  const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [inputH, setInputH] = useState(40);
   const scrollRef = useRef<ScrollView>(null);
@@ -176,7 +177,7 @@ export default function LogScreen() {
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
-  // ===== ボトムドックからの送信: AI解析→即保存→フィード反映（LINE風の連投） =====
+  // ===== ボトムドックからの送信: AI解析→トレイに積む（保存は✓保存で確定・連投可） =====
   const canSend = chat.trim().length > 0 || photos.length > 0;
 
   async function sendQuick() {
@@ -187,9 +188,18 @@ export default function LogScreen() {
     inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
     setPendingTexts((p) => [...p, text || '（写真）']);
     try {
-      const res = await quickLog(uid, text, imgs);
+      const res = await analyzeFood(text, imgs);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
-      await load();
+      const r = res.result;
+      setParsed((p) => ({
+        items: [...(p?.items ?? []), ...r.items],
+        weight: r.weight ?? p?.weight ?? null,
+        waist: r.waist ?? p?.waist ?? null,
+        ex: r.ex ?? p?.ex ?? null,
+        adj: r.adj || p?.adj || 0,
+        mood: r.mood ?? p?.mood ?? null,
+      }));
+      if (text) setStagedNote((n) => (n ? `${n}、${text}` : text));
     } catch {
       setMsg({ ok: false, text: '通信に失敗しました。電波状況を確認してください。' });
       setChat(text);
@@ -198,37 +208,27 @@ export default function LogScreen() {
     }
   }
 
-  // マイ食品チップ: 1タップで登録済みのカロリー・PFCをそのまま今日の記録へ直接追加（AI解析なし）
-  async function tapFood(fd: MyFood) {
-    if (!uid) return;
-    const items = addServing([], fd); // 1食分のitemを生成
-    const total = sumItems(items);
-    setPendingTexts((p) => [...p, fd.name]);
-    try {
-      const { error } = await supabase.from('logs').insert({
-        user_id: uid, date: today, items,
-        kcal: total.kcal, p: total.p, f: total.f, c: total.c,
-        weight: null, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
-      });
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
-      await syncEntriesForDate(uid, today);
-      await load();
-    } finally {
-      setPendingTexts((p) => p.slice(1));
-    }
+  // マイ食品チップ: タップでトレイに積む（保存は✓保存で確定・−で減らせる）
+  function tapFood(fd: MyFood) {
+    const items = addServing(parsed?.items ?? [], fd);
+    setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
+  }
+  function decFood(fd: MyFood) {
+    if (!parsed) return;
+    const items = removeServing(parsed.items, fd);
+    if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
+    else setParsed({ ...parsed, items });
   }
 
-  // 今日すでに食べた回数（チップの×Nバッジ用・dayLogsから逆算）
-  function todayCount(fd: MyFood): number | null {
-    let n = 0;
-    for (const l of dayLogs) {
-      for (const it of ((l.items as FoodItem[]) || [])) {
-        if (it.name !== fd.name) continue;
-        const m = String(it.qty || '').match(/×([\d.]+)/);
-        n += m ? Number(m[1]) : 1;
-      }
-    }
-    return n > 0 ? Math.round(n * 10) / 10 : null;
+  // トレイの個別削除
+  function removeTrayItem(i: number) {
+    if (!parsed) return;
+    const items = parsed.items.filter((_, j) => j !== i);
+    if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
+    else setParsed({ ...parsed, items });
+  }
+  function clearTray() {
+    setParsed(null); setStagedNote('');
   }
 
   // 記録の取り消し: フィード行を長押し→削除（チップ即時追加の押し間違い対策）
@@ -250,7 +250,7 @@ export default function LogScreen() {
   function reuseMeal(m: RecentMeal) {
     const items = [...(parsed?.items ?? []), ...m.items];
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
-    setMsg({ ok: true, text: '保存前確認に入れました。内容を確認して保存してください。' });
+    setMsg({ ok: true, text: '下のトレイに入れました。内容を確認して✓保存してください。' });
   }
 
   function titleOfItems(items: FoodItem[]): string {
@@ -258,23 +258,14 @@ export default function LogScreen() {
     return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
   }
 
+  // トレイの内容を確定保存
   async function save() {
     if (!uid || !parsed) return;
     setSaving(true); setMsg(null);
     try {
-      const total = sumItems(parsed.items);
-      const hasMeal = parsed.items.length > 0;
-      const { error } = await supabase.from('logs').insert({
-        user_id: uid, date: today,
-        items: parsed.items,
-        kcal: hasMeal ? total.kcal : null,
-        p: hasMeal ? total.p : null, f: hasMeal ? total.f : null, c: hasMeal ? total.c : null,
-        weight: parsed.weight, waist: parsed.waist,
-        ex: parsed.ex ?? 'オフ', adj: parsed.adj, mood: parsed.mood || '', text: chat, photo_urls: [],
-      });
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
-      await syncEntriesForDate(uid, today);
-      setChat(''); setParsed(null);
+      const res = await saveParsed(uid, parsed, stagedNote);
+      if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
+      setParsed(null); setStagedNote('');
       await load();
       setMsg({ ok: true, text: '保存しました。' });
     } finally {
@@ -524,13 +515,6 @@ export default function LogScreen() {
             </Pressable>
           ))}
           {dayLogs.length > 0 && <Text style={s.hint}>行を長押しで削除できます</Text>}
-          {/* 送信直後の楽観表示（AI解析中） */}
-          {pendingTexts.map((t, i) => (
-            <View key={`p${i}`} style={s.feedRow}>
-              <ActivityIndicator size="small" color={C.teal} />
-              <Text style={[s.feedTitle, { color: C.sub }]} numberOfLines={1}>{t} — AIが解析して記録中…</Text>
-            </View>
-          ))}
         </View>
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
@@ -556,30 +540,9 @@ export default function LogScreen() {
                     </Pressable>
                   </View>
                 ))}
-                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>↺で保存前確認に入ります。同じ鍋の残り半分なら、確認画面で品目を−して調整できます。</Text>
+                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。</Text>
               </>
             )}
-          </View>
-        )}
-
-        {/* 解析結果（保存前の確認） */}
-        {parsed && (
-          <View style={[s.card, { borderColor: C.teal, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>保存前の確認</Text>
-            {parsed.items.map((it, i) => (
-              <View key={i} style={s.feedRow}>
-                <Text style={[s.feedTitle, { marginLeft: 0 }]}>{it.name} {it.qty}</Text>
-                <Text style={s.feedKcal}>{Math.round(it.kcal)}<Text style={s.feedU}> kcal</Text></Text>
-              </View>
-            ))}
-            <View style={s.heroMeta}>
-              {parsedTotal && parsed.items.length > 0 && <Text style={s.metaT}>合計 {Math.round(parsedTotal.kcal)}kcal / P{Math.round(parsedTotal.p)} F{Math.round(parsedTotal.f)} C{Math.round(parsedTotal.c)}</Text>}
-              {parsed.weight != null && <Text style={s.metaT}>体重 {parsed.weight}kg</Text>}
-              {parsed.ex && parsed.ex !== 'オフ' && <Text style={s.metaT}>運動 {parsed.ex}</Text>}
-            </View>
-            <Pressable style={({ pressed }) => [s.btnPrimary, pressed && { opacity: 0.85 }]} onPress={save} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>この内容で保存する</Text>}
-            </Pressable>
           </View>
         )}
 
@@ -639,9 +602,9 @@ export default function LogScreen() {
         )}
         {/* マイ食品チップ（連打で×2、−で減。1行スクロール⇄全展開グリッドを切替可能） */}
         {myFoods.length > 0 && (() => {
-          // タップ=即・今日の記録へ追加。×Nは今日すでに食べた回数（取り消しはフィード行の長押し）
+          // タップ=トレイに積む（×N=トレイ内の数量・−で減らす。保存は✓保存で確定）
           const chipEls = myFoods.map((fd) => {
-            const cnt = todayCount(fd);
+            const cnt = parsed ? servingCount(parsed.items, fd) : null;
             return (
               <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
                 <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
@@ -649,6 +612,11 @@ export default function LogScreen() {
                     {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
                   </Text>
                 </Pressable>
+                {cnt != null && (
+                  <Pressable onPress={() => decFood(fd)} style={s.chipMinus} hitSlop={4}>
+                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
+                  </Pressable>
+                )}
               </View>
             );
           });
@@ -669,6 +637,48 @@ export default function LogScreen() {
             </View>
           );
         })()}
+        {/* ステージングトレイ: チップ/AI解析の結果はここに積まれ、✓保存で初めてDBに書かれる */}
+        {(parsed != null || pendingTexts.length > 0) && (
+          <View style={s.tray}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+              {parsed?.items.map((it, i) => (
+                <View key={i} style={s.trayChip}>
+                  <Text style={s.trayChipT} numberOfLines={1}>
+                    {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 10 }}>{Math.round(it.kcal)}kcal</Text>
+                  </Text>
+                  <Pressable hitSlop={8} onPress={() => removeTrayItem(i)}><Text style={s.trayX}>×</Text></Pressable>
+                </View>
+              ))}
+              {parsed?.weight != null && (
+                <View style={s.trayChip}>
+                  <Text style={s.trayChipT}>⚖️ {parsed.weight}kg</Text>
+                  <Pressable hitSlop={8} onPress={() => setParsed((p) => (p && (p.items.length > 0 || p.ex) ? { ...p, weight: null } : null))}>
+                    <Text style={s.trayX}>×</Text>
+                  </Pressable>
+                </View>
+              )}
+              {parsed?.ex && parsed.ex !== 'オフ' && (
+                <View style={s.trayChip}><Text style={s.trayChipT}>🏃 {parsed.ex}</Text></View>
+              )}
+              {pendingTexts.map((t, i) => (
+                <View key={`p${i}`} style={s.trayChip}>
+                  <ActivityIndicator size="small" color={C.teal} />
+                  <Text style={[s.trayChipT, { marginLeft: 4 }]} numberOfLines={1}>{t}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            {parsed != null && (
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>破棄</Text></Pressable>
+                <Pressable style={s.traySave} onPress={save} disabled={saving}>
+                  {saving ? <ActivityIndicator color="#fff" /> : (
+                    <Text style={s.traySaveT}>✓ 保存{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
+          </View>
+        )}
         <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow }]}>
           {/* 「ここが入力欄」の直感サイン */}
           <View style={s.pencilBadge}>
@@ -763,6 +773,21 @@ const s = StyleSheet.create({
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 12, color: C.sub, fontWeight: '700' },
   preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
+  tray: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)',
+    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 7, marginBottom: 7,
+  },
+  trayChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
+  },
+  trayChipT: { fontSize: 11.5, fontWeight: '700', color: C.ink },
+  trayX: { fontSize: 14, fontWeight: '800', color: C.coral, marginLeft: 2 },
+  traySave: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
+  traySaveT: { color: '#fff', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  trayClearT: { fontSize: 11, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   previewMain: { fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   previewSub: { fontSize: 11.5, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
   pfcL: { width: 14, fontSize: 11, fontWeight: '800', color: C.sub },

@@ -8,7 +8,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
-import { quickLog } from '@/lib/quicklog';
+import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
+import { sumItems } from '@/lib/items';
 import { C } from '@/lib/ui';
 
 export default function QuickLogFab() {
@@ -16,6 +17,9 @@ export default function QuickLogFab() {
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [pending, setPending] = useState(0);
+  const [staged, setStaged] = useState<ParsedResult | null>(null); // 解析結果（保存前の確認用）
+  const [stagedNote, setStagedNote] = useState('');
+  const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -35,6 +39,7 @@ export default function QuickLogFab() {
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
+  // 送信=AI解析→保存前の確認（stagedに積む。連投可・保存は✓で確定）
   async function send() {
     const t = text.trim();
     if (!t && photos.length === 0) return;
@@ -43,14 +48,36 @@ export default function QuickLogFab() {
     setPending((n) => n + 1);
     inputRef.current?.focus(); // 連投: キーボードを維持
     try {
+      const res = await analyzeFood(t, imgs);
+      if (!res.ok) { setMsg({ ok: false, text: res.error }); setText(t); return; }
+      const r = res.result;
+      setStaged((p) => ({
+        items: [...(p?.items ?? []), ...r.items],
+        weight: r.weight ?? p?.weight ?? null,
+        waist: r.waist ?? p?.waist ?? null,
+        ex: r.ex ?? p?.ex ?? null,
+        adj: r.adj || p?.adj || 0,
+        mood: r.mood ?? p?.mood ?? null,
+      }));
+      if (t) setStagedNote((n) => (n ? `${n}、${t}` : t));
+    } finally {
+      setPending((n) => Math.max(0, n - 1));
+    }
+  }
+
+  async function confirmSave() {
+    if (!staged) return;
+    setSaving(true);
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const res = await quickLog(uid, t, imgs);
-      if (!res.ok) { setMsg({ ok: false, text: res.error }); setText(t); return; }
-      setMsg({ ok: true, text: `記録しました${t ? `: ${t.slice(0, 24)}` : ''}` });
+      const res = await saveParsed(uid, staged, stagedNote);
+      if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
+      setStaged(null); setStagedNote('');
+      setMsg({ ok: true, text: '記録しました。' });
     } finally {
-      setPending((n) => Math.max(0, n - 1));
+      setSaving(false);
     }
   }
 
@@ -79,7 +106,36 @@ export default function QuickLogFab() {
             {pending > 0 && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                 <ActivityIndicator size="small" color={C.teal} />
-                <Text style={s.msg}>AIが解析して記録しています…（送信済み {pending} 件）</Text>
+                <Text style={s.msg}>AIが解析しています…</Text>
+              </View>
+            )}
+            {/* 保存前の確認トレイ */}
+            {staged && (
+              <View style={s.stagedBox}>
+                {staged.items.map((it, i) => (
+                  <View key={i} style={s.stagedRow}>
+                    <Text style={s.stagedT} numberOfLines={1}>{it.name} {it.qty}</Text>
+                    <Text style={s.stagedKcal}>{Math.round(it.kcal)}kcal</Text>
+                    <Pressable hitSlop={8} onPress={() => setStaged((p) => {
+                      if (!p) return p;
+                      const items = p.items.filter((_, j) => j !== i);
+                      return items.length === 0 && p.weight == null && !p.ex ? null : { ...p, items };
+                    })}>
+                      <Text style={s.stagedX}>×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                {staged.weight != null && <Text style={s.stagedT}>⚖️ 体重 {staged.weight}kg</Text>}
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                  <Pressable style={s.stagedSave} onPress={confirmSave} disabled={saving}>
+                    {saving ? <ActivityIndicator color="#fff" /> : (
+                      <Text style={s.stagedSaveT}>✓ この内容で保存{staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : ''}</Text>
+                    )}
+                  </Pressable>
+                  <Pressable onPress={() => { setStaged(null); setStagedNote(''); }} hitSlop={8}>
+                    <Text style={s.stagedClear}>破棄</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
             <View style={s.dock}>
@@ -115,6 +171,14 @@ const s = StyleSheet.create({
   titleSub: { fontSize: 11, fontWeight: '400', color: C.sub },
   thumb: { width: 48, height: 48, borderRadius: 10, borderWidth: 1, borderColor: C.line },
   msg: { fontSize: 12, fontWeight: '600', color: C.sub, marginBottom: 6 },
+  stagedBox: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)', borderRadius: 14, padding: 10, marginBottom: 8 },
+  stagedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+  stagedT: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink },
+  stagedKcal: { fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },
+  stagedX: { fontSize: 15, fontWeight: '800', color: C.coral },
+  stagedSave: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  stagedSaveT: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  stagedClear: { fontSize: 11.5, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   dock: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 24, paddingHorizontal: 8, paddingVertical: 6,
