@@ -11,7 +11,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const LaunchCtx = createContext<{ introDone: boolean }>({ introDone: true });
 export const useLaunch = () => useContext(LaunchCtx);
 
-const HOLD_MS = 380;      // アイコンを一拍見せる時間
+const HOLD_MS = 800;      // アイコンを一拍見せる時間（ユーザー好みで長め）
 const FADE_MS = 480;      // アイコンが消える時間
 const FAILSAFE_MS = 2500; // readyが来ない事故（オフライン等）でも必ず開ける
 
