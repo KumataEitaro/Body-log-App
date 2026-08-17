@@ -9,6 +9,7 @@ import { todayJST } from '@/lib/calc';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import SimpleChart from '@/components/SimpleChart';
 import StatusBarMask from '@/components/StatusBarMask';
+import QuickLogFab from '@/components/QuickLogFab';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
@@ -152,6 +153,7 @@ export default function TrainingScreen() {
         ))}
       </View>
     </ScrollView>
+    <QuickLogFab />
     <StatusBarMask />
     </View>
   );

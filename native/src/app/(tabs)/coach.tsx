@@ -7,6 +7,7 @@ import {
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
+import QuickLogFab from '@/components/QuickLogFab';
 
 type Msg = { role: 'user' | 'ai'; text: string };
 
@@ -67,7 +68,8 @@ export default function CoachScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }} keyboardVerticalOffset={90}>
+    // offsetは0でよい（KAVが自分のフレームとキーボードの重なりを自動計算する。90を足すと入力欄とキーボードの間に不自然な余白が出る）
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={s.wrap}>
         <Text style={s.h}>🧠 AIコーチ <Text style={s.hsub}>— あなたの記録が根拠</Text></Text>
         <ScrollView ref={scrollRef} style={s.log} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
@@ -107,6 +109,7 @@ export default function CoachScreen() {
         </View>
         <Text style={s.disclaimer}>医療的な診断はできません。深刻な不調が続く場合は医療機関へ。</Text>
       </View>
+      <QuickLogFab />
       <StatusBarMask />
     </KeyboardAvoidingView>
   );

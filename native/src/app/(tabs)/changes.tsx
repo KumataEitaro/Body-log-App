@@ -7,6 +7,7 @@ import { C } from '@/lib/ui';
 import SimpleChart, { type ChartPoint } from '@/components/SimpleChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
+import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
@@ -297,6 +298,7 @@ export default function ChangesScreen() {
       </>
       )}
     </ScrollView>
+    <QuickLogFab />
     <StatusBarMask />
     </View>
   );

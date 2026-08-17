@@ -8,6 +8,7 @@ import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import StatusBarMask from '@/components/StatusBarMask';
+import QuickLogFab from '@/components/QuickLogFab';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
 
@@ -206,6 +207,7 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
     </ScrollView>
+    <QuickLogFab />
     <StatusBarMask />
     </View>
   );

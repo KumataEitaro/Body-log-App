@@ -8,8 +8,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { apiPost } from '@/lib/api';
+import { quickLog } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
@@ -56,7 +57,15 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
+  const [pendingTexts, setPendingTexts] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  // ウィジェット/ディープリンク（bodylog://log?quick=1）→ ドックに即フォーカス
+  const { quick } = useLocalSearchParams<{ quick?: string }>();
+  useEffect(() => {
+    if (quick) setTimeout(() => inputRef.current?.focus(), 400);
+  }, [quick]);
 
   const today = todayJST();
 
@@ -142,32 +151,25 @@ export default function LogScreen() {
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
-  // AI解析はテキストか写真がある時だけ有効（チップだけの時は保存前確認から直接保存できる）
-  const canParse = chat.trim().length > 0 || photos.length > 0;
+  // ===== ボトムドックからの送信: AI解析→即保存→フィード反映（LINE風の連投） =====
+  const canSend = chat.trim().length > 0 || photos.length > 0;
 
-  // ===== AI解析（チップ追加分は保持して追記マージ＝Web版と同じ） =====
-  async function parse() {
-    if (!canParse) return;
-    setAnalyzing(true); setMsg(null);
+  async function sendQuick() {
+    if (!canSend || !uid) return;
+    const text = chat.trim();
+    const imgs = photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' }));
+    setChat(''); setPhotos([]); setMsg(null);
+    inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
+    setPendingTexts((p) => [...p, text || '（写真）']);
     try {
-      const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
-        '/api/parse-food', { text: chat, lang: 'ja', images: photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' })) });
-      if (!ok || !json?.ok || !json.result) { setMsg({ ok: false, text: json?.error || '解析に失敗しました。もう一度お試しください。' }); return; }
-      const base = parsed?.items ?? [];
-      const items = [...base, ...(json.result.items || [])];
-      setParsed({
-        items,
-        weight: json.result.weight ?? parsed?.weight ?? null,
-        waist: json.result.waist ?? parsed?.waist ?? null,
-        ex: (json.result.ex as ExLevel) ?? parsed?.ex ?? null,
-        adj: Number(json.result.adj) || parsed?.adj || 0,
-        mood: json.result.mood ?? parsed?.mood ?? null,
-      });
-      setPhotos([]); // 解析済み分は品目に反映済み。再タップでの二重計上を防ぐ
+      const res = await quickLog(uid, text, imgs);
+      if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
+      await load();
     } catch {
       setMsg({ ok: false, text: '通信に失敗しました。電波状況を確認してください。' });
+      setChat(text);
     } finally {
-      setAnalyzing(false);
+      setPendingTexts((p) => p.slice(1));
     }
   }
 
@@ -439,6 +441,13 @@ export default function LogScreen() {
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
             </View>
           ))}
+          {/* 送信直後の楽観表示（AI解析中） */}
+          {pendingTexts.map((t, i) => (
+            <View key={`p${i}`} style={s.feedRow}>
+              <ActivityIndicator size="small" color={C.teal} />
+              <Text style={[s.feedTitle, { color: C.sub }]} numberOfLines={1}>{t} — AIが解析して記録中…</Text>
+            </View>
+          ))}
         </View>
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
@@ -490,66 +499,9 @@ export default function LogScreen() {
 
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
 
-        {/* コンポーザー */}
+        {/* 体重クイック入力 */}
         <View style={s.card}>
-          <TextInput
-            style={s.ta} multiline placeholder={'食事・体重・気分を自由に…\n例）昼は牛丼並盛とサラダ。体重73.5kg'}
-            placeholderTextColor={C.faint} value={chat} onChangeText={setChat}
-            onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
-          />
-          {/* マイ食品チップ（連打で×2、−で減） */}
-          {myFoods.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }} keyboardShouldPersistTaps="handled">
-              {myFoods.map((fd) => {
-                const cnt = parsed ? servingCount(parsed.items, fd) : null;
-                return (
-                  <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
-                    <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
-                      <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
-                        {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
-                      </Text>
-                    </Pressable>
-                    {cnt != null && (
-                      <Pressable onPress={() => decFood(fd)} style={s.chipMinus}>
-                        <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-            </ScrollView>
-          )}
-          {/* 写真からAI解析（撮影/アルバム→1280px圧縮→Gemini） */}
-          {photos.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-              {photos.map((p, i) => (
-                <View key={i} style={s.thumbWrap}>
-                  <Image source={{ uri: p.uri }} style={s.thumb} />
-                  <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>×</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-            <Pressable style={({ pressed }) => [s.btnGhost, pressed && { opacity: 0.7 }]} onPress={takePhoto} disabled={analyzing || photos.length >= 4}>
-              <Text style={s.btnGhostT}>📷 撮影</Text>
-            </Pressable>
-            <Pressable style={({ pressed }) => [s.btnGhost, pressed && { opacity: 0.7 }]} onPress={pickPhotos} disabled={analyzing || photos.length >= 4}>
-              <Text style={s.btnGhostT}>🖼 アルバム</Text>
-            </Pressable>
-          </View>
-          <Pressable style={({ pressed }) => [s.btnPrimary, !canParse && { opacity: 0.35 }, pressed && { opacity: 0.85 }]}
-                     onPress={parse} disabled={analyzing || !canParse}>
-            {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>✨ AI解析{photos.length > 0 ? `（写真${photos.length}枚）` : ''}</Text>}
-          </Pressable>
-          {!canParse && parsed && parsed.items.length > 0 && (
-            <Text style={[s.mutedT, { fontSize: 11.5, textAlign: 'center', marginTop: 6 }]}>チップで選んだ分は、上の「この内容で保存する」からそのまま保存できます</Text>
-          )}
-
-          {/* 体重クイック入力 */}
-          <View style={s.wRow}>
+          <View style={[s.wRow, { marginTop: 0 }]}>
             <TextInput style={s.wInput} placeholder={latestWeight != null ? latestWeight.toFixed(1) : '73.5'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
             <Text style={s.wUnit}>kg</Text>
@@ -559,8 +511,61 @@ export default function LogScreen() {
           </View>
         </View>
 
-        <View style={{ height: 30 }} />
+        <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
+      <View style={s.dockWrap}>
+        {photos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }} keyboardShouldPersistTaps="handled">
+            {photos.map((p, i) => (
+              <View key={i} style={s.thumbWrap}>
+                <Image source={{ uri: p.uri }} style={s.thumb} />
+                <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+        {/* マイ食品チップ（連打で×2、−で減。ドックの真上に常駐） */}
+        {myFoods.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }} keyboardShouldPersistTaps="handled">
+            {myFoods.map((fd) => {
+              const cnt = parsed ? servingCount(parsed.items, fd) : null;
+              return (
+                <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
+                  <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
+                    <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
+                      {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
+                    </Text>
+                  </Pressable>
+                  {cnt != null && (
+                    <Pressable onPress={() => decFood(fd)} style={s.chipMinus}>
+                      <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        )}
+        <View style={s.dock}>
+          <Pressable onPress={takePhoto} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
+            <Text style={s.dockIcon}>📷</Text>
+          </Pressable>
+          <Pressable onPress={pickPhotos} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
+            <Text style={s.dockIcon}>🖼</Text>
+          </Pressable>
+          <TextInput
+            ref={inputRef} style={s.dockInput} placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
+            value={chat} onChangeText={setChat} returnKeyType="send" blurOnSubmit={false} onSubmitEditing={sendQuick}
+          />
+          <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
+            <Text style={s.dockSendT}>↑</Text>
+          </Pressable>
+        </View>
+      </View>
       <StatusBarMask />
     </KeyboardAvoidingView>
   );
@@ -614,6 +619,18 @@ const s = StyleSheet.create({
   chipBtnT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   reuseBtnT: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
+  dock: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 24,
+    paddingHorizontal: 8, paddingVertical: 5,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+  },
+  dockIconBtn: { padding: 4 },
+  dockIcon: { fontSize: 18 },
+  dockInput: { flex: 1, fontSize: 16, color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
+  dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
