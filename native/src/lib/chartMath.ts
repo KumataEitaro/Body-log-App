@@ -59,10 +59,16 @@ export function movingAvg(bins: Bin[], w: number): Bin[] {
 // ===== Y軸 nice目盛り（1-2-5系列） =====
 export function niceTicks(min: number, max: number, target = 5): { ticks: number[]; lo: number; hi: number } {
   if (!(max > min)) { min -= 1; max += 1; }
-  const rawStep = (max - min) / target;
+  const span = max - min;
+  const rawStep = span / target;
   const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const norm = rawStep / mag;
-  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  // きれいな刻み（1-2-5系）を大→小の順に試し、ラベル数がtarget本に届く
+  // 最初の刻みを採用する（「画面上に最低8個の数字」を保証するため）
+  const cands = [10, 5, 2, 1, 0.5, 0.2, 0.1].map((k) => k * mag);
+  let step = cands[cands.length - 1];
+  for (const c of cands) {
+    if (Math.floor(span / c) + 1 >= target) { step = c; break; }
+  }
   const lo = Math.floor(min / step) * step;
   const hi = Math.ceil(max / step) * step;
   const ticks: number[] = [];
