@@ -6,12 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import ReorderableCards from '@/components/ReorderableCards';
 import { useRouter } from 'expo-router';
 import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 
-// 並び替えは↑↓ボタン方式（draggable-flatlistはreanimated 4非対応で描画時クラッシュ
-// するため完全撤去した。ドラッグ式が必要になったらGesture APIで自前実装する）
+// 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
+// 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
@@ -49,17 +49,6 @@ function mergeOrder(saved: string[], def: string[]): string[] {
   return [...kept, ...def.filter((k) => !kept.includes(k))];
 }
 
-// 編集モード中の微振動（Jiggle）
-function Jiggle({ on, children }: { on: boolean; children: ReactNode }) {
-  const rot = useSharedValue(0);
-  useEffect(() => {
-    rot.value = on
-      ? withRepeat(withSequence(withTiming(-0.4, { duration: 140 }), withTiming(0.4, { duration: 140 })), -1, true)
-      : withTiming(0, { duration: 100 });
-  }, [on, rot]);
-  const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
-  return <Animated.View style={st}>{children}</Animated.View>;
-}
 
 function addDays(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
@@ -374,12 +363,14 @@ export default function ChangesScreen() {
   const order = topSeg === 'body' ? orderBody : orderTrain;
   const setOrder = topSeg === 'body' ? setOrderBody : setOrderTrain;
 
-  function moveCard(i: number, dir: -1 | 1) {
-    const j = i + dir;
-    if (j < 0 || j >= order.length) return;
-    const next = [...order];
-    [next[i], next[j]] = [next[j], next[i]];
-    setOrder(next);
+  // 最初の並びに戻す
+  async function resetOrder() {
+    setOrderBody(BODY_ORDER_DEFAULT);
+    setOrderTrain(TRAIN_ORDER_DEFAULT);
+    try {
+      await AsyncStorage.removeItem('bl-order-body');
+      await AsyncStorage.removeItem('bl-order-train');
+    } catch { /* 無視 */ }
   }
 
   const headerJSX = (
@@ -388,7 +379,10 @@ export default function ChangesScreen() {
         <Text style={[s.h, { marginBottom: 0 }]}>概要</Text>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           {editing ? (
-            <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
+            <>
+              <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>元に戻す</Text></Pressable>
+              <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
+            </>
           ) : (
             <>
               <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
@@ -407,46 +401,25 @@ export default function ChangesScreen() {
           </Pressable>
         ))}
       </View>
-      {editing && <Text style={s.editHint}>カードを長押し→ドラッグで並べ替え。「完了」で保存します</Text>}
+      {editing && <Text style={s.editHint}>カードを長押し→そのままドラッグで移動。「完了」で保存します</Text>}
     </>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {editing ? (
-        /* ===== 編集モード: ジグル＋↑↓で並び替え ===== */
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
-          {headerJSX}
-          {order.map((k, i) => (
-            <Jiggle key={k} on>
-              <View style={s.moveCard}>
-                <Text style={s.moveLabel}>{CARD_LABELS[k]}</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable style={[s.moveBtn, i === 0 && { opacity: 0.3 }]} disabled={i === 0} onPress={() => moveCard(i, -1)}>
-                    <Text style={s.moveBtnT}>↑</Text>
-                  </Pressable>
-                  <Pressable style={[s.moveBtn, i === order.length - 1 && { opacity: 0.3 }]} disabled={i === order.length - 1} onPress={() => moveCard(i, 1)}>
-                    <Text style={s.moveBtnT}>↓</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </Jiggle>
-          ))}
-        </ScrollView>
-      ) : (
-        /* ===== 通常モード（保存された順で表示・カード長押しで編集へ） ===== */
-        <ScrollView
-          style={{ flex: 1 }} contentContainerStyle={s.scroll}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-        >
-          {headerJSX}
-          {order.map((k) => (
-            <Pressable key={k} onLongPress={() => setEditing(true)} delayLongPress={400}>
-              {card(k)}
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
+      {/* インプレイスのドラッグ並び替え（通常時は普通のスクロール・カード長押しで編集モードへ） */}
+      <ReorderableCards
+        key={topSeg}
+        editing={editing}
+        order={order}
+        onOrderChange={setOrder}
+        renderCard={card}
+        ghostLabel={(k) => CARD_LABELS[k] ?? k}
+        header={headerJSX}
+        onEnterEdit={() => setEditing(true)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+        contentContainerStyle={s.scroll}
+      />
       {!editing && <QuickLogFab />}
       <StatusBarMask />
     </View>
