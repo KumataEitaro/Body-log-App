@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated,
+  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown } from 'lucide-react-native';
 import { Keyboard } from 'react-native';
@@ -25,6 +25,7 @@ import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/f
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
+import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
@@ -123,12 +124,27 @@ export default function LogScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, scrollYNow.current + delta), animated: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
+  const { introDone } = useLaunch();
   useEffect(() => {
+    if (!introDone) return; // 起動イントロが終わってから案内を始める
     AsyncStorage.getItem('bl-guide-done').then((v) => {
-      if (!v) setTimeout(() => guide.start(), 1200);
+      if (!v) setTimeout(() => guide.start(), 900);
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [introDone]);
+
+  // 起動時の時差入場（Withings風）: ヘッダー→ヒーロー→カード→ドックの順にフェード＋スライドイン
+  const enterV = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    if (!introDone) return;
+    Animated.stagger(70, enterV.map((v) =>
+      Animated.timing(v, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    )).start();
+  }, [introDone, enterV]);
+  const enter = enterV.map((v, i) => ({
+    opacity: v,
+    transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [i === 3 ? 18 : 14, 0] }) }],
+  }));
 
   const today = todayJST();
 
@@ -445,14 +461,14 @@ export default function LogScreen() {
         onScroll={(e) => { scrollYNow.current = e.nativeEvent.contentOffset.y; }}
         scrollEventThrottle={32}
       >
-        <View style={s.brandRow}>
+        <Animated.View style={[s.brandRow, enter[0]]}>
           <Text style={s.brand}>BodyLog</Text>
           <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
-        </View>
+        </Animated.View>
 
         {/* ヒーロー */}
         {profile && (
-          <View style={s.hero} ref={heroTarget} collapsable={false}>
+          <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
             <Text style={s.heroL}>{left < 0 ? 'オーバー' : 'あと食べられる'}{plan ? '（計画）' : '（維持）'}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
@@ -479,7 +495,7 @@ export default function LogScreen() {
                 })}
               </View>
             )}
-          </View>
+          </Animated.View>
         )}
 
         {/* 昨日の穴埋めカード（責めないトーン） */}
@@ -543,7 +559,7 @@ export default function LogScreen() {
         )}
 
         {/* 今日のフィード */}
-        <View style={s.card}>
+        <Animated.View style={[s.card, enter[2]]}>
           <Text style={s.h2}>今日の記録 <Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
           {dayLogs.length === 0 && <Text style={s.mutedT}>まだ記録がありません。下から1回分ずつ記録しましょう。</Text>}
           {dayLogs.map((l) => (
@@ -556,7 +572,7 @@ export default function LogScreen() {
             </Pressable>
           ))}
           {dayLogs.length > 0 && <Text style={s.hint}>行を長押しで削除できます</Text>}
-        </View>
+        </Animated.View>
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
         {recentMeals.length > 0 && (
@@ -590,7 +606,7 @@ export default function LogScreen() {
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
 
         {/* 体重クイック入力 */}
-        <View style={s.card}>
+        <Animated.View style={[s.card, enter[2]]}>
           <View style={[s.wRow, { marginTop: 0 }]}>
             <TextInput style={s.wInput} placeholder={latestWeight != null ? latestWeight.toFixed(1) : '73.5'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
@@ -600,13 +616,13 @@ export default function LogScreen() {
               <Text style={s.btnGhostT}>体重を記録</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
 
         <View style={{ height: 16 }} />
       </ScrollView>
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
-      <View style={s.dockWrap} ref={dockTarget} collapsable={false}>
+      <Animated.View style={[s.dockWrap, enter[3]]} ref={dockTarget} collapsable={false}>
         {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
         {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
@@ -760,7 +776,7 @@ export default function LogScreen() {
             <Text style={s.dockSendT}>↑</Text>
           </Pressable>
         </Animated.View>
-      </View>
+      </Animated.View>
       <StatusBarMask />
       <HeaderGear />
     </KeyboardAvoidingView>

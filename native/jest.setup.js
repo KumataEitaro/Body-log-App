@@ -78,6 +78,11 @@ jest.mock('react-native-svg', () => {
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 // --- expo各種 ---
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn(() => Promise.resolve(true)),
+  hideAsync: jest.fn(() => Promise.resolve(true)),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({}),

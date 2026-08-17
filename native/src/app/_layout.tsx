@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
+import { LaunchProvider } from '@/components/LaunchIntro';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -27,9 +28,9 @@ export default function RootLayout() {
   }, [ready, authed, segments, router]);
 
   return (
-    <>
+    <LaunchProvider ready={ready}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
-    </>
+    </LaunchProvider>
   );
 }
