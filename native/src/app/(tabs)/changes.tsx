@@ -7,7 +7,7 @@ import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
-import { useGuideTarget } from '@/components/GuideTour';
+import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
 import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
@@ -72,6 +72,7 @@ export default function ChangesScreen() {
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
+  const guide = useGuide();
   const chartTarget = useGuideTarget('chart');
   const gearTarget = useGuideTarget('gear');
   const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
@@ -443,6 +444,7 @@ export default function ChangesScreen() {
         onEnterEdit={() => setEditing(true)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         contentContainerStyle={s.scroll}
+        onScroller={(fn) => guide.registerScroller('/changes', fn)}
       />
       {!editing && <QuickLogFab />}
       <StatusBarMask />

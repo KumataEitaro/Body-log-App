@@ -22,7 +22,7 @@ const GUIDE_DONE_KEY = 'bl-guide-done';
 const HILITE = '#f59e0b'; // ハイライト色（ドックのティールと区別するアンバー）
 
 type Rct = { x: number; y: number; w: number; h: number };
-type SpotStep = { kind: 'spot'; route: string; target: string; title: string; text: string };
+type SpotStep = { kind: 'spot'; route: string; target: string; title: string; text: string; demo?: 'coach' };
 type CardStep = { kind: 'card'; id: 'welcome' | 'profile' | 'goal' | 'done' };
 type StepDef = SpotStep | CardStep;
 
@@ -35,7 +35,7 @@ const STEPS: StepDef[] = [
   { kind: 'spot', route: '/training', target: 'trainInput', title: '筋トレの記録', text: '種目・kg・回数・セットを入れて保存。保存するとレストタイマーが自動で走ります。' },
   { kind: 'spot', route: '/changes', target: 'chart', title: '変化を見る', text: '体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。' },
   { kind: 'spot', route: '/changes', target: 'gear', title: '設定はここ', text: 'プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。' },
-  { kind: 'spot', route: '/coach', target: 'welcome', title: 'AIコーチ', text: '迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。' },
+  { kind: 'spot', route: '/coach', target: 'welcome', title: 'AIコーチ', text: '迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。', demo: 'coach' },
   { kind: 'card', id: 'done' },
 ];
 
@@ -43,8 +43,9 @@ type Ctx = {
   active: boolean;
   start: () => void;
   register: (key: string, ref: RefObject<View | null>) => void;
+  registerScroller: (route: string, scrollBy: (delta: number) => void) => void;
 };
-const GuideCtx = createContext<Ctx>({ active: false, start: () => {}, register: () => {} });
+const GuideCtx = createContext<Ctx>({ active: false, start: () => {}, register: () => {}, registerScroller: () => {} });
 export const useGuide = () => useContext(GuideCtx);
 
 // 各画面がハイライト対象を登録するためのフック（refを対象Viewに渡す）
@@ -58,21 +59,35 @@ export function useGuideTarget(key: string) {
 export function GuideProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
   const targets = useRef(new Map<string, RefObject<View | null>>());
+  const scrollers = useRef(new Map<string, (delta: number) => void>());
   const register = useCallback((key: string, ref: RefObject<View | null>) => {
     targets.current.set(key, ref);
   }, []);
+  const registerScroller = useCallback((route: string, scrollBy: (delta: number) => void) => {
+    scrollers.current.set(route, scrollBy);
+  }, []);
   const start = useCallback(() => setActive(true), []);
   return (
-    <GuideCtx.Provider value={{ active, start, register }}>
+    <GuideCtx.Provider value={{ active, start, register, registerScroller }}>
       <View style={{ flex: 1 }}>
         {children}
-        {active && <GuideOverlay targets={targets} close={() => setActive(false)} />}
+        {active && <GuideOverlay targets={targets} scrollers={scrollers} close={() => setActive(false)} />}
       </View>
     </GuideCtx.Provider>
   );
 }
 
-function GuideOverlay({ targets, close }: { targets: RefObject<Map<string, RefObject<View | null>>>; close: () => void }) {
+// 画面側がガイドの自動スクロールを受け入れるためのフック
+export function useGuideScroller(route: string, scrollBy: (delta: number) => void) {
+  const { registerScroller } = useGuide();
+  useEffect(() => { registerScroller(route, scrollBy); }, [route, registerScroller, scrollBy]);
+}
+
+function GuideOverlay({ targets, scrollers, close }: {
+  targets: RefObject<Map<string, RefObject<View | null>>>;
+  scrollers: RefObject<Map<string, (delta: number) => void>>;
+  close: () => void;
+}) {
   const router = useRouter();
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rct | null>(null);
@@ -102,26 +117,45 @@ function GuideOverlay({ targets, close }: { targets: RefObject<Map<string, RefOb
     else setIdx(idx + 1);
   }, [idx, finish]);
 
-  // spotステップ: 対象タブへ自動遷移→レイアウト確定を待って対象を測定
+  // spotステップ: 対象タブへ自動遷移→対象が画面外なら「指で動かすような」自動スクロールで
+  // 全体を可視域に入れてから測定・照射する
   useEffect(() => {
     setRect(null);
     if (step.kind !== 'spot') return;
     router.navigate(step.route as never);
     let tries = 0;
+    let scrolled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const later = (fn: () => void, ms: number) => { timers.push(setTimeout(fn, ms)); };
     const tryMeasure = () => {
       tries += 1;
       const r = targets.current?.get(step.target);
       if (r?.current) {
         r.current.measureInWindow((x, y, w, h) => {
-          if (w > 0 && h > 0) setRect({ x, y, w, h });
-          else if (tries < 6) setTimeout(tryMeasure, 250);
-          else next(); // 対象が見つからない環境ではそのステップを飛ばす
+          if (!(w > 0 && h > 0)) {
+            if (tries < 6) later(tryMeasure, 250); else next();
+            return;
+          }
+          // 吹き出し分の余白を確保した可視域: 上110px〜下(H-290)px
+          const topSafe = 110;
+          const bottomSafe = H - 290;
+          const fitH = Math.min(h, bottomSafe - topSafe);
+          const desiredTop = Math.min(Math.max(y, topSafe), bottomSafe - fitH);
+          const delta = y - desiredTop;
+          const scroller = scrollers.current?.get(step.route);
+          if (!scrolled && Math.abs(delta) > 24 && scroller) {
+            scrolled = true;
+            scroller(delta); // ネイティブのease(ゆっくり動き出しゆっくり止まる)でスクロール
+            later(tryMeasure, 750); // スクロール完了を待って再測定
+            return;
+          }
+          setRect({ x, y, w, h });
         });
-      } else if (tries < 6) setTimeout(tryMeasure, 250);
+      } else if (tries < 6) later(tryMeasure, 250);
       else next();
     };
-    const t = setTimeout(tryMeasure, 450);
-    return () => clearTimeout(t);
+    later(tryMeasure, 450);
+    return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx]);
 
@@ -163,6 +197,7 @@ function GuideOverlay({ targets, close }: { targets: RefObject<Map<string, RefOb
         <View style={[s.bubble, bubbleBelow ? { top: hole.y + hole.h + 14 } : { bottom: H - hole.y + 14 }]}>
           <Text style={s.bubbleTitle}>{step.title}</Text>
           <Text style={s.bubbleText}>{step.text}</Text>
+          {step.demo === 'coach' && <CoachDemo />}
           <Pressable style={s.nextBtn} onPress={next}>
             <Text style={s.nextBtnT}>{lastSpot ? '最後へ' : '次へ'}</Text>
           </Pressable>
@@ -311,6 +346,52 @@ function GoalCard({ onDone }: { onDone: () => void }) {
   );
 }
 
+// AIコーチの自動デモ: 質問が勝手にタイプされ→考え中→回答がふわっと現れる
+function CoachDemo() {
+  const Q = '昨日食べすぎちゃった…どうすれば？';
+  const A = 'まず大丈夫、1日では太りません。今日は目標を少し緩めて、たんぱく質を多めに。挽回は2〜3日かけるのがコツです💪';
+  const [qLen, setQLen] = useState(0);
+  const [phase, setPhase] = useState<'typing' | 'thinking' | 'answer'>('typing');
+  const fade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setQLen((n) => {
+        if (n >= Q.length) { clearInterval(iv); setPhase('thinking'); return n; }
+        return n + 1;
+      });
+    }, 65);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'thinking') return;
+    const t = setTimeout(() => {
+      setPhase('answer');
+      Animated.timing(fade, { toValue: 1, duration: 550, useNativeDriver: true }).start();
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  return (
+    <View style={s.demoWrap}>
+      <View style={s.demoUser}>
+        <Text style={s.demoUserT}>{Q.slice(0, qLen)}{phase === 'typing' ? '▍' : ''}</Text>
+      </View>
+      {phase === 'thinking' && (
+        <View style={s.demoAi}><Text style={s.demoAiT}>考え中…</Text></View>
+      )}
+      {phase === 'answer' && (
+        <Animated.View style={[s.demoAi, { opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }]}>
+          <Text style={s.demoAiT}>{A}</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
 function DoneCard({ onFinish }: { onFinish: () => void }) {
   return (
     <View style={s.card}>
@@ -335,6 +416,11 @@ const s = StyleSheet.create({
   bubbleTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 5 },
   bubbleText: { fontSize: 13, color: C.sub, lineHeight: 20 },
   nextBtn: { backgroundColor: HILITE, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 12 },
+  demoWrap: { marginTop: 10, gap: 6 },
+  demoUser: { alignSelf: 'flex-end', backgroundColor: C.ink, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '90%' },
+  demoUserT: { color: '#fff', fontSize: 12.5, lineHeight: 18 },
+  demoAi: { alignSelf: 'flex-start', backgroundColor: '#f2f4f1', borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '92%' },
+  demoAiT: { color: C.ink, fontSize: 12.5, lineHeight: 19 },
   nextBtnT: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   beak: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
   beakUp: { top: -10, borderBottomWidth: 10, borderBottomColor: '#fff' },

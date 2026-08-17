@@ -22,7 +22,7 @@ import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
-import { useGuide, useGuideTarget } from '@/components/GuideTour';
+import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
@@ -115,6 +115,11 @@ export default function LogScreen() {
   const guide = useGuide();
   const heroTarget = useGuideTarget('hero');
   const dockTarget = useGuideTarget('dock');
+  const scrollYNow = useRef(0);
+  useGuideScroller('/log', useCallback((delta: number) => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, scrollYNow.current + delta), animated: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
   useEffect(() => {
     AsyncStorage.getItem('bl-guide-done').then((v) => {
       if (!v) setTimeout(() => guide.start(), 1200);
@@ -434,6 +439,8 @@ export default function LogScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        onScroll={(e) => { scrollYNow.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={32}
       >
         <View style={s.brandRow}>
           <Text style={s.brand}>BodyLog</Text>

@@ -30,10 +30,11 @@ type Props = {
   onEnterEdit: () => void;
   refreshControl?: ReactElement<RefreshControlProps>;
   contentContainerStyle?: object;
+  onScroller?: (scrollBy: (delta: number) => void) => void; // ガイドツアーの自動スクロール受け口
 };
 
 export default function ReorderableCards({
-  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle,
+  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller,
 }: Props) {
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollY = useSharedValue(0);
@@ -54,6 +55,15 @@ export default function ReorderableCards({
   const winH = Dimensions.get('window').height;
 
   useEffect(() => () => { if (autoScroll.current) clearInterval(autoScroll.current); }, []);
+
+  // ガイドツアー用: 相対スクロール（ネイティブease付き）
+  useEffect(() => {
+    onScroller?.((delta) => {
+      scrollNow.current = Math.max(0, scrollNow.current + delta);
+      scrollRef.current?.scrollTo({ y: scrollNow.current, animated: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function stopAutoScroll() {
     if (autoScroll.current) { clearInterval(autoScroll.current); autoScroll.current = null; }

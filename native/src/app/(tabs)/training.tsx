@@ -1,6 +1,6 @@
 // トレーニングタブ（Phase 2）: 筋トレ入力・挙上重量の推移・ボリューム判定・履歴。
 // Web版 /training の移植（ヘルスケアのワークアウト表示はPhase 3=dev clientビルド後）
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -8,7 +8,7 @@ import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
-import { useGuideTarget } from '@/components/GuideTour';
+import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 
@@ -21,6 +21,11 @@ export default function TrainingScreen() {
   const [saving, setSaving] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒
   const trainInputTarget = useGuideTarget('trainInput');
+  const trScrollRef = useRef<ScrollView>(null);
+  const trY = useRef(0);
+  useGuideScroller('/training', useCallback((delta: number) => {
+    trScrollRef.current?.scrollTo({ y: Math.max(0, trY.current + delta), animated: true });
+  }, []));
 
   // レストタイマーのカウントダウン
   useEffect(() => {
@@ -85,7 +90,9 @@ export default function TrainingScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
+      ref={trScrollRef}
       style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+      onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       <Text style={s.h}>トレーニング</Text>
