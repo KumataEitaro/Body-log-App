@@ -90,7 +90,9 @@ export default function CoachPage() {
             </p>
           )}
           {msgs.map((m, i) => (
-            <div key={i} className={`chat-b ${m.role}`}>{m.text}</div>
+            <div key={i} className={`chat-b ${m.role}`}>
+              {m.text.split(/\*\*(.+?)\*\*/g).map((p, j) => (j % 2 === 1 ? <b key={j}>{p}</b> : p))}
+            </div>
           ))}
           {busy && <div className="chat-b ai"><span className="spin" />データを確認しています…</div>}
         </div>

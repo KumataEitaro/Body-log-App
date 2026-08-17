@@ -9,6 +9,29 @@ import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 
 type Msg = { role: 'user' | 'ai'; text: string };
+
+// AI回答の軽量リッチ表示: **太字**・「・」箇条書き・空行をネイティブに描画（Wall of Text対策）
+function RichText({ text, style }: { text: string; style: object }) {
+  const bold = (s2: string) =>
+    s2.split(/\*\*(.+?)\*\*/g).map((p, j) => (j % 2 === 1 ? <Text key={j} style={{ fontWeight: '800' }}>{p}</Text> : p));
+  return (
+    <View>
+      {text.split('\n').map((ln, i) => {
+        if (ln.trim() === '') return <View key={i} style={{ height: 7 }} />;
+        const m = ln.match(/^[・\-•]\s?(.*)$/);
+        if (m) {
+          return (
+            <View key={i} style={{ flexDirection: 'row', marginTop: 2 }}>
+              <Text style={[style, { marginRight: 5 }]}>・</Text>
+              <Text style={[style, { flex: 1 }]}>{bold(m[1])}</Text>
+            </View>
+          );
+        }
+        return <Text key={i} style={style}>{bold(ln)}</Text>;
+      })}
+    </View>
+  );
+}
 const QUICK = ['気分がすぐれないんだけど、何が原因かな', '過食しちゃった…', '体重が減らなくなってきた', '最近トレの調子が上がらない'];
 
 export default function CoachScreen() {
@@ -53,7 +76,9 @@ export default function CoachScreen() {
           )}
           {msgs.map((m, i) => (
             <View key={i} style={[s.bubble, m.role === 'user' ? s.bUser : s.bAi]}>
-              <Text style={[s.bubbleT, m.role === 'user' && { color: '#fff' }]}>{m.text}</Text>
+              {m.role === 'ai'
+                ? <RichText text={m.text} style={s.bubbleT} />
+                : <Text style={[s.bubbleT, { color: '#fff' }]}>{m.text}</Text>}
             </View>
           ))}
           {busy && (

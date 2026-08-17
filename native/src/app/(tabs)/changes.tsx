@@ -10,9 +10,11 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
+import { logIcon, logTitle } from '@/lib/feed';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; target: number; diff: number | null };
-type DayDetail = { id: string; at: string | null; text: string; kcal: number | null }[];
+import { type FoodItem } from '@/lib/items';
+type DayDetail = { id: string; at: string | null; text: string; kcal: number | null; items: FoodItem[] | null; weight: number | null; ex: string | null; mood: string | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
 
 const SERIES = [
@@ -77,7 +79,7 @@ export default function ChangesScreen() {
   async function openDay(dateKey: string) {
     if (daySel === dateKey) { setDaySel(null); setDayDetail(null); return; }
     setDaySel(dateKey); setDayDetail(null);
-    const { data } = await supabase.from('logs').select('id,at,text,kcal')
+    const { data } = await supabase.from('logs').select('id,at,text,kcal,items,weight,ex,mood')
       .eq('date', dateKey).order('at', { ascending: true });
     setDayDetail((data as DayDetail) || []);
   }
@@ -195,8 +197,11 @@ export default function ChangesScreen() {
             {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>この日の記録はありません。</Text>}
             {dayDetail?.map((l) => (
               <View key={l.id} style={s.dayRow}>
-                <Text style={s.dayText}>{l.text || '（メモなし）'}</Text>
-                {l.kcal != null && <Text style={s.dayKcal}>{Math.round(Number(l.kcal))}kcal</Text>}
+                <Text style={{ fontSize: 13 }}>{logIcon(l)}</Text>
+                <Text style={s.dayText} numberOfLines={2}>{logTitle(l)}</Text>
+                {l.kcal != null && (
+                  <View style={s.kcalBadge}><Text style={s.kcalBadgeT}>{Math.round(Number(l.kcal)).toLocaleString()} kcal</Text></View>
+                )}
               </View>
             ))}
           </View>
@@ -256,9 +261,10 @@ const s = StyleSheet.create({
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
   dayHead: { fontSize: 12.5, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
-  dayRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingVertical: 4 },
+  dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   dayText: { flex: 1, fontSize: 13, color: C.ink, lineHeight: 19 },
-  dayKcal: { fontSize: 12.5, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  kcalBadge: { backgroundColor: '#eef4f0', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  kcalBadgeT: { fontSize: 11.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   fxHead: { fontSize: 11.5, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   fxName: { fontSize: 13.5, fontWeight: '700', color: C.ink },

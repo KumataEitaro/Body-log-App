@@ -23,6 +23,7 @@ export default function MonthCalendar({
   const [y0, m0] = today.split('-').map(Number);
   const [view, setView] = useState({ y: y0, m: m0 - 1 }); // m: 0-11
 
+  const isCurrentMonth = view.y === y0 && view.m === m0 - 1; // 未来月へは進めない（全部空になるだけ）
   const first = new Date(view.y, view.m, 1);
   const lastDate = new Date(view.y, view.m + 1, 0).getDate();
   const cells: (number | null)[] = [...Array(first.getDay()).fill(null), ...Array.from({ length: lastDate }, (_, i) => i + 1)];
@@ -37,7 +38,9 @@ export default function MonthCalendar({
       <View style={s.head}>
         <Pressable style={s.nav} onPress={() => shiftMonth(-1)} hitSlop={8}><Text style={s.navT}>‹</Text></Pressable>
         <Text style={s.month}>{view.y}年{view.m + 1}月</Text>
-        <Pressable style={s.nav} onPress={() => shiftMonth(1)} hitSlop={8}><Text style={s.navT}>›</Text></Pressable>
+        <Pressable style={s.nav} onPress={() => shiftMonth(1)} hitSlop={8} disabled={isCurrentMonth}>
+          <Text style={[s.navT, isCurrentMonth && { opacity: 0.25 }]}>›</Text>
+        </Pressable>
       </View>
       <View style={s.grid}>
         {DOW.map((d, i) => (

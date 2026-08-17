@@ -18,6 +18,7 @@ import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
+import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
@@ -336,16 +337,6 @@ export default function LogScreen() {
     setBackfill(null);
   }
 
-  function feedTitle(l: DayLog): string {
-    const items = (l.items as FoodItem[]) || [];
-    if (l.kcal != null && items.length > 0) {
-      const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
-      return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
-    }
-    if (l.weight != null) return `体重 ${Number(l.weight).toFixed(1)}kg`;
-    if (l.ex && l.ex !== 'オフ') return `運動 ${l.ex}`;
-    return String(l.text || l.mood || '記録').slice(0, 40);
-  }
 
   const parsedTotal = parsed ? sumItems(parsed.items) : null;
 
@@ -443,7 +434,8 @@ export default function LogScreen() {
           {dayLogs.map((l) => (
             <View key={l.id} style={s.feedRow}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
-              <Text style={s.feedTitle} numberOfLines={2}>{feedTitle(l)}</Text>
+              <Text style={{ fontSize: 13, marginRight: 2 }}>{logIcon(l)}</Text>
+              <Text style={s.feedTitle} numberOfLines={2}>{logTitle(l)}</Text>
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
             </View>
           ))}
