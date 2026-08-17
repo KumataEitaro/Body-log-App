@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert,
+  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated,
 } from 'react-native';
+import { Pencil } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -64,6 +65,19 @@ export default function LogScreen() {
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
+
+  // 入力ドックのパルス発光（画面を開いた瞬間に「ここが入力欄」と分かるように）
+  const glow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 1, duration: 1250, useNativeDriver: false }),
+      Animated.timing(glow, { toValue: 0, duration: 1250, useNativeDriver: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [glow]);
+  const glowBorder = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(5,150,105,0.45)', 'rgba(5,150,105,1)'] });
+  const glowShadow = glow.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.3] });
   function toggleFoodsView() {
     const v = foodsView === 'row' ? 'grid' : 'row';
     setFoodsView(v);
@@ -649,24 +663,28 @@ export default function LogScreen() {
             </View>
           );
         })()}
-        <View style={s.dock}>
+        <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow }]}>
+          {/* 「ここが入力欄」の直感サイン */}
+          <View style={s.pencilBadge}>
+            <Pencil color={C.teal} size={16} strokeWidth={2.5} />
+          </View>
+          <TextInput
+            ref={inputRef} multiline
+            style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
+            placeholder="ここをタップして食事を入力…" placeholderTextColor={C.sub}
+            value={chat} onChangeText={setChat}
+            onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
+          />
           <Pressable onPress={takePhoto} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
             <Text style={s.dockIcon}>📷</Text>
           </Pressable>
           <Pressable onPress={pickPhotos} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
             <Text style={s.dockIcon}>🖼</Text>
           </Pressable>
-          <TextInput
-            ref={inputRef} multiline
-            style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
-            placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
-            value={chat} onChangeText={setChat}
-            onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
-          />
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <Text style={s.dockSendT}>↑</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
       <StatusBarMask />
     </KeyboardAvoidingView>
@@ -724,13 +742,14 @@ const s = StyleSheet.create({
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 24,
-    paddingHorizontal: 8, paddingVertical: 5,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#ffffff', borderWidth: 2, borderColor: C.teal, borderRadius: 18,
+    paddingHorizontal: 8, paddingVertical: 6,
+    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, elevation: 8,
   },
   dockIconBtn: { padding: 4 },
   dockIcon: { fontSize: 18 },
-  dockInput: { flex: 1, fontSize: 16, color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
+  dockInput: { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
+  pencilBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#e6f7f2', alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
   dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },

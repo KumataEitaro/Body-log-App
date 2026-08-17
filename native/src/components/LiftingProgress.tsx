@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
-import SimpleChart from '@/components/SimpleChart';
+import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 
 function shiftDate(d: string, n: number): string {
@@ -110,10 +110,11 @@ export default function LiftingProgress() {
           </Pressable>
         ))}
       </View>
-      <SimpleChart
+      <InteractiveChart
         points={exPoints.map((p) => ({ date: p.date, value: chartMode === 'kg' ? p.maxKg : p.volume }))}
         unit={chartMode === 'kg' ? 'kg' : 'kg·回'} decimals={0}
         planValue={chartMode === 'kg' && activeEx ? goalKg.get(activeEx) ?? null : null}
+        presetDays={null}
       />
       {/* 種目セレクタ（チップ⇄リストの表示切替つき） */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>

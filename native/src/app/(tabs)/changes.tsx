@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
-import SimpleChart, { type ChartPoint } from '@/components/SimpleChart';
+import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
@@ -105,15 +105,14 @@ export default function ChangesScreen() {
   }
 
   const today = todayJST();
-  const from = addDays(today, -range);
-  const inRange = rows.filter((r) => range >= 9999 || r.date >= from);
 
+  // チャートには全期間を渡し、表示窓（presetDays＋ピンチ/パン）で絞る
   const points: ChartPoint[] = (() => {
     switch (serie) {
-      case 'weight': return inRange.filter((r) => r.weight != null).map((r) => ({ date: r.date, value: r.weight! }));
-      case 'waist': return inRange.filter((r) => r.waist != null).map((r) => ({ date: r.date, value: r.waist! }));
-      case 'intake': return inRange.filter((r) => r.intake != null).map((r) => ({ date: r.date, value: r.intake! }));
-      case 'burn': return inRange.map((r) => ({ date: r.date, value: r.target }));
+      case 'weight': return rows.filter((r) => r.weight != null).map((r) => ({ date: r.date, value: r.weight! }));
+      case 'waist': return rows.filter((r) => r.waist != null).map((r) => ({ date: r.date, value: r.waist! }));
+      case 'intake': return rows.filter((r) => r.intake != null).map((r) => ({ date: r.date, value: r.intake! }));
+      case 'burn': return rows.map((r) => ({ date: r.date, value: r.target }));
     }
   })();
   const conf = SERIES.find((x) => x.key === serie)!;
@@ -230,9 +229,10 @@ export default function ChangesScreen() {
             </Pressable>
           ))}
         </View>
-        <SimpleChart
+        <InteractiveChart
           points={points} unit={conf.unit} decimals={conf.decimals}
           planValue={serie === 'weight' && goal?.target_weight != null ? Number(goal.target_weight) : null}
+          presetDays={range >= 9999 ? null : range}
         />
         <View style={s.chips}>
           {RANGES.map((r) => (
