@@ -1,12 +1,14 @@
 // AIコーチ相談タブ: 本人データを根拠に回答
 // 初期状態は中央寄せのウェルカムUI（アイコン+2x2クイック質問）。会話開始後は通常のタイムライン
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, type LucideIcon } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, type LucideIcon } from 'lucide-react-native';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
@@ -24,6 +26,11 @@ type CoachAction =
   | { kind: 'training'; name: string; target_kg: number; label: string };
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
+
+// 過去の相談は端末に保存して日付で振り返れるようにする
+type HistEntry = { d: string; role: 'user' | 'ai'; text: string };
+const HIST_KEY = 'bl-coach-history';
+const HIST_MAX = 800;
 
 const QUICK: { Icon: LucideIcon; t: string }[] = [
   { Icon: Utensils, t: '過食しちゃった時の対処法' },
@@ -63,26 +70,66 @@ export default function CoachScreen() {
   const insets = useSafeAreaInsets();
   const welcomeTarget = useGuideTarget('welcome');
   const kbVisible = useKeyboardVisible();
+  const [histOpen, setHistOpen] = useState(false);
+  const [histQ, setHistQ] = useState('');
+  const [hist, setHist] = useState<HistEntry[]>([]);
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }, [msgs, busy]);
 
+  // 他タブで開いたキーボードを引き継がない（入力欄をタップしたときだけ立ち上げる）
+  useFocusEffect(useCallback(() => { Keyboard.dismiss(); }, []));
+
+  // 相談履歴のロード＆追記（端末ローカル・日付検索用）
+  useEffect(() => {
+    AsyncStorage.getItem(HIST_KEY).then((raw) => {
+      if (raw) { try { setHist(JSON.parse(raw)); } catch { /* 壊れていたら空から */ } }
+    });
+  }, []);
+  function logHist(role: 'user' | 'ai', text: string) {
+    setHist((prev) => {
+      const next = [...prev, { d: new Date().toISOString(), role, text }].slice(-HIST_MAX);
+      AsyncStorage.setItem(HIST_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }
+
+  // 検索（日付 "8/15"・"2026/8/15" or キーワード）→ 日付ごとにグループ化（新しい日が上）
+  const histGroups = useMemo(() => {
+    const q = histQ.trim().toLowerCase();
+    const fmt = (iso: string) => {
+      const t = new Date(iso);
+      return `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()}`;
+    };
+    const groups: { date: string; items: HistEntry[] }[] = [];
+    for (const e of hist) {
+      const date = fmt(e.d);
+      if (q && !date.includes(q) && !date.slice(5).includes(q) && !e.text.toLowerCase().includes(q)) continue;
+      const g = groups[groups.length - 1];
+      if (g && g.date === date) g.items.push(e);
+      else groups.push({ date, items: [e] });
+    }
+    return groups.reverse();
+  }, [hist, histQ]);
+
   async function send(q: string) {
     const question = q.trim();
     if (!question || busy) return;
-    const hist = msgs.slice(-6);
+    const history = msgs.slice(-6);
     setMsgs((m) => [...m, { role: 'user', text: question }]);
+    logHist('user', question);
     setInput('');
     setBusy(true);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string }>(
-        '/api/coach', { question, history: hist });
+        '/api/coach', { question, history });
       if (!ok || !json?.ok || !json.answer) {
         setMsgs((m) => [...m, { role: 'ai', text: json?.error || 'うまく答えられませんでした。もう一度お試しください。' }]);
         return;
       }
       setMsgs((m) => [...m, { role: 'ai', text: json.answer!, action: json.action ?? undefined }]);
+      logHist('ai', json.answer!);
     } catch {
       setMsgs((m) => [...m, { role: 'ai', text: '通信に失敗しました。電波状況を確認してください。' }]);
     } finally {
@@ -131,20 +178,26 @@ export default function CoachScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={s.wrap}>
         {empty ? (
-          /* ===== Empty State: 中央寄せのウェルカムUI ===== */
-          <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}>
-            <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
-            <Text style={s.welcomeTitle}>AIコーチに相談する</Text>
-            <Text style={s.welcomeSub}>直近の食事・体重・栄養ログをもとにアドバイスします</Text>
-            <View style={s.quickGrid}>
-              {QUICK.map((q) => (
-                <Pressable key={q.t} style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.7 }]} onPress={() => send(q.t)}>
-                  <q.Icon color={C.teal} size={21} strokeWidth={2.2} />
-                  <Text style={s.quickT}>{q.t}</Text>
-                </Pressable>
-              ))}
+          /* ===== Empty State: 中央寄せのウェルカムUI（キーボード表示中はスクロールしてロゴまで見える） ===== */
+          <ScrollView
+            contentContainerStyle={[s.welcomeScroll, { paddingTop: insets.top + 8 }]}
+            keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}>
+            <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}
+                  onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+              <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
+              <Text style={s.welcomeTitle}>AIコーチに相談する</Text>
+              <Text style={s.welcomeSub}>直近の食事・体重・栄養ログをもとにアドバイスします</Text>
+              <View style={s.quickGrid}>
+                {QUICK.map((q) => (
+                  <Pressable key={q.t} style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.7 }]} onPress={() => send(q.t)}>
+                    <q.Icon color={C.teal} size={21} strokeWidth={2.2} />
+                    <Text style={s.quickT}>{q.t}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
+          </ScrollView>
         ) : (
           /* ===== 会話タイムライン ===== */
           <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 8 }}
@@ -199,13 +252,50 @@ export default function CoachScreen() {
       </View>
       <StatusBarMask />
       <HeaderGear />
+      {/* 左上: 相談履歴（⚙とミラー配置） */}
+      <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
+        <History size={16} color={C.sub} />
+      </Pressable>
+
+      {/* ===== 相談履歴モーダル: 日付グループ＋日付/キーワード検索 ===== */}
+      <Modal visible={histOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHistOpen(false)}>
+        <View style={s.histWrap}>
+          <View style={s.histHead}>
+            <Text style={s.histTitle}>相談履歴</Text>
+            <Pressable onPress={() => setHistOpen(false)} hitSlop={10}><X size={20} color={C.sub} /></Pressable>
+          </View>
+          <TextInput
+            style={s.histSearch} placeholder="日付やキーワードで検索（例: 8/15、タンパク質）" placeholderTextColor={C.faint}
+            value={histQ} onChangeText={setHistQ} returnKeyType="search" clearButtonMode="while-editing"
+          />
+          {histGroups.length === 0 ? (
+            <Text style={s.histEmpty}>{hist.length === 0 ? 'まだ相談履歴がありません。' : '該当する履歴が見つかりません。'}</Text>
+          ) : (
+            <ScrollView style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+              {histGroups.map((g) => (
+                <View key={g.date} style={{ marginBottom: 16 }}>
+                  <Text style={s.histDate}>{g.date}</Text>
+                  {g.items.map((e, i) => (
+                    <View key={i} style={[s.bubble, e.role === 'user' ? s.bUser : s.bAi]}>
+                      {e.role === 'ai'
+                        ? <RichText text={e.text} style={s.bubbleT} />
+                        : <Text style={[s.bubbleT, { color: '#fff' }]}>{e.text}</Text>}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
   wrap: { flex: 1, paddingHorizontal: 16, paddingBottom: 6 },
-  welcomeWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 30 },
+  welcomeScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 10 },
+  welcomeWrap: { alignItems: 'center', paddingBottom: 30 },
   welcomeIcon: {
     width: 76, height: 76, borderRadius: 38, backgroundColor: C.panel,
     borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', marginBottom: 14,
@@ -240,4 +330,19 @@ const s = StyleSheet.create({
   sendInline: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 10, color: C.faint, marginTop: 5 },
+  histBtn: {
+    position: 'absolute', left: 16, zIndex: 30,
+    width: 30, height: 30, borderRadius: 9,
+    borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  histWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
+  histHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  histTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  histSearch: {
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: C.ink, marginBottom: 12,
+  },
+  histDate: { fontSize: 12, fontWeight: '800', color: C.sub, marginBottom: 6 },
+  histEmpty: { fontSize: 13, color: C.sub, marginTop: 24, textAlign: 'center' },
 });
