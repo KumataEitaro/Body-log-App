@@ -5,6 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, type LucideIcon } from 'lucide-react-native';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
@@ -55,6 +56,7 @@ export default function CoachScreen() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -139,7 +141,7 @@ export default function CoachScreen() {
           </View>
         ) : (
           /* ===== 会話タイムライン ===== */
-          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 56, paddingBottom: 8 }}
+          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 8 }}
                       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {msgs.map((m, i) => (
               <View key={i}>
