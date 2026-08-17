@@ -58,8 +58,16 @@ export default function LogScreen() {
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
   const [pendingTexts, setPendingTexts] = useState<string[]>([]);
+  const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
+  function toggleFoodsView() {
+    const v = foodsView === 'row' ? 'grid' : 'row';
+    setFoodsView(v);
+    AsyncStorage.setItem('bl-foods-view', v).catch(() => {});
+  }
 
   // ウィジェット/ディープリンク（bodylog://log?quick=1）→ ドックに即フォーカス
   const { quick } = useLocalSearchParams<{ quick?: string }>();
@@ -528,28 +536,42 @@ export default function LogScreen() {
             ))}
           </ScrollView>
         )}
-        {/* マイ食品チップ（連打で×2、−で減。ドックの真上に常駐） */}
-        {myFoods.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }} keyboardShouldPersistTaps="handled">
-            {myFoods.map((fd) => {
-              const cnt = parsed ? servingCount(parsed.items, fd) : null;
-              return (
-                <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
-                  <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
-                    <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
-                      {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
-                    </Text>
+        {/* マイ食品チップ（連打で×2、−で減。1行スクロール⇄全展開グリッドを切替可能） */}
+        {myFoods.length > 0 && (() => {
+          const chipEls = myFoods.map((fd) => {
+            const cnt = parsed ? servingCount(parsed.items, fd) : null;
+            return (
+              <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
+                <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
+                  <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
+                    {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
+                  </Text>
+                </Pressable>
+                {cnt != null && (
+                  <Pressable onPress={() => decFood(fd)} style={s.chipMinus}>
+                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
                   </Pressable>
-                  {cnt != null && (
-                    <Pressable onPress={() => decFood(fd)} style={s.chipMinus}>
-                      <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
+                )}
+              </View>
+            );
+          });
+          return (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
+              {foodsView === 'row' ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+                  {chipEls}
+                </ScrollView>
+              ) : (
+                <ScrollView style={{ flex: 1, maxHeight: 150 }} keyboardShouldPersistTaps="handled">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{chipEls}</View>
+                </ScrollView>
+              )}
+              <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
+                <Text style={s.viewToggleT}>{foodsView === 'row' ? '▦' : '▬'}</Text>
+              </Pressable>
+            </View>
+          );
+        })()}
         <View style={s.dock}>
           <Pressable onPress={takePhoto} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
             <Text style={s.dockIcon}>📷</Text>
@@ -631,6 +653,8 @@ const s = StyleSheet.create({
   dockInput: { flex: 1, fontSize: 16, color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
   dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
+  viewToggleT: { fontSize: 12, color: C.sub, fontWeight: '700' },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },

@@ -2,6 +2,7 @@
 // トレタブから移設: 種目切替・重量/ボリューム切替・目標線・ボリューム判定
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
@@ -14,6 +15,14 @@ export default function LiftingProgress() {
   const [goalKg, setGoalKg] = useState<Map<string, number>>(new Map());
   const [selEx, setSelEx] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<'kg' | 'volume'>('kg');
+  const [exView, setExView] = useState<'chips' | 'list'>('chips');
+
+  useEffect(() => { AsyncStorage.getItem('bl-ex-view').then((v) => { if (v === 'list') setExView('list'); }).catch(() => {}); }, []);
+  function toggleExView() {
+    const v = exView === 'chips' ? 'list' : 'chips';
+    setExView(v);
+    AsyncStorage.setItem('bl-ex-view', v).catch(() => {});
+  }
 
   const load = useCallback(async () => {
     const [{ data }, { data: tg }] = await Promise.all([
@@ -55,12 +64,29 @@ export default function LiftingProgress() {
         unit={chartMode === 'kg' ? 'kg' : 'kg·回'} decimals={0}
         planValue={chartMode === 'kg' && activeEx ? goalKg.get(activeEx) ?? null : null}
       />
-      <View style={s.chips}>
-        {exercises.map((n) => (
-          <Pressable key={n} style={[s.chip, n === activeEx && s.chipOn]} onPress={() => setSelEx(n)}>
-            <Text style={[s.chipT, n === activeEx && { color: '#fff' }]}>{n}</Text>
-          </Pressable>
-        ))}
+      {/* 種目セレクタ（チップ⇄リストの表示切替つき） */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        {exView === 'chips' ? (
+          <View style={[s.chips, { flex: 1 }]}>
+            {exercises.map((n) => (
+              <Pressable key={n} style={[s.chip, n === activeEx && s.chipOn]} onPress={() => setSelEx(n)}>
+                <Text style={[s.chipT, n === activeEx && { color: '#fff' }]}>{n}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={{ flex: 1, marginVertical: 8 }}>
+            {exercises.map((n) => (
+              <Pressable key={n} style={s.listRow} onPress={() => setSelEx(n)}>
+                <Text style={[s.listT, n === activeEx && { color: C.ink, fontWeight: '800' }]}>{n}</Text>
+                {n === activeEx && <Text style={{ color: C.teal, fontWeight: '800' }}>✓</Text>}
+              </Pressable>
+            ))}
+          </View>
+        )}
+        <Pressable onPress={toggleExView} hitSlop={8} style={s.viewToggle}>
+          <Text style={s.viewToggleT}>{exView === 'chips' ? '☰' : '▤'}</Text>
+        </Pressable>
       </View>
       {verdict && (
         <Text style={[s.verdict, { color: verdict.trend === 'down' ? C.amber : C.teal }]}>
@@ -85,4 +111,8 @@ const s = StyleSheet.create({
   chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
   verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
   muted: { fontSize: 11, color: C.faint, marginTop: 4 },
+  listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: C.line },
+  listT: { fontSize: 13.5, color: C.sub, fontWeight: '600' },
+  viewToggle: { marginLeft: 6, marginTop: 8, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+  viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
 });
