@@ -5,7 +5,8 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { ArrowUp } from 'lucide-react-native';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, type LucideIcon } from 'lucide-react-native';
+import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -19,12 +20,12 @@ type CoachAction =
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
 
-const QUICK = [
-  { e: '🥪', t: '過食しちゃった時の対処法' },
-  { e: '📉', t: '体重が落ちない原因は？' },
-  { e: '🏋️', t: '今日の筋トレアドバイス' },
-  { e: '💤', t: '気分が乗らない時は？' },
-] as const;
+const QUICK: { Icon: LucideIcon; t: string }[] = [
+  { Icon: Utensils, t: '過食しちゃった時の対処法' },
+  { Icon: TrendingDown, t: '体重が落ちない原因は？' },
+  { Icon: Dumbbell, t: '今日の筋トレアドバイス' },
+  { Icon: Moon, t: '気分が乗らない時は？' },
+];
 
 // AI回答の軽量リッチ表示: **太字**・「・」箇条書き・空行をネイティブに描画（Wall of Text対策）
 function RichText({ text, style }: { text: string; style: object }) {
@@ -124,13 +125,13 @@ export default function CoachScreen() {
         {empty ? (
           /* ===== Empty State: 中央寄せのウェルカムUI ===== */
           <View style={s.welcomeWrap}>
-            <View style={s.welcomeIcon}><Text style={{ fontSize: 36 }}>🧠</Text></View>
+            <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
             <Text style={s.welcomeTitle}>AIコーチに相談する</Text>
             <Text style={s.welcomeSub}>直近の食事・体重・栄養ログをもとにアドバイスします</Text>
             <View style={s.quickGrid}>
               {QUICK.map((q) => (
                 <Pressable key={q.t} style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.7 }]} onPress={() => send(q.t)}>
-                  <Text style={s.quickEmoji}>{q.e}</Text>
+                  <q.Icon color={C.teal} size={21} strokeWidth={2.2} />
                   <Text style={s.quickT}>{q.t}</Text>
                 </Pressable>
               ))}

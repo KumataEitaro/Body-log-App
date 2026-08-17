@@ -1,10 +1,13 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
@@ -29,6 +32,31 @@ const SERIES = [
 ] as const;
 const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '全', d: 9999 }] as const;
 
+// ===== レイアウト並び替え（iOS風Jiggle Mode） =====
+const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'trends', 'health'];
+const TRAIN_ORDER_DEFAULT = ['lifting', 'tgoal'];
+const CARD_LABELS: Record<string, string> = {
+  kpi: 'サマリー', calendar: '📅 カレンダー', chart: '📈 推移グラフ', goal: '🎯 目標設定',
+  trends: '🔬 食材の傾向', health: '⌚ 歩数・睡眠', lifting: '🏋️ トレ実績・グラフ', tgoal: '🎯 種目別目標',
+};
+// 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
+function mergeOrder(saved: string[], def: string[]): string[] {
+  const kept = saved.filter((k) => def.includes(k));
+  return [...kept, ...def.filter((k) => !kept.includes(k))];
+}
+
+// 編集モード中の微振動（Jiggle）
+function Jiggle({ on, children }: { on: boolean; children: ReactNode }) {
+  const rot = useSharedValue(0);
+  useEffect(() => {
+    rot.value = on
+      ? withRepeat(withSequence(withTiming(-0.4, { duration: 140 }), withTiming(0.4, { duration: 140 })), -1, true)
+      : withTiming(0, { duration: 100 });
+  }, [on, rot]);
+  const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
+  return <Animated.View style={st}>{children}</Animated.View>;
+}
+
 function addDays(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
   dt.setDate(dt.getDate() + n);
@@ -45,6 +73,29 @@ export default function ChangesScreen() {
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
+  const [editing, setEditing] = useState(false);
+  const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
+  const [orderTrain, setOrderTrain] = useState<string[]>(TRAIN_ORDER_DEFAULT);
+
+  // 並び順の復元
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = JSON.parse((await AsyncStorage.getItem('bl-order-body')) || 'null');
+        if (Array.isArray(b)) setOrderBody(mergeOrder(b, BODY_ORDER_DEFAULT));
+        const t = JSON.parse((await AsyncStorage.getItem('bl-order-train')) || 'null');
+        if (Array.isArray(t)) setOrderTrain(mergeOrder(t, TRAIN_ORDER_DEFAULT));
+      } catch { /* 初回など */ }
+    })();
+  }, []);
+
+  async function finishEditing() {
+    setEditing(false);
+    try {
+      await AsyncStorage.setItem('bl-order-body', JSON.stringify(orderBody));
+      await AsyncStorage.setItem('bl-order-train', JSON.stringify(orderTrain));
+    } catch { /* 保存失敗はレイアウトが戻るだけ */ }
+  }
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
@@ -149,33 +200,8 @@ export default function ChangesScreen() {
     }
   }
 
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-    <ScrollView
-      style={{ flex: 1 }} contentContainerStyle={s.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-    >
-      <Text style={s.h}>変化</Text>
-
-      {/* トップセグメント: ターゲット軸で2択（実績と目標は同じ画面に縦積み） */}
-      <View style={s.topSegWrap}>
-        {([['body', '🧍 身体の変化'], ['training', '🏋️ 筋トレの成長']] as const).map(([k, l]) => (
-          <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
-            <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {topSeg === 'training' && (
-        <>
-          <LiftingProgress />
-          <GoalPanel mode="training" />
-        </>
-      )}
-
-      {topSeg === 'body' && (
-      <>
-      {/* KPI */}
+  // ===== カード定義（表示順はorderBody/orderTrainの配列で制御） =====
+  const kpiCard = (
       <View style={s.kpiRow}>
         <View style={s.kpi}>
           <Text style={s.kpiL}>体重</Text>
@@ -197,8 +223,9 @@ export default function ChangesScreen() {
           <Text style={s.kpiD}>±0扱い</Text>
         </View>
       </View>
+  );
 
-      {/* カレンダー（サマリーの直下・日タップで詳細） */}
+  const calendarCard = (
       <View style={s.card}>
         <Text style={s.h2}>📅 カレンダー</Text>
         <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
@@ -219,8 +246,9 @@ export default function ChangesScreen() {
           </View>
         )}
       </View>
+  );
 
-      {/* グラフ */}
+  const chartCard = (
       <View style={s.card}>
         <View style={s.chips}>
           {SERIES.map((x) => (
@@ -245,12 +273,9 @@ export default function ChangesScreen() {
           <Text style={s.note}>点線＝目標 {Number(goal.target_weight).toFixed(1)}kg</Text>
         )}
       </View>
+  );
 
-      {/* 目標設定＋チートデイ（グラフの直下＝実績と目標を同じ画面で） */}
-      <GoalPanel mode="weight" />
-
-      {/* 食材×体の傾向（データが揃うまで非表示・Web版と同じしきい値） */}
-      {foodFx.length >= 3 && (() => {
+  const trendsCard = foodFx.length >= 3 ? (() => {
         const down = foodFx.filter((f) => f.effect < -0.02).slice(0, 3);
         const up = [...foodFx].reverse().filter((f) => f.effect > 0.02).slice(0, 3);
         if (down.length === 0 && up.length === 0) return null;
@@ -282,10 +307,9 @@ export default function ChangesScreen() {
             <Text style={s.note}>※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。</Text>
           </View>
         );
-      })()}
+      })() : null;
 
-      {/* 歩数・睡眠（ヘルスケア連携が有効な環境のみ） */}
-      {healthAvailable() && (
+  const healthCard = healthAvailable() ? (
         <View style={s.card}>
           <Text style={s.h2}>⌚ 歩数・睡眠（直近7日）</Text>
           {activity === null ? (
@@ -303,12 +327,88 @@ export default function ChangesScreen() {
           )}
           {healthMsg && <Text style={[s.note, { color: C.coral }]}>{healthMsg}</Text>}
         </View>
+  ) : null;
+
+  function card(key: string): ReactNode {
+    switch (key) {
+      case 'kpi': return kpiCard;
+      case 'calendar': return calendarCard;
+      case 'chart': return chartCard;
+      case 'goal': return <GoalPanel mode="weight" />;
+      case 'trends': return trendsCard;
+      case 'health': return healthCard;
+      case 'lifting': return <LiftingProgress />;
+      case 'tgoal': return <GoalPanel mode="training" />;
+      default: return null;
+    }
+  }
+
+  const order = topSeg === 'body' ? orderBody : orderTrain;
+  const setOrder = topSeg === 'body' ? setOrderBody : setOrderTrain;
+
+  const headerJSX = (
+    <>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text style={[s.h, { marginBottom: 0 }]}>変化</Text>
+        {editing ? (
+          <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
+        ) : (
+          <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
+        )}
+      </View>
+      <View style={s.topSegWrap}>
+        {([['body', '🧍 身体の変化'], ['training', '🏋️ 筋トレの成長']] as const).map(([k, l]) => (
+          <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
+            <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {editing && <Text style={s.editHint}>カードを長押し→ドラッグで並べ替え。「完了」で保存します</Text>}
+    </>
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {editing ? (
+        /* ===== Jiggle Mode（編集）: ドラッグで並び替え・カード内操作は停止 ===== */
+        <DraggableFlatList
+          data={order}
+          keyExtractor={(k) => k}
+          style={{ flex: 1 }}
+          contentContainerStyle={s.scroll}
+          ListHeaderComponent={headerJSX}
+          activationDistance={8}
+          onDragEnd={({ data }) => setOrder([...data])}
+          renderItem={({ item, drag, isActive }) => (
+            <ScaleDecorator activeScale={1.04}>
+              <Jiggle on={!isActive}>
+                <Pressable onLongPress={drag} delayLongPress={120} style={isActive ? s.lifted : undefined}>
+                  <View pointerEvents="none">
+                    {card(item) ?? (
+                      <View style={s.ghostCard}><Text style={s.ghostT}>{CARD_LABELS[item]}（データが揃うと表示されます）</Text></View>
+                    )}
+                  </View>
+                </Pressable>
+              </Jiggle>
+            </ScaleDecorator>
+          )}
+        />
+      ) : (
+        /* ===== 通常モード（保存された順で表示・カード長押しで編集へ） ===== */
+        <ScrollView
+          style={{ flex: 1 }} contentContainerStyle={s.scroll}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+        >
+          {headerJSX}
+          {order.map((k) => (
+            <Pressable key={k} onLongPress={() => setEditing(true)} delayLongPress={400}>
+              {card(k)}
+            </Pressable>
+          ))}
+        </ScrollView>
       )}
-      </>
-      )}
-    </ScrollView>
-    <QuickLogFab />
-    <StatusBarMask />
+      {!editing && <QuickLogFab />}
+      <StatusBarMask />
     </View>
   );
 }
@@ -320,6 +420,20 @@ const s = StyleSheet.create({
   topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
   topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
+  editBtnT: { fontSize: 12, fontWeight: '800', color: C.sub },
+  doneBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  doneBtnT: { fontSize: 12.5, fontWeight: '800', color: '#fff' },
+  editHint: { fontSize: 11, color: C.sub, marginBottom: 10, textAlign: 'center' },
+  lifted: {
+    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 },
+    elevation: 12, borderRadius: 20, backgroundColor: C.bg,
+  },
+  ghostCard: {
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
+    borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
+  },
+  ghostT: { fontSize: 12.5, color: C.sub, fontWeight: '600' },
   actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   actBtnT: { fontSize: 12.5, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },

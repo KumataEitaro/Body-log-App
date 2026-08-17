@@ -413,7 +413,10 @@ export default function LogScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <Text style={s.brand}>▍BodyLog <Text style={s.beta}>ネイティブβ</Text></Text>
+        <View style={s.brandRow}>
+          <Text style={s.brand}>BodyLog</Text>
+          <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
+        </View>
 
         {/* ヒーロー */}
         {profile && (
@@ -693,8 +696,10 @@ export default function LogScreen() {
 
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64 },
-  brand: { fontSize: 18, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  beta: { fontSize: 11, color: C.teal, fontWeight: '700' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
+  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
   hero: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18, marginBottom: 12 },
   heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
