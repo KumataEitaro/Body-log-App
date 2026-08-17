@@ -8,8 +8,9 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { Camera, ImagePlus, X } from 'lucide-react-native';
+import { Camera, ImagePlus, X, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 
@@ -61,6 +62,25 @@ export default function BodyPhotosCard() {
       const out = await manipulateAsync(res.assets[0].uri, [{ resize: { width: 1080 } }], { compress: 0.8, format: SaveFormat.JPEG, base64: true });
       if (out.base64) { setPendingImg({ uri: out.uri, base64: out.base64 }); setMsg(null); }
     } catch { setMsg('画像の処理に失敗しました。'); }
+  }
+
+  // 写真からAIが体脂肪率を推定（±3%程度の目安・結果は編集可能）
+  const [aiBusy, setAiBusy] = useState(false);
+  async function estimateBf() {
+    if (!pendingImg || aiBusy) return;
+    setAiBusy(true); setMsg(null);
+    try {
+      const { ok, json } = await apiPost<{ ok: boolean; result?: { bf_est?: number; comment?: string }; error?: string }>(
+        '/api/analyze-body', { mode: 'assess', images: [{ data: pendingImg.base64, mime: 'image/jpeg' }] });
+      if (ok && json?.ok && json.result?.bf_est != null) {
+        setBfInput(String(json.result.bf_est));
+        setMsg(`AI推定 ${Number(json.result.bf_est).toFixed(1)}%（±3%程度の目安）${json.result.comment ? ` — ${json.result.comment}` : ''}`);
+      } else {
+        setMsg(json?.error || 'AI推定に失敗しました。手入力もできます。');
+      }
+    } catch {
+      setMsg('通信に失敗しました。');
+    } finally { setAiBusy(false); }
   }
 
   async function save() {
@@ -164,8 +184,18 @@ export default function BodyPhotosCard() {
           <Image source={{ uri: pendingImg.uri }} style={s.pendingImg} />
           <View style={{ flex: 1 }}>
             <Text style={s.label}>体脂肪率（%・任意）</Text>
-            <TextInput style={s.input} placeholder="21.5" placeholderTextColor={C.faint}
-                       keyboardType="decimal-pad" value={bfInput} onChangeText={setBfInput} />
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <TextInput style={[s.input, { flex: 1 }]} placeholder="21.5" placeholderTextColor={C.faint}
+                         keyboardType="decimal-pad" value={bfInput} onChangeText={setBfInput} />
+              <Pressable style={s.aiBtn} onPress={estimateBf} disabled={aiBusy}>
+                {aiBusy ? <ActivityIndicator size="small" color={C.teal} /> : (
+                  <>
+                    <Sparkles size={13} color={C.teal} strokeWidth={2.2} />
+                    <Text style={s.aiBtnT}>AIで推定</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               <Pressable style={s.saveBtn} onPress={save} disabled={busy}>
                 {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnT}>✓ 保存</Text>}
@@ -230,6 +260,12 @@ const s = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 4 },
   input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 10, fontSize: 15, color: C.ink },
   saveBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  aiBtn: {
+    flexDirection: 'row', gap: 4, alignItems: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(5,150,105,0.4)', backgroundColor: '#f2faf7',
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8,
+  },
+  aiBtnT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
   saveBtnT: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
   cancelT: { fontSize: 12, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   addBtn: {

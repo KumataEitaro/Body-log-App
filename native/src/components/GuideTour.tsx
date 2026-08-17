@@ -28,8 +28,6 @@ type StepDef = SpotStep | CardStep;
 
 const STEPS: StepDef[] = [
   { kind: 'card', id: 'welcome' },
-  { kind: 'card', id: 'profile' },
-  { kind: 'card', id: 'goal' },
   { kind: 'spot', route: '/log', target: 'hero', title: 'あと食べられる量', text: '残りカロリーとP/F/Cの残りが、いつもここに表示されます。' },
   { kind: 'spot', route: '/log', target: 'dock', title: '記録はここに書くだけ', text: '「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。' },
   { kind: 'spot', route: '/training', target: 'trainInput', title: '筋トレの記録', text: '種目・kg・回数・セットを入れて保存。保存するとレストタイマーが自動で走ります。' },
@@ -109,7 +107,10 @@ function GuideOverlay({ targets, scrollers, close }: {
   const finish = useCallback(() => {
     AsyncStorage.setItem(GUIDE_DONE_KEY, '1').catch(() => {});
     close();
-    router.navigate('/log' as never);
+    // 紙芝居のあとは初回オンボーディング（プロフィール→目標）へ。済んでいれば食事タブへ
+    AsyncStorage.getItem('bl-onboard-done')
+      .then((v) => router.navigate((v ? '/log' : '/onboarding') as never))
+      .catch(() => router.navigate('/log' as never));
   }, [close, router]);
 
   const next = useCallback(() => {
@@ -212,8 +213,6 @@ function GuideOverlay({ targets, scrollers, close }: {
       {step.kind === 'card' && (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.cardWrap} pointerEvents="box-none">
           {step.id === 'welcome' && <WelcomeCard onStart={next} onSkip={finish} />}
-          {step.id === 'profile' && <ProfileCard onDone={next} />}
-          {step.id === 'goal' && <GoalCard onDone={next} />}
           {step.id === 'done' && <DoneCard onFinish={finish} />}
         </KeyboardAvoidingView>
       )}
@@ -228,128 +227,22 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
     <View style={s.card}>
       <Text style={s.cardEmoji}>👋</Text>
       <Text style={s.cardTitle}>ようこそ BodyLog へ</Text>
-      <Text style={s.cardText}>1分で使い方をご案内します。{'\n'}まずはあなたの基本情報と目標を設定して、正確なカロリー計算を始めましょう。</Text>
+      <Text style={s.cardText}>1分で使い方をご案内します。{'\n'}ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。</Text>
       <Pressable style={s.primaryBtn} onPress={onStart}><Text style={s.primaryBtnT}>ガイドを始める</Text></Pressable>
       <Pressable onPress={onSkip} hitSlop={8}><Text style={s.linkT}>今はしない</Text></Pressable>
     </View>
   );
 }
 
-function ProfileCard({ onDone }: { onDone: () => void }) {
-  const [sex, setSex] = useState<'male' | 'female'>('male');
-  const [height, setHeight] = useState('170');
-  const [age, setAge] = useState('30');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-      const { data: p } = await supabase.from('profiles').select('sex,height_cm,age').eq('id', session.user.id).maybeSingle();
-      if (p) {
-        if (p.sex) setSex(p.sex);
-        if (p.height_cm != null) setHeight(String(p.height_cm));
-        if (p.age != null) setAge(String(p.age));
-      }
-    })();
-  }, []);
-
-  async function save() {
-    setBusy(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      if (uid) {
-        await supabase.from('profiles').update({ sex, height_cm: Number(height) || 170, age: Number(age) || 30 }).eq('id', uid);
-      }
-      onDone();
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <View style={s.card}>
-      <Text style={s.cardTitle}>① あなたの基本情報</Text>
-      <Text style={s.cardText}>基礎代謝の計算に使います（あとで⚙から変更できます）</Text>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-        {([['male', '男性'], ['female', '女性']] as const).map(([k, l]) => (
-          <Pressable key={k} style={[s.seg, sex === k && s.segOn]} onPress={() => setSex(k)}>
-            <Text style={[s.segT, sex === k && { color: '#fff' }]}>{l}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.label}>身長(cm)</Text>
-          <TextInput style={s.input} keyboardType="number-pad" value={height} onChangeText={setHeight} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.label}>年齢</Text>
-          <TextInput style={s.input} keyboardType="number-pad" value={age} onChangeText={setAge} />
-        </View>
-      </View>
-      <Pressable style={s.primaryBtn} onPress={save} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnT}>保存して次へ</Text>}
-      </Pressable>
-      <Pressable onPress={onDone} hitSlop={8}><Text style={s.linkT}>あとで設定する</Text></Pressable>
-    </View>
-  );
-}
-
-function GoalCard({ onDone }: { onDone: () => void }) {
-  const [targetW, setTargetW] = useState('');
-  const [months, setMonths] = useState(3);
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    const tw = Number(targetW);
-    if (!(tw > 20)) { onDone(); return; }
-    setBusy(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      if (uid) {
-        const d = new Date();
-        d.setMonth(d.getMonth() + months);
-        const targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const { data: g } = await supabase.from('goals').select('start_date').maybeSingle();
-        if (g) {
-          await supabase.from('goals').update({ target_weight: tw, target_date: targetDate }).eq('user_id', uid);
-        } else {
-          const { data: w } = await supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1);
-          const startW = w?.length ? Number(w[0].weight) : tw;
-          await supabase.from('goals').insert({ user_id: uid, target_weight: tw, target_date: targetDate, start_date: todayJST(), start_weight: startW });
-        }
-      }
-      onDone();
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <View style={s.card}>
-      <Text style={s.cardTitle}>② 目標を決める</Text>
-      <Text style={s.cardText}>目標から逆算して、毎日の「あと食べられる量」を計算します</Text>
-      <Text style={s.label}>目標体重（kg）</Text>
-      <TextInput style={s.input} keyboardType="decimal-pad" placeholder="例: 72.0" placeholderTextColor={C.faint} value={targetW} onChangeText={setTargetW} />
-      <Text style={s.label}>いつまでに</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {[1, 3, 6].map((m) => (
-          <Pressable key={m} style={[s.seg, months === m && s.segOn]} onPress={() => setMonths(m)}>
-            <Text style={[s.segT, months === m && { color: '#fff' }]}>{m}ヶ月</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Pressable style={s.primaryBtn} onPress={save} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnT}>保存して次へ</Text>}
-      </Pressable>
-      <Pressable onPress={onDone} hitSlop={8}><Text style={s.linkT}>あとで設定する</Text></Pressable>
-    </View>
-  );
-}
-
 // AIコーチの自動デモ: 質問が勝手にタイプされ→考え中→回答がふわっと現れる
+// （回答は実データ分析の雰囲気が伝わるよう、あえて具体的な数字入りの分厚い例文にしている）
 function CoachDemo() {
-  const Q = '昨日食べすぎちゃった…どうすれば？';
-  const A = 'まず大丈夫、1日では太りません。今日は目標を少し緩めて、たんぱく質を多めに。挽回は2〜3日かけるのがコツです💪';
+  const Q = '最近ちょっと停滞気味かも。食事に何か問題ある？';
+  const A = '直近7日の記録を見ると、気になる傾向が2つあります。\n\n' +
+    '・炭水化物が平均96g/日と、目標160gの6割しか取れていません。糖質が少なすぎると筋グリコーゲンが枯れて、トレ後半で力が出ない・体重が水分で乱高下する原因になります\n' +
+    '・一方、たんぱく質は平均132g（体重×1.6g）でしっかり確保できています💪\n' +
+    '・摂取カロリーは平均1,690kcalで目標−70kcal。ペース自体は悪くありません\n\n' +
+    'おすすめは「トレする日だけ白米を150g（+250kcal）足す」こと。週の収支はまだ赤字のままなので、減量ペースを崩さずパフォーマンスだけ取り戻せます。まずは次のトレ日に試してみましょう。';
   const [qLen, setQLen] = useState(0);
   const [phase, setPhase] = useState<'typing' | 'thinking' | 'answer'>('typing');
   const fade = useRef(new Animated.Value(0)).current;

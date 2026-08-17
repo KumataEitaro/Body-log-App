@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
@@ -10,8 +10,8 @@ const MAX_IMAGE_BYTES = 1_500_000;
 // mode: 'assess'  = 現状の体組成判定（写真1〜2枚）
 // mode: 'compare' = 前回写真との比較（before/after 各1枚）
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // 認証確認（Web=Cookie / ネイティブ=Bearer 両対応）
+  const { supabase, user } = await getApiAuth(req);
   if (!user) return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
 
   const key = process.env.GEMINI_API_KEY;

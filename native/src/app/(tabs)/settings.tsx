@@ -16,6 +16,7 @@ import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
+import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
 type Sheet = null | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT';
@@ -167,7 +168,7 @@ export default function SettingsScreen() {
       {/* アカウント設定 */}
       <Text style={s.groupLabel}>アカウント設定</Text>
       <View style={s.group}>
-        <Row icon={<UserRound color={C.teal} size={19} />} label="プロフィール編集" sub="表示名・性別・身長・年齢・生活係数" onPress={() => openSheet('profile')} />
+        <Row icon={<UserRound color={C.teal} size={19} />} label="プロフィール編集" sub="表示名・性別・身長・年齢・活動量" onPress={() => openSheet('profile')} />
         <View style={s.sep} />
         <Row icon={<Salad color={C.teal} size={19} />} label="マイ食品の管理" sub={`${foods.length}件 登録済み`} onPress={() => openSheet('foods')} />
       </View>
@@ -231,11 +232,9 @@ export default function SettingsScreen() {
               <Text style={s.label}>年齢</Text>
               <TextInput style={s.input} keyboardType="number-pad" value={age} onChangeText={setAge} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>生活係数</Text>
-              <TextInput style={s.input} keyboardType="decimal-pad" value={life} onChangeText={setLife} />
-            </View>
           </View>
+          <Text style={s.label}>日常の活動量 <Text style={{ fontWeight: '400' }}>— 消費カロリーの計算に使います</Text></Text>
+          <ActivityLevelPicker value={Number(life) || 1.375} onChange={(v) => setLife(String(v))} />
           <Pressable style={[s.btnPrimary, { marginTop: 16 }]} onPress={saveProfile} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>保存する</Text>}
           </Pressable>
