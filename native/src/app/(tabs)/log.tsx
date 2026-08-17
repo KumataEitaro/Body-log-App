@@ -5,7 +5,8 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
+import DockIconButton from '@/components/DockIconButton';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -766,14 +767,10 @@ export default function LogScreen() {
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />
-          <Pressable onPress={takePhoto} hitSlop={6} style={[s.dockIconBtn, photos.length >= 4 && { opacity: 0.35 }]} disabled={photos.length >= 4}>
-            <Camera size={21} color={C.sub} strokeWidth={2} />
-          </Pressable>
-          <Pressable onPress={pickPhotos} hitSlop={6} style={[s.dockIconBtn, photos.length >= 4 && { opacity: 0.35 }]} disabled={photos.length >= 4}>
-            <Images size={20} color={C.sub} strokeWidth={2} />
-          </Pressable>
+          <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
+          <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
-            <Text style={s.dockSendT}>↑</Text>
+            <ArrowUp color="#fff" size={17} strokeWidth={3} />
           </Pressable>
         </Animated.View>
       </Animated.View>

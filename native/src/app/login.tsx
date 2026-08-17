@@ -1,8 +1,12 @@
-// ログイン / 新規登録（Web版と同じSupabaseアカウント）
+// ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+
+WebBrowser.maybeCompleteAuthSession();
+const OAUTH_REDIRECT = 'bodylog://auth-callback';
 
 export default function LoginScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -46,6 +50,43 @@ export default function LoginScreen() {
     // セッションが返った場合は_layoutの認証ゲートが自動遷移
   }
 
+  // Google SSO: Supabase→Googleの認可ページをアプリ内ブラウザで開き、
+  // bodylog://auth-callback に返ってきたコードをセッションに交換する（PKCE）
+  const [gBusy, setGBusy] = useState(false);
+  async function googleLogin() {
+    setGBusy(true); setMsg(''); setInfo('');
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: OAUTH_REDIRECT, skipBrowserRedirect: true },
+      });
+      if (error || !data?.url) {
+        setMsg(/provider is not enabled/i.test(error?.message ?? '')
+          ? 'Googleログインは準備中です（Supabase側のプロバイダ設定待ち）。'
+          : 'Googleログインを開始できませんでした。');
+        return;
+      }
+      const res = await WebBrowser.openAuthSessionAsync(data.url, OAUTH_REDIRECT);
+      if (res.type !== 'success' || !res.url) return; // ユーザーが閉じた
+      const url = new URL(res.url);
+      const code = url.searchParams.get('code');
+      if (code) {
+        const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (exErr) setMsg('ログインの完了処理に失敗しました。もう一度お試しください。');
+        return;
+      }
+      // フォールバック: implicitフローで #access_token=… が返ってきた場合
+      const frag = new URLSearchParams(res.url.split('#')[1] ?? '');
+      const access_token = frag.get('access_token');
+      const refresh_token = frag.get('refresh_token');
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+      } else {
+        setMsg('ログインの完了処理に失敗しました。もう一度お試しください。');
+      }
+    } finally { setGBusy(false); }
+  }
+
   const isLogin = mode === 'login';
 
   return (
@@ -76,6 +117,18 @@ export default function LoginScreen() {
         <Pressable style={({ pressed }) => [s.btn, pressed && { opacity: 0.8 }]} onPress={isLogin ? login : signup} disabled={busy}>
           <Text style={s.btnT}>{busy ? (isLogin ? 'ログイン中…' : '登録中…') : (isLogin ? 'ログイン' : 'アカウントを作成')}</Text>
         </Pressable>
+        {/* SSO */}
+        <View style={s.orRow}>
+          <View style={s.orLine} /><Text style={s.orT}>または</Text><View style={s.orLine} />
+        </View>
+        <Pressable style={({ pressed }) => [s.ssoBtn, pressed && { opacity: 0.8 }]} onPress={googleLogin} disabled={gBusy}>
+          {gBusy ? <ActivityIndicator color={C.ink} /> : (
+            <>
+              <Text style={s.gMark}>G</Text>
+              <Text style={s.ssoT}>Googleで続ける</Text>
+            </>
+          )}
+        </Pressable>
         {!isLogin && (
           <Text style={s.terms}>登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。</Text>
         )}
@@ -102,4 +155,13 @@ const s = StyleSheet.create({
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   btnT: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
   terms: { fontSize: 11, color: C.faint, marginTop: 12, lineHeight: 17, textAlign: 'center' },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
+  orLine: { flex: 1, height: 0.5, backgroundColor: C.line },
+  orT: { fontSize: 11.5, color: C.faint, fontWeight: '700' },
+  ssoBtn: {
+    flexDirection: 'row', gap: 8, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line,
+    borderRadius: 999, paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+  },
+  gMark: { fontSize: 15, fontWeight: '900', color: '#4285F4' },
+  ssoT: { color: C.ink, fontSize: 14, fontWeight: '800' },
 });

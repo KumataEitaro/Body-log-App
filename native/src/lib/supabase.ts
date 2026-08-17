@@ -12,6 +12,7 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
+      flowType: 'pkce', // モバイルOAuth（Google SSO等）はコード交換方式が安全
     },
   },
 );

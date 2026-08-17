@@ -6,7 +6,8 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Images, Weight } from 'lucide-react-native';
+import { Camera, Images, Weight, ArrowUp } from 'lucide-react-native';
+import DockIconButton from '@/components/DockIconButton';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
@@ -145,15 +146,15 @@ export default function QuickLogFab() {
               </View>
             )}
             <View style={s.dock}>
-              <Pressable onPress={() => pickPhoto(true)} hitSlop={6} style={s.iconBtn}><Camera size={21} color={C.sub} strokeWidth={2} /></Pressable>
-              <Pressable onPress={() => pickPhoto(false)} hitSlop={6} style={s.iconBtn}><Images size={20} color={C.sub} strokeWidth={2} /></Pressable>
+              <DockIconButton Icon={Camera} onPress={() => pickPhoto(true)} />
+              <DockIconButton Icon={Images} onPress={() => pickPhoto(false)} />
               <TextInput
                 ref={inputRef} style={s.input} placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
                 value={text} onChangeText={setText} autoFocus returnKeyType="send"
                 blurOnSubmit={false} onSubmitEditing={send}
               />
               <Pressable style={[s.send, !(text.trim() || photos.length) && { opacity: 0.35 }]} onPress={send} disabled={!(text.trim() || photos.length)}>
-                <Text style={s.sendT}>↑</Text>
+                <ArrowUp color="#fff" size={17} strokeWidth={3} />
               </Pressable>
             </View>
           </View>
