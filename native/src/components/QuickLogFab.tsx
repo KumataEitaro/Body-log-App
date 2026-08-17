@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Camera, Images, Weight } from 'lucide-react-native';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
@@ -125,7 +126,12 @@ export default function QuickLogFab() {
                     </Pressable>
                   </View>
                 ))}
-                {staged.weight != null && <Text style={s.stagedT}>⚖️ 体重 {staged.weight}kg</Text>}
+                {staged.weight != null && (
+                  <View style={[s.stagedRow, { gap: 6 }]}>
+                    <Weight size={13} color={C.sub} />
+                    <Text style={s.stagedT}>体重 {staged.weight}kg</Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
                   <Pressable style={s.stagedSave} onPress={confirmSave} disabled={saving}>
                     {saving ? <ActivityIndicator color="#fff" /> : (
@@ -139,8 +145,8 @@ export default function QuickLogFab() {
               </View>
             )}
             <View style={s.dock}>
-              <Pressable onPress={() => pickPhoto(true)} hitSlop={6} style={s.iconBtn}><Text style={s.icon}>📷</Text></Pressable>
-              <Pressable onPress={() => pickPhoto(false)} hitSlop={6} style={s.iconBtn}><Text style={s.icon}>🖼</Text></Pressable>
+              <Pressable onPress={() => pickPhoto(true)} hitSlop={6} style={s.iconBtn}><Camera size={21} color={C.sub} strokeWidth={2} /></Pressable>
+              <Pressable onPress={() => pickPhoto(false)} hitSlop={6} style={s.iconBtn}><Images size={20} color={C.sub} strokeWidth={2} /></Pressable>
               <TextInput
                 ref={inputRef} style={s.input} placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
                 value={text} onChangeText={setText} autoFocus returnKeyType="send"

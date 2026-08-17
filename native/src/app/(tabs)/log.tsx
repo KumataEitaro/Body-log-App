@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated,
 } from 'react-native';
-import { Pencil, History } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -592,8 +592,9 @@ export default function LogScreen() {
             <TextInput style={s.wInput} placeholder={latestWeight != null ? latestWeight.toFixed(1) : '73.5'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
             <Text style={s.wUnit}>kg</Text>
-            <Pressable style={({ pressed }) => [s.btnGhost, pressed && { opacity: 0.7 }]} onPress={saveWeight} disabled={saving || !wWeight}>
-              <Text style={s.btnGhostT}>⚖️ 体重を記録</Text>
+            <Pressable style={({ pressed }) => [s.btnGhost, { flexDirection: 'row', gap: 6, justifyContent: 'center' }, pressed && { opacity: 0.7 }]} onPress={saveWeight} disabled={saving || !wWeight}>
+              <Weight size={15} color={C.ink} />
+              <Text style={s.btnGhostT}>体重を記録</Text>
             </Pressable>
           </View>
         </View>
@@ -696,14 +697,18 @@ export default function LogScreen() {
               ))}
               {parsed?.weight != null && (
                 <View style={s.trayChip}>
-                  <Text style={s.trayChipT}>⚖️ {parsed.weight}kg</Text>
+                  <Weight size={12} color={C.sub} />
+                  <Text style={s.trayChipT}>{parsed.weight}kg</Text>
                   <Pressable hitSlop={8} onPress={() => setParsed((p) => (p && (p.items.length > 0 || p.ex) ? { ...p, weight: null } : null))}>
                     <Text style={s.trayX}>×</Text>
                   </Pressable>
                 </View>
               )}
               {parsed?.ex && parsed.ex !== 'オフ' && (
-                <View style={s.trayChip}><Text style={s.trayChipT}>🏃 {parsed.ex}</Text></View>
+                <View style={s.trayChip}>
+                  <Activity size={12} color={C.sub} />
+                  <Text style={s.trayChipT}>{parsed.ex}</Text>
+                </View>
               )}
               {pendingTexts.map((t, i) => (
                 <View key={`p${i}`} style={s.trayChip}>
@@ -736,11 +741,11 @@ export default function LogScreen() {
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />
-          <Pressable onPress={takePhoto} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
-            <Text style={s.dockIcon}>📷</Text>
+          <Pressable onPress={takePhoto} hitSlop={6} style={[s.dockIconBtn, photos.length >= 4 && { opacity: 0.35 }]} disabled={photos.length >= 4}>
+            <Camera size={21} color={C.sub} strokeWidth={2} />
           </Pressable>
-          <Pressable onPress={pickPhotos} hitSlop={6} style={s.dockIconBtn} disabled={photos.length >= 4}>
-            <Text style={s.dockIcon}>🖼</Text>
+          <Pressable onPress={pickPhotos} hitSlop={6} style={[s.dockIconBtn, photos.length >= 4 && { opacity: 0.35 }]} disabled={photos.length >= 4}>
+            <Images size={20} color={C.sub} strokeWidth={2} />
           </Pressable>
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <Text style={s.dockSendT}>↑</Text>
