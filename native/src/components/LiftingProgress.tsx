@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
+import { TrendingUp, CalendarDays } from 'lucide-react-native';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
@@ -60,7 +61,7 @@ export default function LiftingProgress() {
   if (exercises.length === 0) {
     return (
       <View style={s.card}>
-        <Text style={s.h2}>📈 挙上重量の推移</Text>
+        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
         <Text style={s.muted}>トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。</Text>
       </View>
     );
@@ -86,7 +87,7 @@ export default function LiftingProgress() {
 
     {/* トレーニングカレンダー */}
     <View style={s.card}>
-      <Text style={s.h2}>📅 トレーニングカレンダー</Text>
+      <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>トレーニングカレンダー</Text></View>
       <MonthCalendar today={today} marks={marks} selected={daySel} mode="training"
                      onSelect={(d) => setDaySel(daySel === d ? null : d)} />
       {daySel && (
@@ -102,7 +103,7 @@ export default function LiftingProgress() {
 
     {/* 推移グラフ */}
     <View style={s.card}>
-      <Text style={s.h2}>📈 挙上重量の推移</Text>
+      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
       <View style={s.chips}>
         {(['kg', 'volume'] as const).map((m) => (
           <Pressable key={m} style={[s.chip, chartMode === m && s.chipOn]} onPress={() => setChartMode(m)}>
@@ -158,6 +159,7 @@ export default function LiftingProgress() {
 const s = StyleSheet.create({
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },

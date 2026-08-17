@@ -65,7 +65,7 @@ export default function QuickLogFab() {
           <Pressable style={s.backdrop} onPress={() => setOpen(false)} />
           <View style={s.sheet}>
             <View style={s.grip} />
-            <Text style={s.title}>⚡ かんたん記録 <Text style={s.titleSub}>— 食事・体重・気分をそのまま送信</Text></Text>
+            <Text style={s.title}>かんたん記録 <Text style={s.titleSub}>— 食事・体重・気分をそのまま送信</Text></Text>
             {photos.length > 0 && (
               <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
                 {photos.map((p, i) => (

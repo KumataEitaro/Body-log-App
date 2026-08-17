@@ -78,14 +78,14 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   if (planValue != null && planValue > vMin - (vMax - vMin) && planValue < vMax + (vMax - vMin)) {
     vMin = Math.min(vMin, planValue); vMax = Math.max(vMax, planValue);
   }
-  const { ticks, lo, hi } = niceTicks(vMin, vMax, fs ? 7 : 4);
+  const { ticks, lo, hi } = niceTicks(vMin, vMax, fs ? 8 : 6);
 
   const x = (idx: number) => PAD_L + ((idx - startF) / win.days) * plotW;
   const y = (v: number) => PAD_T + (1 - (v - lo) / Math.max(1e-9, hi - lo)) * plotH;
 
   const trendPts = visTrend.map((b) => ({ x: x(b.idx), y: y(b.value) }));
   const rawPts = visRaw.map((b) => ({ x: x(b.idx), y: y(b.value) }));
-  const xtks = xTicks(startF, win.end, Math.max(3, Math.round(plotW / 72)));
+  const xtks = xTicks(startF, win.end, Math.max(5, Math.round(plotW / 38)));
 
   // 期間ヘッダーと傾向（表示中トレンドの端点差）
   const delta = visTrend.length >= 2 ? visTrend[visTrend.length - 1].value - visTrend[0].value : null;
@@ -98,26 +98,35 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     return { end: e, days: d };
   };
 
-  let g0 = { end: win.end, days: win.days };
+  // ジェスチャー開始時の窓をrefに保持する。
+  // 【重要】以前はローカル変数で保持していたため、setWinの再描画のたびに
+  // 「開始時の窓」が現在値で再初期化され、指の開き比率がズーム済みの値へ
+  // 毎フレーム再適用される複利バグ（指数的な暴走ズーム）になっていた。
+  const g0 = useRef({ end: 0, days: 0 });
+
   const pan = Gesture.Pan()
     .runOnJS(true)
     .activeOffsetX([-12, 12]).failOffsetY([-16, 16]) // 縦スクロールを奪わない
-    .onStart(() => { g0 = { end: win.end, days: win.days }; })
+    .onStart(() => { g0.current = { end: win.end, days: win.days }; })
     .onUpdate((e) => {
-      const shift = (-e.translationX / plotW) * g0.days;
-      setWin(clampWin(g0.end + shift, g0.days));
+      const shift = (-e.translationX / plotW) * g0.current.days;
+      setWin(clampWin(g0.current.end + shift, g0.current.days));
     });
   const pinch = Gesture.Pinch()
     .runOnJS(true)
-    .onStart(() => { g0 = { end: win.end, days: win.days }; })
+    .onStart(() => { g0.current = { end: win.end, days: win.days }; })
     .onUpdate((e) => {
       const fx = Math.min(1, Math.max(0, ((e.focalX ?? plotW / 2) - PAD_L) / plotW));
-      const focalIdx = (g0.end - g0.days) + fx * g0.days;
-      // 指数ダンピング: scaleの2D距離比（縦成分・狭い初期指間の暴れ）を減衰。
-      // k=0.65 → 自然なピンチ1回(scale≈2)で表示幅が約1/1.6＝「1ピンチ1段」基準に合わせる
-      const damped = Math.pow(Math.max(0.2, e.scale), 0.65);
-      const newDays = Math.min(Math.max(7, g0.days / damped), span);
-      setWin(clampWin(focalIdx + (1 - fx) * newDays, newDays));
+      const focalIdx = (g0.current.end - g0.current.days) + fx * g0.current.days;
+      // 複利バグ解消後はWithings同等のほぼ物理1:1（縦成分の混入だけ軽く減衰）
+      const damped = Math.pow(Math.max(0.2, e.scale), 0.9);
+      const newDays = Math.min(Math.max(7, g0.current.days / damped), span);
+      const target = clampWin(focalIdx + (1 - fx) * newDays, newDays);
+      // Withings風のローパス: 指に数フレーム遅れてぬるっと追従させる
+      setWin((prev) => ({
+        end: prev.end + (target.end - prev.end) * 0.5,
+        days: prev.days + (target.days - prev.days) * 0.5,
+      }));
     });
   const doubleTap = Gesture.Tap().numberOfTaps(2).runOnJS(true)
     .onEnd(() => setWin({ end: lastIdx + 1, days: Math.min(presetDays ?? span, span) }));
@@ -164,12 +173,13 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                     {t.toFixed(decimals > 0 && hi - lo < 10 ? decimals : 0)}
                   </SvgText>
                 ))}
-                {/* 縦グリッド＋Xラベル */}
+                {/* 縦グリッド（全境界に引く・ラベル付きはやや濃く） */}
                 {xtks.map((t) => (
-                  <Line key={`v${t.idx}`} x1={x(t.idx)} y1={PAD_T} x2={x(t.idx)} y2={PAD_T + plotH} stroke={C.line} strokeWidth={0.5} strokeDasharray="2,3" />
+                  <Line key={`v${t.idx}`} x1={x(t.idx)} y1={PAD_T} x2={x(t.idx)} y2={PAD_T + plotH}
+                        stroke={t.label ? '#d5d9d3' : C.line} strokeWidth={0.5} strokeDasharray={t.label ? undefined : '2,3'} />
                 ))}
-                {xtks.map((t) => (
-                  <SvgText key={`vl${t.idx}`} x={x(t.idx)} y={height - 7} fontSize={9.5} fill={C.faint} textAnchor="middle">{t.label}</SvgText>
+                {xtks.filter((t) => t.label !== '').map((t) => (
+                  <SvgText key={`vl${t.idx}`} x={x(t.idx)} y={height - 7} fontSize={9} fill={C.sub} textAnchor="middle">{t.label}</SvgText>
                 ))}
                 {/* 目標線 */}
                 {planValue != null && planValue >= lo && planValue <= hi && (

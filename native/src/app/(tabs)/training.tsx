@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
+import { ClipboardList, BookOpen, Timer } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 
@@ -16,6 +17,25 @@ export default function TrainingScreen() {
   const [tRows, setTRows] = useState<TRow[]>([{ name: '', kg: '', reps: '', sets: '' }]);
   const [history, setHistory] = useState<HistRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒
+
+  // レストタイマーのカウントダウン
+  useEffect(() => {
+    if (restLeft == null || restLeft <= 0) return;
+    const t = setInterval(() => setRestLeft((v) => (v == null || v <= 1 ? 0 : v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [restLeft]);
+
+  // 前回参照: 同じ種目の直近記録をテキストから抽出（例: ベンチプレス 80kg×8×3）
+  function lastRecordOf(name: string): { text: string; kg: number; date: string } | null {
+    if (!name.trim()) return null;
+    for (const h1 of history) {
+      const re = new RegExp(`${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ([\\d.]+)kg(×\\d+(?:×\\d+)?)?`);
+      const m = h1.text.match(re);
+      if (m) return { text: `${m[1]}kg${m[2] || ''}`, kg: Number(m[1]), date: h1.date };
+    }
+    return null;
+  }
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,6 +72,7 @@ export default function TrainingScreen() {
       await syncEntriesForDate(uid, today);
       setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
       await load();
+      setRestLeft(90); // 保存でレストタイマー自動開始
       setMsg({ ok: true, text: '保存しました。継続が最強の種目です💪' });
     } finally {
       setSaving(false);
@@ -66,9 +87,25 @@ export default function TrainingScreen() {
     >
       <Text style={s.h}>トレーニング</Text>
 
+      {/* レストタイマー（保存で自動開始・タップで90秒リスタート） */}
+      {restLeft != null && (
+        <Pressable style={s.rest} onPress={() => setRestLeft(90)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Timer size={15} color={C.teal} />
+            <Text style={s.restL}>レスト</Text>
+          </View>
+          <Text style={s.restN}>
+            {restLeft > 0
+              ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
+              : '終了💪'}
+          </Text>
+          <Text style={s.restHint}>{restLeft > 0 ? 'タップで90秒に戻す' : '次のセットへ！'}</Text>
+        </Pressable>
+      )}
+
       {/* 入力 */}
       <View style={s.card}>
-        <Text style={s.h2}>🏋️ 今日のトレーニングを記録</Text>
+        <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日のトレーニングを記録</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
             <TextInput style={[s.tIn, { flex: 1 }]} placeholder="種目" placeholderTextColor={C.faint}
@@ -84,6 +121,22 @@ export default function TrainingScreen() {
             </Pressable>
           </View>
         ))}
+        {/* 前回参照: 同種目の直近記録と更新判定 */}
+        {(() => {
+          const first = tRows.find((r) => r.name.trim());
+          if (!first) return null;
+          const prev = lastRecordOf(first.name);
+          if (!prev) return null;
+          const curKg = Number(first.kg);
+          const diff = curKg > 0 ? Math.round((curKg - prev.kg) * 10) / 10 : null;
+          return (
+            <Text style={s.prevRef}>
+              前回: {first.name.trim()} {prev.text}（{prev.date.slice(5).replace('-', '/')}）
+              {diff != null && diff > 0 && <Text style={{ color: C.teal, fontWeight: '800' }}> → +{diff}kg 更新💪</Text>}
+              {diff != null && diff < 0 && <Text style={{ color: C.sub }}> → {diff}kg</Text>}
+            </Text>
+          );
+        })()}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
           <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])}>
             <Text style={s.btnGhostT}>＋ 種目を追加</Text>
@@ -97,12 +150,12 @@ export default function TrainingScreen() {
 
       {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
       {history.length > 0 && (
-        <Text style={s.moveNote}>📈 挙上重量の推移グラフは「変化」タブ →「🏋️ 筋トレの成長」で見られます</Text>
+        <Text style={s.moveNote}>📈 挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます</Text>
       )}
 
       {/* 履歴 */}
       <View style={s.card}>
-        <Text style={s.h2}>📖 筋トレ履歴</Text>
+        <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレ履歴</Text></View>
         {history.length === 0 && <Text style={s.muted}>まだ記録がありません。今日の1セット目から始めましょう。</Text>}
         {history.slice(0, 20).map((h1) => (
           <View key={h1.id} style={s.histRow}>
@@ -122,6 +175,16 @@ const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 10 },
+  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  rest: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)',
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
+  },
+  restL: { fontSize: 12, fontWeight: '800', color: C.ink },
+  restN: { fontSize: 20, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
+  restHint: { fontSize: 10, color: C.sub },
+  prevRef: { fontSize: 11.5, color: C.sub, marginTop: 4, lineHeight: 17 },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
   tRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
   tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 15, color: C.ink },

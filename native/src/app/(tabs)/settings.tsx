@@ -80,7 +80,7 @@ export default function SettingsScreen() {
       if (!(await requestHealthAuth())) { setMsg({ ok: false, text: 'ヘルスケアへのアクセスが許可されませんでした。' }); return; }
       const res = await importWeights(uid, 90);
       if ('error' in res) { setMsg({ ok: false, text: res.error }); return; }
-      setMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。「変化」タブのグラフに反映されます。` : '新しく取り込める体重データはありませんでした。' });
+      setMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。「概要」タブのグラフに反映されます。` : '新しく取り込める体重データはありませんでした。' });
     } finally { setBusy(false); }
   }
 
@@ -252,7 +252,7 @@ export default function SettingsScreen() {
           <Text style={s.note}>この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。</Text>
         ) : (
           <>
-            <Text style={s.note}>Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「変化」タブで見られます。</Text>
+            <Text style={s.note}>Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。</Text>
             <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={healthImportWeights} disabled={busy}>
               {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>⚖️ 体重を取り込む（過去90日）</Text>}
             </Pressable>

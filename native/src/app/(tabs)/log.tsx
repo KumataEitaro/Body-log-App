@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated,
 } from 'react-native';
-import { Pencil } from 'lucide-react-native';
+import { Pencil, History } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -538,7 +538,10 @@ export default function LogScreen() {
           <View style={s.card}>
             <Pressable style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                        onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
-              <Text style={[s.h2, { marginBottom: 0 }]}>🔁 前の食事をもう一度</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <History size={14} color={C.teal} />
+                <Text style={[s.h2, { marginBottom: 0 }]}>前の食事をもう一度</Text>
+              </View>
               <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : '▾ ひらく'}</Text>
             </Pressable>
             {recentOpen && (
@@ -599,8 +602,8 @@ export default function LogScreen() {
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
       <View style={s.dockWrap}>
-        {/* リアルタイム残量プレビュー（入力中・選択中にキーボード直上へ表示） */}
-        {(chat.trim().length > 0 || parsed != null) && profile && (() => {
+        {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
+        {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
           const pvLeft = left - addK;
           const pv = macros ? {

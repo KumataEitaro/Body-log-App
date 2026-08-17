@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Target, Beef, Dumbbell } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
@@ -155,7 +156,7 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
       {mode === 'weight' && (
         <>
         <View style={s.card}>
-          <Text style={s.h2}>🎯 目標設定</Text>
+          <View style={s.h2Row}><Target size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>目標設定</Text></View>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
               <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
@@ -209,7 +210,7 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
 
         {/* チートデイ */}
         <View style={s.card}>
-          <Text style={s.h2}>🍖 チートデイ</Text>
+          <View style={s.h2Row}><Beef size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>チートデイ</Text></View>
           <Text style={s.note}>登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。</Text>
           {events.map((e) => (
             <View key={e.id} style={s.evRow}>
@@ -249,7 +250,7 @@ export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
 
       {mode === 'training' && (
         <View style={s.card}>
-          <Text style={s.h2}>🏋️ 種目ごとの目標重量</Text>
+          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>種目ごとの目標重量</Text></View>
           {tGoals.length === 0 && <Text style={s.note}>まだ目標がありません。種目と目標重量を追加しましょう。</Text>}
           {tGoals.map((tg) => {
             const best = bests.get(tg.name) ?? 0;
@@ -291,6 +292,7 @@ const s = StyleSheet.create({
   segT: { fontSize: 13, fontWeight: '800', color: C.sub },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 6 },
+  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   statusRow: { marginBottom: 14 },
   statusBig: { fontSize: 24, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   statusSub: { fontSize: 13, fontWeight: '700', marginTop: 2 },

@@ -70,40 +70,47 @@ export function niceTicks(min: number, max: number, target = 5): { ticks: number
   return { ticks, lo, hi };
 }
 
-// ===== X軸目盛り（ズーム率に応じて日→週→月→年の密度を自動調整） =====
+// ===== X軸目盛り =====
+// Withings準拠: 縦グリッドは「全境界」に引き、ラベルだけ間引く（label=''はグリッドのみ）
 export type XTick = { idx: number; label: string };
-export function xTicks(startIdx: number, endIdx: number, maxLabels = 5): XTick[] {
+export function xTicks(startIdx: number, endIdx: number, maxLabels = 8): XTick[] {
   const days = endIdx - startIdx;
   const out: XTick[] = [];
   const first = new Date(Math.ceil(startIdx) * 86400000);
-  if (days <= 21) {
-    // 日単位: N日おきに M/D
-    const step = Math.max(1, Math.ceil(days / maxLabels));
-    for (let i = Math.ceil(startIdx); i <= Math.floor(endIdx); i += step) {
+  if (days <= 32) {
+    // 日境界: グリッドは毎日（21日超は2日毎）、ラベルはmaxLabels本まで
+    const gridStep = days <= 21 ? 1 : 2;
+    const labelStep = Math.max(gridStep, Math.ceil(days / maxLabels));
+    for (let i = Math.ceil(startIdx); i <= Math.floor(endIdx); i += gridStep) {
       const d = new Date(i * 86400000);
-      out.push({ idx: i, label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}` });
+      const labeled = (i - Math.ceil(startIdx)) % labelStep === 0;
+      out.push({ idx: i, label: labeled ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}` : '' });
     }
-  } else if (days <= 450) {
-    // 月境界: 1日ごとに M月（数が多ければ間引き）
+  } else if (days <= 500) {
+    // 月境界: グリッドは全月、ラベルは全月（多すぎる時だけ間引き）
     const months: XTick[] = [];
     const cur = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1));
     while (cur.getTime() / 86400000 <= endIdx) {
       const idx = cur.getTime() / 86400000;
       if (idx >= startIdx) {
-        months.push({ idx, label: cur.getUTCMonth() === 0 ? `${String(cur.getUTCFullYear()).slice(2)}/1` : `${cur.getUTCMonth() + 1}月` });
+        months.push({ idx, label: cur.getUTCMonth() === 0 ? `${String(cur.getUTCFullYear()).slice(2)}/1` : `${cur.getUTCMonth() + 1}` });
       }
       cur.setUTCMonth(cur.getUTCMonth() + 1);
     }
-    const step = Math.max(1, Math.ceil(months.length / maxLabels));
-    for (let i = 0; i < months.length; i += step) out.push(months[i]);
+    const labelStep = Math.max(1, Math.ceil(months.length / maxLabels));
+    months.forEach((m, i) => out.push({ idx: m.idx, label: i % labelStep === 0 ? m.label : '' }));
   } else {
-    // 年境界
+    // 年境界: グリッドは全年＋補助で半年、ラベルは全年
     const cur = new Date(Date.UTC(first.getUTCFullYear(), 0, 1));
     while (cur.getTime() / 86400000 <= endIdx) {
       const idx = cur.getTime() / 86400000;
-      if (idx >= startIdx) out.push({ idx, label: `${cur.getUTCFullYear()}年` });
+      if (idx >= startIdx) out.push({ idx, label: `${cur.getUTCFullYear()}` });
+      const mid = new Date(cur); mid.setUTCMonth(6);
+      const midIdx = mid.getTime() / 86400000;
+      if (midIdx >= startIdx && midIdx <= endIdx) out.push({ idx: midIdx, label: '' });
       cur.setUTCFullYear(cur.getUTCFullYear() + 1);
     }
+    out.sort((a, b) => a.idx - b.idx);
   }
   return out;
 }

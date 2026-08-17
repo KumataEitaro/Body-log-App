@@ -7,6 +7,8 @@ import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 
 // draggable-flatlistは旧reanimated APIに依存しておりreanimated 4環境ではimport時に
 // クラッシュし得るため、遅延ロード＋失敗時は↑↓ボタン並び替えへフォールバックする
@@ -45,8 +47,8 @@ const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '
 const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['lifting', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
-  kpi: 'サマリー', calendar: '📅 カレンダー', chart: '📈 推移グラフ', goal: '🎯 目標設定',
-  trends: '🔬 食材の傾向', health: '⌚ 歩数・睡眠', lifting: '🏋️ トレ実績・グラフ', tgoal: '🎯 種目別目標',
+  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', goal: '目標設定',
+  trends: '食材の傾向', health: '歩数・睡眠', lifting: 'トレ実績・グラフ', tgoal: '種目別目標',
 };
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -81,6 +83,7 @@ export default function ChangesScreen() {
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
+  const router = useRouter();
   const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
   const [editing, setEditing] = useState(false);
   const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
@@ -236,7 +239,7 @@ export default function ChangesScreen() {
 
   const calendarCard = (
       <View style={s.card}>
-        <Text style={s.h2}>📅 カレンダー</Text>
+        <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>カレンダー</Text></View>
         <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
         {daySel && (
           <View style={s.dayBox}>
@@ -291,7 +294,7 @@ export default function ChangesScreen() {
         const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
         return (
           <View style={s.card}>
-            <Text style={s.h2}>🔬 食材とあなたの体の傾向</Text>
+            <View style={s.h2Row}><FlaskConical size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>食材とあなたの体の傾向</Text></View>
             <Text style={s.note}>よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。</Text>
             {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>▼ 食べた翌日、下がりやすい</Text>}
             {down.map((f) => (
@@ -320,7 +323,7 @@ export default function ChangesScreen() {
 
   const healthCard = healthAvailable() ? (
         <View style={s.card}>
-          <Text style={s.h2}>⌚ 歩数・睡眠（直近7日）</Text>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>歩数・睡眠（直近7日）</Text></View>
           {activity === null ? (
             <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
               <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : 'ヘルスケアから読み込む'}</Text>
@@ -366,16 +369,24 @@ export default function ChangesScreen() {
   const headerJSX = (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Text style={[s.h, { marginBottom: 0 }]}>変化</Text>
-        {editing ? (
-          <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
-        ) : (
-          <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
-        )}
+        <Text style={[s.h, { marginBottom: 0 }]}>概要</Text>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {editing ? (
+            <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
+          ) : (
+            <>
+              <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
+              <Pressable onPress={() => router.push('/settings')} hitSlop={8} style={s.gearBtn}>
+                <Settings size={16} color={C.sub} />
+              </Pressable>
+            </>
+          )}
+        </View>
       </View>
       <View style={s.topSegWrap}>
-        {([['body', '🧍 身体の変化'], ['training', '🏋️ 筋トレの成長']] as const).map(([k, l]) => (
+        {([['body', '身体の変化', PersonStanding], ['training', '筋トレの成長', Dumbbell]] as const).map(([k, l, Icon]) => (
           <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
+            <Icon size={14} color={topSeg === k ? '#fff' : C.sub} />
             <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
           </Pressable>
         ))}
@@ -456,7 +467,9 @@ const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
   topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
   editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },

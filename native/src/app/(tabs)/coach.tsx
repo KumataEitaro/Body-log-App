@@ -110,7 +110,7 @@ export default function CoachScreen() {
               .upsert({ user_id: uid, name: a.name, target_kg: Number(a.target_kg) }, { onConflict: 'user_id,name' }));
           }
           if (error) {
-            setMsgs((m) => [...m, { role: 'ai', text: '目標の更新に失敗しました。「変化」タブから手動で設定してください。' }]);
+            setMsgs((m) => [...m, { role: 'ai', text: '目標の更新に失敗しました。「概要」タブから手動で設定してください。' }]);
             return;
           }
           setMsgs((m) => m.map((x, i) => (i === idx ? { ...x, applied: true } : x)));
@@ -155,7 +155,7 @@ export default function CoachScreen() {
                   <View style={s.actionCard}>
                     <Text style={s.actionLabel}>💡 {m.action.label}</Text>
                     {m.applied ? (
-                      <Text style={s.actionDone}>✓ 適用しました（「変化」タブに反映）</Text>
+                      <Text style={s.actionDone}>✓ 適用しました（「概要」タブに反映）</Text>
                     ) : (
                       <Pressable style={s.actionBtn} onPress={() => applyAction(m.action!, i)}>
                         <Text style={s.actionBtnT}>この目標を適用する</Text>
