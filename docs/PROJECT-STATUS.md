@@ -37,7 +37,7 @@
 
 - **秘密情報（GEMINI_API_KEY等のサーバーキー・パスワード）はAIが値を扱わない**。ユーザーがVercel/Codemagicに直接登録。.env.localは読まない。EXPO_PUBLIC_のsb_publishable_キーは公開クライアントキーなので扱ってよい（native/.envはgit管理）
 - codemagic.io / supabase.com / Apple系サイトは組織ブラウザからアクセス不可だった経緯があり、**CIログ・ダッシュボードはユーザーがスクショ/テキストを貼る運用**
-- コミットは細かく区切る（PCスリープ対策）。native変更時は `cd native && npx tsc --noEmit` を通してからcommit
+- コミットは細かく区切る（PCスリープ対策）。native変更時は `cd native && npx tsc --noEmit && npm test` を通してからcommit（npm test=jest-expoの全画面smoke test。描画時クラッシュ＝リリースの白画面を検出する。過去にD&Dライブラリのreanimated非互換で2度白画面事故あり）
 - Webの動作確認は `npm run build` → `npx vercel deploy --prod`。テストは vitest（tests/）
 - 回答・コミットメッセージは日本語
 
