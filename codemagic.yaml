@@ -134,7 +134,8 @@ workflows:
           agvtool new-version -all $BUILD_NUMBER
       - name: Build ipa
         script: |
-          xcode-project use-profiles
+          # node_modules内のxcodeprojを触らないよう対象を限定（--warn-onlyで非対応プロジェクトはスキップ）
+          xcode-project use-profiles --project "native/ios/BodyLog.xcodeproj" --warn-only
           set +e
           xcode-project build-ipa --workspace native/ios/BodyLog.xcworkspace --scheme BodyLog
           RC=$?
