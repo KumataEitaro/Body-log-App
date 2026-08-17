@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
+import DateStrip from '@/components/DateStrip';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -147,7 +148,9 @@ export default function LogScreen() {
     transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [i === 3 ? 18 : 14, 0] }) }],
   }));
 
-  const today = todayJST();
+  // 記録先の日付（既定=今日。過去日にも記録できる。旧Web版の日付選択の復活）
+  const [viewDate, setViewDate] = useState(todayJST());
+  const today = viewDate;
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -160,9 +163,9 @@ export default function LogScreen() {
       supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
       supabase.from('entries').select('weight,date').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio').order('created_at', { ascending: true }).limit(30),
-      supabase.from('logs').select('*').eq('date', todayJST()).order('at', { ascending: true }),
+      supabase.from('logs').select('*').eq('date', viewDate).order('at', { ascending: true }),
       supabase.from('logs').select('id,date,items,kcal')
-        .lt('date', todayJST()).not('kcal', 'is', null)
+        .lt('date', viewDate).not('kcal', 'is', null)
         .order('at', { ascending: false }).limit(40),
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
@@ -184,7 +187,7 @@ export default function LogScreen() {
       if (meals.length >= 6) break;
     }
     setRecentMeals(meals);
-  }, []);
+  }, [viewDate]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -319,7 +322,7 @@ export default function LogScreen() {
     if (!uid || !parsed) return;
     setSaving(true); setMsg(null);
     try {
-      const res = await saveParsed(uid, parsed, stagedNote);
+      const res = await saveParsed(uid, parsed, stagedNote, viewDate);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       setParsed(null); setStagedNote('');
       await load();
@@ -405,12 +408,18 @@ export default function LogScreen() {
         const t = todayJST();
         if (await AsyncStorage.getItem('bl-backfill-snooze') === t) return;
         const y = shiftDate(t, -1);
-        const [{ data: e }, { data: first }] = await Promise.all([
+        const [entRes, firstRes, logRes] = await Promise.all([
           supabase.from('entries').select('intake,mood,food_text').eq('date', y).maybeSingle(),
           supabase.from('entries').select('date').order('date', { ascending: true }).limit(1),
+          supabase.from('logs').select('id').eq('date', y).not('kcal', 'is', null).limit(1),
         ]);
+        // 取得に1つでも失敗したら出さない（誤って「記録なし」と言うほうが害が大きい）
+        if (entRes.error || firstRes.error || logRes.error) return;
+        const e = entRes.data;
+        const first = firstRes.data;
         if (!first || first.length === 0 || first[0].date > y) return; // 始めたばかり
-        if (e?.intake != null) return; // 昨日は記録済み
+        if (e?.intake != null) return; // 日次サマリーに食事あり
+        if ((logRes.data?.length ?? 0) > 0) return; // 生ログに食事あり（サマリー同期ズレでも出さない）
         const binge = detectStruggle([String(e?.mood || ''), String(e?.food_text || '')]) === 'binge';
         setBackfill({ date: y, binge });
       } catch { /* 穴埋めは本体機能に影響させない */ }
@@ -462,8 +471,9 @@ export default function LogScreen() {
         onScroll={(e) => { scrollYNow.current = e.nativeEvent.contentOffset.y; }}
         scrollEventThrottle={32}
       >
-        <Animated.View style={[s.brandRow, enter[0]]}>
+        <Animated.View style={[s.brandRow, enter[0], { justifyContent: 'space-between', marginRight: 38 }]}>
           <Text style={s.pageTitle}>食事</Text>
+          <DateStrip value={viewDate} onChange={setViewDate} />
         </Animated.View>
 
         {/* ヒーロー */}
@@ -501,7 +511,7 @@ export default function LogScreen() {
         {/* 昨日の穴埋めカード（責めないトーン） */}
         {backfill && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : '📝 昨日の記録がありません'}</Text>
+            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : '📝 昨日の食事記録がありません'}</Text>
             <Text style={s.mutedT}>
               {backfill.binge
                 ? '食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。'

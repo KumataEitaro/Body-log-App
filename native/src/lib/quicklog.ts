@@ -37,11 +37,11 @@ export async function analyzeFood(text: string, images: QuickImage[]): Promise<{
   };
 }
 
-// ステージング内容を今日のログとして確定保存
-export async function saveParsed(uid: string, p: ParsedResult, note: string): Promise<{ ok: true } | { ok: false; error: string }> {
+// ステージング内容をログとして確定保存（dateを渡せば過去日にも記録できる。省略時=今日）
+export async function saveParsed(uid: string, p: ParsedResult, note: string, date?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const total = sumItems(p.items);
   const hasMeal = p.items.length > 0;
-  const today = todayJST();
+  const today = date || todayJST();
   const { error } = await supabase.from('logs').insert({
     user_id: uid, date: today,
     items: p.items,

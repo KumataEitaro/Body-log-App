@@ -11,6 +11,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
+import DateStrip from '@/components/DateStrip';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
@@ -60,6 +61,9 @@ export default function TrainingScreen() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // 記録先の日付（既定=今日。過去日にも記録できる）
+  const [viewDate, setViewDate] = useState(todayJST());
+
   // かんたん記録の状態
   const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
   const [actIdx, setActIdx] = useState<number | null>(null);
@@ -86,7 +90,7 @@ export default function TrainingScreen() {
       if (!uid) return;
       const a = ACTIVITIES[actIdx];
       const kcal = actKcal();
-      const today = todayJST();
+      const today = viewDate;
       const { error } = await supabase.from('logs').insert({
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: kcal, mood: '',
@@ -123,7 +127,7 @@ export default function TrainingScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const today = todayJST();
+      const today = viewDate;
       const { error } = await supabase.from('logs').insert({
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
@@ -147,7 +151,10 @@ export default function TrainingScreen() {
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      <Text style={s.pageTitle}>運動</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
+        <Text style={[s.pageTitle, { marginBottom: 0 }]}>運動</Text>
+        <DateStrip value={viewDate} onChange={setViewDate} />
+      </View>
 
       {/* かんたん記録 ⇄ 筋トレ のセグメント */}
       <View style={s.segWrap}>
