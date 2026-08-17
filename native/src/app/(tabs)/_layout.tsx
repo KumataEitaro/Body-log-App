@@ -19,8 +19,8 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="log" options={{ title: '食事', tabBarIcon: ({ color, size }) => <Utensils color={color} size={size - 2} /> }} />
       <Tabs.Screen name="training" options={{ title: 'トレ', tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size - 2} /> }} />
-      <Tabs.Screen name="changes" options={{ title: '概要', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size - 2} /> }} />
       <Tabs.Screen name="coach" options={{ title: '相談', tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="changes" options={{ title: '概要', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size - 2} /> }} />
       <Tabs.Screen name="goal" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>

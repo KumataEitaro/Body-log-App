@@ -283,13 +283,20 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               </View>
             );
           })}
-          <Text style={s.label}>種目名</Text>
-          <TextInput style={s.input} placeholder="ベンチプレス" placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
-          <Text style={s.label}>目標重量（kg）</Text>
-          <TextInput style={s.input} placeholder="100" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={tKg} onChangeText={setTKg} />
-          <Pressable style={[s.btnPrimary, { marginTop: 12 }]} onPress={addTrainingGoal} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>目標を追加する</Text>}
-          </Pressable>
+          {/* 入力は情報量が小さいので1行に収める（縦積みはスペースの無駄） */}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+            <View style={{ flex: 1.5 }}>
+              <Text style={s.label}>種目名</Text>
+              <TextInput style={s.input} placeholder="ベンチプレス" placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.label}>目標（kg）</Text>
+              <TextInput style={s.input} placeholder="100" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={tKg} onChangeText={setTKg} />
+            </View>
+            <Pressable style={[s.btnGhost, { paddingHorizontal: 16 }]} onPress={addTrainingGoal} disabled={busy}>
+              {busy ? <ActivityIndicator color={C.ink} /> : <Text style={s.btnGhostT}>追加</Text>}
+            </Pressable>
+          </View>
         </View>
       )}
 

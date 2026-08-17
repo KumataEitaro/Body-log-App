@@ -4,12 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
 import { C } from '@/lib/ui';
+import { useGuideTarget } from '@/components/GuideTour';
 
-export default function HeaderGear() {
+export default function HeaderGear({ guideKey }: { guideKey?: string }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // ガイドの照射対象になれる（概要タブが guideKey="gear" を渡す。他タブはダミーキー）
+  const target = useGuideTarget(guideKey ?? '__gear_unused__');
   return (
     <Pressable
+      ref={target}
+      collapsable={false}
       style={[s.btn, { top: insets.top + 8 }]}
       onPress={() => router.push('/settings')}
       hitSlop={10}

@@ -95,7 +95,10 @@ export default function TrainingScreen() {
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      <Text style={s.h}>トレーニング</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <Text style={s.brand}>BodyLog</Text>
+        <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
+      </View>
 
       {/* レストタイマー（保存で自動開始・タップで90秒リスタート） */}
       {restLeft != null && (
@@ -185,6 +188,9 @@ export default function TrainingScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
+  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 10 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {

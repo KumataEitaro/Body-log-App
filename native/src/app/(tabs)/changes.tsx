@@ -10,7 +10,9 @@ import ReorderableCards from '@/components/ReorderableCards';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
-import { Settings, CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
+import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
+import HeaderGear from '@/components/HeaderGear';
+import GoalSummaryCard from '@/components/GoalSummaryCard';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
@@ -74,7 +76,6 @@ export default function ChangesScreen() {
   const router = useRouter();
   const guide = useGuide();
   const chartTarget = useGuideTarget('chart');
-  const gearTarget = useGuideTarget('gear');
   const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
   const [editing, setEditing] = useState(false);
   const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
@@ -374,13 +375,13 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
-      case 'goal': return <GoalPanel mode="weight" weightSections="cheat" />;
+      case 'goal': return <GoalSummaryCard mode="weight" />;
       case 'trends': return trendsCard;
       case 'health': return healthCard;
       case 'tkpi': return <LiftKpiCard />;
       case 'tcal': return <LiftCalendarCard />;
       case 'tchart': return <LiftChartCard />;
-      case 'tgoal': return <GoalPanel mode="training" />;
+      case 'tgoal': return <GoalSummaryCard mode="training" />;
       default: return null;
     }
   }
@@ -401,20 +402,19 @@ export default function ChangesScreen() {
   const headerJSX = (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Text style={[s.h, { marginBottom: 0 }]}>概要</Text>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        {/* 左上は全タブ共通のブランド。⚙は固定配置のHeaderGear（右余白38で衝突回避） */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={s.brand}>BodyLog</Text>
+          <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginRight: 38 }}>
           {editing ? (
             <>
               <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>元に戻す</Text></Pressable>
               <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
             </>
           ) : (
-            <>
-              <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
-              <Pressable onPress={() => router.push('/settings')} hitSlop={8} style={s.gearBtn} ref={gearTarget} collapsable={false}>
-                <Settings size={16} color={C.sub} />
-              </Pressable>
-            </>
+            <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
           )}
         </View>
       </View>
@@ -448,6 +448,7 @@ export default function ChangesScreen() {
       />
       {!editing && <QuickLogFab />}
       <StatusBarMask />
+      <HeaderGear guideKey="gear" />
     </View>
   );
 }
@@ -455,6 +456,9 @@ export default function ChangesScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
+  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
