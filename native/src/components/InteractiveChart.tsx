@@ -106,6 +106,9 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   // 【重要2】パンとピンチでrefを共有すると、同時発火時に互いの開始値を壊す → 別々に保持
   const panStart = useRef({ end: 0, days: 0 });
   const pinchStart = useRef({ end: 0, days: 0 });
+  // リフトオフ・ノイズ対策: 指が離れる直前の数十msは指間距離が物理的に暴れるため、
+  // ピンチ中の窓履歴を持ち、終了時は「90ms前の状態」に確定する（離れ際の入力を捨てる）
+  const pinchHist = useRef<{ t: number; end: number; days: number }[]>([]);
 
   const pan = Gesture.Pan()
     .runOnJS(true)
@@ -122,7 +125,10 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     .onEnd(() => reportDays(win.days));
   const pinch = Gesture.Pinch()
     .runOnJS(true)
-    .onStart(() => { pinchStart.current = { end: win.end, days: win.days }; })
+    .onStart(() => {
+      pinchStart.current = { end: win.end, days: win.days };
+      pinchHist.current = [];
+    })
     .onUpdate((e) => {
       const fx = Math.min(1, Math.max(0, ((e.focalX ?? plotW / 2) - PAD_L) / plotW));
       const focalIdx = (pinchStart.current.end - pinchStart.current.days) + fx * pinchStart.current.days;
@@ -130,13 +136,28 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
       const damped = Math.pow(Math.max(0.2, e.scale), 0.9);
       const newDays = Math.min(Math.max(7, pinchStart.current.days / damped), span);
       const target = clampWin(focalIdx + (1 - fx) * newDays, newDays);
+      // 履歴に積む（400msより古いものは捨てる）
+      const now = Date.now();
+      pinchHist.current.push({ t: now, end: target.end, days: target.days });
+      while (pinchHist.current.length > 0 && now - pinchHist.current[0].t > 400) pinchHist.current.shift();
       // Withings風のローパス: 指に数フレーム遅れてぬるっと追従させる
       setWin((prev) => ({
         end: prev.end + (target.end - prev.end) * 0.5,
         days: prev.days + (target.days - prev.days) * 0.5,
       }));
     })
-    .onEnd(() => reportDays(win.days));
+    .onEnd(() => {
+      // 離れ際90msの暴れを無効化: それ以前の最後の状態へ確定する
+      const cutoff = Date.now() - 90;
+      const stable = [...pinchHist.current].reverse().find((h) => h.t <= cutoff);
+      if (stable) {
+        setWin(clampWin(stable.end, stable.days));
+        reportDays(stable.days);
+      } else {
+        reportDays(win.days);
+      }
+      pinchHist.current = [];
+    });
   const doubleTap = Gesture.Tap().numberOfTaps(2).runOnJS(true)
     .onEnd(() => {
       const d = Math.min(presetDays ?? span, span);
