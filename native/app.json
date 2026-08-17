@@ -8,7 +8,6 @@
     "scheme": "bodylog",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.gotcha.bodylog.rn",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
