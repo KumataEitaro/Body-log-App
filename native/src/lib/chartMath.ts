@@ -78,16 +78,15 @@ export function xTicks(startIdx: number, endIdx: number, maxLabels = 8): XTick[]
   const out: XTick[] = [];
   const first = new Date(Math.ceil(startIdx) * 86400000);
   if (days <= 32) {
-    // 日境界: グリッドは毎日（21日超は2日毎）、ラベルはmaxLabels本まで
-    const gridStep = days <= 21 ? 1 : 2;
-    const labelStep = Math.max(gridStep, Math.ceil(days / maxLabels));
-    for (let i = Math.ceil(startIdx); i <= Math.floor(endIdx); i += gridStep) {
+    // 日境界: グリッドは毎日、ラベルはmaxLabels本まで
+    const labelStep = Math.max(1, Math.ceil(days / maxLabels));
+    for (let i = Math.ceil(startIdx); i <= Math.floor(endIdx); i += 1) {
       const d = new Date(i * 86400000);
       const labeled = (i - Math.ceil(startIdx)) % labelStep === 0;
       out.push({ idx: i, label: labeled ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}` : '' });
     }
   } else if (days <= 500) {
-    // 月境界: グリッドは全月、ラベルは全月（多すぎる時だけ間引き）
+    // 月境界: グリッドは全月＋（〜200日は週の補助線も）、ラベルは全月（多すぎる時だけ間引き）
     const months: XTick[] = [];
     const cur = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1));
     while (cur.getTime() / 86400000 <= endIdx) {
@@ -99,15 +98,24 @@ export function xTicks(startIdx: number, endIdx: number, maxLabels = 8): XTick[]
     }
     const labelStep = Math.max(1, Math.ceil(months.length / maxLabels));
     months.forEach((m, i) => out.push({ idx: m.idx, label: i % labelStep === 0 ? m.label : '' }));
+    if (days <= 200) {
+      // 週の補助線（月曜・ラベルなし）
+      for (let i = Math.ceil(startIdx); i <= Math.floor(endIdx); i += 1) {
+        if (((i + 3) % 7) === 0 && !out.some((t) => Math.abs(t.idx - i) < 1)) out.push({ idx: i, label: '' });
+      }
+      out.sort((a, b) => a.idx - b.idx);
+    }
   } else {
-    // 年境界: グリッドは全年＋補助で半年、ラベルは全年
+    // 年境界: グリッドは全年＋四半期の補助線、ラベルは全年
     const cur = new Date(Date.UTC(first.getUTCFullYear(), 0, 1));
     while (cur.getTime() / 86400000 <= endIdx) {
       const idx = cur.getTime() / 86400000;
       if (idx >= startIdx) out.push({ idx, label: `${cur.getUTCFullYear()}` });
-      const mid = new Date(cur); mid.setUTCMonth(6);
-      const midIdx = mid.getTime() / 86400000;
-      if (midIdx >= startIdx && midIdx <= endIdx) out.push({ idx: midIdx, label: '' });
+      for (const q of [3, 6, 9]) {
+        const mid = new Date(cur); mid.setUTCMonth(q);
+        const midIdx = mid.getTime() / 86400000;
+        if (midIdx >= startIdx && midIdx <= endIdx) out.push({ idx: midIdx, label: '' });
+      }
       cur.setUTCFullYear(cur.getUTCFullYear() + 1);
     }
     out.sort((a, b) => a.idx - b.idx);

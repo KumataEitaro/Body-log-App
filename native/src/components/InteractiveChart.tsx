@@ -81,14 +81,14 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   if (planValue != null && planValue > vMin - (vMax - vMin) && planValue < vMax + (vMax - vMin)) {
     vMin = Math.min(vMin, planValue); vMax = Math.max(vMax, planValue);
   }
-  const { ticks, lo, hi } = niceTicks(vMin, vMax, fs ? 8 : 6);
+  const { ticks, lo, hi } = niceTicks(vMin, vMax, fs ? 10 : 8);
 
   const x = (idx: number) => PAD_L + ((idx - startF) / win.days) * plotW;
   const y = (v: number) => PAD_T + (1 - (v - lo) / Math.max(1e-9, hi - lo)) * plotH;
 
   const trendPts = visTrend.map((b) => ({ x: x(b.idx), y: y(b.value) }));
   const rawPts = visRaw.map((b) => ({ x: x(b.idx), y: y(b.value) }));
-  const xtks = xTicks(startF, win.end, Math.max(5, Math.round(plotW / 38)));
+  const xtks = xTicks(startF, win.end, Math.max(6, Math.round(plotW / 30)));
 
   // 期間ヘッダーと傾向（表示中トレンドの端点差）
   const delta = visTrend.length >= 2 ? visTrend[visTrend.length - 1].value - visTrend[0].value : null;
