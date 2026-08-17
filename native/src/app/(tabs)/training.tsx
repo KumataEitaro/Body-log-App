@@ -6,8 +6,6 @@ import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { trainingSeries, volumeVerdict } from '@/lib/training';
-import SimpleChart from '@/components/SimpleChart';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 
@@ -17,9 +15,6 @@ type HistRow = { id: string; date: string; text: string };
 export default function TrainingScreen() {
   const [tRows, setTRows] = useState<TRow[]>([{ name: '', kg: '', reps: '', sets: '' }]);
   const [history, setHistory] = useState<HistRow[]>([]);
-  const [goalKg, setGoalKg] = useState<Map<string, number>>(new Map());
-  const [selEx, setSelEx] = useState<string | null>(null);
-  const [chartMode, setChartMode] = useState<'kg' | 'volume'>('kg');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,8 +25,6 @@ export default function TrainingScreen() {
     const { data } = await supabase.from('logs').select('id,date,text')
       .like('text', '🏋️%').order('at', { ascending: false }).limit(60);
     setHistory((data as HistRow[]) || []);
-    const { data: tg } = await supabase.from('training_goals').select('name,target_kg');
-    if (tg) setGoalKg(new Map(tg.map((g: { name: string; target_kg: number }) => [g.name, Number(g.target_kg)])));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -64,12 +57,6 @@ export default function TrainingScreen() {
       setSaving(false);
     }
   }
-
-  const series = trainingSeries(history);
-  const exercises = [...series.entries()].sort((a, b) => b[1].length - a[1].length).map(([n]) => n);
-  const activeEx = selEx && series.has(selEx) ? selEx : exercises[0] ?? null;
-  const exPoints = activeEx ? series.get(activeEx)! : [];
-  const verdict = volumeVerdict(exPoints);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -108,37 +95,9 @@ export default function TrainingScreen() {
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
 
-      {/* 進捗グラフ */}
-      {exercises.length > 0 && (
-        <View style={s.card}>
-          <Text style={s.h2}>📈 挙上重量の推移</Text>
-          <View style={s.chips}>
-            {(['kg', 'volume'] as const).map((m) => (
-              <Pressable key={m} style={[s.chip, chartMode === m && s.chipOn]} onPress={() => setChartMode(m)}>
-                <Text style={[s.chipT, chartMode === m && { color: '#fff' }]}>{m === 'kg' ? '重量(kg)' : 'ボリューム'}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <SimpleChart
-            points={exPoints.map((p) => ({ date: p.date, value: chartMode === 'kg' ? p.maxKg : p.volume }))}
-            unit={chartMode === 'kg' ? 'kg' : 'kg·回'} decimals={0}
-            planValue={chartMode === 'kg' && activeEx ? goalKg.get(activeEx) ?? null : null}
-          />
-          <View style={s.chips}>
-            {exercises.map((n) => (
-              <Pressable key={n} style={[s.chip, n === activeEx && s.chipOn]} onPress={() => setSelEx(n)}>
-                <Text style={[s.chipT, n === activeEx && { color: '#fff' }]}>{n}</Text>
-              </Pressable>
-            ))}
-          </View>
-          {verdict && (
-            <Text style={[s.verdict, { color: verdict.trend === 'down' ? C.amber : C.teal }]}>
-              {verdict.trend === 'up' && `💪 ボリューム上昇中（直近 ${verdict.lastVolume.toLocaleString()}kg·回・平均比 +${verdict.pct}%）`}
-              {verdict.trend === 'flat' && `➡️ ボリューム維持（平均比 ${verdict.pct > 0 ? '+' : ''}${verdict.pct}%）。減量中の維持は十分な成果`}
-              {verdict.trend === 'down' && `⚠️ ボリューム低下（平均比 ${verdict.pct}%）。赤字が深すぎるサインかも。たんぱく質と睡眠を確認`}
-            </Text>
-          )}
-        </View>
+      {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
+      {history.length > 0 && (
+        <Text style={s.moveNote}>📈 挙上重量の推移グラフは「変化」タブ →「🏋️ 筋トレの成長」で見られます</Text>
       )}
 
       {/* 履歴 */}
@@ -177,6 +136,7 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
   chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
   verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
+  moveNote: { fontSize: 11.5, color: C.sub, marginBottom: 12, paddingHorizontal: 4, lineHeight: 17 },
   muted: { fontSize: 13, color: C.sub },
   histRow: { flexDirection: 'row', gap: 10, paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line },
   histDate: { fontSize: 11, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },

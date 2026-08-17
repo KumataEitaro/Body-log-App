@@ -9,6 +9,7 @@ import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
+import LiftingProgress from '@/components/LiftingProgress';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
@@ -43,7 +44,7 @@ export default function ChangesScreen() {
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
-  const [topSeg, setTopSeg] = useState<'progress' | 'goal'>('progress');
+  const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
@@ -157,18 +158,23 @@ export default function ChangesScreen() {
     >
       <Text style={s.h}>変化</Text>
 
-      {/* トップセグメント: 記録の変化 ⇄ 目標（旧目標タブを統合） */}
+      {/* トップセグメント: ターゲット軸で2択（実績と目標は同じ画面に縦積み） */}
       <View style={s.topSegWrap}>
-        {([['progress', '📈 記録の変化'], ['goal', '🎯 目標']] as const).map(([k, l]) => (
+        {([['body', '🧍 身体の変化'], ['training', '🏋️ 筋トレの成長']] as const).map(([k, l]) => (
           <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
             <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
           </Pressable>
         ))}
       </View>
 
-      {topSeg === 'goal' && <GoalPanel />}
+      {topSeg === 'training' && (
+        <>
+          <LiftingProgress />
+          <GoalPanel mode="training" />
+        </>
+      )}
 
-      {topSeg === 'progress' && (
+      {topSeg === 'body' && (
       <>
       {/* KPI */}
       <View style={s.kpiRow}>
@@ -217,6 +223,9 @@ export default function ChangesScreen() {
           <Text style={s.note}>点線＝目標 {Number(goal.target_weight).toFixed(1)}kg</Text>
         )}
       </View>
+
+      {/* 目標設定＋チートデイ（グラフの直下＝実績と目標を同じ画面で） */}
+      <GoalPanel mode="weight" />
 
       {/* カレンダー（日タップで詳細） */}
       <View style={s.card}>

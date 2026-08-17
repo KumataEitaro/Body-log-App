@@ -16,8 +16,9 @@ function fmt(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function GoalPanel() {
-  const [seg, setSeg] = useState<'weight' | 'training'>('weight');
+// mode='weight': 目標設定カード＋チートデイカード / mode='training': 種目別目標重量カード
+// （タブ切替は親=変化タブのセグメントに一本化。ここでは切替UIを持たない）
+export default function GoalPanel({ mode }: { mode: 'weight' | 'training' }) {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [initWeight, setInitWeight] = useState<number | null>(null);
@@ -151,18 +152,10 @@ export default function GoalPanel() {
 
   return (
     <View>
-      {/* セグメント切替 */}
-      <View style={s.segWrap}>
-        {([['weight', '🎯 体重変化'], ['training', '🏋️ 筋トレ重量']] as const).map(([k, l]) => (
-          <Pressable key={k} style={[s.seg, seg === k && s.segOn]} onPress={() => { setSeg(k); setMsg(null); }}>
-            <Text style={[s.segT, seg === k && { color: '#fff' }]}>{l}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {seg === 'weight' && (
+      {mode === 'weight' && (
         <>
         <View style={s.card}>
+          <Text style={s.h2}>🎯 目標設定</Text>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
               <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
@@ -254,8 +247,9 @@ export default function GoalPanel() {
         </>
       )}
 
-      {seg === 'training' && (
+      {mode === 'training' && (
         <View style={s.card}>
+          <Text style={s.h2}>🏋️ 種目ごとの目標重量</Text>
           {tGoals.length === 0 && <Text style={s.note}>まだ目標がありません。種目と目標重量を追加しましょう。</Text>}
           {tGoals.map((tg) => {
             const best = bests.get(tg.name) ?? 0;
