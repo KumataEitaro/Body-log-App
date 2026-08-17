@@ -1,6 +1,7 @@
 // 目標タブ（Phase 3）: 体重変化の目標＋筋トレ重量の目標（セグメント切替）
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
@@ -23,6 +24,7 @@ export default function GoalScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -125,14 +127,26 @@ export default function GoalScreen() {
               )}
             </View>
           )}
-          <Text style={s.label}>目標日（YYYY-MM-DD）</Text>
-          <TextInput style={s.input} placeholder="2026-12-31" placeholderTextColor={C.faint} value={gDate} onChangeText={setGDate} autoCapitalize="none" />
+          <Text style={s.label}>目標日</Text>
+          <Pressable style={s.input} onPress={() => setShowDatePicker((v) => !v)}>
+            <Text style={{ fontSize: 16, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : 'タップして選ぶ'}</Text>
+          </Pressable>
+          {showDatePicker && (
+            <DateTimePicker
+              value={gDate ? new Date(gDate + 'T00:00:00') : new Date()}
+              mode="date" display="inline" minimumDate={new Date()} locale="ja-JP"
+              onChange={(_, d) => {
+                if (d) setGDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+                setShowDatePicker(false);
+              }}
+            />
+          )}
           <Text style={s.label}>目標体重（kg）</Text>
           <TextInput style={s.input} placeholder="82.0" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gWeight} onChangeText={setGWeight} />
           <Pressable style={[s.btnPrimary, { marginTop: 12 }]} onPress={saveWeightGoal} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>目標を保存する</Text>}
           </Pressable>
-          <Text style={s.note}>PFC詳細設定・チートデイ登録はPhase 3bで移植予定（現行アプリで設定可・データ共通）</Text>
+          <Text style={s.note}>PFC詳細設定・チートデイ登録は現行Web版で設定できます（データ共通）</Text>
         </View>
       )}
 

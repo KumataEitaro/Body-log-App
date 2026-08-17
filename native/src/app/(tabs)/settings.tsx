@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
+import { healthAvailable, requestHealthAuth, importWeights, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -16,6 +17,9 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthMsg, setHealthMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -71,6 +75,30 @@ export default function SettingsScreen() {
     } finally { setBusy(false); }
   }
 
+  async function healthImportWeights() {
+    setHealthBusy(true); setHealthMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      if (!(await requestHealthAuth())) { setHealthMsg({ ok: false, text: 'ヘルスケアへのアクセスが許可されませんでした。' }); return; }
+      const res = await importWeights(uid, 90);
+      if ('error' in res) { setHealthMsg({ ok: false, text: res.error }); return; }
+      setHealthMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。グラフに反映されます。` : '新しく取り込める体重データはありませんでした。' });
+    } finally { setHealthBusy(false); }
+  }
+
+  async function healthShowActivity() {
+    setHealthBusy(true); setHealthMsg(null);
+    try {
+      if (!(await requestHealthAuth())) { setHealthMsg({ ok: false, text: 'ヘルスケアへのアクセスが許可されませんでした。' }); return; }
+      const res = await readActivitySummary(7);
+      if ('error' in res) { setHealthMsg({ ok: false, text: res.error }); return; }
+      setActivity(res);
+      if (res.length === 0) setHealthMsg({ ok: true, text: '直近7日のデータが見つかりませんでした。' });
+    } finally { setHealthBusy(false); }
+  }
+
   const bmrPreview = mifflinBMR(sex, 70, Number(height) || 0, Number(age) || 0);
 
   return (
@@ -114,7 +142,39 @@ export default function SettingsScreen() {
 
       {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
 
-      <Text style={s.note}>通知・ヘルスケア連携・マイ食品管理・言語はPhase 3bで移植予定（現行アプリで設定可・データ共通）</Text>
+      {/* ヘルスケア連携（Expo Goでは案内のみ・TestFlight/dev clientで有効） */}
+      <View style={s.card}>
+        <Text style={s.h2}>⌚ ヘルスケア連携</Text>
+        {!healthAvailable() ? (
+          <Text style={s.note}>この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。</Text>
+        ) : (
+          <>
+            <Text style={s.note}>Appleヘルスケアから体重を取り込み、歩数・睡眠を確認できます。データは機能提供のみに使用し、広告等には一切使用しません。</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={healthImportWeights} disabled={healthBusy}>
+                {healthBusy ? <ActivityIndicator color={C.ink} /> : <Text style={s.btnGhostT}>⚖️ 体重を取込（90日）</Text>}
+              </Pressable>
+              <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={healthShowActivity} disabled={healthBusy}>
+                <Text style={s.btnGhostT}>👟 歩数・睡眠を見る</Text>
+              </Pressable>
+            </View>
+            {activity && activity.length > 0 && (
+              <View style={{ marginTop: 10 }}>
+                {activity.map((a) => (
+                  <View key={a.date} style={s.actRow}>
+                    <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
+                    <Text style={s.actVal}>👟 {a.steps.toLocaleString()}歩</Text>
+                    <Text style={s.actVal}>😴 {a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+        {healthMsg && <Text style={[s.msg, { color: healthMsg.ok ? C.teal : C.coral, marginTop: 8 }]}>{healthMsg.text}</Text>}
+      </View>
+
+      <Text style={s.note}>通知・マイ食品管理・言語切替は現行Web版で設定できます（データ共通）</Text>
 
       {/* ログアウト */}
       <Pressable style={[s.btnGhost, { marginTop: 16 }]} onPress={() => supabase.auth.signOut()}>
@@ -154,4 +214,7 @@ const s = StyleSheet.create({
   btnDanger: { backgroundColor: C.coral, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
   note: { fontSize: 11.5, color: C.sub, lineHeight: 18, marginTop: 4 },
   msg: { fontSize: 13, fontWeight: '600', marginBottom: 8, paddingHorizontal: 4 },
+  actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
+  actDate: { fontSize: 11.5, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
+  actVal: { fontSize: 12.5, color: C.ink, fontVariant: ['tabular-nums'] },
 });

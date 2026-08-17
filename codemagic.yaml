@@ -100,3 +100,59 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  # ===== React Native版（native/）→ TestFlight =====
+  # 手動実行のみ（Start new build でこのworkflowを選択）。
+  # 事前準備: Apple Developer portalで Bundle ID com.gotcha.bodylog.rn を登録し、
+  # App Store Connectでアプリを作成しておくこと（署名プロファイルは自動生成される）。
+  rn-testflight:
+    name: BodyLog RN (native/) → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: bodylog-asc
+    environment:
+      xcode: latest
+      node: 22
+      vars:
+        BUNDLE_ID: com.gotcha.bodylog.rn
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gotcha.bodylog.rn
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd native
+          npm install
+      - name: Expo prebuild（iosプロジェクト生成＋pod install）
+        script: |
+          cd native
+          npx expo prebuild --platform ios
+      - name: Set build number
+        script: |
+          cd native/ios
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Build ipa
+        script: |
+          xcode-project use-profiles
+          set +e
+          xcode-project build-ipa --workspace native/ios/BodyLog.xcworkspace --scheme BodyLog
+          RC=$?
+          if [ $RC -ne 0 ]; then
+            echo "=================== xcodebuild エラー抜粋 ==================="
+            LOG=$(ls -t /tmp/xcodebuild_logs/*.log 2>/dev/null | head -1)
+            if [ -n "$LOG" ]; then
+              grep -nE "(: error:|error generated|❌|fatal error:)" "$LOG" | head -60
+              echo "-------------------- ログ末尾200行 --------------------"
+              tail -200 "$LOG"
+            fi
+            echo "============================================================"
+          fi
+          exit $RC
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
