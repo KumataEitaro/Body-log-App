@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform,
+  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -48,6 +50,7 @@ export default function LogScreen() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wWeight, setWWeight] = useState('');
+  const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
 
   const today = todayJST();
 
@@ -89,13 +92,41 @@ export default function LogScreen() {
   const macros = profile ? macroTargets(weightForBmr, goalKcal, goal?.protein_per_kg, goal?.fat_per_kg, goal?.fat_max_g) : null;
   const eatenP = Math.round(summary.p ?? 0);
 
+  // ===== 写真の取得（Web版と同じ最大辺1280px・JPEG品質0.72に圧縮してAPIへ） =====
+  async function compressToPayload(uri: string): Promise<{ uri: string; base64: string } | null> {
+    try {
+      const out = await manipulateAsync(uri, [{ resize: { width: 1280 } }], { compress: 0.72, format: SaveFormat.JPEG, base64: true });
+      return out.base64 ? { uri: out.uri, base64: out.base64 } : null;
+    } catch { return null; }
+  }
+
+  async function takePhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { setMsg({ ok: false, text: 'カメラの許可が必要です（設定アプリ→BodyLog）。' }); return; }
+    const res = await ImagePicker.launchCameraAsync({ quality: 1 });
+    if (res.canceled || !res.assets?.length) return;
+    const p = await compressToPayload(res.assets[0].uri);
+    if (p) setPhotos((prev) => [...prev, p].slice(0, 4));
+  }
+
+  async function pickPhotos() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { setMsg({ ok: false, text: '写真ライブラリの許可が必要です（設定アプリ→BodyLog）。' }); return; }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 - photos.length, quality: 1,
+    });
+    if (res.canceled || !res.assets?.length) return;
+    const list = (await Promise.all(res.assets.map((a) => compressToPayload(a.uri)))).filter(Boolean) as { uri: string; base64: string }[];
+    setPhotos((prev) => [...prev, ...list].slice(0, 4));
+  }
+
   // ===== AI解析（チップ追加分は保持して追記マージ＝Web版と同じ） =====
   async function parse() {
-    if (!chat.trim()) { setMsg({ ok: false, text: 'メモを書いてください（写真対応はPhase 2）。' }); return; }
+    if (!chat.trim() && photos.length === 0) { setMsg({ ok: false, text: 'メモを書くか、写真を追加してください。' }); return; }
     setAnalyzing(true); setMsg(null);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
-        '/api/parse-food', { text: chat, lang: 'ja' });
+        '/api/parse-food', { text: chat, lang: 'ja', images: photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' })) });
       if (!ok || !json?.ok || !json.result) { setMsg({ ok: false, text: json?.error || '解析に失敗しました。もう一度お試しください。' }); return; }
       const base = parsed?.items ?? [];
       const items = [...base, ...(json.result.items || [])];
@@ -107,6 +138,7 @@ export default function LogScreen() {
         adj: Number(json.result.adj) || parsed?.adj || 0,
         mood: json.result.mood ?? parsed?.mood ?? null,
       });
+      setPhotos([]); // 解析済み分は品目に反映済み。再タップでの二重計上を防ぐ
     } catch {
       setMsg({ ok: false, text: '通信に失敗しました。電波状況を確認してください。' });
     } finally {
@@ -430,8 +462,29 @@ export default function LogScreen() {
               })}
             </ScrollView>
           )}
+          {/* 写真からAI解析（撮影/アルバム→1280px圧縮→Gemini） */}
+          {photos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+              {photos.map((p, i) => (
+                <View key={i} style={s.thumbWrap}>
+                  <Image source={{ uri: p.uri }} style={s.thumb} />
+                  <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>×</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Pressable style={({ pressed }) => [s.btnGhost, pressed && { opacity: 0.7 }]} onPress={takePhoto} disabled={analyzing || photos.length >= 4}>
+              <Text style={s.btnGhostT}>📷 撮影</Text>
+            </Pressable>
+            <Pressable style={({ pressed }) => [s.btnGhost, pressed && { opacity: 0.7 }]} onPress={pickPhotos} disabled={analyzing || photos.length >= 4}>
+              <Text style={s.btnGhostT}>🖼 アルバム</Text>
+            </Pressable>
+          </View>
           <Pressable style={({ pressed }) => [s.btnPrimary, pressed && { opacity: 0.85 }]} onPress={parse} disabled={analyzing}>
-            {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>✨ AI解析</Text>}
+            {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>✨ AI解析{photos.length > 0 ? `（写真${photos.length}枚）` : ''}</Text>}
           </Pressable>
 
           {/* 体重クイック入力 */}
@@ -497,4 +550,7 @@ const s = StyleSheet.create({
   btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
   chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   chipBtnT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
+  thumbWrap: { marginRight: 8 },
+  thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
+  thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
 });

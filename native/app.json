@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "native",
-    "slug": "native",
+    "name": "BodyLog",
+    "slug": "bodylog-native",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "native",
+    "scheme": "bodylog",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.gotcha.bodylog.rn"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +26,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "食事の写真からAIが栄養素を推定するために使用します。",
+          "cameraPermission": "食事を撮影してAIが栄養素を推定するために使用します。"
+        }
+      ],
       [
         "expo-splash-screen",
         {
