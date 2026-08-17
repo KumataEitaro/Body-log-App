@@ -101,30 +101,34 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     return { end: e, days: d };
   };
 
-  // ジェスチャー開始時の窓をrefに保持する。
-  // 【重要】以前はローカル変数で保持していたため、setWinの再描画のたびに
-  // 「開始時の窓」が現在値で再初期化され、指の開き比率がズーム済みの値へ
-  // 毎フレーム再適用される複利バグ（指数的な暴走ズーム）になっていた。
-  const g0 = useRef({ end: 0, days: 0 });
+  // ジェスチャー開始時の窓のスナップショット。
+  // 【重要1】ローカル変数だと再描画のたびに再初期化され複利ズームになる → refで保持
+  // 【重要2】パンとピンチでrefを共有すると、同時発火時に互いの開始値を壊す → 別々に保持
+  const panStart = useRef({ end: 0, days: 0 });
+  const pinchStart = useRef({ end: 0, days: 0 });
 
   const pan = Gesture.Pan()
     .runOnJS(true)
+    .maxPointers(1) // 【指を離した瞬間に縮尺が跳ぶバグの修正】
+    // 2本指ピンチ中は重心移動でパンも同時発火し、パンが「開始時のdays」を
+    // 書き戻し続けていた。指を離す瞬間、最後の書き込みがパン側になると
+    // ズームが一気に巻き戻る。パンを1本指専用にしてピンチと完全分離する。
     .activeOffsetX([-12, 12]).failOffsetY([-16, 16]) // 縦スクロールを奪わない
-    .onStart(() => { g0.current = { end: win.end, days: win.days }; })
+    .onStart(() => { panStart.current = { end: win.end, days: win.days }; })
     .onUpdate((e) => {
-      const shift = (-e.translationX / plotW) * g0.current.days;
-      setWin(clampWin(g0.current.end + shift, g0.current.days));
+      const shift = (-e.translationX / plotW) * panStart.current.days;
+      setWin(clampWin(panStart.current.end + shift, panStart.current.days));
     })
     .onEnd(() => reportDays(win.days));
   const pinch = Gesture.Pinch()
     .runOnJS(true)
-    .onStart(() => { g0.current = { end: win.end, days: win.days }; })
+    .onStart(() => { pinchStart.current = { end: win.end, days: win.days }; })
     .onUpdate((e) => {
       const fx = Math.min(1, Math.max(0, ((e.focalX ?? plotW / 2) - PAD_L) / plotW));
-      const focalIdx = (g0.current.end - g0.current.days) + fx * g0.current.days;
+      const focalIdx = (pinchStart.current.end - pinchStart.current.days) + fx * pinchStart.current.days;
       // 複利バグ解消後はWithings同等のほぼ物理1:1（縦成分の混入だけ軽く減衰）
       const damped = Math.pow(Math.max(0.2, e.scale), 0.9);
-      const newDays = Math.min(Math.max(7, g0.current.days / damped), span);
+      const newDays = Math.min(Math.max(7, pinchStart.current.days / damped), span);
       const target = clampWin(focalIdx + (1 - fx) * newDays, newDays);
       // Withings風のローパス: 指に数フレーム遅れてぬるっと追従させる
       setWin((prev) => ({
