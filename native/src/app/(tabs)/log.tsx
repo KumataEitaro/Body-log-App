@@ -24,6 +24,7 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
+type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
 
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
@@ -51,6 +52,8 @@ export default function LogScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [wWeight, setWWeight] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
+  const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
+  const [recentOpen, setRecentOpen] = useState(false);
 
   const today = todayJST();
 
@@ -59,13 +62,16 @@ export default function LogScreen() {
     const userId = session?.user?.id;
     if (!userId) return;
     setUid(userId);
-    const [profRes, goalRes, evRes, wRes, foodRes, logRes] = await Promise.all([
+    const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('goals').select('*').maybeSingle(),
       supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
       supabase.from('entries').select('weight,date').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio').order('created_at', { ascending: true }).limit(30),
       supabase.from('logs').select('*').eq('date', todayJST()).order('at', { ascending: true }),
+      supabase.from('logs').select('id,date,items,kcal')
+        .lt('date', todayJST()).not('kcal', 'is', null)
+        .order('at', { ascending: false }).limit(40),
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
     if (goalRes.data) setGoal(goalRes.data as Goal);
@@ -73,6 +79,19 @@ export default function LogScreen() {
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
     setMyFoods((foodRes.data as MyFood[]) || []);
     setDayLogs((logRes.data as DayLog[]) || []);
+    // 「もう一度食べる」候補: 品目内訳のある過去の食事を、同じ品目構成は最新1件に重複排除
+    const seen = new Set<string>();
+    const meals: RecentMeal[] = [];
+    for (const r of (recentRes.data as RecentMeal[]) || []) {
+      const items = (r.items as FoodItem[]) || [];
+      if (items.length === 0) continue;
+      const key = items.map((it) => `${it.name}|${it.qty || ''}`).sort().join(',');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      meals.push({ ...r, items });
+      if (meals.length >= 6) break;
+    }
+    setRecentMeals(meals);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -155,6 +174,18 @@ export default function LogScreen() {
     const items = removeServing(parsed.items, fd);
     if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
     else setParsed({ ...parsed, items });
+  }
+
+  // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
+  function reuseMeal(m: RecentMeal) {
+    const items = [...(parsed?.items ?? []), ...m.items];
+    setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
+    setMsg({ ok: true, text: '保存前確認に入れました。内容を確認して保存してください。' });
+  }
+
+  function titleOfItems(items: FoodItem[]): string {
+    const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
+    return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
   }
 
   async function save() {
@@ -411,6 +442,32 @@ export default function LogScreen() {
           ))}
         </View>
 
+        {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
+        {recentMeals.length > 0 && (
+          <View style={s.card}>
+            <Pressable style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                       onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
+              <Text style={[s.h2, { marginBottom: 0 }]}>🔁 前の食事をもう一度</Text>
+              <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : '▾ ひらく'}</Text>
+            </Pressable>
+            {recentOpen && (
+              <>
+                {recentMeals.map((m) => (
+                  <View key={m.id} style={[s.feedRow, { alignItems: 'center' }]}>
+                    <Text style={s.feedTime}>{m.date.slice(5).replace('-', '/')}</Text>
+                    <Text style={s.feedTitle} numberOfLines={2}>{titleOfItems(m.items)}</Text>
+                    <Text style={s.feedKcal}>{Math.round(Number(m.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>
+                    <Pressable style={s.reuseBtn} hitSlop={6} onPress={() => reuseMeal(m)}>
+                      <Text style={s.reuseBtnT}>↺</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>↺で保存前確認に入ります。同じ鍋の残り半分なら、確認画面で品目を−して調整できます。</Text>
+              </>
+            )}
+          </View>
+        )}
+
         {/* 解析結果（保存前の確認） */}
         {parsed && (
           <View style={[s.card, { borderColor: C.teal, borderWidth: 1.5 }]}>
@@ -550,6 +607,8 @@ const s = StyleSheet.create({
   btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
   chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   chipBtnT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
+  reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  reuseBtnT: { color: '#fff', fontSize: 16, fontWeight: '800' },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
