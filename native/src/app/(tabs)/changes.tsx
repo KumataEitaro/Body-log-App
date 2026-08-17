@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
+import BodyPhotosCard from '@/components/BodyPhotosCard';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
@@ -27,7 +28,7 @@ import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
 import { logIcon, logTitle } from '@/lib/feed';
 
-type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; target: number; diff: number | null };
+type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
 type DayDetail = { id: string; at: string | null; text: string; kcal: number | null; items: FoodItem[] | null; weight: number | null; ex: string | null; mood: string | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
@@ -35,16 +36,17 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 const SERIES = [
   { key: 'weight', label: '体重', unit: 'kg', decimals: 1 },
   { key: 'waist', label: 'ウエスト', unit: 'cm', decimals: 1 },
+  { key: 'bodyfat', label: '体脂肪率', unit: '%', decimals: 1 },
   { key: 'intake', label: '摂取kcal', unit: '', decimals: 0 },
   { key: 'burn', label: '消費kcal', unit: '', decimals: 0 },
 ] as const;
 const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '全', d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'trends', 'health'];
+const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'goal', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
-  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', goal: 'チートデイ',
+  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', photos: '体の写真', goal: '目標',
   trends: '食材の傾向', health: '歩数・睡眠',
   tkpi: 'トレのサマリー', tcal: 'トレーニングカレンダー', tchart: '挙上重量グラフ', tgoal: '種目別目標',
 };
@@ -124,17 +126,21 @@ export default function ChangesScreen() {
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-    const [profRes, entRes, goalRes, itemRes] = await Promise.all([
+    const [profRes, entResRaw, goalRes, itemRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
-      supabase.from('entries').select('date,intake,weight,waist,ex,adj').order('date', { ascending: true }),
+      supabase.from('entries').select('date,intake,weight,waist,bodyfat,ex,adj').order('date', { ascending: true }),
       supabase.from('goals').select('*').maybeSingle(),
       supabase.from('logs').select('date,items').order('date', { ascending: true }).limit(2000),
     ]);
+    // bodyfat列が無い旧DB（v16未適用）でも画面が壊れないようフォールバック
+    const entRes = entResRaw.error
+      ? await supabase.from('entries').select('date,intake,weight,waist,ex,adj').order('date', { ascending: true })
+      : entResRaw;
     const prof = profRes.data as Profile | null;
     if (goalRes.data) setGoal(goalRes.data as Goal);
     if (!prof || !entRes.data) return;
     let w: number = Number(prof.init_weight) || 70;
-    setRows((entRes.data as { date: string; intake: number | null; weight: number | null; waist: number | null; ex: string | null; adj: number | null }[]).map((e) => {
+    setRows((entRes.data as { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; ex: string | null; adj: number | null }[]).map((e) => {
       if (e.weight != null) w = Number(e.weight);
       const bmr = mifflinBMR(prof.sex, w, Number(prof.height_cm), Number(prof.age));
       const target = targetKcal(bmr, Number(prof.life_factor), (e.ex as ExLevel) || 'オフ', Number(e.adj) || 0);
@@ -143,6 +149,7 @@ export default function ChangesScreen() {
         date: e.date, intake,
         weight: e.weight == null ? null : Number(e.weight),
         waist: e.waist == null ? null : Number(e.waist),
+        bodyfat: e.bodyfat == null ? null : Number(e.bodyfat),
         target, diff: intake == null ? null : Math.round(intake - target),
       };
     }));
@@ -183,6 +190,7 @@ export default function ChangesScreen() {
     switch (serie) {
       case 'weight': return rows.filter((r) => r.weight != null).map((r) => ({ date: r.date, value: r.weight! }));
       case 'waist': return rows.filter((r) => r.waist != null).map((r) => ({ date: r.date, value: r.waist! }));
+      case 'bodyfat': return rows.filter((r) => r.bodyfat != null).map((r) => ({ date: r.date, value: r.bodyfat! }));
       case 'intake': return rows.filter((r) => r.intake != null).map((r) => ({ date: r.date, value: r.intake! }));
       case 'burn': return rows.map((r) => ({ date: r.date, value: r.target }));
     }
@@ -375,6 +383,7 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
+      case 'photos': return <BodyPhotosCard />;
       case 'goal': return <GoalSummaryCard mode="weight" />;
       case 'trends': return trendsCard;
       case 'health': return healthCard;

@@ -27,6 +27,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   const [initWeight, setInitWeight] = useState<number | null>(null);
   const [gDate, setGDate] = useState('');
   const [gWeight, setGWeight] = useState('');
+  const [gBf, setGBf] = useState('');
   const [gProtein, setGProtein] = useState('');
   const [gFat, setGFat] = useState('');
   const [gFatMax, setGFatMax] = useState('');
@@ -59,6 +60,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       const g = gRes.data as Goal;
       setGoal(g);
       setGDate(g.target_date); setGWeight(String(g.target_weight ?? ''));
+      const bf = (g as Goal & { target_bodyfat?: number | null }).target_bodyfat;
+      setGBf(bf != null ? String(bf) : '');
       setGProtein(g.protein_per_kg != null ? String(g.protein_per_kg) : '');
       setGFat(g.fat_per_kg != null ? String(g.fat_per_kg) : '');
       setGFatMax(g.fat_max_g != null ? String(g.fat_max_g) : '');
@@ -91,11 +94,12 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       // PFC列が無い旧DB環境でも保存できるようフォールバック（Web版と同じ流儀）
       let { error } = await supabase.from('goals').upsert({
         ...base,
+        target_bodyfat: gBf === '' ? null : Number(gBf) || null,
         protein_per_kg: gProtein === '' ? null : Number(gProtein) || null,
         fat_per_kg: gFat === '' ? null : Number(gFat) || null,
         fat_max_g: gFatMax === '' ? null : Number(gFatMax) || null,
       });
-      if (error && /protein_per_kg|fat_per_kg|fat_max_g|column|schema/.test(error.message)) {
+      if (error && /target_bodyfat|protein_per_kg|fat_per_kg|fat_max_g|column|schema/.test(error.message)) {
         ({ error } = await supabase.from('goals').upsert(base));
       }
       if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
@@ -182,6 +186,10 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             <View style={{ flex: 1 }}>
               <Text style={s.label}>目標体重（kg）</Text>
               <TextInput style={s.input} placeholder="82.0" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gWeight} onChangeText={setGWeight} />
+            </View>
+            <View style={{ flex: 0.9 }}>
+              <Text style={s.label}>体脂肪率（%）</Text>
+              <TextInput style={s.input} placeholder="任意" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gBf} onChangeText={setGBf} />
             </View>
           </View>
           {showDatePicker && (

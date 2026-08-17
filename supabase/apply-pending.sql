@@ -50,3 +50,30 @@ create policy "training_goals_own" on public.training_goals
 
 -- v15: プレミアム課金（この日時まで有効。RevenueCat Webhookが更新する。NULL=無料）
 alter table public.profiles add column if not exists premium_until timestamptz;
+
+-- v16: 体脂肪率目標＋週1体写真
+alter table public.goals add column if not exists target_bodyfat numeric;
+alter table public.entries add column if not exists bodyfat numeric;
+alter table public.logs add column if not exists bodyfat numeric;
+
+create table if not exists public.body_photos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date date not null,
+  path text not null,
+  bodyfat numeric,
+  note text,
+  created_at timestamptz not null default now()
+);
+alter table public.body_photos enable row level security;
+drop policy if exists "body_photos_own" on public.body_photos;
+create policy "body_photos_own" on public.body_photos
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 写真本体は非公開バケットに保存（パスは <user_id>/... 固定でRLS）
+insert into storage.buckets (id, name, public) values ('body-photos', 'body-photos', false)
+  on conflict (id) do nothing;
+drop policy if exists "body_photos_storage_own" on storage.objects;
+create policy "body_photos_storage_own" on storage.objects
+  for all using (bucket_id = 'body-photos' and auth.uid()::text = (storage.foldername(name))[1])
+  with check (bucket_id = 'body-photos' and auth.uid()::text = (storage.foldername(name))[1]);
