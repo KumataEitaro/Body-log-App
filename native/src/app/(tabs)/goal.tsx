@@ -7,6 +7,7 @@ import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { progressStatus, type Goal } from '@/lib/goal';
 import { trainingSeries } from '@/lib/training';
+import StatusBarMask from '@/components/StatusBarMask';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 
@@ -101,7 +102,8 @@ export default function GoalScreen() {
   const status = goal && latestWeight != null ? progressStatus(goal, todayJST(), latestWeight) : null;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled"
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
       <Text style={s.h}>目標</Text>
 
@@ -183,6 +185,8 @@ export default function GoalScreen() {
 
       {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
     </ScrollView>
+    <StatusBarMask />
+    </View>
   );
 }
 

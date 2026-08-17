@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
+import StatusBarMask from '@/components/StatusBarMask';
 
 type Msg = { role: 'user' | 'ai'; text: string };
 const QUICK = ['気分がすぐれないんだけど、何が原因かな', '過食しちゃった…', '体重が減らなくなってきた', '最近トレの調子が上がらない'];
@@ -81,6 +82,7 @@ export default function CoachScreen() {
         </View>
         <Text style={s.disclaimer}>医療的な診断はできません。深刻な不調が続く場合は医療機関へ。</Text>
       </View>
+      <StatusBarMask />
     </KeyboardAvoidingView>
   );
 }

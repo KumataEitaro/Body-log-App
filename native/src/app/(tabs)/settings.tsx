@@ -6,6 +6,7 @@ import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights, readActivitySummary, type HealthDaySummary } from '@/lib/health';
+import StatusBarMask from '@/components/StatusBarMask';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -102,7 +103,8 @@ export default function SettingsScreen() {
   const bmrPreview = mifflinBMR(sex, 70, Number(height) || 0, Number(age) || 0);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       <Text style={s.h}>設定</Text>
 
       {/* プロフィール */}
@@ -193,6 +195,8 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
     </ScrollView>
+    <StatusBarMask />
+    </View>
   );
 }
 

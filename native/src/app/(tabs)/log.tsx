@@ -1,6 +1,6 @@
 // 食事タブ（Phase 1コア）: ヒーロー・今日のフィード・AI解析コンポーザー・マイ食品チップ・体重クイック入力
 // ロジックはWeb版のlib/*をそのまま移植して使用（データ・計算式は完全互換）
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image,
@@ -18,6 +18,7 @@ import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
+import StatusBarMask from '@/components/StatusBarMask';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
@@ -54,6 +55,7 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
 
   const today = todayJST();
 
@@ -139,9 +141,12 @@ export default function LogScreen() {
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
+  // AI解析はテキストか写真がある時だけ有効（チップだけの時は保存前確認から直接保存できる）
+  const canParse = chat.trim().length > 0 || photos.length > 0;
+
   // ===== AI解析（チップ追加分は保持して追記マージ＝Web版と同じ） =====
   async function parse() {
-    if (!chat.trim() && photos.length === 0) { setMsg({ ok: false, text: 'メモを書くか、写真を追加してください。' }); return; }
+    if (!canParse) return;
     setAnalyzing(true); setMsg(null);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
@@ -347,9 +352,11 @@ export default function LogScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text style={s.brand}>▍BodyLog <Text style={s.beta}>ネイティブβ</Text></Text>
 
@@ -496,6 +503,7 @@ export default function LogScreen() {
           <TextInput
             style={s.ta} multiline placeholder={'食事・体重・気分を自由に…\n例）昼は牛丼並盛とサラダ。体重73.5kg'}
             placeholderTextColor={C.faint} value={chat} onChangeText={setChat}
+            onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
           />
           {/* マイ食品チップ（連打で×2、−で減） */}
           {myFoods.length > 0 && (
@@ -540,9 +548,13 @@ export default function LogScreen() {
               <Text style={s.btnGhostT}>🖼 アルバム</Text>
             </Pressable>
           </View>
-          <Pressable style={({ pressed }) => [s.btnPrimary, pressed && { opacity: 0.85 }]} onPress={parse} disabled={analyzing}>
+          <Pressable style={({ pressed }) => [s.btnPrimary, !canParse && { opacity: 0.35 }, pressed && { opacity: 0.85 }]}
+                     onPress={parse} disabled={analyzing || !canParse}>
             {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>✨ AI解析{photos.length > 0 ? `（写真${photos.length}枚）` : ''}</Text>}
           </Pressable>
+          {!canParse && parsed && parsed.items.length > 0 && (
+            <Text style={[s.mutedT, { fontSize: 11.5, textAlign: 'center', marginTop: 6 }]}>チップで選んだ分は、上の「この内容で保存する」からそのまま保存できます</Text>
+          )}
 
           {/* 体重クイック入力 */}
           <View style={s.wRow}>
@@ -557,6 +569,7 @@ export default function LogScreen() {
 
         <View style={{ height: 30 }} />
       </ScrollView>
+      <StatusBarMask />
     </KeyboardAvoidingView>
   );
 }

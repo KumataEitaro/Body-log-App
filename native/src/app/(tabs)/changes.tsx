@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import SimpleChart, { type ChartPoint } from '@/components/SimpleChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
+import StatusBarMask from '@/components/StatusBarMask';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
@@ -110,21 +111,27 @@ export default function ChangesScreen() {
   // KPI
   const weights = rows.filter((r) => r.weight != null);
   const latestW = weights.length ? weights[weights.length - 1].weight! : null;
-  const firstW = weights.length ? weights[0].weight! : null;
+  // 増減は直近30日の起点と比較（全期間比は取込データ起点になり実感と合わない）
+  const w30 = weights.filter((r) => r.date >= addDays(today, -30));
+  const firstW = w30.length ? w30[0].weight! : null;
   const sumAll = Math.round(rows.reduce((a, r) => a + (r.diff ?? 0), 0));
+  // 未記録は「直近30日」に限定して数える（全期間だと取込データ起点で数千日になり意味を失う）
   let unrecorded = 0;
   if (rows.length > 0) {
     const yest = addDays(today, -1);
+    const from30 = addDays(today, -30);
+    const start = rows[0].date > from30 ? rows[0].date : from30;
     const byDate = new Map(rows.map((r) => [r.date, r]));
-    for (let d = rows[0].date; d <= yest; d = addDays(d, 1)) {
+    for (let d = start; d <= yest; d = addDays(d, 1)) {
       const r = byDate.get(d);
       if (!r || r.intake == null) unrecorded++;
     }
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={s.scroll}
+      style={{ flex: 1 }} contentContainerStyle={s.scroll}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       <Text style={s.h}>身体の変化</Text>
@@ -136,7 +143,7 @@ export default function ChangesScreen() {
           <Text style={s.kpiV}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
           {latestW != null && firstW != null && (
             <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.teal : C.coral }]}>
-              {latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
+              30日で{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
             </Text>
           )}
         </View>
@@ -146,7 +153,7 @@ export default function ChangesScreen() {
           <Text style={s.kpiD}>脂肪 約{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>未記録</Text>
+          <Text style={s.kpiL}>未記録（30日）</Text>
           <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>日</Text></Text>
           <Text style={s.kpiD}>±0扱い</Text>
         </View>
@@ -231,6 +238,8 @@ export default function ChangesScreen() {
         );
       })()}
     </ScrollView>
+    <StatusBarMask />
+    </View>
   );
 }
 

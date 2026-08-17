@@ -8,6 +8,7 @@ import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import SimpleChart from '@/components/SimpleChart';
+import StatusBarMask from '@/components/StatusBarMask';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
@@ -70,8 +71,9 @@ export default function TrainingScreen() {
   const verdict = volumeVerdict(exPoints);
 
   return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled"
+      style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       <Text style={s.h}>トレーニング</Text>
@@ -150,6 +152,8 @@ export default function TrainingScreen() {
         ))}
       </View>
     </ScrollView>
+    <StatusBarMask />
+    </View>
   );
 }
 
