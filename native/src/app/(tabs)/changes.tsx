@@ -6,8 +6,17 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+
+// draggable-flatlistは旧reanimated APIに依存しておりreanimated 4環境ではimport時に
+// クラッシュし得るため、遅延ロード＋失敗時は↑↓ボタン並び替えへフォールバックする
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let DFL: any = null, ScaleDec: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const m = require('react-native-draggable-flatlist');
+  DFL = m.default; ScaleDec = m.ScaleDecorator;
+} catch { /* フォールバックUIを使用 */ }
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
@@ -346,6 +355,14 @@ export default function ChangesScreen() {
   const order = topSeg === 'body' ? orderBody : orderTrain;
   const setOrder = topSeg === 'body' ? setOrderBody : setOrderTrain;
 
+  function moveCard(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[i], next[j]] = [next[j], next[i]];
+    setOrder(next);
+  }
+
   const headerJSX = (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -370,29 +387,51 @@ export default function ChangesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {editing ? (
-        /* ===== Jiggle Mode（編集）: ドラッグで並び替え・カード内操作は停止 ===== */
-        <DraggableFlatList
-          data={order}
-          keyExtractor={(k) => k}
-          style={{ flex: 1 }}
-          contentContainerStyle={s.scroll}
-          ListHeaderComponent={headerJSX}
-          activationDistance={8}
-          onDragEnd={({ data }) => setOrder([...data])}
-          renderItem={({ item, drag, isActive }) => (
-            <ScaleDecorator activeScale={1.04}>
-              <Jiggle on={!isActive}>
-                <Pressable onLongPress={drag} delayLongPress={120} style={isActive ? s.lifted : undefined}>
-                  <View pointerEvents="none">
-                    {card(item) ?? (
-                      <View style={s.ghostCard}><Text style={s.ghostT}>{CARD_LABELS[item]}（データが揃うと表示されます）</Text></View>
-                    )}
+        DFL ? (
+          /* ===== Jiggle Mode（編集）: ドラッグで並び替え・カード内操作は停止 ===== */
+          <DFL
+            data={order}
+            keyExtractor={(k: string) => k}
+            style={{ flex: 1 }}
+            contentContainerStyle={s.scroll}
+            ListHeaderComponent={headerJSX}
+            activationDistance={8}
+            onDragEnd={({ data }: { data: string[] }) => setOrder([...data])}
+            renderItem={({ item, drag, isActive }: { item: string; drag: () => void; isActive: boolean }) => (
+              <ScaleDec activeScale={1.04}>
+                <Jiggle on={!isActive}>
+                  <Pressable onLongPress={drag} delayLongPress={120} style={isActive ? s.lifted : undefined}>
+                    <View pointerEvents="none">
+                      {card(item) ?? (
+                        <View style={s.ghostCard}><Text style={s.ghostT}>{CARD_LABELS[item]}（データが揃うと表示されます）</Text></View>
+                      )}
+                    </View>
+                  </Pressable>
+                </Jiggle>
+              </ScaleDec>
+            )}
+          />
+        ) : (
+          /* ===== フォールバック編集: ↑↓ボタンで並び替え（D&Dライブラリが使えない環境） ===== */
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
+            {headerJSX}
+            {order.map((k, i) => (
+              <Jiggle key={k} on>
+                <View style={s.moveCard}>
+                  <Text style={s.moveLabel}>{CARD_LABELS[k]}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable style={[s.moveBtn, i === 0 && { opacity: 0.3 }]} disabled={i === 0} onPress={() => moveCard(i, -1)}>
+                      <Text style={s.moveBtnT}>↑</Text>
+                    </Pressable>
+                    <Pressable style={[s.moveBtn, i === order.length - 1 && { opacity: 0.3 }]} disabled={i === order.length - 1} onPress={() => moveCard(i, 1)}>
+                      <Text style={s.moveBtnT}>↓</Text>
+                    </Pressable>
                   </View>
-                </Pressable>
+                </View>
               </Jiggle>
-            </ScaleDecorator>
-          )}
-        />
+            ))}
+          </ScrollView>
+        )
       ) : (
         /* ===== 通常モード（保存された順で表示・カード長押しで編集へ） ===== */
         <ScrollView
@@ -434,6 +473,14 @@ const s = StyleSheet.create({
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
   },
   ghostT: { fontSize: 12.5, color: C.sub, fontWeight: '600' },
+  moveCard: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,
+    paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10,
+  },
+  moveLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
+  moveBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  moveBtnT: { fontSize: 16, fontWeight: '800', color: C.teal },
   actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   actBtnT: { fontSize: 12.5, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
