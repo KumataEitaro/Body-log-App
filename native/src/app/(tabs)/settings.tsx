@@ -26,8 +26,10 @@ export default function SettingsScreen() {
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (prof) {
         setName(prof.display_name || '');
-        setSex(prof.sex); setHeight(String(prof.height_cm)); setAge(String(prof.age));
-        setLife(String(prof.life_factor));
+        if (prof.sex) setSex(prof.sex);
+        if (prof.height_cm != null) setHeight(String(prof.height_cm));
+        if (prof.age != null) setAge(String(prof.age));
+        if (prof.life_factor != null) setLife(String(prof.life_factor));
       }
     })();
   }, []);
@@ -64,7 +66,8 @@ export default function SettingsScreen() {
     try {
       const { ok, json } = await apiPost<{ ok: boolean; error?: string }>('/api/account/delete', {});
       if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || '削除に失敗しました。もう一度お試しください。' }); return; }
-      await supabase.auth.signOut(); // 認証ゲートがログイン画面へ遷移させる
+      // アカウントはサーバー側で消滅済み。グローバルsignOutはdead sessionでエラーになり得るためローカルのみ確実に破棄
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     } finally { setBusy(false); }
   }
 

@@ -13,6 +13,7 @@ export default function GoalScreen() {
   const [seg, setSeg] = useState<'weight' | 'training'>('weight');
   const [goal, setGoal] = useState<Goal | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [initWeight, setInitWeight] = useState<number | null>(null);
   const [gDate, setGDate] = useState('');
   const [gWeight, setGWeight] = useState('');
   const [tGoals, setTGoals] = useState<TGoal[]>([]);
@@ -26,12 +27,14 @@ export default function GoalScreen() {
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-    const [gRes, wRes, tgRes, histRes] = await Promise.all([
+    const [gRes, wRes, tgRes, histRes, profRes] = await Promise.all([
       supabase.from('goals').select('*').maybeSingle(),
       supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('training_goals').select('id,name,target_kg,target_date').order('created_at', { ascending: true }),
       supabase.from('logs').select('date,text').like('text', '🏋️%').order('at', { ascending: false }).limit(200),
+      supabase.from('profiles').select('init_weight').eq('id', session.user.id).maybeSingle(),
     ]);
+    if (profRes.data?.init_weight != null) setInitWeight(Number(profRes.data.init_weight));
     if (gRes.data) {
       const g = gRes.data as Goal;
       setGoal(g);
@@ -55,7 +58,8 @@ export default function GoalScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const start = goal?.start_weight ?? latestWeight ?? Number(gWeight);
+      // Web版と同じ優先順: 既存goal→最新実測→onboarding時の初期体重（目標値へのフォールバックは進捗計算を無意味にするため避ける）
+      const start = goal?.start_weight ?? latestWeight ?? initWeight ?? Number(gWeight);
       const { error } = await supabase.from('goals').upsert({
         user_id: uid, target_date: gDate, target_weight: Number(gWeight),
         start_date: goal?.start_date ?? todayJST(), start_weight: start,
@@ -116,7 +120,7 @@ export default function GoalScreen() {
               {status && (
                 <Text style={[s.statusSub, { color: status.state === 'behind' ? C.coral : C.teal }]}>
                   {status.state === 'ahead' ? `${Math.abs(status.diffDays)}日先行 🎉` : status.state === 'behind' ? `${Math.abs(status.diffDays)}日遅れ` : '順調 👍'}
-                  ・あと{Math.max(0, latestWeight - Number(goal.target_weight)).toFixed(1)}kg
+                  ・あと{Math.abs(latestWeight - Number(goal.target_weight)).toFixed(1)}kg
                 </Text>
               )}
             </View>
