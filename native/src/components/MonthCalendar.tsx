@@ -13,12 +13,13 @@ function keyOf(y: number, m: number, d: number): string {
 }
 
 export default function MonthCalendar({
-  today, marks, selected, onSelect,
+  today, marks, selected, onSelect, mode = 'body',
 }: {
   today: string;
   marks: Map<string, DayMark>;
   selected: string | null;
   onSelect: (dateKey: string) => void;
+  mode?: 'body' | 'training'; // trainingは「実施日ドット」のみの凡例にする
 }) {
   const [y0, m0] = today.split('-').map(Number);
   const [view, setView] = useState({ y: y0, m: m0 - 1 }); // m: 0-11
@@ -68,10 +69,19 @@ export default function MonthCalendar({
         })}
       </View>
       <View style={s.legend}>
-        <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>記録あり</Text>
-        <View style={[s.legDot, { backgroundColor: C.coral }]} /><Text style={s.legT}>目標超過</Text>
-        <Text style={[s.legT, { fontWeight: '800' }]}>?</Text><Text style={s.legT}>未記録</Text>
-        <Text style={s.legT}>・タップで詳細</Text>
+        {mode === 'training' ? (
+          <>
+            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>トレした日</Text>
+            <Text style={s.legT}>・タップで内容を表示</Text>
+          </>
+        ) : (
+          <>
+            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>記録あり</Text>
+            <View style={[s.legDot, { backgroundColor: C.coral }]} /><Text style={s.legT}>目標超過</Text>
+            <Text style={[s.legT, { fontWeight: '800' }]}>?</Text><Text style={s.legT}>未記録</Text>
+            <Text style={s.legT}>・タップで詳細</Text>
+          </>
+        )}
       </View>
     </View>
   );

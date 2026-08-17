@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image,
+  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,7 +18,7 @@ import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights
 import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
-import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
+import { addServing, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
@@ -59,6 +59,7 @@ export default function LogScreen() {
   const [recentOpen, setRecentOpen] = useState(false);
   const [pendingTexts, setPendingTexts] = useState<string[]>([]);
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
+  const [inputH, setInputH] = useState(40);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -130,6 +131,8 @@ export default function LogScreen() {
   const left = goalKcal - eaten;
   const macros = profile ? macroTargets(weightForBmr, goalKcal, goal?.protein_per_kg, goal?.fat_per_kg, goal?.fat_max_g) : null;
   const eatenP = Math.round(summary.p ?? 0);
+  const eatenF = Math.round(summary.f ?? 0);
+  const eatenC = Math.round(summary.c ?? 0);
 
   // ===== 写真の取得（Web版と同じ最大辺1280px・JPEG品質0.72に圧縮してAPIへ） =====
   async function compressToPayload(uri: string): Promise<{ uri: string; base64: string } | null> {
@@ -181,15 +184,52 @@ export default function LogScreen() {
     }
   }
 
-  function tapFood(fd: MyFood) {
-    const items = addServing(parsed?.items ?? [], fd);
-    setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
+  // マイ食品チップ: 1タップで登録済みのカロリー・PFCをそのまま今日の記録へ直接追加（AI解析なし）
+  async function tapFood(fd: MyFood) {
+    if (!uid) return;
+    const items = addServing([], fd); // 1食分のitemを生成
+    const total = sumItems(items);
+    setPendingTexts((p) => [...p, fd.name]);
+    try {
+      const { error } = await supabase.from('logs').insert({
+        user_id: uid, date: today, items,
+        kcal: total.kcal, p: total.p, f: total.f, c: total.c,
+        weight: null, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
+      });
+      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      await syncEntriesForDate(uid, today);
+      await load();
+    } finally {
+      setPendingTexts((p) => p.slice(1));
+    }
   }
-  function decFood(fd: MyFood) {
-    if (!parsed) return;
-    const items = removeServing(parsed.items, fd);
-    if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
-    else setParsed({ ...parsed, items });
+
+  // 今日すでに食べた回数（チップの×Nバッジ用・dayLogsから逆算）
+  function todayCount(fd: MyFood): number | null {
+    let n = 0;
+    for (const l of dayLogs) {
+      for (const it of ((l.items as FoodItem[]) || [])) {
+        if (it.name !== fd.name) continue;
+        const m = String(it.qty || '').match(/×([\d.]+)/);
+        n += m ? Number(m[1]) : 1;
+      }
+    }
+    return n > 0 ? Math.round(n * 10) / 10 : null;
+  }
+
+  // 記録の取り消し: フィード行を長押し→削除（チップ即時追加の押し間違い対策）
+  function confirmDeleteLog(l: DayLog) {
+    Alert.alert('この記録を削除しますか？', logTitle(l), [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除する', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('logs').delete().eq('id', l.id);
+          if (uid) await syncEntriesForDate(uid, today);
+          await load();
+        },
+      },
+    ]);
   }
 
   // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
@@ -371,9 +411,25 @@ export default function LogScreen() {
             <View style={s.hline}><View style={[s.hfill, { width: `${Math.min(100, Math.max(0, (eaten / Math.max(1, goalKcal)) * 100))}%` }, left < 0 && { backgroundColor: C.coral }]} /></View>
             <View style={s.heroMeta}>
               <Text style={s.metaT}>摂取 {eaten.toLocaleString()}</Text>
-              {macros && <Text style={s.metaT}>P {eatenP}/{macros.p}g</Text>}
               <Text style={s.metaT}>目標 {goalKcal.toLocaleString()}</Text>
             </View>
+            {/* 残りPFCプログレスバー */}
+            {macros && (
+              <View style={{ marginTop: 10, gap: 5 }}>
+                {([['P', eatenP, macros.p, C.teal], ['F', eatenF, macros.f, '#d97706'], ['C', eatenC, macros.c, '#3b82f6']] as const).map(([lb, eat, tgt, col]) => {
+                  const over = eat > tgt;
+                  return (
+                    <View key={lb} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={s.pfcL}>{lb}</Text>
+                      <View style={s.pfcBar}>
+                        <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
+                      </View>
+                      <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? `+${eat - tgt}g超過` : `あと${tgt - eat}g`}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
 
@@ -442,13 +498,15 @@ export default function LogScreen() {
           <Text style={s.h2}>今日の記録 <Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
           {dayLogs.length === 0 && <Text style={s.mutedT}>まだ記録がありません。下から1回分ずつ記録しましょう。</Text>}
           {dayLogs.map((l) => (
-            <View key={l.id} style={s.feedRow}>
+            <Pressable key={l.id} style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
+                       onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
               <Text style={{ fontSize: 13, marginRight: 2 }}>{logIcon(l)}</Text>
               <Text style={s.feedTitle} numberOfLines={2}>{logTitle(l)}</Text>
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
-            </View>
+            </Pressable>
           ))}
+          {dayLogs.length > 0 && <Text style={s.hint}>行を長押しで削除できます</Text>}
           {/* 送信直後の楽観表示（AI解析中） */}
           {pendingTexts.map((t, i) => (
             <View key={`p${i}`} style={s.feedRow}>
@@ -524,6 +582,29 @@ export default function LogScreen() {
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
       <View style={s.dockWrap}>
+        {/* リアルタイム残量プレビュー（入力中・選択中にキーボード直上へ表示） */}
+        {(chat.trim().length > 0 || parsed != null) && profile && (() => {
+          const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
+          const pvLeft = left - addK;
+          const pv = macros ? {
+            p: macros.p - eatenP - (parsedTotal ? Math.round(parsedTotal.p) : 0),
+            f: macros.f - eatenF - (parsedTotal ? Math.round(parsedTotal.f) : 0),
+            c: macros.c - eatenC - (parsedTotal ? Math.round(parsedTotal.c) : 0),
+          } : null;
+          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb}残${v}g` : `${lb} ${-v}g超過`);
+          return (
+            <View style={s.preview}>
+              <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
+                {parsed ? '追加後 ' : ''}{pvLeft >= 0 ? `残り ${pvLeft.toLocaleString()}kcal` : `${(-pvLeft).toLocaleString()}kcal 超過`}
+              </Text>
+              {pv && (
+                <Text style={[s.previewSub, (pv.p < 0 || pv.f < 0 || pv.c < 0) && { color: C.coral }]}>
+                  {fmt(pv.p, 'P')} ・ {fmt(pv.f, 'F')} ・ {fmt(pv.c, 'C')}
+                </Text>
+              )}
+            </View>
+          );
+        })()}
         {photos.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }} keyboardShouldPersistTaps="handled">
             {photos.map((p, i) => (
@@ -538,8 +619,9 @@ export default function LogScreen() {
         )}
         {/* マイ食品チップ（連打で×2、−で減。1行スクロール⇄全展開グリッドを切替可能） */}
         {myFoods.length > 0 && (() => {
+          // タップ=即・今日の記録へ追加。×Nは今日すでに食べた回数（取り消しはフィード行の長押し）
           const chipEls = myFoods.map((fd) => {
-            const cnt = parsed ? servingCount(parsed.items, fd) : null;
+            const cnt = todayCount(fd);
             return (
               <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
                 <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
@@ -547,11 +629,6 @@ export default function LogScreen() {
                     {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
                   </Text>
                 </Pressable>
-                {cnt != null && (
-                  <Pressable onPress={() => decFood(fd)} style={s.chipMinus}>
-                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
-                  </Pressable>
-                )}
               </View>
             );
           });
@@ -580,8 +657,11 @@ export default function LogScreen() {
             <Text style={s.dockIcon}>🖼</Text>
           </Pressable>
           <TextInput
-            ref={inputRef} style={s.dockInput} placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
-            value={chat} onChangeText={setChat} returnKeyType="send" blurOnSubmit={false} onSubmitEditing={sendQuick}
+            ref={inputRef} multiline
+            style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
+            placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
+            value={chat} onChangeText={setChat}
+            onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <Text style={s.dockSendT}>↑</Text>
@@ -643,7 +723,7 @@ const s = StyleSheet.create({
   reuseBtnT: { color: '#fff', fontSize: 16, fontWeight: '800' },
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 24,
     paddingHorizontal: 8, paddingVertical: 5,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
@@ -655,6 +735,14 @@ const s = StyleSheet.create({
   dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 12, color: C.sub, fontWeight: '700' },
+  preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
+  previewMain: { fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  previewSub: { fontSize: 11.5, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
+  pfcL: { width: 14, fontSize: 11, fontWeight: '800', color: C.sub },
+  pfcBar: { flex: 1, height: 6, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden' },
+  pfcFill: { height: 6, borderRadius: 3 },
+  pfcT: { width: 86, fontSize: 10.5, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  hint: { fontSize: 10, color: C.faint, textAlign: 'right', marginTop: 6 },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },

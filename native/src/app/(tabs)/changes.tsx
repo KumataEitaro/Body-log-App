@@ -199,6 +199,28 @@ export default function ChangesScreen() {
         </View>
       </View>
 
+      {/* カレンダー（サマリーの直下・日タップで詳細） */}
+      <View style={s.card}>
+        <Text style={s.h2}>📅 カレンダー</Text>
+        <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
+        {daySel && (
+          <View style={s.dayBox}>
+            <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の記録</Text>
+            {dayDetail === null && <Text style={s.note}>読み込み中…</Text>}
+            {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>この日の記録はありません。</Text>}
+            {dayDetail?.map((l) => (
+              <View key={l.id} style={s.dayRow}>
+                <Text style={{ fontSize: 13 }}>{logIcon(l)}</Text>
+                <Text style={s.dayText} numberOfLines={2}>{logTitle(l)}</Text>
+                {l.kcal != null && (
+                  <View style={s.kcalBadge}><Text style={s.kcalBadgeT}>{Math.round(Number(l.kcal)).toLocaleString()} kcal</Text></View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
       {/* グラフ */}
       <View style={s.card}>
         <View style={s.chips}>
@@ -226,28 +248,6 @@ export default function ChangesScreen() {
 
       {/* 目標設定＋チートデイ（グラフの直下＝実績と目標を同じ画面で） */}
       <GoalPanel mode="weight" />
-
-      {/* カレンダー（日タップで詳細） */}
-      <View style={s.card}>
-        <Text style={s.h2}>📅 カレンダー</Text>
-        <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
-        {daySel && (
-          <View style={s.dayBox}>
-            <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の記録</Text>
-            {dayDetail === null && <Text style={s.note}>読み込み中…</Text>}
-            {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>この日の記録はありません。</Text>}
-            {dayDetail?.map((l) => (
-              <View key={l.id} style={s.dayRow}>
-                <Text style={{ fontSize: 13 }}>{logIcon(l)}</Text>
-                <Text style={s.dayText} numberOfLines={2}>{logTitle(l)}</Text>
-                {l.kcal != null && (
-                  <View style={s.kcalBadge}><Text style={s.kcalBadgeT}>{Math.round(Number(l.kcal)).toLocaleString()} kcal</Text></View>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
 
       {/* 食材×体の傾向（データが揃うまで非表示・Web版と同じしきい値） */}
       {foodFx.length >= 3 && (() => {

@@ -145,14 +145,23 @@ export async function POST(req: Request) {
     '- メモに酒・睡眠不足などの手がかりがあれば言及する\n' +
     '- 責めない・寄り添うトーン\n' +
     '- 医療的な診断・疾患名の断定はしない。深刻な不調が続く場合は受診を勧める\n' +
-    '\n必ず {"answer":"回答本文"} のJSONのみを返す（answer内の改行は\\n、強調は**text**）。';
+    '- 回答の中で「具体的な新しい目標値」を提案した場合のみ、JSONに action を1つ追加する（提案が無ければ含めない）:\n' +
+    '  PFC変更: {"kind":"pfc","protein_per_kg":2.2,"fat_per_kg":0.8,"label":"たんぱく質係数を2.2g/kgへ"}（変更しない側のキーは省略）\n' +
+    '  体重目標: {"kind":"weight","target_weight":80,"target_date":"2026-10-31","label":"目標を80kg/10月末へ"}\n' +
+    '  筋トレ目標: {"kind":"training","name":"ベンチプレス","target_kg":100,"label":"ベンチプレス目標を100kgへ"}\n' +
+    '\n必ず {"answer":"回答本文","action":{...}} のJSONのみを返す（actionは任意。answer内の改行は\\n、強調は**text**）。';
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
   let answer = '';
+  let action: Record<string, unknown> | null = null;
   try {
-    const j = parseJsonLoose(r.text) as { answer?: string };
+    const j = parseJsonLoose(r.text) as { answer?: string; action?: Record<string, unknown> };
     answer = String(j.answer || '').trim();
+    // actionは想定kindのみ通す（プロンプトインジェクション等での任意データ書込を防ぐ）
+    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training'].includes(String(j.action.kind))) {
+      action = j.action;
+    }
   } catch { /* JSON崩れ時は生テキストを使う */ }
   if (!answer) answer = r.text.trim();
 
@@ -161,5 +170,5 @@ export async function POST(req: Request) {
   };
   try { after(bumpUsage); } catch { void bumpUsage(); }
 
-  return NextResponse.json({ ok: true, answer, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1 });
+  return NextResponse.json({ ok: true, answer, action, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1 });
 }

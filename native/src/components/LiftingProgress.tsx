@@ -5,8 +5,16 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { todayJST } from '@/lib/calc';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import SimpleChart from '@/components/SimpleChart';
+import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
+
+function shiftDate(d: string, n: number): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
 
 type HistRow = { id: string; date: string; text: string };
 
@@ -16,6 +24,7 @@ export default function LiftingProgress() {
   const [selEx, setSelEx] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<'kg' | 'volume'>('kg');
   const [exView, setExView] = useState<'chips' | 'list'>('chips');
+  const [daySel, setDaySel] = useState<string | null>(null);
 
   useEffect(() => { AsyncStorage.getItem('bl-ex-view').then((v) => { if (v === 'list') setExView('list'); }).catch(() => {}); }, []);
   function toggleExView() {
@@ -40,16 +49,58 @@ export default function LiftingProgress() {
   const exPoints = activeEx ? series.get(activeEx)! : [];
   const verdict = volumeVerdict(exPoints);
 
+  // サマリー＋カレンダー用（トレ実施日ベース）
+  const today = todayJST();
+  const trainDates = [...new Set(history.map((h) => h.date))];
+  const monthCount = trainDates.filter((d) => d.startsWith(today.slice(0, 7))).length;
+  const last30 = trainDates.filter((d) => d >= shiftDate(today, -30)).length;
+  const marks = new Map<string, DayMark>(trainDates.map((d) => [d, { logged: true, over: false }]));
+  const dayItems = daySel ? history.filter((h) => h.date === daySel) : [];
+
   if (exercises.length === 0) {
     return (
       <View style={s.card}>
         <Text style={s.h2}>📈 挙上重量の推移</Text>
-        <Text style={s.muted}>トレタブで筋トレを記録すると、種目ごとの成長グラフがここに描かれます。</Text>
+        <Text style={s.muted}>トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。</Text>
       </View>
     );
   }
 
   return (
+    <View>
+    {/* サマリー */}
+    <View style={s.kpiRow}>
+      <View style={s.kpi}>
+        <Text style={s.kpiL}>今月のトレ</Text>
+        <Text style={s.kpiV}>{monthCount}<Text style={s.kpiU}>日</Text></Text>
+      </View>
+      <View style={s.kpi}>
+        <Text style={s.kpiL}>直近30日</Text>
+        <Text style={s.kpiV}>{last30}<Text style={s.kpiU}>日</Text></Text>
+      </View>
+      <View style={s.kpi}>
+        <Text style={s.kpiL}>種目数</Text>
+        <Text style={s.kpiV}>{exercises.length}<Text style={s.kpiU}>種目</Text></Text>
+      </View>
+    </View>
+
+    {/* トレーニングカレンダー */}
+    <View style={s.card}>
+      <Text style={s.h2}>📅 トレーニングカレンダー</Text>
+      <MonthCalendar today={today} marks={marks} selected={daySel} mode="training"
+                     onSelect={(d) => setDaySel(daySel === d ? null : d)} />
+      {daySel && (
+        <View style={s.dayBox}>
+          <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} のトレーニング</Text>
+          {dayItems.length === 0 && <Text style={s.muted}>この日の筋トレ記録はありません。</Text>}
+          {dayItems.map((h) => (
+            <Text key={h.id} style={s.dayText}>{h.text.replace(/^🏋️ /, '')}</Text>
+          ))}
+        </View>
+      )}
+    </View>
+
+    {/* 推移グラフ */}
     <View style={s.card}>
       <Text style={s.h2}>📈 挙上重量の推移</Text>
       <View style={s.chips}>
@@ -99,6 +150,7 @@ export default function LiftingProgress() {
         <Text style={s.muted}>点線＝目標 {goalKg.get(activeEx)}kg</Text>
       )}
     </View>
+    </View>
   );
 }
 
@@ -111,6 +163,14 @@ const s = StyleSheet.create({
   chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
   verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
   muted: { fontSize: 11, color: C.faint, marginTop: 4 },
+  kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  kpi: { flex: 1, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12 },
+  kpiL: { fontSize: 10, fontWeight: '700', color: C.sub },
+  kpiV: { fontSize: 20, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
+  kpiU: { fontSize: 11, color: C.sub, fontWeight: '600' },
+  dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
+  dayHead: { fontSize: 12.5, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
+  dayText: { fontSize: 13, color: C.ink, lineHeight: 20, paddingVertical: 3 },
   listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: C.line },
   listT: { fontSize: 13.5, color: C.sub, fontWeight: '600' },
   viewToggle: { marginLeft: 6, marginTop: 8, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
