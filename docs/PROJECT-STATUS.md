@@ -40,6 +40,7 @@
 - コミットは細かく区切る（PCスリープ対策）。native変更時は `cd native && npx tsc --noEmit && npm test` を通してからcommit（npm test=jest-expoの全画面smoke test。描画時クラッシュ＝リリースの白画面を検出する。過去にD&Dライブラリのreanimated非互換で2度白画面事故あり）
 - Webの動作確認は `npm run build` → `npx vercel deploy --prod`。テストは vitest（tests/）
 - 回答・コミットメッセージは日本語
+- **アイコン画像を変更したら `node native/scripts/icon-center-check.js` を必ず実行**（円フィット法で±2px以内を確認）。バウンディングボックス法は落ち影で偏るため禁止（2026-08にbbox法で12pxズレを見逃した事故あり）。数値検証に加えて、スクワークル+実寸(180/60px)のホーム画面モックを生成してユーザーの目視承認を得ること。補正に使った指標と検証指標は必ず別にする
 
 ## 主要ドキュメント
 
