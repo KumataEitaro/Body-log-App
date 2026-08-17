@@ -78,6 +78,14 @@ jest.mock('react-native-svg', () => {
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 // --- expo各種 ---
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  scheduleNotificationAsync: jest.fn(() => Promise.resolve('notif-id')),
+  cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+  setNotificationHandler: jest.fn(),
+}));
+
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(() => Promise.resolve(true)),
   hideAsync: jest.fn(() => Promise.resolve(true)),

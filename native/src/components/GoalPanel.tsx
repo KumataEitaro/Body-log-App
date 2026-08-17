@@ -9,6 +9,7 @@ import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { progressStatus, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
 import { trainingSeries } from '@/lib/training';
+import { scheduleCheatDayEve } from '@/lib/notify';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 type Ev = { id: string; date: string; title: string; extra_kcal: number };
@@ -120,6 +121,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
         .select('id,date,title,extra_kcal').single();
       if (error) { setMsg({ ok: false, text: '登録に失敗しました。もう一度お試しください。' }); return; }
       setEvents((prev) => [...prev, data as Ev].sort((a, b) => (a.date < b.date ? -1 : 1)));
+      scheduleCheatDayEve(evDate); // 前日20時のリマインド（通知許可がなければ静かにスキップ）
       setEvDate('');
       setMsg({ ok: true, text: 'チートデイを登録しました。前後の日で計画が自動的に吸収します。' });
     } finally { setBusy(false); }

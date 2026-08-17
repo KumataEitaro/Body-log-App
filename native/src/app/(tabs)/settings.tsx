@@ -4,8 +4,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell } from 'lucide-react-native';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -59,6 +61,28 @@ export default function SettingsScreen() {
   useEffect(() => { load(); }, [load]);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
+
+  // 通知トグル（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
+  const [notifDaily, setNotifDaily] = useState(false);
+  const [notifWeekly, setNotifWeekly] = useState(false);
+  useEffect(() => {
+    AsyncStorage.multiGet(['bl-notif-daily', 'bl-notif-weekly']).then((kv) => {
+      setNotifDaily(kv[0]?.[1] === '1');
+      setNotifWeekly(kv[1]?.[1] === '1');
+    }).catch(() => {});
+  }, []);
+  async function toggleDaily(on: boolean) {
+    setNotifDaily(on);
+    const ok = await setDailyLogReminder(on);
+    if (!ok && on) { setNotifDaily(false); Alert.alert('通知を許可してください', 'iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'); return; }
+    AsyncStorage.setItem('bl-notif-daily', on ? '1' : '0').catch(() => {});
+  }
+  async function toggleWeekly(on: boolean) {
+    setNotifWeekly(on);
+    const ok = await setWeeklyPhotoReminder(on);
+    if (!ok && on) { setNotifWeekly(false); Alert.alert('通知を許可してください', 'iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'); return; }
+    AsyncStorage.setItem('bl-notif-weekly', on ? '1' : '0').catch(() => {});
+  }
 
   async function saveProfile() {
     setBusy(true); setMsg(null);
@@ -179,6 +203,27 @@ export default function SettingsScreen() {
         <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
         <Row icon={<Dumbbell color={C.teal} size={19} />} label="筋トレの目標" sub="種目ごとの目標重量" onPress={() => openSheet('goalT')} />
+      </View>
+
+      {/* 通知 */}
+      <Text style={s.groupLabel}>通知</Text>
+      <View style={s.group}>
+        <View style={s.notifRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.notifLabel}>記録リマインダー</Text>
+            <Text style={s.notifSub}>毎日21:00に「今日の記録」を通知</Text>
+          </View>
+          <Switch value={notifDaily} onValueChange={toggleDaily} trackColor={{ true: C.teal }} />
+        </View>
+        <View style={s.sep} />
+        <View style={s.notifRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.notifLabel}>週1回の体写真</Text>
+            <Text style={s.notifSub}>日曜19:00に撮影リマインド</Text>
+          </View>
+          <Switch value={notifWeekly} onValueChange={toggleWeekly} trackColor={{ true: C.teal }} />
+        </View>
+        <Text style={s.notifNote}>チートデイの前日20:00にも自動でお知らせします（登録時に設定・通知許可が必要）。Expo Goでは動作せず、TestFlight版で有効です。</Text>
       </View>
 
       {/* データ・連携 */}
@@ -336,6 +381,10 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 },
+  notifLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
+  notifSub: { fontSize: 11, color: C.sub, marginTop: 2 },
+  notifNote: { fontSize: 10.5, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
   group: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
   rowIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#e8f5f0', alignItems: 'center', justifyContent: 'center' },

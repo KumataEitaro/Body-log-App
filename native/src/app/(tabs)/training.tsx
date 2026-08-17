@@ -1,12 +1,12 @@
-// トレーニングタブ（Phase 2）: 筋トレ入力・挙上重量の推移・ボリューム判定・履歴。
-// Web版 /training の移植（ヘルスケアのワークアウト表示はPhase 3=dev clientビルド後）
+// 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
+// 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { ClipboardList, BookOpen, Timer } from 'lucide-react-native';
+import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
@@ -14,6 +14,19 @@ import QuickLogFab from '@/components/QuickLogFab';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
+
+// かんたん記録: METs換算（消費kcal = METs × 体重kg × 時間h × 1.05）
+const ACTIVITIES = [
+  { e: '🐕', n: '散歩', mets: 3.0 },
+  { e: '🚶', n: 'ウォーキング', mets: 3.5 },
+  { e: '🏃', n: 'ランニング', mets: 8.0 },
+  { e: '🚴', n: '自転車', mets: 6.0 },
+  { e: '🧘', n: 'ヨガ・ストレッチ', mets: 2.5 },
+  { e: '🏊', n: '水泳', mets: 6.0 },
+  { e: '🧹', n: '家事・掃除', mets: 3.3 },
+  { e: '⚽', n: 'スポーツ', mets: 7.0 },
+] as const;
+const MINUTES = [10, 20, 30, 45, 60, 90] as const;
 
 export default function TrainingScreen() {
   const [tRows, setTRows] = useState<TRow[]>([{ name: '', kg: '', reps: '', sets: '' }]);
@@ -46,6 +59,45 @@ export default function TrainingScreen() {
   }
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // かんたん記録の状態
+  const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
+  const [actIdx, setActIdx] = useState<number | null>(null);
+  const [actMin, setActMin] = useState<number>(30);
+  const [actSaving, setActSaving] = useState(false);
+  const [myWeight, setMyWeight] = useState<number>(60);
+  useEffect(() => {
+    supabase.from('entries').select('weight').not('weight', 'is', null)
+      .order('date', { ascending: false }).limit(1)
+      .then(({ data }) => { if (data?.length) setMyWeight(Number(data[0].weight)); });
+  }, []);
+
+  function actKcal(): number {
+    if (actIdx == null) return 0;
+    return Math.round(ACTIVITIES[actIdx].mets * myWeight * (actMin / 60) * 1.05);
+  }
+
+  async function saveActivity() {
+    if (actIdx == null) { setMsg({ ok: false, text: '運動の種類を選んでください。' }); return; }
+    setActSaving(true); setMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const a = ACTIVITIES[actIdx];
+      const kcal = actKcal();
+      const today = todayJST();
+      const { error } = await supabase.from('logs').insert({
+        user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
+        weight: null, ex: 'オフ', adj: kcal, mood: '',
+        text: `🏃 ${a.n} ${actMin}分（約${kcal}kcal消費）`, photo_urls: [],
+      });
+      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      await syncEntriesForDate(uid, today);
+      setActIdx(null);
+      setMsg({ ok: true, text: `${a.n} ${actMin}分を記録しました。今日の目標カロリーに+${kcal}kcal反映されます🎉` });
+    } finally { setActSaving(false); }
+  }
 
   const setT = (i: number, patch: Partial<TRow>) => setTRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
@@ -95,13 +147,52 @@ export default function TrainingScreen() {
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <Text style={s.brand}>BodyLog</Text>
-        <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
+      <Text style={s.pageTitle}>運動</Text>
+
+      {/* かんたん記録 ⇄ 筋トレ のセグメント */}
+      <View style={s.segWrap}>
+        {([['easy', 'かんたん記録', Footprints], ['lift', '筋トレ', Dumbbell]] as const).map(([k, l, Icon]) => (
+          <Pressable key={k} style={[s.segBtn, seg === k && s.segBtnOn]} onPress={() => setSeg(k)}>
+            <Icon size={14} color={seg === k ? '#fff' : C.sub} />
+            <Text style={[s.segBtnT, seg === k && { color: '#fff' }]}>{l}</Text>
+          </Pressable>
+        ))}
       </View>
 
+      {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
+      {seg === 'easy' && (
+        <View style={s.card} ref={trainInputTarget} collapsable={false}>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日の運動をゆるく記録</Text></View>
+          <Text style={s.muted}>犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。</Text>
+          <View style={s.actGrid}>
+            {ACTIVITIES.map((a, i) => (
+              <Pressable key={a.n} style={[s.actChip, actIdx === i && s.actChipOn]} onPress={() => setActIdx(i)}>
+                <Text style={{ fontSize: 17 }}>{a.e}</Text>
+                <Text style={[s.actChipT, actIdx === i && { color: C.teal }]}>{a.n}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>時間</Text>
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+            {MINUTES.map((m) => (
+              <Pressable key={m} style={[s.minChip, actMin === m && s.minChipOn]} onPress={() => setActMin(m)}>
+                <Text style={[s.minChipT, actMin === m && { color: '#fff' }]}>{m}分</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={saveActivity} disabled={actSaving || actIdx == null}>
+            {actSaving ? <ActivityIndicator color="#fff" /> : (
+              <Text style={s.btnPrimaryT}>
+                {actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
+              </Text>
+            )}
+          </Pressable>
+          {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+        </View>
+      )}
+
       {/* レストタイマー（保存で自動開始・タップで90秒リスタート） */}
-      {restLeft != null && (
+      {seg === 'lift' && restLeft != null && (
         <Pressable style={s.rest} onPress={() => setRestLeft(90)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Timer size={15} color={C.teal} />
@@ -117,7 +208,7 @@ export default function TrainingScreen() {
       )}
 
       {/* 入力 */}
-      <View style={s.card} ref={trainInputTarget} collapsable={false}>
+      <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日のトレーニングを記録</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
@@ -158,16 +249,16 @@ export default function TrainingScreen() {
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>保存する</Text>}
           </Pressable>
         </View>
-        {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+        {msg && seg === 'lift' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
 
       {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
-      {history.length > 0 && (
+      {seg === 'lift' && history.length > 0 && (
         <Text style={s.moveNote}>📈 挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます</Text>
       )}
 
       {/* 履歴 */}
-      <View style={s.card}>
+      <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
         <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレ履歴</Text></View>
         {history.length === 0 && <Text style={s.muted}>まだ記録がありません。今日の1セット目から始めましょう。</Text>}
         {history.slice(0, 20).map((h1) => (
@@ -188,9 +279,24 @@ export default function TrainingScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
-  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
+  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink, marginBottom: 12 },
+  segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  segBtn: {
+    flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
+    paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
+  },
+  segBtnOn: { backgroundColor: C.teal, borderColor: C.teal },
+  segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  actChip: {
+    width: '23%', backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 14,
+    paddingVertical: 10, alignItems: 'center', gap: 3,
+  },
+  actChipOn: { borderColor: C.teal, backgroundColor: '#f2faf7' },
+  actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
+  minChip: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  minChipOn: { backgroundColor: C.ink, borderColor: C.ink },
+  minChipT: { fontSize: 12.5, fontWeight: '800', color: C.sub },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 10 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {

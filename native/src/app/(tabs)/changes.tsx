@@ -411,11 +411,8 @@ export default function ChangesScreen() {
   const headerJSX = (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        {/* 左上は全タブ共通のブランド。⚙は固定配置のHeaderGear（右余白38で衝突回避） */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={s.brand}>BodyLog</Text>
-          <View style={s.betaPill}><Text style={s.betaPillT}>BETA</Text></View>
-        </View>
+        {/* ⚙は固定配置のHeaderGear（右余白38で衝突回避） */}
+        <Text style={s.pageTitle}>概要</Text>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginRight: 38 }}>
           {editing ? (
             <>
@@ -465,9 +462,7 @@ export default function ChangesScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
-  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
+  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },

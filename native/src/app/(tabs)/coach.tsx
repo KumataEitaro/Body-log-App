@@ -200,7 +200,7 @@ export default function CoachScreen() {
           </ScrollView>
         ) : (
           /* ===== 会話タイムライン ===== */
-          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 8 }}
+          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 52, paddingBottom: 8 }}
                       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {msgs.map((m, i) => (
               <View key={i}>
@@ -252,6 +252,8 @@ export default function CoachScreen() {
       </View>
       <StatusBarMask />
       <HeaderGear />
+      {/* 中央上: タブタイトル（履歴と⚙の間） */}
+      <Text style={[s.pageTitle, { top: insets.top + 12 }]} pointerEvents="none">相談</Text>
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
         <History size={16} color={C.sub} />
@@ -330,6 +332,7 @@ const s = StyleSheet.create({
   sendInline: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 10, color: C.faint, marginTop: 5 },
+  pageTitle: { position: 'absolute', alignSelf: 'center', fontSize: 15, fontWeight: '600', color: C.ink, zIndex: 29 },
   histBtn: {
     position: 'absolute', left: 16, zIndex: 30,
     width: 30, height: 30, borderRadius: 9,

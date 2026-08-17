@@ -1,7 +1,7 @@
 // ネイティブタブバー（4タブ構成）。設定は「概要」ヘッダーの⚙から（タブ非表示のルートとして残す）
 // GuideProviderで包み、初回ガイドのスポットライトがタブバーごと覆えるようにする
 import { Tabs } from 'expo-router';
-import { Utensils, Dumbbell, ChartLine, MessageCircle } from 'lucide-react-native';
+import { Utensils, Activity, ChartLine, MessageCircle } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { GuideProvider } from '@/components/GuideTour';
 
@@ -18,7 +18,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="log" options={{ title: '食事', tabBarIcon: ({ color, size }) => <Utensils color={color} size={size - 2} /> }} />
-      <Tabs.Screen name="training" options={{ title: 'トレ', tabBarIcon: ({ color, size }) => <Dumbbell color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="training" options={{ title: '運動', tabBarIcon: ({ color, size }) => <Activity color={color} size={size - 2} /> }} />
       <Tabs.Screen name="coach" options={{ title: '相談', tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size - 2} /> }} />
       <Tabs.Screen name="changes" options={{ title: '概要', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size - 2} /> }} />
       <Tabs.Screen name="goal" options={{ href: null }} />

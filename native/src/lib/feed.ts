@@ -14,6 +14,7 @@ export type FeedLog = {
 export function logIcon(l: FeedLog): string {
   const items = (l.items as FoodItem[]) || [];
   if (l.text?.startsWith('🏋️')) return '🏋️';
+  if (l.text?.startsWith('🏃')) return '🏃';
   if (items.length > 0 || l.kcal != null) return '🍽';
   if (l.weight != null) return '⚖️';
   if (l.ex && l.ex !== 'オフ') return '🏃';
@@ -24,6 +25,7 @@ export function logIcon(l: FeedLog): string {
 export function logTitle(l: FeedLog): string {
   const items = (l.items as FoodItem[]) || [];
   if (l.text?.startsWith('🏋️')) return l.text.replace(/^🏋️ /, '');
+  if (l.text?.startsWith('🏃')) return l.text.replace(/^🏃 /, '');
   if (items.length > 0) {
     const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
     return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');

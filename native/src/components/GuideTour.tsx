@@ -30,7 +30,7 @@ const STEPS: StepDef[] = [
   { kind: 'card', id: 'welcome' },
   { kind: 'spot', route: '/log', target: 'hero', title: 'あと食べられる量', text: '残りカロリーとP/F/Cの残りが、いつもここに表示されます。' },
   { kind: 'spot', route: '/log', target: 'dock', title: '記録はここに書くだけ', text: '「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。' },
-  { kind: 'spot', route: '/training', target: 'trainInput', title: '筋トレの記録', text: '種目・kg・回数・セットを入れて保存。保存するとレストタイマーが自動で走ります。' },
+  { kind: 'spot', route: '/training', target: 'trainInput', title: '運動の記録', text: '犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。' },
   { kind: 'spot', route: '/changes', target: 'chart', title: '変化を見る', text: '体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。' },
   { kind: 'spot', route: '/changes', target: 'gear', title: '設定はここ', text: 'プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。' },
   { kind: 'spot', route: '/coach', target: 'welcome', title: 'AIコーチ', text: '迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。', demo: 'coach' },
