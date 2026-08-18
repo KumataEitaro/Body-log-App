@@ -54,13 +54,16 @@ Appleの審査員がログインして中身を確認するために必要です
 2. **新規登録**で審査用アカウントを作る
    - メール: 使っていないGmailなど（例: `bodylog.review@gmail.com`）
    - パスワード: メモしておく
-3. プロフィールを入力（性別・身長・年齢）
-4. 目標を設定（体重の目標）
-5. **記録を数日分入れる**（審査員が空っぽの画面を見ないように）
-   - 食事を3〜4件（「唐揚げ定食」などでOK）
-   - 体重を2〜3日分
-   - 運動を1〜2件
-6. 終わったら自分のアカウントに戻す
+3. **1年分の記録を自動生成する**（手入力は不要）
+   👉 https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
+   - `C:UsershashiDownloadsodylogsupabaseseed-demo.sql` を開く
+   - 冒頭の `demo_email` を、2で作ったメールアドレスに書き換える
+   - 全文をコピーしてSQL Editorに貼り付け、**RUN**
+   - 実行後に件数が表示される（日次サマリー約335件・記録約1,700件）
+4. アプリを再読み込みして、グラフや履歴が入っていることを確認
+5. 終わったら自分のアカウントに戻す
+
+> 生成されるのは、88kg→77kg前後まで1年かけて減量した記録です。停滞期・週末の増加・記録が飛んだ日・過食した日まで含まれているので、グラフも分析カードも自然に埋まります。
 
 > メールアドレスとパスワードは STEP 5 で使うのでメモしておいてください。
 
@@ -155,7 +158,7 @@ STEP 4で撮った画像をドラッグ&ドロップ
 
 | 用途 | URL |
 |---|---|
-| Supabase SQL実行 | https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new |
+| Supabase SQL実行（更新・デモデータ生成とも） | https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new |
 | Supabase テーブル確認 | https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/editor |
 | Codemagic ビルド | https://codemagic.io/apps |
 | App Store Connect | https://appstoreconnect.apple.com/apps |
