@@ -9,7 +9,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen } from 'lucide-react-native';
+import ColumnReader from '@/components/ColumnReader';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
@@ -22,7 +23,7 @@ import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT';
+type Sheet = null | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -241,6 +242,10 @@ export default function SettingsScreen() {
         <Row icon={<CircleHelp color={C.teal} size={19} />} label="使い方ガイドをもう一度見る"
              sub="各画面の説明と初期設定をやり直せます"
              onPress={() => guide.start()} />
+        <View style={s.sep} />
+        <Row icon={<BookOpen color={C.teal} size={19} />} label="読みもの"
+             sub="PFCバランス・カロリー収支・過食の心理など5本"
+             onPress={() => openSheet('columns')} />
       </View>
 
       {/* アクション */}
@@ -282,6 +287,14 @@ export default function SettingsScreen() {
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
+    </Modal>
+
+    {/* ===== 読みもの（コラム）モーダル ===== */}
+    <Modal visible={sheet === 'columns'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <View style={s.sheetBody}>
+        <SheetHeader title="📖 読みもの" />
+        <ScrollView><ColumnReader /></ScrollView>
+      </View>
     </Modal>
 
     {/* ===== マイ食品管理モーダル ===== */}

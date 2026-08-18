@@ -18,6 +18,7 @@ import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
+import ColumnReader from '@/components/ColumnReader';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
@@ -195,6 +196,10 @@ export default function CoachScreen() {
                     <Text style={s.quickT}>{q.t}</Text>
                   </Pressable>
                 ))}
+              </View>
+              {/* 聞く前に読める知識（PFCの意味など、毎回AIに聞かなくて済むように） */}
+              <View style={{ alignSelf: 'stretch', marginTop: 22 }}>
+                <ColumnReader />
               </View>
             </View>
           </ScrollView>
