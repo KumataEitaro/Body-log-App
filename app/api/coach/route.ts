@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     const j = parseJsonLoose(r.text) as { answer?: string; action?: Record<string, unknown> };
     answer = String(j.answer || '').trim();
     // actionは想定kindのみ通す（プロンプトインジェクション等での任意データ書込を防ぐ）
-    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training'].includes(String(j.action.kind))) {
+    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training', 'kcal'].includes(String(j.action.kind))) {
       action = j.action;
     }
   } catch { /* JSON崩れ時は生テキストを使う */ }

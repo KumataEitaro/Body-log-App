@@ -19,12 +19,14 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import { t } from '@/lib/i18n';
+import { useRouter } from 'expo-router';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
   | { kind: 'pfc'; protein_per_kg?: number; fat_per_kg?: number; label: string }
   | { kind: 'weight'; target_weight?: number; target_date?: string; label: string }
-  | { kind: 'training'; name: string; target_kg: number; label: string };
+  | { kind: 'training'; name: string; target_kg: number; label: string }
+  | { kind: 'kcal'; target_date: string; label: string };
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
 
@@ -64,6 +66,7 @@ function RichText({ text, style }: { text: string; style: object }) {
 }
 
 export default function CoachScreen() {
+  const router = useRouter();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -159,6 +162,9 @@ export default function CoachScreen() {
             if (a.target_weight != null) patch.target_weight = Number(a.target_weight);
             if (a.target_date) patch.target_date = a.target_date;
             ({ error } = await supabase.from('goals').update(patch).eq('user_id', uid));
+          } else if (a.kind === 'kcal') {
+            if (!/^d{4}-d{2}-d{2}$/.test(a.target_date)) return;
+            ({ error } = await supabase.from('goals').update({ target_date: a.target_date }).eq('user_id', uid));
           } else if (a.kind === 'training') {
             ({ error } = await supabase.from('training_goals')
               .upsert({ user_id: uid, name: a.name, target_kg: Number(a.target_kg) }, { onConflict: 'user_id,name' }));
@@ -218,9 +224,15 @@ export default function CoachScreen() {
                     {m.applied ? (
                       <Text style={s.actionDone}>{t('✓ 適用しました（「概要」タブに反映）')}</Text>
                     ) : (
-                      <Pressable style={s.actionBtn} onPress={() => applyAction(m.action!, i)}>
-                        <Text style={s.actionBtnT}>{t('この目標を適用する')}</Text>
-                      </Pressable>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                        <Pressable style={s.actionBtn} onPress={() => applyAction(m.action!, i)}>
+                          <Text style={s.actionBtnT}>{t('この目標を適用する')}</Text>
+                        </Pressable>
+                        <Pressable style={s.actionAlt}
+                                   onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW' } })}>
+                          <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
                 )}
@@ -324,7 +336,9 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.teal, borderRadius: 14, padding: 12, marginBottom: 8, marginTop: -2,
   },
   actionLabel: { fontSize: 13, fontWeight: '700', color: C.ink, lineHeight: 19 },
-  actionBtn: { backgroundColor: C.teal, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16, alignSelf: 'flex-start', marginTop: 8 },
+  actionBtn: { backgroundColor: C.teal, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
+  actionAlt: { borderWidth: 1.5, borderColor: C.teal, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.panel },
+  actionAltT: { color: C.teal, fontSize: 12.5, fontWeight: '800' },
   actionBtnT: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
   actionDone: { color: C.teal, fontSize: 12.5, fontWeight: '800', marginTop: 8 },
   inRow: {

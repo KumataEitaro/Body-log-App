@@ -1,7 +1,7 @@
 // マイページ: iOS設定アプリ風のグループ化メニューリスト
 // フォーム・一覧のベタ貼りを廃止し、各機能はモーダル（pageSheet）で開く
 // 構成: ヘッダーサマリー → アカウント設定 → データ・連携 → アクション（ログアウト/削除）
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
@@ -20,6 +20,7 @@ import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
+import { useLocalSearchParams } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
@@ -45,6 +46,16 @@ export default function SettingsScreen() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
   const guide = useGuide();
+
+  // 相談タブ等からのディープリンク（/settings?open=goalW）で目的のシートを直接開く
+  const { open } = useLocalSearchParams<{ open?: string }>();
+  const consumedOpen = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || consumedOpen.current === open) return;
+    consumedOpen.current = open;
+    if (open === 'goalW' || open === 'goalT' || open === 'profile' || open === 'theme') openSheet(open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
