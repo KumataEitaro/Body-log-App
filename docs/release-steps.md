@@ -56,7 +56,7 @@ Appleの審査員がログインして中身を確認するために必要です
    - パスワード: メモしておく
 3. **1年分の記録を自動生成する**（手入力は不要）
    👉 https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
-   - `C:UsershashiDownloadsodylogsupabaseseed-demo.sql` を開く
+   - `bodylog/supabase/seed-demo.sql` を開く（Downloadsフォルダの中）
    - 冒頭の `demo_email` を、2で作ったメールアドレスに書き換える
    - 全文をコピーしてSQL Editorに貼り付け、**RUN**
    - 実行後に件数が表示される（日次サマリー約335件・記録約1,700件）
