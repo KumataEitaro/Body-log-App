@@ -1,11 +1,12 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
-import { t } from '@/lib/i18n';
+import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
+import { Languages, Check } from 'lucide-react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
@@ -94,12 +95,20 @@ export default function LoginScreen() {
   }
 
   const isLogin = mode === 'login';
+  const locale = useLocale();
+  const [langOpen, setLangOpen] = useState(false);
+  const langLabel = LOCALES.find((l) => l.code === locale)?.label ?? '日本語';
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
       <View style={s.inner}>
+        <Pressable style={s.langBtn} onPress={() => setLangOpen(true)} hitSlop={8}>
+          <Languages size={15} color={C.sub} />
+          <Text style={s.langBtnT}>{langLabel}</Text>
+        </Pressable>
+
         <Text style={s.logo}>▍BodyLog</Text>
-        <Text style={s.sub}>{isLogin ? 'おかえりなさい。記録を続けましょう' : t('無料アカウントを作成（Web版と共通）')}</Text>
+        <Text style={s.sub}>{isLogin ? t('おかえりなさい。記録を続けましょう') : t('無料アカウントを作成（Web版と共通）')}</Text>
 
         {/* ログイン/新規登録の切り替え */}
         <View style={{ marginBottom: 16 }}>
@@ -141,6 +150,26 @@ export default function LoginScreen() {
           <Text style={s.terms}>{t('登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。')}</Text>
         )}
       </View>
+
+      <Modal visible={langOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setLangOpen(false)}>
+        <View style={s.sheet}>
+          <View style={s.sheetHead}>
+            <Text style={s.sheetTitle}>{t('言語')}</Text>
+            <Pressable onPress={() => setLangOpen(false)} hitSlop={10}>
+              <Text style={s.sheetClose}>{t('閉じる')}</Text>
+            </Pressable>
+          </View>
+          <ScrollView>
+            {LOCALES.map((l) => (
+              <Pressable key={l.code} style={s.langRow}
+                         onPress={() => { setLocale(l.code); setLangOpen(false); }}>
+                <Text style={s.langRowT}>{l.label}</Text>
+                {locale === l.code && <Check size={18} color={C.teal} strokeWidth={3} />}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -148,6 +177,21 @@ export default function LoginScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, justifyContent: 'center' },
   inner: { paddingHorizontal: 28 },
+  langBtn: {
+    alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 14,
+    borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
+    borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
+  },
+  langBtnT: { fontSize: 12, fontWeight: '700', color: C.sub },
+  sheet: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: 16 },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  sheetClose: { fontSize: 14, fontWeight: '700', color: C.teal },
+  langRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 15, borderBottomWidth: 0.5, borderBottomColor: C.line,
+  },
+  langRowT: { fontSize: 15.5, color: C.ink, fontWeight: '600' },
   logo: { fontSize: 28, fontWeight: '800', color: C.ink, marginBottom: 6 },
   sub: { fontSize: 13, color: C.sub, marginBottom: 18 },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 16 },
