@@ -22,7 +22,7 @@ import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
-import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '@/components/LiftingProgress';
+import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard } from '@/components/LiftingProgress';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
@@ -45,11 +45,11 @@ const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'goal', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal'];
+const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
   kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', photos: '体の写真', goal: '目標',
   trends: '食材の傾向', health: '歩数・睡眠',
-  tkpi: 'トレのサマリー', tcal: 'トレーニングカレンダー', tchart: '挙上重量グラフ', tgoal: '種目別目標',
+  tkpi: '週間サマリー', tcal: '運動カレンダー', tbal: '週別バランス', tchart: '筋トレの成長', tgoal: '運動目標',
 };
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -390,6 +390,7 @@ export default function ChangesScreen() {
       case 'health': return healthCard;
       case 'tkpi': return <LiftKpiCard />;
       case 'tcal': return <LiftCalendarCard />;
+      case 'tbal': return <BalanceCard />;
       case 'tchart': return <LiftChartCard />;
       case 'tgoal': return <GoalSummaryCard mode="training" />;
       default: return null;
