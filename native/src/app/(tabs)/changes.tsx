@@ -14,6 +14,7 @@ import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
+import BingeTriggerCard from '@/components/BingeTriggerCard';
 import { SegmentedControl } from '@/components/ui/Selectable';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
@@ -45,10 +46,10 @@ const series = () => [
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'goal', 'trends', 'health'];
+const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'binge', 'goal', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
-  kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), goal: t('目標'),
+  kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   trends: t('食材の傾向'), health: t('歩数・睡眠'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
 };
@@ -386,6 +387,7 @@ export default function ChangesScreen() {
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
       case 'photos': return <BodyPhotosCard />;
+      case 'binge': return <BingeTriggerCard />;
       case 'goal': return <GoalSummaryCard mode="weight" />;
       case 'trends': return trendsCard;
       case 'health': return healthCard;

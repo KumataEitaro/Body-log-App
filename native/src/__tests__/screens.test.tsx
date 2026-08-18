@@ -11,6 +11,7 @@ import GoalPanel from '../components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '../components/LiftingProgress';
 import QuickLogFab from '../components/QuickLogFab';
 import { GuideProvider } from '../components/GuideTour';
+import BingeTriggerCard from '@/components/BingeTriggerCard';
 
 jest.useFakeTimers();
 
@@ -66,5 +67,8 @@ describe('components smoke', () => {
       expect(() => tree.toJSON()).not.toThrow();
       await act(async () => { tree.unmount(); });
     }
+  });
+  it('過食の引き金カードが例外なくマウントできる', () => {
+    expect(() => renderer.create(<BingeTriggerCard />)).not.toThrow();
   });
 });
