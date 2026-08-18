@@ -11,6 +11,8 @@ import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
+import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
+import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
 import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES } from '@/lib/theme';
@@ -69,6 +71,8 @@ export default function SettingsScreen() {
   const locale = useLocale();
   const units = useUnits();
   const theme = useTheme();
+  const todo = useTodoBadge();
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
@@ -197,6 +201,22 @@ export default function SettingsScreen() {
             {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ 基礎代謝 約{Math.round(bmr)}kcal
           </Text>
         </View>
+      </View>
+
+      {/* 通知センター（メニュー最上部） */}
+      <View style={[s.group, { marginBottom: 18 }]}>
+        <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]}
+                   onPress={() => { todo.refresh(); setNoticeOpen(true); }}>
+          <View style={s.rowIcon}><BellRing color={C.teal} size={19} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.rowLabel}>{t('通知センター')}</Text>
+            <Text style={s.rowSub}>
+              {todo.count > 0 ? t('入力すべき項目が{n}件あります', { n: todo.count }) : t('いま対応が必要な項目はありません')}
+            </Text>
+          </View>
+          <TodoBadge count={todo.count} style={{ marginRight: 6 }} />
+          <ChevronRight color={C.faint} size={18} />
+        </Pressable>
       </View>
 
       {/* アカウント設定 */}
@@ -493,6 +513,7 @@ export default function SettingsScreen() {
     </Modal>
 
     <QuickLogFab />
+    <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
     <StatusBarMask />
     </View>
   );

@@ -4,11 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
 import { C } from '@/lib/ui';
+import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { useGuideTarget } from '@/components/GuideTour';
 
 export default function HeaderGear({ guideKey }: { guideKey?: string }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const todo = useTodoBadge();
   // ガイドの照射対象になれる（概要タブが guideKey="gear" を渡す。他タブはダミーキー）
   const target = useGuideTarget(guideKey ?? '__gear_unused__');
   return (
@@ -20,6 +22,7 @@ export default function HeaderGear({ guideKey }: { guideKey?: string }) {
       hitSlop={10}
     >
       <Settings size={16} color={C.sub} />
+      <TodoBadge count={todo.count} style={{ position: 'absolute', top: -5, right: -5 }} />
     </Pressable>
   );
 }
