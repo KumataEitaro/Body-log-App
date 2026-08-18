@@ -47,7 +47,7 @@ const s = StyleSheet.create({
     backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 10,
   },
-  on: { borderColor: C.teal, backgroundColor: '#f2faf7' },
+  on: { borderColor: C.teal, backgroundColor: C.accentSoft },
   t: { fontSize: 13.5, fontWeight: '800', color: C.ink },
   d: { fontSize: 11, color: C.sub, marginTop: 2, lineHeight: 16 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },

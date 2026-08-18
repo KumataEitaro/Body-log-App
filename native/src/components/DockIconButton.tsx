@@ -23,5 +23,5 @@ export default function DockIconButton({ Icon, onPress, disabled, tint, size = 1
 
 const s = StyleSheet.create({
   btn: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  pressed: { backgroundColor: '#f1f3f0', transform: [{ scale: 0.94 }] },
+  pressed: { backgroundColor: C.pressed, transform: [{ scale: 0.94 }] },
 });

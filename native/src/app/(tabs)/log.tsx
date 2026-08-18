@@ -600,7 +600,7 @@ export default function LogScreen() {
             <Text style={s.h2}>{t('💭 いまの気分は？')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
-                <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: '#eef0ee' }]}
+                <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}
                            disabled={moodBusy} onPress={() => saveMood(i + 1)}>
                   <Text style={{ fontSize: 26 }}>{e}</Text>
                 </Pressable>
@@ -838,14 +838,14 @@ const s = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
-  betaPill: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  betaPill: { backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
   hero: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18, marginBottom: 12 },
   heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 15, color: C.sub, fontWeight: '600' },
-  hline: { height: 7, backgroundColor: '#eceeeb', borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
-  hfill: { height: 7, backgroundColor: '#3f4c5a', borderRadius: 4 },
+  hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
+  hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 12, color: C.sub, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
@@ -872,7 +872,7 @@ const s = StyleSheet.create({
   chipT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
   moodBtn: {
     flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
-    backgroundColor: '#f4f5f3', borderWidth: 1, borderColor: C.line, marginBottom: 8,
+    backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, marginBottom: 8,
   },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   btnPrimaryT: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
@@ -898,7 +898,7 @@ const s = StyleSheet.create({
   dockIconBtn: { padding: 4 },
   dockIcon: { fontSize: 18 },
   dockInput: { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
-  pencilBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#e6f7f2', alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
+  pencilBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
   dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
@@ -906,7 +906,7 @@ const s = StyleSheet.create({
   preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
   tray: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)',
+    backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 14, paddingHorizontal: 8, paddingVertical: 7, marginBottom: 7,
   },
   trayChip: {
@@ -924,11 +924,11 @@ const s = StyleSheet.create({
   pfcL: { width: 74, fontSize: 11, fontWeight: '800', color: C.sub },
   pfcAb: { fontSize: 9.5, fontWeight: '700', color: C.faint },
   adviceBox: {
-    marginTop: 8, backgroundColor: '#f2faf7', borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)',
+    marginTop: 8, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
   },
   adviceT: { fontSize: 12, color: C.ink, lineHeight: 19, fontWeight: '500' },
-  pfcBar: { flex: 1, height: 6, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden' },
+  pfcBar: { flex: 1, height: 6, backgroundColor: C.track, borderRadius: 3, overflow: 'hidden' },
   pfcFill: { height: 6, borderRadius: 3 },
   pfcT: { width: 86, fontSize: 10.5, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
   hint: { fontSize: 10, color: C.faint, textAlign: 'right', marginTop: 6 },

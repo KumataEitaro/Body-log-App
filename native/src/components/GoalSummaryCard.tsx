@@ -70,7 +70,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12,
   },
   iconWrap: {
-    width: 32, height: 32, borderRadius: 10, backgroundColor: '#e6f7f2',
+    width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge,
     alignItems: 'center', justifyContent: 'center',
   },
   title: { fontSize: 13, fontWeight: '800', color: C.ink },

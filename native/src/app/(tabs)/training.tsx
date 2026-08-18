@@ -13,7 +13,7 @@ import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import DateStrip from '@/components/DateStrip';
-import { SegmentedControl, Chip, OptionButton, SEL } from '@/components/ui/Selectable';
+import { SegmentedControl, Chip, OptionButton } from '@/components/ui/Selectable';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 import { t } from '@/lib/i18n';
 
@@ -411,10 +411,10 @@ const s = StyleSheet.create({
   segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   actChip: {
-    width: '23%', backgroundColor: SEL.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
+    width: '23%', backgroundColor: C.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
     paddingVertical: 10, alignItems: 'center', gap: 3,
   },
-  actChipOn: { borderColor: C.teal, backgroundColor: SEL.tealSoft },
+  actChipOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
   actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
   hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
   hkHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -435,7 +435,7 @@ const s = StyleSheet.create({
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)',
+    backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
   },
   restL: { fontSize: 12, fontWeight: '800', color: C.ink },

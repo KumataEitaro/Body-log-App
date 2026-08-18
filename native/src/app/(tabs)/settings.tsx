@@ -13,7 +13,7 @@ import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp,
 import ColumnReader from '@/components/ColumnReader';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
-import { useTheme, setTheme, ACCENTS, PFC_PRESETS, pfcColors } from '@/lib/theme';
+import { useTheme, setTheme, ACCENTS, PFC_PRESETS, PALETTES } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -161,7 +161,7 @@ export default function SettingsScreen() {
   // 1行メニュー（アイコン＋ラベル＋chevron）
   function Row({ icon, label, sub, onPress, danger }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; danger?: boolean }) {
     return (
-      <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: '#f1f3f0' }]} onPress={onPress}>
+      <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]} onPress={onPress}>
         <View style={s.rowIcon}>{icon}</View>
         <View style={{ flex: 1 }}>
           <Text style={[s.rowLabel, danger && { color: C.coral }]}>{label}</Text>
@@ -344,7 +344,9 @@ export default function SettingsScreen() {
           <View style={s.swatchRow}>
             {ACCENTS.map((a) => (
               <Pressable key={a.key} style={s.swatchWrap} onPress={() => setTheme({ accent: a.key })}>
-                <View style={[s.swatch, { backgroundColor: a.color }, theme.accent === a.key && s.swatchOn]}>
+                <View style={[s.swatch, { backgroundColor: PALETTES[a.key].bg, borderWidth: 1, borderColor: PALETTES[a.key].line }, theme.accent === a.key && s.swatchOn]}>
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 16, backgroundColor: PALETTES[a.key].accentBadge }} />
+                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: a.color }} />
                   {theme.accent === a.key && <Text style={s.swatchCheck}>✓</Text>}
                 </View>
                 <Text style={[s.swatchT, theme.accent === a.key && { color: C.ink, fontWeight: '800' }]}>{t(a.label)}</Text>
@@ -487,7 +489,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', gap: 12, alignItems: 'center',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 18,
   },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e8f5f0', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   sumName: { fontSize: 16, fontWeight: '800', color: C.ink },
   sumMail: { fontSize: 11.5, color: C.sub, marginTop: 1 },
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
@@ -506,7 +508,7 @@ const s = StyleSheet.create({
   pfcRowOn: { borderColor: C.teal, backgroundColor: C.tealWeak },
   pfcName: { fontSize: 14, fontWeight: '800', color: C.ink },
   pfcNote: { fontSize: 11, color: C.sub, marginTop: 2 },
-  pfcSample: { height: 6, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden' },
+  pfcSample: { height: 6, backgroundColor: C.track, borderRadius: 3, overflow: 'hidden' },
   unitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 9 },
   unitLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
   langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.line },
@@ -517,7 +519,7 @@ const s = StyleSheet.create({
   notifNote: { fontSize: 10.5, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
   group: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  rowIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#e8f5f0', alignItems: 'center', justifyContent: 'center' },
+  rowIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 14.5, fontWeight: '600', color: C.ink },
   rowSub: { fontSize: 11, color: C.sub, marginTop: 1 },
   sep: { height: 0.5, backgroundColor: C.line, marginLeft: 56 },

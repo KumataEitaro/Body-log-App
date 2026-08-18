@@ -114,7 +114,7 @@ const s = StyleSheet.create({
   month: { fontSize: 14, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 5, borderRadius: 10 },
-  sel: { backgroundColor: '#e8f5f0' },
+  sel: { backgroundColor: C.accentBadge },
   dow: { fontSize: 10.5, fontWeight: '700', color: C.sub },
   num: { fontSize: 13.5, fontWeight: '600', color: C.ink, fontVariant: ['tabular-nums'] },
   today: { color: C.teal, fontWeight: '800' },

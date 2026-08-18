@@ -177,7 +177,7 @@ const s = StyleSheet.create({
   titleSub: { fontSize: 11, fontWeight: '400', color: C.sub },
   thumb: { width: 48, height: 48, borderRadius: 10, borderWidth: 1, borderColor: C.line },
   msg: { fontSize: 12, fontWeight: '600', color: C.sub, marginBottom: 6 },
-  stagedBox: { backgroundColor: '#e6f7f2', borderWidth: 1, borderColor: 'rgba(5,150,105,0.3)', borderRadius: 14, padding: 10, marginBottom: 8 },
+  stagedBox: { backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 14, padding: 10, marginBottom: 8 },
   stagedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
   stagedT: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink },
   stagedKcal: { fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },

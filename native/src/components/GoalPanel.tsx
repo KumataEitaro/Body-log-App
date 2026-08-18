@@ -409,7 +409,7 @@ const s = StyleSheet.create({
   tgRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tgName: { fontSize: 14, fontWeight: '700', color: C.ink },
   tgNum: { fontSize: 12.5, color: C.sub, fontVariant: ['tabular-nums'] },
-  bar: { height: 8, backgroundColor: '#eceeeb', borderRadius: 4, marginTop: 5, overflow: 'hidden' },
+  bar: { height: 8, backgroundColor: C.track, borderRadius: 4, marginTop: 5, overflow: 'hidden' },
   barFill: { height: 8, backgroundColor: C.teal, borderRadius: 4 },
   msg: { fontSize: 13, fontWeight: '600', paddingHorizontal: 4 },
 });

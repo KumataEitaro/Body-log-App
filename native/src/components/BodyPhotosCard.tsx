@@ -258,7 +258,7 @@ const s = StyleSheet.create({
   saveBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
   aiBtn: {
     flexDirection: 'row', gap: 4, alignItems: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(5,150,105,0.4)', backgroundColor: '#f2faf7',
+    borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
     borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8,
   },
   aiBtnT: { fontSize: 11.5, fontWeight: '800', color: C.teal },

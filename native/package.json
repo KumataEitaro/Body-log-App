@@ -58,7 +58,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest --silent",
-    "i18n:keys": "node scripts/i18n-keys.js"
+    "i18n:keys": "node scripts/i18n-keys.js",
+    "web:preview": "expo start --web --port 8082",
+    "web:serve": "npx --yes serve dist -s -l 8083"
   },
   "private": true,
   "jest": {

@@ -134,10 +134,10 @@ const s = StyleSheet.create({
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 11, fontWeight: '400', color: C.sub },
-  countBadge: { marginLeft: 'auto', backgroundColor: '#e6f7f2', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  countBadge: { marginLeft: 'auto', backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   countBadgeT: { fontSize: 10, fontWeight: '800', color: C.teal },
   rec: {
-    backgroundColor: '#f2faf7', borderWidth: 1.5, borderColor: 'rgba(5,150,105,0.3)', borderRadius: 16,
+    backgroundColor: C.accentSoft, borderWidth: 1.5, borderColor: C.accentBorder, borderRadius: 16,
     padding: 12, marginBottom: 10,
   },
   recLabel: { fontSize: 10, fontWeight: '800', color: C.teal, letterSpacing: 0.6 },

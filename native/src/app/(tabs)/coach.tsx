@@ -322,7 +322,7 @@ const s = StyleSheet.create({
   bAi: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   bubbleT: { fontSize: 14, lineHeight: 22, color: C.ink },
   actionCard: {
-    alignSelf: 'flex-start', maxWidth: '88%', backgroundColor: '#e8f5f0',
+    alignSelf: 'flex-start', maxWidth: '88%', backgroundColor: C.accentBadge,
     borderWidth: 1, borderColor: C.teal, borderRadius: 14, padding: 12, marginBottom: 8, marginTop: -2,
   },
   actionLabel: { fontSize: 13, fontWeight: '700', color: C.ink, lineHeight: 19 },

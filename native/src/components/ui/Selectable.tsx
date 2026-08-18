@@ -8,13 +8,6 @@ import { View, Text, Pressable, StyleSheet, Animated, ActivityIndicator } from '
 import * as Haptics from 'expo-haptics';
 import { C } from '@/lib/ui';
 
-// デザイントークン
-export const SEL = {
-  track: '#eef0ee',      // セグメントのトラック地
-  chipBg: '#f4f5f3',     // チップ未選択地
-  chipText: '#5b6560',   // 未選択文字
-  tealSoft: '#f0faf6',   // teal薄地（枠線ハイライト用）
-} as const;
 
 function hapt() { Haptics.selectionAsync().catch(() => {}); }
 
@@ -110,21 +103,21 @@ export function OptionButton({ label, onPress, variant = 'filled', busy, disable
 
 const s = StyleSheet.create({
   // Segmented
-  track: { position: 'relative', flexDirection: 'row', backgroundColor: SEL.track, borderRadius: 999, padding: 3 },
+  track: { position: 'relative', flexDirection: 'row', backgroundColor: C.segTrack, borderRadius: 999, padding: 3 },
   plate: {
     position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: '#fff', borderRadius: 999,
     shadowColor: '#141815', shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   segBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999 },
-  segT: { fontSize: 13, fontWeight: '600', color: SEL.chipText },
+  segT: { fontSize: 13, fontWeight: '600', color: C.sub },
   segTOn: { color: C.ink, fontWeight: '700' },
   // Chip
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: SEL.chipBg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 9,
   },
-  chipT: { fontSize: 12.5, fontWeight: '600', color: SEL.chipText },
+  chipT: { fontSize: 12.5, fontWeight: '600', color: C.sub },
   chipOnTeal: {
     backgroundColor: C.teal, borderColor: C.teal,
     shadowColor: C.teal, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
@@ -133,7 +126,7 @@ const s = StyleSheet.create({
     backgroundColor: C.ink, borderColor: C.ink,
     shadowColor: '#141815', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-  chipOnOutline: { borderWidth: 1.5, borderColor: C.teal, backgroundColor: SEL.tealSoft },
+  chipOnOutline: { borderWidth: 1.5, borderColor: C.teal, backgroundColor: C.accentSoft },
   // OptionButton
   opt: {
     flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center',
@@ -147,6 +140,6 @@ const s = StyleSheet.create({
     backgroundColor: C.teal,
     shadowColor: C.teal, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-  optTonal: { backgroundColor: SEL.chipBg, borderWidth: 1, borderColor: C.line },
+  optTonal: { backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
   optT: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });
