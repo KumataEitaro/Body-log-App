@@ -8,7 +8,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, type LucideIcon } from 'lucide-react-native';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, type LucideIcon } from 'lucide-react-native';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
@@ -18,7 +18,6 @@ import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
-import ColumnReader from '@/components/ColumnReader';
 import { t } from '@/lib/i18n';
 
 // AIが提案した目標変更（承認制で直接適用する）
@@ -179,10 +178,11 @@ export default function CoachScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={s.wrap}>
+        <Text style={[s.pageTitle, { marginTop: insets.top + 8 }]}>{t('相談')}</Text>
         {empty ? (
           /* ===== Empty State: 中央寄せのウェルカムUI（キーボード表示中はスクロールしてロゴまで見える） ===== */
           <ScrollView
-            contentContainerStyle={[s.welcomeScroll, { paddingTop: insets.top + 8 }]}
+            contentContainerStyle={s.welcomeScroll}
             keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}>
             <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}
@@ -198,15 +198,11 @@ export default function CoachScreen() {
                   </Pressable>
                 ))}
               </View>
-              {/* 聞く前に読める知識（PFCの意味など、毎回AIに聞かなくて済むように） */}
-              <View style={{ alignSelf: 'stretch', marginTop: 22 }}>
-                <ColumnReader />
-              </View>
             </View>
           </ScrollView>
         ) : (
           /* ===== 会話タイムライン ===== */
-          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 52, paddingBottom: 8 }}
+          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
                       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {msgs.map((m, i) => (
               <View key={i}>
@@ -239,12 +235,16 @@ export default function CoachScreen() {
           </ScrollView>
         )}
 
-        {/* 入力ドック（下部固定・フィールド内右端にインライン送信アイコン） */}
+        {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
         <View style={s.inRow}>
-          {kbVisible && (
-            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8} style={s.kbDismiss}>
-              <ChevronDown size={19} color={C.sub} strokeWidth={2.5} />
+          {kbVisible ? (
+            <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
+              <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />
             </Pressable>
+          ) : (
+            <View style={s.pencilBadge}>
+              <MessageCircle color={C.teal} size={17} strokeWidth={2.5} />
+            </View>
           )}
           <TextInput style={s.input} placeholder="相談してみる…" placeholderTextColor={C.faint}
                      value={input} onChangeText={setInput} multiline />
@@ -258,8 +258,6 @@ export default function CoachScreen() {
       </View>
       <StatusBarMask />
       <HeaderGear />
-      {/* 中央上: タブタイトル（履歴と⚙の間） */}
-      <Text style={[s.pageTitle, { top: insets.top + 12 }]} pointerEvents="none">{t('相談')}</Text>
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
         <History size={16} color={C.sub} />
@@ -330,17 +328,22 @@ const s = StyleSheet.create({
   actionBtnT: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
   actionDone: { color: C.teal, fontSize: 12.5, fontWeight: '800', marginTop: 8 },
   inRow: {
-    flexDirection: 'row', alignItems: 'flex-end', marginTop: 6,
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 22,
-    paddingLeft: 14, paddingRight: 5, paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 6,
+    backgroundColor: C.panel, borderWidth: 2, borderColor: C.teal, borderRadius: 24,
+    paddingLeft: 6, paddingRight: 5, paddingVertical: 5,
+    shadowColor: C.teal, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-  input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 16, color: C.ink, paddingTop: 6, paddingBottom: 6 },
-  sendInline: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
+  pencilBadge: {
+    width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 1,
+  },
+  input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 16, fontWeight: '600', color: C.ink, paddingTop: 6, paddingBottom: 6 },
+  sendInline: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 10, color: C.faint, marginTop: 5 },
-  pageTitle: { position: 'absolute', alignSelf: 'center', fontSize: 15, fontWeight: '600', color: C.ink, zIndex: 29 },
+  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink, marginBottom: 10, marginLeft: 2 },
   histBtn: {
-    position: 'absolute', left: 16, zIndex: 30,
+    position: 'absolute', right: 54, zIndex: 30,
     width: 30, height: 30, borderRadius: 9,
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
     alignItems: 'center', justifyContent: 'center',
