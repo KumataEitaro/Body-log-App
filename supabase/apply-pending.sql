@@ -77,3 +77,13 @@ drop policy if exists "body_photos_storage_own" on storage.objects;
 create policy "body_photos_storage_own" on storage.objects
   for all using (bucket_id = 'body-photos' and auth.uid()::text = (storage.foldername(name))[1])
   with check (bucket_id = 'body-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- v17: 運動ドメイン刷新（習慣目標・運動の時間/距離・HealthKit取込の重複排除）
+alter table public.goals add column if not exists ex_per_week numeric;      -- 週の運動回数目標
+alter table public.goals add column if not exists ex_weekly_kcal numeric;   -- 週の消費kcal目標
+alter table public.goals add column if not exists ex_min_minutes numeric;   -- 1回とカウントする最低分数
+alter table public.logs add column if not exists ex_minutes numeric;        -- 運動時間（分）
+alter table public.logs add column if not exists ex_km numeric;             -- 距離（km）
+alter table public.logs add column if not exists source_id text;            -- HealthKit等の取込元ID（重複排除）
+create unique index if not exists logs_source_id_uniq
+  on public.logs (user_id, source_id) where source_id is not null;

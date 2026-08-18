@@ -453,6 +453,27 @@ export default function LogScreen() {
     }
   }
 
+  // 朝の気分カード: その日まだ気分が無ければ1タップで聞く（スキップはその日限り）
+  const [moodSnoozed, setMoodSnoozed] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem('bl-mood-snooze').then((v) => setMoodSnoozed(v === todayJST())).catch(() => {});
+  }, []);
+  const [moodBusy, setMoodBusy] = useState(false);
+  const hasMoodToday = dayLogs.some((l) => l.mood);
+  const showMood = viewDate === todayJST() && profile != null && !hasMoodToday && !moodSnoozed;
+  async function saveMood(n: number) {
+    if (!uid || moodBusy) return;
+    setMoodBusy(true);
+    try {
+      await saveParsed(uid, { items: [], weight: null, waist: null, ex: null, adj: 0, mood: `${n}/5` }, '', viewDate);
+      await load();
+    } finally { setMoodBusy(false); }
+  }
+  function moodSnooze() {
+    AsyncStorage.setItem('bl-mood-snooze', todayJST()).catch(() => {});
+    setMoodSnoozed(true);
+  }
+
   async function backfillSnooze() {
     try { await AsyncStorage.setItem('bl-backfill-snooze', todayJST()); } catch { /* 無視 */ }
     setBackfill(null);
@@ -554,6 +575,25 @@ export default function LogScreen() {
             ) : (
               <OptionButton style={{ marginTop: 10 }} variant="tonal" label="OK、気をつける" onPress={snoozeRisk} />
             )}
+          </View>
+        )}
+
+        {/* 朝の気分カード（その日1回だけ・記録かスキップで消える） */}
+        {showMood && (
+          <View style={s.card}>
+            <Text style={s.h2}>💭 いまの気分は？</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
+                <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: '#eef0ee' }]}
+                           disabled={moodBusy} onPress={() => saveMood(i + 1)}>
+                  <Text style={{ fontSize: 26 }}>{e}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.mutedT}>気分と食欲はつながっています。記録するとAIの過食予報が賢くなります。</Text>
+            <Pressable onPress={moodSnooze} style={{ marginTop: 6, alignSelf: 'center' }} hitSlop={8}>
+              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>今日は聞かないで</Text>
+            </Pressable>
           </View>
         )}
 
@@ -813,6 +853,10 @@ const s = StyleSheet.create({
   chipMain: { paddingVertical: 9, paddingLeft: 13, paddingRight: 11 },
   chipMinus: { paddingVertical: 9, paddingHorizontal: 12, borderLeftWidth: 1.5, borderLeftColor: C.line },
   chipT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
+  moodBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
+    backgroundColor: '#f4f5f3', borderWidth: 1, borderColor: C.line, marginBottom: 8,
+  },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   btnPrimaryT: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   wRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },

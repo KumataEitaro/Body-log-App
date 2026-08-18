@@ -13,6 +13,7 @@ import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import DateStrip from '@/components/DateStrip';
 import { SegmentedControl, Chip, OptionButton, SEL } from '@/components/ui/Selectable';
+import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
@@ -69,6 +70,7 @@ export default function TrainingScreen() {
   const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
   const [actIdx, setActIdx] = useState<number | null>(null);
   const [actMin, setActMin] = useState<number>(30);
+  const [actKm, setActKm] = useState(''); // 距離（km・徒歩/ラン/自転車のみ任意入力）
   const [actSaving, setActSaving] = useState(false);
   const [myWeight, setMyWeight] = useState<number>(60);
   useEffect(() => {
@@ -77,9 +79,17 @@ export default function TrainingScreen() {
       .then(({ data }) => { if (data?.length) setMyWeight(Number(data[0].weight)); });
   }, []);
 
+  const DIST_OK = ['散歩', 'ウォーキング', 'ランニング', '自転車'];
   function actKcal(): number {
     if (actIdx == null) return 0;
-    return Math.round(ACTIVITIES[actIdx].mets * myWeight * (actMin / 60) * 1.05);
+    const a = ACTIVITIES[actIdx];
+    const km = Number(actKm);
+    // 距離が入っていれば距離ベースの推定に切替（精度が上がる）
+    if (km > 0 && DIST_OK.includes(a.n)) {
+      const perKgKm = a.n === 'ランニング' ? 1.05 : a.n === '自転車' ? 0.35 : 0.55;
+      return Math.round(perKgKm * myWeight * km);
+    }
+    return Math.round(a.mets * myWeight * (actMin / 60) * 1.05);
   }
 
   async function saveActivity() {
@@ -91,16 +101,22 @@ export default function TrainingScreen() {
       if (!uid) return;
       const a = ACTIVITIES[actIdx];
       const kcal = actKcal();
+      const km = Number(actKm) > 0 && DIST_OK.includes(a.n) ? Number(actKm) : null;
       const today = viewDate;
-      const { error } = await supabase.from('logs').insert({
+      const base = {
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: kcal, mood: '',
-        text: `🏃 ${a.n} ${actMin}分（約${kcal}kcal消費）`, photo_urls: [],
-      });
+        text: `🏃 ${a.n} ${actMin}分${km ? ` ${km}km` : ''}（約${kcal}kcal消費）`, photo_urls: [],
+      };
+      // v17列（ex_minutes/ex_km）が無い旧DBでも保存できるようフォールバック
+      let { error } = await supabase.from('logs').insert({ ...base, ex_minutes: actMin, ex_km: km });
+      if (error && /ex_minutes|ex_km|column|schema/i.test(error.message)) {
+        ({ error } = await supabase.from('logs').insert(base));
+      }
       if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
       await syncEntriesForDate(uid, today);
-      setActIdx(null);
-      setMsg({ ok: true, text: `${a.n} ${actMin}分を記録しました。今日の目標カロリーに+${kcal}kcal反映されます🎉` });
+      setActIdx(null); setActKm('');
+      setMsg({ ok: true, text: `${a.n} ${actMin}分${km ? ` ${km}km` : ''}を記録しました。目標カロリーに+${kcal}kcal反映されます🎉` });
     } finally { setActSaving(false); }
   }
 
@@ -135,10 +151,37 @@ export default function TrainingScreen() {
       });
       if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
       await syncEntriesForDate(uid, today);
+
+      // RMフィードバック: 推定1RM(Epley)を目標・自己ベストと照合して一言返す
+      let fb = '保存しました。継続が最強の種目です💪';
+      try {
+        const first = tRows.find((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0);
+        if (first) {
+          const name = first.name.trim();
+          const est = Math.round(epley1RM(Number(first.kg), Number(first.reps)));
+          let bestPast = 0; // 保存前の履歴から同種目の過去最高1RM
+          for (const h1 of history) for (const p of parse1RMs(h1.text)) {
+            if (p.name === name) bestPast = Math.max(bestPast, Math.round(p.est));
+          }
+          const { data: tg } = await supabase.from('training_goals').select('target_kg').eq('name', name).maybeSingle();
+          const goalKg = tg ? Math.round(Number(tg.target_kg)) : null;
+          if (goalKg && est >= goalKg) {
+            fb = `🎉 目標達成！${name} 推定MAX ${est}kg（目標${goalKg}kg超え）。次の目標を設定しよう`;
+          } else if (goalKg) {
+            const need = repsNeededFor(goalKg, Number(first.kg));
+            fb = `おしい！RM換算だとMAX ${est}kg。目標${goalKg}kgまであと${goalKg - est}kg${need && need > Number(first.reps) ? `（${Number(first.kg)}kgなら${need}回で到達）` : ''}`;
+          } else if (bestPast > 0 && est > bestPast) {
+            fb = `自己ベスト更新💪 ${name} 推定MAX ${est}kg（前回比 +${est - bestPast}kg）`;
+          } else {
+            fb = `保存しました。${name} 推定MAX ${est}kg（RM換算）`;
+          }
+        }
+      } catch { /* フィードバックが取れなくても保存は成功している */ }
+
       setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
       await load();
       setRestLeft(90); // 保存でレストタイマー自動開始
-      setMsg({ ok: true, text: '保存しました。継続が最強の種目です💪' });
+      setMsg({ ok: true, text: fb });
     } finally {
       setSaving(false);
     }
@@ -182,11 +225,21 @@ export default function TrainingScreen() {
             ))}
           </View>
           <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>時間</Text>
-          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {MINUTES.map((m) => (
               <Chip key={m} label={`${m}分`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
             ))}
+            <TextInput style={s.freeMin} placeholder="分" placeholderTextColor={C.faint} keyboardType="number-pad"
+                       value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
+                       onChangeText={(v) => { const n = Number(v); if (n > 0) setActMin(n); }} />
           </View>
+          {actIdx != null && DIST_OK.includes(ACTIVITIES[actIdx].n) && (
+            <>
+              <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>距離（km・任意。入れると消費kcalの精度が上がります）</Text>
+              <TextInput style={[s.freeMin, { width: 110 }]} placeholder="5.0" placeholderTextColor={C.faint}
+                         keyboardType="decimal-pad" value={actKm} onChangeText={setActKm} />
+            </>
+          )}
           <OptionButton
             style={{ marginTop: 14 }}
             label={actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
@@ -296,9 +349,10 @@ const s = StyleSheet.create({
   },
   actChipOn: { borderColor: C.teal, backgroundColor: SEL.tealSoft },
   actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
-  minChip: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  minChipOn: { backgroundColor: C.ink, borderColor: C.ink },
-  minChipT: { fontSize: 12.5, fontWeight: '800', color: C.sub },
+  freeMin: {
+    width: 72, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 8, fontSize: 12.5, color: C.ink, textAlign: 'center',
+  },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 10 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {

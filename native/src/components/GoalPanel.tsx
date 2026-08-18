@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Target, Beef, Dumbbell } from 'lucide-react-native';
+import { Target, Beef, Dumbbell, Footprints } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { progressStatus, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
 import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
-import { OptionButton } from '@/components/ui/Selectable';
+import { OptionButton, Chip } from '@/components/ui/Selectable';
+import { epley1RM } from '@/lib/rm';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 type Ev = { id: string; date: string; title: string; extra_kcal: number };
@@ -42,6 +43,12 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   const [bests, setBests] = useState<Map<string, number>>(new Map());
   const [tName, setTName] = useState('');
   const [tKg, setTKg] = useState('');
+  const [tReps, setTReps] = useState(1); // 目標回数（既定=1回。1回で挙げたいMAX重量が主役）
+  // 運動習慣目標（週N回・週kcal・最低分数）
+  const [exPerWeek, setExPerWeek] = useState('');
+  const [exWeeklyKcal, setExWeeklyKcal] = useState('');
+  const [exMinMinutes, setExMinMinutes] = useState('');
+  const [habitBusy, setHabitBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -62,6 +69,10 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       const g = gRes.data as Goal;
       setGoal(g);
       setGDate(g.target_date); setGWeight(String(g.target_weight ?? ''));
+      const gx = g as Goal & { ex_per_week?: number | null; ex_weekly_kcal?: number | null; ex_min_minutes?: number | null };
+      if (gx.ex_per_week != null) setExPerWeek(String(gx.ex_per_week));
+      if (gx.ex_weekly_kcal != null) setExWeeklyKcal(String(gx.ex_weekly_kcal));
+      if (gx.ex_min_minutes != null) setExMinMinutes(String(gx.ex_min_minutes));
       const bf = (g as Goal & { target_bodyfat?: number | null }).target_bodyfat;
       setGBf(bf != null ? String(bf) : '');
       setGProtein(g.protein_per_kg != null ? String(g.protein_per_kg) : '');
@@ -136,21 +147,49 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   async function addTrainingGoal() {
     const name = tName.trim(); const kg = Number(tKg);
     if (!name || !(kg > 0)) { setMsg({ ok: false, text: '種目名と目標重量(kg)を入力してください。' }); return; }
+    // 目標はRM換算した推定1RMで保存する（例: 100kg×5回 → 1RM 117kg）
+    const target = Math.round(epley1RM(kg, tReps));
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
       const { error } = await supabase.from('training_goals')
-        .upsert({ user_id: uid, name, target_kg: kg }, { onConflict: 'user_id,name' });
+        .upsert({ user_id: uid, name, target_kg: target }, { onConflict: 'user_id,name' });
       if (error) {
         setMsg({ ok: false, text: /does not exist|schema/i.test(error.message) ? 'DBの初回セットアップが未完了です（apply-pending.sqlの実行が必要）。' : '保存に失敗しました。' });
         return;
       }
-      setTName(''); setTKg('');
+      setTName(''); setTKg(''); setTReps(1);
       await load();
-      setMsg({ ok: true, text: `「${name} ${kg}kg」を目標に設定しました。トレタブのグラフに目標線が出ます。` });
+      setMsg({
+        ok: true,
+        text: tReps === 1
+          ? `「${name} MAX ${target}kg」を目標に設定しました。`
+          : `「${name} ${kg}kg×${tReps}回」→ RM換算でMAX ${target}kg を目標に設定しました。`,
+      });
     } finally { setBusy(false); }
+  }
+
+  // 運動習慣目標の保存（列が無い旧DBならv16/v17の実行を促す）
+  async function saveHabitGoal() {
+    setHabitBusy(true); setMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const { error } = await supabase.from('goals').upsert({
+        user_id: uid,
+        ex_per_week: exPerWeek === '' ? null : Number(exPerWeek) || null,
+        ex_weekly_kcal: exWeeklyKcal === '' ? null : Number(exWeeklyKcal) || null,
+        ex_min_minutes: exMinMinutes === '' ? null : Number(exMinMinutes) || null,
+      }, { onConflict: 'user_id' });
+      if (error) {
+        setMsg({ ok: false, text: /ex_per_week|column|schema/i.test(error.message) ? '習慣目標はDB更新（apply-pending.sqlのv17）後に使えます。' : '保存に失敗しました。' });
+        return;
+      }
+      setMsg({ ok: true, text: '運動習慣の目標を保存しました。「概要」タブの運動の記録に反映されます。' });
+    } finally { setHabitBusy(false); }
   }
 
   async function removeTrainingGoal(id: string) {
@@ -270,7 +309,29 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
       {mode === 'training' && (
         <View style={s.card}>
-          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>種目ごとの目標重量</Text></View>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>運動習慣の目標</Text></View>
+          <Text style={s.note}>散歩レベルでOK。週にどれだけ動くかを決めると「概要」の運動の記録で達成度が見えます。</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.label}>週の回数</Text>
+              <TextInput style={s.input} placeholder="3" placeholderTextColor={C.faint} keyboardType="number-pad"
+                         value={exPerWeek} onChangeText={setExPerWeek} />
+            </View>
+            <View style={{ flex: 1.2 }}>
+              <Text style={s.label}>週の消費kcal</Text>
+              <TextInput style={s.input} placeholder="1000" placeholderTextColor={C.faint} keyboardType="number-pad"
+                         value={exWeeklyKcal} onChangeText={setExWeeklyKcal} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.label}>最低分数/回</Text>
+              <TextInput style={s.input} placeholder="20" placeholderTextColor={C.faint} keyboardType="number-pad"
+                         value={exMinMinutes} onChangeText={setExMinMinutes} />
+            </View>
+          </View>
+          <OptionButton style={{ marginTop: 12 }} variant="teal" label="習慣目標を保存" onPress={saveHabitGoal} busy={habitBusy} />
+
+          <View style={s.divider} />
+          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレの目標（RM換算）</Text></View>
           {tGoals.length === 0 && <Text style={s.note}>まだ目標がありません。種目と目標重量を追加しましょう。</Text>}
           {tGoals.map((tg) => {
             const best = bests.get(tg.name) ?? 0;
@@ -290,18 +351,27 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               </View>
             );
           })}
-          {/* 入力は情報量が小さいので1行に収める（縦積みはスペースの無駄） */}
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1.5 }}>
               <Text style={s.label}>種目名</Text>
               <TextInput style={s.input} placeholder="ベンチプレス" placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>目標（kg）</Text>
+              <Text style={s.label}>重量（kg）</Text>
               <TextInput style={s.input} placeholder="100" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={tKg} onChangeText={setTKg} />
             </View>
-            <OptionButton variant="tonal" label="追加" onPress={addTrainingGoal} busy={busy} />
           </View>
+          {/* 回数は「1回=MAX重量」を主役に大きく。5/8/10回で入れてもRM換算で1RM目標に統一される */}
+          <Text style={s.label}>回数（1回=そのままMAX目標）</Text>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            {[1, 5, 8, 10].map((r) => (
+              <Chip key={r} label={r === 1 ? '1回（MAX）' : `${r}回`} tone="ink" selected={tReps === r} onPress={() => setTReps(r)} />
+            ))}
+          </View>
+          {Number(tKg) > 0 && tReps > 1 && (
+            <Text style={s.rmPreview}>RM換算: {tName.trim() || 'この種目'}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
+          )}
+          <OptionButton style={{ marginTop: 12 }} variant="tonal" label="筋トレ目標を追加" onPress={addTrainingGoal} busy={busy} />
         </View>
       )}
 
@@ -323,6 +393,7 @@ const s = StyleSheet.create({
   statusBig: { fontSize: 24, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   statusSub: { fontSize: 13, fontWeight: '700', marginTop: 2 },
   label: { fontSize: 11, fontWeight: '700', color: C.sub, marginTop: 10, marginBottom: 4 },
+  rmPreview: { fontSize: 12, fontWeight: '700', color: C.teal, marginTop: 8 },
   input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 16, color: C.ink },
   pfcToggle: { fontSize: 12.5, fontWeight: '800', color: C.sub },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },

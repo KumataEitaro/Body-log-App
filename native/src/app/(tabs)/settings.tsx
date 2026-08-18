@@ -203,7 +203,7 @@ export default function SettingsScreen() {
       <View style={s.group}>
         <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
-        <Row icon={<Dumbbell color={C.teal} size={19} />} label="筋トレの目標" sub="種目ごとの目標重量" onPress={() => openSheet('goalT')} />
+        <Row icon={<Dumbbell color={C.teal} size={19} />} label="運動の目標" sub="週の運動習慣・種目ごとの目標重量（RM換算）" onPress={() => openSheet('goalT')} />
       </View>
 
       {/* 通知 */}
