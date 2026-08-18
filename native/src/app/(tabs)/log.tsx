@@ -10,6 +10,7 @@ import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
+import { pfcColors } from '@/lib/theme';
 import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
@@ -519,9 +520,9 @@ export default function LogScreen() {
             {macros && (
               <View style={{ marginTop: 10, gap: 5 }}>
                 {([
-                  [PFC_LABEL.p, 'P', eatenP, macros.p, C.teal],
-                  [PFC_LABEL.f, 'F', eatenF, macros.f, '#d97706'],
-                  [PFC_LABEL.c, 'C', eatenC, macros.c, '#3b82f6'],
+                  [PFC_LABEL.p, 'P', eatenP, macros.p, pfcColors().p],
+                  [PFC_LABEL.f, 'F', eatenF, macros.f, pfcColors().f],
+                  [PFC_LABEL.c, 'C', eatenC, macros.c, pfcColors().c],
                 ] as const).map(([ja, ab, eat, tgt, col]) => {
                   const over = eat > tgt;
                   return (
@@ -843,8 +844,8 @@ const s = StyleSheet.create({
   heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 15, color: C.sub, fontWeight: '600' },
-  hline: { height: 5, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden', marginVertical: 8 },
-  hfill: { height: 5, backgroundColor: C.teal, borderRadius: 3 },
+  hline: { height: 7, backgroundColor: '#eceeeb', borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
+  hfill: { height: 7, backgroundColor: '#3f4c5a', borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 12, color: C.sub, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },

@@ -9,10 +9,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
+import { useTheme, setTheme, ACCENTS, PFC_PRESETS, pfcColors } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -26,7 +27,7 @@ import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'lang' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
+type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
 
   const locale = useLocale();
   const units = useUnits();
+  const theme = useTheme();
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
@@ -213,6 +215,14 @@ export default function SettingsScreen() {
         <Row icon={<Dumbbell color={C.teal} size={19} />} label="運動の目標" sub="週の運動習慣・種目ごとの目標重量（RM換算）" onPress={() => openSheet('goalT')} />
       </View>
 
+      {/* 見た目（テーマカラー・PFCの色） */}
+      <Text style={s.groupLabel}>{t('見た目')}</Text>
+      <View style={s.group}>
+        <Row icon={<Palette color={C.teal} size={19} />} label={t('テーマカラー')}
+             sub={`${ACCENTS.find((a) => a.key === theme.accent)?.label ?? ''} ・ ${PFC_PRESETS.find((x) => x.key === theme.pfc)?.label ?? ''}`}
+             onPress={() => openSheet('theme')} />
+      </View>
+
       {/* 表示（言語・単位） */}
       <Text style={s.groupLabel}>{t('言語')} ・ {t('単位')}</Text>
       <View style={s.group}>
@@ -323,6 +333,47 @@ export default function SettingsScreen() {
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
+    </Modal>
+
+    {/* ===== テーマ選択モーダル ===== */}
+    <Modal visible={sheet === 'theme'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <View style={s.sheetBody}>
+        <SheetHeader title={'🎨 ' + t('テーマカラー')} />
+        <ScrollView>
+          <Text style={s.label}>{t('アクセントカラー')}</Text>
+          <View style={s.swatchRow}>
+            {ACCENTS.map((a) => (
+              <Pressable key={a.key} style={s.swatchWrap} onPress={() => setTheme({ accent: a.key })}>
+                <View style={[s.swatch, { backgroundColor: a.color }, theme.accent === a.key && s.swatchOn]}>
+                  {theme.accent === a.key && <Text style={s.swatchCheck}>✓</Text>}
+                </View>
+                <Text style={[s.swatchT, theme.accent === a.key && { color: C.ink, fontWeight: '800' }]}>{t(a.label)}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={[s.label, { marginTop: 22 }]}>{t('P/F/Cバーの色')}</Text>
+          <Text style={s.note}>{t('たんぱく質・脂質・炭水化物のバーの色を選べます。合計カロリーのバーとは別の色になります。')}</Text>
+          {PFC_PRESETS.map((preset) => (
+            <Pressable key={preset.key} style={[s.pfcRow, theme.pfc === preset.key && s.pfcRowOn]}
+                       onPress={() => setTheme({ pfc: preset.key })}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.pfcName, theme.pfc === preset.key && { color: C.teal }]}>{t(preset.label)}</Text>
+                <Text style={s.pfcNote}>{t(preset.note)}</Text>
+              </View>
+              <View style={{ gap: 3, width: 92 }}>
+                {(['p', 'f', 'c'] as const).map((k) => (
+                  <View key={k} style={s.pfcSample}>
+                    <View style={{ width: k === 'p' ? '80%' : k === 'f' ? '55%' : '95%', height: 6, borderRadius: 3, backgroundColor: preset.colors[k] }} />
+                  </View>
+                ))}
+              </View>
+              {theme.pfc === preset.key && <Text style={{ color: C.teal, fontWeight: '800', marginLeft: 8 }}>✓</Text>}
+            </Pressable>
+          ))}
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </View>
     </Modal>
 
     {/* ===== 言語選択モーダル ===== */}
@@ -442,6 +493,20 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 4 },
+  swatchWrap: { alignItems: 'center', width: 78 },
+  swatch: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  swatchOn: { borderWidth: 3, borderColor: C.ink },
+  swatchCheck: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  swatchT: { fontSize: 10.5, color: C.sub, marginTop: 5, fontWeight: '600', textAlign: 'center' },
+  pfcRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12,
+    borderWidth: 1.5, borderColor: C.line, borderRadius: 14, marginTop: 8, backgroundColor: C.bg,
+  },
+  pfcRowOn: { borderColor: C.teal, backgroundColor: C.tealWeak },
+  pfcName: { fontSize: 14, fontWeight: '800', color: C.ink },
+  pfcNote: { fontSize: 11, color: C.sub, marginTop: 2 },
+  pfcSample: { height: 6, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden' },
   unitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 9 },
   unitLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
   langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.line },
