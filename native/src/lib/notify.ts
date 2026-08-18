@@ -38,8 +38,8 @@ export async function setDailyLogReminder(on: boolean): Promise<boolean> {
   try {
     const id = await Notifications.scheduleNotificationAsync({
       content: { title: '今日の記録、忘れていませんか？', body: '食べたものを1行書くだけでOK。続けるほどAIのアドバイスが賢くなります。' },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      trigger: { hour: 21, minute: 0, repeats: true } as any,
+      // v57からトリガーはtype必須（旧形式{hour,minute,repeats}は例外を投げる）
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 21, minute: 0 },
     });
     const ids = await getIds(); ids.daily = id; await setIds(ids);
     return true;
@@ -54,8 +54,7 @@ export async function setWeeklyPhotoReminder(on: boolean): Promise<boolean> {
   try {
     const id = await Notifications.scheduleNotificationAsync({
       content: { title: '週1回の体チェック📸', body: '同じ場所・同じポーズで1枚。「概要」タブの体の写真から記録できます。' },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      trigger: { weekday: 1, hour: 19, minute: 0, repeats: true } as any, // weekday 1=日曜
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 19, minute: 0 }, // weekday 1=日曜
     });
     const ids = await getIds(); ids.weekly = id; await setIds(ids);
     return true;
@@ -72,8 +71,7 @@ export async function scheduleCheatDayEve(dateStr: string): Promise<void> {
     if (d.getTime() <= Date.now()) return;
     await Notifications.scheduleNotificationAsync({
       content: { title: '明日はチートデイ🍖', body: '今日は普段どおりでOK。明日は罪悪感なく楽しみましょう。前後の日で計画が自動調整されます。' },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      trigger: { date: d } as any,
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
     });
   } catch { /* Expo Go等では黙って諦める */ }
 }

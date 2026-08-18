@@ -79,6 +79,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 
 // --- expo各種 ---
 jest.mock('expo-notifications', () => ({
+  SchedulableTriggerInputTypes: { DAILY: 'daily', WEEKLY: 'weekly', DATE: 'date', CALENDAR: 'calendar' },
   getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
   scheduleNotificationAsync: jest.fn(() => Promise.resolve('notif-id')),

@@ -6,7 +6,10 @@ import { C } from '@/lib/ui';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 
-export type DayMark = { logged: boolean; over: boolean; unknown?: boolean };
+export type DayMark = { logged: boolean; over: boolean; unknown?: boolean; kind?: 'lift' | 'cardio' | 'both' };
+
+// 有酸素（散歩など）の薄い緑。筋トレの濃いteal（C.teal）と2色で使い分ける
+export const CARDIO_GREEN = '#7ed8b4';
 
 function keyOf(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -62,7 +65,18 @@ export default function MonthCalendar({
               {!future && (
                 mk?.unknown && !isToday
                   ? <Text style={s.q}>?</Text>
-                  : <View style={[s.dot, { backgroundColor: !mk?.logged ? 'transparent' : mk.over ? C.coral : C.teal }]} />
+                  : mode === 'training' && mk?.logged && mk.kind === 'both'
+                    ? (
+                      <View style={{ flexDirection: 'row', gap: 2, marginTop: 2 }}>
+                        <View style={[s.dot, { marginTop: 0, backgroundColor: C.teal }]} />
+                        <View style={[s.dot, { marginTop: 0, backgroundColor: CARDIO_GREEN }]} />
+                      </View>
+                    )
+                    : <View style={[s.dot, {
+                        backgroundColor: !mk?.logged ? 'transparent'
+                          : mode === 'training' ? (mk.kind === 'cardio' ? CARDIO_GREEN : C.teal)
+                          : mk.over ? C.coral : C.teal,
+                      }]} />
               )}
             </Pressable>
           );
@@ -71,8 +85,13 @@ export default function MonthCalendar({
       <View style={s.legend}>
         {mode === 'training' ? (
           <>
-            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>トレした日</Text>
-            <Text style={s.legT}>・タップで内容を表示</Text>
+            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>筋トレ</Text>
+            <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.legT}>有酸素</Text>
+            <View style={{ flexDirection: 'row', gap: 2 }}>
+              <View style={[s.legDot, { backgroundColor: C.teal }]} />
+              <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} />
+            </View><Text style={s.legT}>両方</Text>
+            <Text style={s.legT}>・タップで内容</Text>
           </>
         ) : (
           <>
