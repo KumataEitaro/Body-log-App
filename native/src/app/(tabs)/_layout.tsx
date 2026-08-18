@@ -4,8 +4,10 @@ import { Tabs } from 'expo-router';
 import { Utensils, Activity, ChartLine, MessageCircle } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { GuideProvider } from '@/components/GuideTour';
+import { t, useLocale } from '@/lib/i18n';
 
 export default function TabsLayout() {
+  useLocale(); // 言語を切り替えたらタブ名も即座に追従
   return (
     <GuideProvider>
     <Tabs
@@ -17,10 +19,10 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
       }}
     >
-      <Tabs.Screen name="log" options={{ title: '食事', tabBarIcon: ({ color, size }) => <Utensils color={color} size={size - 2} /> }} />
-      <Tabs.Screen name="training" options={{ title: '運動', tabBarIcon: ({ color, size }) => <Activity color={color} size={size - 2} /> }} />
-      <Tabs.Screen name="coach" options={{ title: '相談', tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size - 2} /> }} />
-      <Tabs.Screen name="changes" options={{ title: '概要', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="log" options={{ title: t('食事'), tabBarIcon: ({ color, size }) => <Utensils color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="training" options={{ title: t('運動'), tabBarIcon: ({ color, size }) => <Activity color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="coach" options={{ title: t('相談'), tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size - 2} /> }} />
+      <Tabs.Screen name="changes" options={{ title: t('概要'), tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size - 2} /> }} />
       <Tabs.Screen name="goal" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>

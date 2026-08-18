@@ -49,7 +49,8 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "@kingstinct/react-native-healthkit"
+      "@kingstinct/react-native-healthkit",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

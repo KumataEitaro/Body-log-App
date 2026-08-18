@@ -10,6 +10,7 @@ import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
+import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -151,6 +152,7 @@ export default function LogScreen() {
   }));
 
   // 記録先の日付（既定=今日。過去日にも記録できる。旧Web版の日付選択の復活）
+  const units = useUnits();
   const [viewDate, setViewDate] = useState(todayJST());
   const today = viewDate;
 
@@ -335,8 +337,9 @@ export default function LogScreen() {
   }
 
   async function saveWeight() {
-    const w = Number(wWeight);
-    if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: '体重は20〜300kgで入力してください。' }); return; }
+    // 入力は表示単位（kg/lb）。DBは常にkgで保存する
+    const w = displayToKg(Number(wWeight), units.weight);
+    if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: '体重の値を確認してください。' }); return; }
     setSaving(true);
     try {
       await supabase.from('logs').insert({
@@ -346,7 +349,7 @@ export default function LogScreen() {
       await syncEntriesForDate(uid, today);
       setWWeight('');
       await load();
-      setMsg({ ok: true, text: `体重 ${w.toFixed(1)}kg を記録しました。` });
+      setMsg({ ok: true, text: `体重 ${fmtWeight(w)} を記録しました。` });
     } finally {
       setSaving(false);
     }
@@ -658,9 +661,9 @@ export default function LogScreen() {
         {/* 体重クイック入力 */}
         <Animated.View style={[s.card, enter[2]]}>
           <View style={[s.wRow, { marginTop: 0 }]}>
-            <TextInput style={s.wInput} placeholder={latestWeight != null ? latestWeight.toFixed(1) : '73.5'}
+            <TextInput style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
-            <Text style={s.wUnit}>kg</Text>
+            <Text style={s.wUnit}>{units.weight}</Text>
             <OptionButton variant="tonal" label="体重を記録" leading={<Weight size={15} color={C.ink} />}
                           onPress={saveWeight} busy={saving} disabled={!wWeight} />
           </View>

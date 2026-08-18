@@ -9,8 +9,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
+import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
+import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
+import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +26,7 @@ import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
+type Sheet = null | 'lang' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -61,6 +64,9 @@ export default function SettingsScreen() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const locale = useLocale();
+  const units = useUnits();
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
@@ -186,7 +192,7 @@ export default function SettingsScreen() {
           <Text style={s.sumName}>{name || 'ニックネーム未設定'}</Text>
           <Text style={s.sumMail}>{email || '—'}</Text>
           <Text style={s.sumMeta}>
-            {height}cm{latestWeight != null ? ` ・ ${latestWeight.toFixed(1)}kg` : ''} ・ 基礎代謝 約{Math.round(bmr)}kcal
+            {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ 基礎代謝 約{Math.round(bmr)}kcal
           </Text>
         </View>
       </View>
@@ -205,6 +211,36 @@ export default function SettingsScreen() {
         <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
         <Row icon={<Dumbbell color={C.teal} size={19} />} label="運動の目標" sub="週の運動習慣・種目ごとの目標重量（RM換算）" onPress={() => openSheet('goalT')} />
+      </View>
+
+      {/* 表示（言語・単位） */}
+      <Text style={s.groupLabel}>{t('言語')} ・ {t('単位')}</Text>
+      <View style={s.group}>
+        <Row icon={<Languages color={C.teal} size={19} />} label={t('言語')}
+             sub={LOCALES.find((l) => l.code === locale)?.label ?? 'Japanese'}
+             onPress={() => openSheet('lang')} />
+        <View style={s.sep} />
+        <View style={s.unitRow}>
+          <Text style={s.unitLabel}>{t('体重の単位')}</Text>
+          <View style={{ width: 150 }}>
+            <Seg options={[{ key: 'kg', label: 'kg' }, { key: 'lb', label: 'lb' }]}
+                 value={units.weight} onChange={(v) => setUnits({ weight: v })} />
+          </View>
+        </View>
+        <View style={s.unitRow}>
+          <Text style={s.unitLabel}>{t('身長の単位')}</Text>
+          <View style={{ width: 150 }}>
+            <Seg options={[{ key: 'cm', label: 'cm' }, { key: 'ft', label: 'ft / in' }]}
+                 value={units.height} onChange={(v) => setUnits({ height: v })} />
+          </View>
+        </View>
+        <View style={s.unitRow}>
+          <Text style={s.unitLabel}>{t('距離の単位')}</Text>
+          <View style={{ width: 150 }}>
+            <Seg options={[{ key: 'km', label: 'km' }, { key: 'mi', label: 'mi' }]}
+                 value={units.distance} onChange={(v) => setUnits({ distance: v })} />
+          </View>
+        </View>
       </View>
 
       {/* 通知 */}
@@ -287,6 +323,22 @@ export default function SettingsScreen() {
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
+    </Modal>
+
+    {/* ===== 言語選択モーダル ===== */}
+    <Modal visible={sheet === 'lang'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <View style={s.sheetBody}>
+        <SheetHeader title={"🌐 " + t("言語")} />
+        <ScrollView>
+          {LOCALES.map((l) => (
+            <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}>
+              <Text style={[s.langT, locale === l.code && { color: C.teal, fontWeight: '800' }]}>{l.label}</Text>
+              {locale === l.code && <Text style={{ color: C.teal, fontWeight: '800' }}>✓</Text>}
+            </Pressable>
+          ))}
+          <Text style={s.note}>未翻訳の項目は日本語で表示されます。翻訳は順次追加していきます。</Text>
+        </ScrollView>
+      </View>
     </Modal>
 
     {/* ===== 読みもの（コラム）モーダル ===== */}
@@ -390,6 +442,10 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
+  unitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 9 },
+  unitLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
+  langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.line },
+  langT: { fontSize: 15, color: C.ink, fontWeight: '600' },
   notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 },
   notifLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
   notifSub: { fontSize: 11, color: C.sub, marginTop: 2 },

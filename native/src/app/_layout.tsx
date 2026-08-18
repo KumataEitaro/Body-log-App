@@ -4,12 +4,17 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { LaunchProvider } from '@/components/LaunchIntro';
+import { loadLocale } from '@/lib/i18n';
+import { loadUnits } from '@/lib/units';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const router = useRouter();
   const segments = useSegments();
+
+  // 言語・単位の設定を起動時に読み込む（未設定なら端末言語に追従）
+  useEffect(() => { loadLocale(); loadUnits(); }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
