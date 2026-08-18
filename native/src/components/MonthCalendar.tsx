@@ -42,7 +42,7 @@ export default function MonthCalendar({
     <View>
       <View style={s.head}>
         <Pressable style={s.nav} onPress={() => shiftMonth(-1)} hitSlop={8}><Text style={s.navT}>‹</Text></Pressable>
-        <Text style={s.month}>{view.y}年{view.m + 1}月</Text>
+        <Text style={s.month}>{t('{y}年{m}月', { y: view.y, m: view.m + 1 })}</Text>
         <Pressable style={s.nav} onPress={() => shiftMonth(1)} hitSlop={8} disabled={isCurrentMonth}>
           <Text style={[s.navT, isCurrentMonth && { opacity: 0.25 }]}>›</Text>
         </Pressable>

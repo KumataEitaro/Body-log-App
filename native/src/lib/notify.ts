@@ -2,6 +2,7 @@
 // Expo Goでは動作が制限されるため全て安全に失敗する（TestFlight/dev clientで完全動作）
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { t } from './i18n';
 
 const IDS_KEY = 'bl-notif-ids'; // { daily?: string; weekly?: string }
 
@@ -37,7 +38,7 @@ export async function setDailyLogReminder(on: boolean): Promise<boolean> {
   if (!(await ensureNotifPermission())) return false;
   try {
     const id = await Notifications.scheduleNotificationAsync({
-      content: { title: '今日の記録、忘れていませんか？', body: '食べたものを1行書くだけでOK。続けるほどAIのアドバイスが賢くなります。' },
+      content: { title: t('今日の記録、忘れていませんか？'), body: t('食べたものを1行書くだけでOK。続けるほどAIのアドバイスが賢くなります。') },
       // v57からトリガーはtype必須（旧形式{hour,minute,repeats}は例外を投げる）
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 21, minute: 0 },
     });
@@ -53,7 +54,7 @@ export async function setWeeklyPhotoReminder(on: boolean): Promise<boolean> {
   if (!(await ensureNotifPermission())) return false;
   try {
     const id = await Notifications.scheduleNotificationAsync({
-      content: { title: '週1回の体チェック📸', body: '同じ場所・同じポーズで1枚。「概要」タブの体の写真から記録できます。' },
+      content: { title: t('週1回の体チェック📸'), body: t('同じ場所・同じポーズで1枚。「概要」タブの体の写真から記録できます。') },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 19, minute: 0 }, // weekday 1=日曜
     });
     const ids = await getIds(); ids.weekly = id; await setIds(ids);
@@ -70,7 +71,7 @@ export async function scheduleCheatDayEve(dateStr: string): Promise<void> {
     d.setDate(d.getDate() - 1);
     if (d.getTime() <= Date.now()) return;
     await Notifications.scheduleNotificationAsync({
-      content: { title: '明日はチートデイ🍖', body: '今日は普段どおりでOK。明日は罪悪感なく楽しみましょう。前後の日で計画が自動調整されます。' },
+      content: { title: t('明日はチートデイ🍖'), body: t('今日は普段どおりでOK。明日は罪悪感なく楽しみましょう。前後の日で計画が自動調整されます。') },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
     });
   } catch { /* Expo Go等では黙って諦める */ }

@@ -132,12 +132,12 @@ export default function QuickLogFab() {
                 {staged.weight != null && (
                   <View style={[s.stagedRow, { gap: 6 }]}>
                     <Weight size={13} color={C.sub} />
-                    <Text style={s.stagedT}>体重 {staged.weight}kg</Text>
+                    <Text style={s.stagedT}>{t('体重')} {staged.weight}kg</Text>
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
                   <OptionButton variant="teal" busy={saving} onPress={confirmSave}
-                                label={`✓ この内容で保存${staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : ''}`} />
+                                label={t('✓ この内容で保存') + (staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : '')} />
                   <Pressable onPress={() => { setStaged(null); setStagedNote(''); }} hitSlop={8}>
                     <Text style={s.stagedClear}>{t('破棄')}</Text>
                   </Pressable>
@@ -148,7 +148,7 @@ export default function QuickLogFab() {
               <DockIconButton Icon={Camera} onPress={() => pickPhoto(true)} />
               <DockIconButton Icon={Images} onPress={() => pickPhoto(false)} />
               <TextInput
-                ref={inputRef} style={s.input} placeholder="バナナ、コーヒー など…" placeholderTextColor={C.faint}
+                ref={inputRef} style={s.input} placeholder={t('バナナ、コーヒー など…')} placeholderTextColor={C.faint}
                 value={text} onChangeText={setText} autoFocus returnKeyType="send"
                 blurOnSubmit={false} onSubmitEditing={send}
               />

@@ -1,12 +1,13 @@
 // Phase 1では未移植のタブ用プレースホルダー（現行Web版への案内つき）
 import { View, Text, StyleSheet } from 'react-native';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 export default function Placeholder({ title, note }: { title: string; note?: string }) {
   return (
     <View style={s.wrap}>
       <Text style={s.title}>{title}</Text>
-      <Text style={s.note}>{note ?? 'この画面はネイティブ版に移植中です。\nそれまでは現行のBodyLogアプリで利用できます（データは共通）。'}</Text>
+      <Text style={s.note}>{note ?? t('この画面はネイティブ版に移植中です。')}</Text>
     </View>
   );
 }

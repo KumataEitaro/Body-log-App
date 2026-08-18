@@ -3,6 +3,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Polyline, Line as SvgLine, Text as SvgText, Circle } from 'react-native-svg';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 export type ChartPoint = { date: string; value: number };
 
@@ -15,7 +16,7 @@ export default function SimpleChart({ points, unit, decimals = 1, planValue }: {
   planValue?: number | null; // 目標線（水平・任意）
 }) {
   if (points.length < 2) {
-    return <View style={s.empty}><Text style={s.emptyT}>記録が2件以上たまるとグラフが描かれます</Text></View>;
+    return <View style={s.empty}><Text style={s.emptyT}>{t('記録が2件以上たまるとグラフが描かれます')}</Text></View>;
   }
   const vals = points.map((p) => p.value);
   const withPlan = planValue != null ? [...vals, planValue] : vals;
@@ -53,7 +54,7 @@ export default function SimpleChart({ points, unit, decimals = 1, planValue }: {
         <SvgText x={PL} y={H - 6} fontSize={10} fill={C.faint}>{fmtX(points[0].date)}</SvgText>
         <SvgText x={W - PR} y={H - 6} fontSize={10} fill={C.faint} textAnchor="end">{fmtX(last.date)}</SvgText>
       </Svg>
-      <Text style={s.latest}>最新 {fmt(last.value)}{unit}</Text>
+      <Text style={s.latest}>{t('最新')} {fmt(last.value)}{unit}</Text>
     </View>
   );
 }

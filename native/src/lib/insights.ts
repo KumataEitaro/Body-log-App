@@ -69,13 +69,13 @@ export function assessBingeRisk(days: InsightDay[], todayDow: number): BingeRisk
   const streak = deficitStreak(days);
   if (streak >= 3) {
     score += 2;
-    reasons.push({ key: 'streak', text: `${streak}日連続で大きめの赤字（−300kcal超）が続いています` });
+    reasons.push({ key: 'streak', text: t('{n}日連続で大きめの赤字（−300kcal超）が続いています', { n: streak }) });
     const pre = preBingeStreaks(days).filter((n) => n > 0);
     if (pre.length >= 2) {
       const avg = Math.round((pre.reduce((a, b) => a + b, 0) / pre.length) * 10) / 10;
       if (streak >= avg) {
         score += 1;
-        reasons.push({ key: 'personal-streak', text: `あなたの過去の食べ過ぎは、平均${avg}日連続赤字の後に起きています` });
+        reasons.push({ key: 'personal-streak', text: t('あなたの過去の食べ過ぎは、平均{n}日連続赤字の後に起きています', { n: avg }) });
       }
     }
   }
@@ -84,7 +84,7 @@ export function assessBingeRisk(days: InsightDay[], todayDow: number): BingeRisk
   const y = days[days.length - 1];
   if (y?.diff != null && y.diff <= -600) {
     score += 1;
-    reasons.push({ key: 'big-deficit', text: `昨日は特に大きな赤字（−${Math.abs(Math.round(y.diff)).toLocaleString()}kcal）でした` });
+    reasons.push({ key: 'big-deficit', text: t('昨日は特に大きな赤字（−{n}kcal）でした', { n: Math.abs(Math.round(y.diff)).toLocaleString() }) });
   }
 
   // R3: たんぱく質不足が2日以上（満腹感が持続しにくく食欲が乱れやすい）
@@ -92,7 +92,7 @@ export function assessBingeRisk(days: InsightDay[], todayDow: number): BingeRisk
   const lowP = last2.filter((d) => d.intake != null && d.intake > 0 && d.p != null && (d.p * 4) / d.intake < 0.15);
   if (last2.length === 2 && lowP.length === 2) {
     score += 1;
-    reasons.push({ key: 'low-protein', text: 'たんぱく質が2日続けて不足気味です（食欲が乱れやすい状態）' });
+    reasons.push({ key: 'low-protein', text: t('たんぱく質が2日続けて不足気味です（食欲が乱れやすい状態）') });
   }
 
   // R4: 曜日の癖（個人統計。食べ過ぎが3回以上あり、半分以上が今日と同じ曜日）
@@ -102,7 +102,7 @@ export function assessBingeRisk(days: InsightDay[], todayDow: number): BingeRisk
     const share = sameDow / binges.length;
     if (share >= 0.5) {
       score += 2;
-      reasons.push({ key: 'dow', text: `過去の食べ過ぎの${Math.round(share * 100)}%が${DOW_JA[todayDow]}曜日に起きています` });
+      reasons.push({ key: 'dow', text: t('過去の食べ過ぎの{p}%が{d}曜日に起きています', { p: Math.round(share * 100), d: t(DOW_JA[todayDow]) }) });
     }
   }
 

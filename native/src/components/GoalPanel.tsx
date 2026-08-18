@@ -158,7 +158,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       const { error } = await supabase.from('training_goals')
         .upsert({ user_id: uid, name, target_kg: target }, { onConflict: 'user_id,name' });
       if (error) {
-        setMsg({ ok: false, text: /does not exist|schema/i.test(error.message) ? 'DBの初回セットアップが未完了です（apply-pending.sqlの実行が必要）。' : '保存に失敗しました。' });
+        setMsg({ ok: false, text: /does not exist|schema/i.test(error.message) ? t('DBの初回セットアップが未完了です（apply-pending.sqlの実行が必要）。') : t('保存に失敗しました。もう一度お試しください。') });
         return;
       }
       setTName(''); setTKg(''); setTReps(1);
@@ -166,8 +166,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       setMsg({
         ok: true,
         text: tReps === 1
-          ? `「${name} MAX ${target}kg」を目標に設定しました。`
-          : `「${name} ${kg}kg×${tReps}回」→ RM換算でMAX ${target}kg を目標に設定しました。`,
+          ? t('「{name} MAX {kg}kg」を目標に設定しました。', { name, kg: target })
+          : t('「{name} {kg}kg×{reps}回」→ RM換算でMAX {max}kg を目標に設定しました。', { name, kg, reps: tReps, max: target }),
       });
     } finally { setBusy(false); }
   }
@@ -186,7 +186,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
         ex_min_minutes: exMinMinutes === '' ? null : Number(exMinMinutes) || null,
       }, { onConflict: 'user_id' });
       if (error) {
-        setMsg({ ok: false, text: /ex_per_week|column|schema/i.test(error.message) ? '習慣目標はDB更新（apply-pending.sqlのv17）後に使えます。' : '保存に失敗しました。' });
+        setMsg({ ok: false, text: /ex_per_week|column|schema/i.test(error.message) ? t('習慣目標はDB更新（apply-pending.sqlのv17）後に使えます。') : t('保存に失敗しました。もう一度お試しください。') });
         return;
       }
       setMsg({ ok: true, text: t('運動習慣の目標を保存しました。「概要」タブの運動の記録に反映されます。') });
@@ -213,7 +213,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               {status && (
                 <Text style={[s.statusSub, { color: status.state === 'behind' ? C.coral : C.teal }]}>
                   {status.state === 'ahead' ? `${Math.abs(status.diffDays)}日先行 🎉` : status.state === 'behind' ? `${Math.abs(status.diffDays)}${t('日遅れ')}` : t('順調 👍')}
-                  ・あと{Math.abs(latestWeight - Number(goal.target_weight)).toFixed(1)}kg
+                  ・{t('あと{n}kg', { n: Math.abs(latestWeight - Number(goal.target_weight)).toFixed(1) })}
                 </Text>
               )}
             </View>
@@ -232,7 +232,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             </View>
             <View style={{ flex: 0.9 }}>
               <Text style={s.label}>{t('体脂肪率（%）')}</Text>
-              <TextInput style={s.input} placeholder="任意" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gBf} onChangeText={setGBf} />
+              <TextInput style={s.input} placeholder={t('任意')} placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gBf} onChangeText={setGBf} />
             </View>
           </View>
           {showDatePicker && (
@@ -245,7 +245,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
           {/* PFC詳細（折りたたみ） */}
           <Pressable style={{ marginTop: 12 }} onPress={() => setPfcOpen((v) => !v)} hitSlop={6}>
-            <Text style={s.pfcToggle}>{pfcOpen ? '▴' : '▾'} PFC詳細設定（任意）</Text>
+            <Text style={s.pfcToggle}>{pfcOpen ? '▴' : '▾'} {t('PFC詳細設定（任意）')}</Text>
           </Pressable>
           {pfcOpen && (
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -259,12 +259,12 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>{t('F上限（g/日）')}</Text>
-                <TextInput style={s.input} placeholder="なし" placeholderTextColor={C.faint} keyboardType="number-pad" value={gFatMax} onChangeText={setGFatMax} />
+                <TextInput style={s.input} placeholder={t('なし')} placeholderTextColor={C.faint} keyboardType="number-pad" value={gFatMax} onChangeText={setGFatMax} />
               </View>
             </View>
           )}
 
-          <OptionButton style={{ marginTop: 14 }} label="目標を保存する" onPress={saveWeightGoal} busy={busy} />
+          <OptionButton style={{ marginTop: 14 }} label={t('目標を保存する')} onPress={saveWeightGoal} busy={busy} />
           </>
           )}
 
@@ -294,7 +294,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Text style={s.label}>+kcal</Text>
               <TextInput style={s.input} keyboardType="number-pad" value={evKcal} onChangeText={setEvKcal} />
             </View>
-            <OptionButton variant="tonal" label="追加" onPress={addEvent} busy={busy} />
+            <OptionButton variant="tonal" label={t('追加')} onPress={addEvent} busy={busy} />
           </View>
           {evPicker && (
             <DateTimePicker

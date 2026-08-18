@@ -79,7 +79,7 @@ export default function BingeTriggerCard() {
         <View style={s.h2Row}><Tornado size={14} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
         <Text style={s.muted}>
           {t('3週間ほど記録が貯まると、食べすぎた日の前後に何が起きていたかを分析できます。')}
-          {'\n'}{t('いまの記録')}: {report.totalDays}{t('日')}
+          {'\n'}{t('いまの記録')}: {t('{n}日', { n: report.totalDays })}
         </Text>
       </View>
     );
@@ -93,7 +93,7 @@ export default function BingeTriggerCard() {
       <View style={s.h2Row}>
         <Tornado size={14} color={C.teal} />
         <Text style={s.h2}>{t('過食の引き金')}</Text>
-        <Text style={s.count}>{report.bingeDays}{t('日')} / {report.totalDays}{t('日')}</Text>
+        <Text style={s.count}>{t('{n}日', { n: report.bingeDays })} / {t('{n}日', { n: report.totalDays })}</Text>
       </View>
 
       {top.length === 0 ? (
@@ -105,7 +105,7 @@ export default function BingeTriggerCard() {
             <View key={tr.key} style={s.trRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.trLabel}>{t(tr.label)}</Text>
-                <Text style={s.trDetail}>{t(tr.detail)} ・ {tr.n}{t('日中')}{tr.hits}{t('日')}</Text>
+                <Text style={s.trDetail}>{t(tr.detail)} ・ {t('{n}日中{m}日', { n: tr.n, m: tr.hits })}</Text>
               </View>
               <View style={s.liftBox}>
                 <Text style={s.liftN}>{tr.lift.toFixed(1)}<Text style={s.liftX}>倍</Text></Text>
@@ -143,7 +143,7 @@ export default function BingeTriggerCard() {
         )}
         {report.after.recoverDays != null && (
           <Text style={s.afterT}>
-            ・{t('体重が戻るまで')}: <Text style={s.afterN}>{t('平均')}{report.after.recoverDays.toFixed(1)}{t('日')}</Text>
+            ・{t('体重が戻るまで')}: <Text style={s.afterN}>{t('平均{n}日', { n: report.after.recoverDays.toFixed(1) })}</Text>
           </Text>
         )}
       </View>

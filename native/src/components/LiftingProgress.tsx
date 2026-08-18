@@ -114,7 +114,7 @@ export function LiftKpiCard() {
     <View style={s.card}>
       <View style={[s.h2Row, { justifyContent: 'space-between' }]}>
         <Text style={[s.h2, { marginBottom: 0 }]}>{t('今週の運動')}<Text style={s.weekNote}>{t('— 月曜はじまり')}</Text></Text>
-        {streak > 0 && <Text style={s.streak}>🔥 {streak}週連続</Text>}
+        {streak > 0 && <Text style={s.streak}>🔥 {t('{n}週連続', { n: streak })}</Text>}
       </View>
       <View style={s.kpiRow}>
         <View style={s.kpi}>
@@ -130,10 +130,10 @@ export function LiftKpiCard() {
           <Text style={s.kpiV}>{mins}<Text style={s.kpiU}>{t('分')}</Text></Text>
         </View>
       </View>
-      {kcal > 0 && <Text style={s.earnT}>🍚 今週の運動で +{kcal.toLocaleString()}kcal 食べられる分を稼ぎました</Text>}
-      {minOk > 0 && <Text style={s.muted}>※ {minOk}分以上の運動を1回とカウントしています</Text>}
+      {kcal > 0 && <Text style={s.earnT}>{t('🍚 今週の運動で +{n}kcal 食べられる分を稼ぎました', { n: kcal.toLocaleString() })}</Text>}
+      {minOk > 0 && <Text style={s.muted}>{t('※ {n}分以上の運動を1回とカウントしています', { n: minOk })}</Text>}
       {!hasGoal && (
-        <OptionButton style={{ marginTop: 10 }} variant="tonal" label="週の目標を決める（設定 → 運動の目標）"
+        <OptionButton style={{ marginTop: 10 }} variant="tonal" label={t('週の目標を決める（設定 → 運動の目標）')}
                       onPress={() => router.push('/settings' as never)} />
       )}
     </View>
@@ -162,7 +162,7 @@ export function LiftCalendarCard() {
                      onSelect={(d) => setDaySel(daySel === d ? null : d)} />
       {daySel && (
         <View style={s.dayBox}>
-          <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の運動</Text>
+          <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} {t('の運動')}</Text>
           {dayItems.length === 0 && <Text style={s.muted}>{t('この日の運動記録はありません。')}</Text>}
           {dayItems.map((h) => (
             <Text key={h.id} style={s.dayText}>
@@ -206,14 +206,14 @@ export function BalanceCard() {
               {w.cardio > 0 && <View style={{ flex: w.cardio, backgroundColor: CARDIO_GREEN }} />}
               <View style={{ flex: Math.max(0.001, max - total) }} />
             </View>
-            <Text style={s.balMin}>{total > 0 ? `${total}分` : '—'}</Text>
+            <Text style={s.balMin}>{total > 0 ? `${total}${t('分')}` : '—'}</Text>
           </View>
         );
       })}
       <View style={s.balLegend}>
         <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.muted}>{t('筋トレ')}</Text>
         <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.muted}>{t('有酸素')}</Text>
-        <Text style={s.muted}>・筋トレの時間未記録は1回{LIFT_MIN_DEFAULT}分換算</Text>
+        <Text style={s.muted}>{t('・筋トレの時間未記録は1回{n}分換算', { n: LIFT_MIN_DEFAULT })}</Text>
       </View>
     </View>
   );
@@ -298,13 +298,13 @@ export function LiftChartCard() {
       </View>
       {verdict && (
         <Text style={[s.verdict, { color: verdict.trend === 'down' ? C.amber : C.teal }]}>
-          {verdict.trend === 'up' && `💪 ボリューム上昇中（直近 ${verdict.lastVolume.toLocaleString()}kg·回・平均比 +${verdict.pct}%）`}
-          {verdict.trend === 'flat' && `➡️ ボリューム維持（平均比 ${verdict.pct > 0 ? '+' : ''}${verdict.pct}%）。減量中の維持は十分な成果`}
-          {verdict.trend === 'down' && `⚠️ ボリューム低下（平均比 ${verdict.pct}%）。赤字が深すぎるサインかも。たんぱく質と睡眠を確認`}
+          {verdict.trend === 'up' && t('💪 ボリューム上昇中（直近 {v}kg·回・平均比 +{p}%）', { v: verdict.lastVolume.toLocaleString(), p: verdict.pct })}
+          {verdict.trend === 'flat' && t('➡️ ボリューム維持（平均比 {p}%）。減量中の維持は十分な成果', { p: `${verdict.pct > 0 ? '+' : ''}${verdict.pct}` })}
+          {verdict.trend === 'down' && t('⚠️ ボリューム低下（平均比 {p}%）。赤字が深すぎるサインかも。たんぱく質と睡眠を確認', { p: verdict.pct })}
         </Text>
       )}
       {activeEx && goalKg.has(activeEx) && chartMode === '1rm' && (
-        <Text style={s.muted}>点線＝目標MAX {goalKg.get(activeEx)}kg（RM換算・あと{Math.max(0, (goalKg.get(activeEx) ?? 0) - (rmPoints[rmPoints.length - 1]?.value ?? 0))}kg）</Text>
+        <Text style={s.muted}>{t('点線＝目標MAX {kg}kg（RM換算・あと{left}kg）', { kg: goalKg.get(activeEx) ?? 0, left: Math.max(0, (goalKg.get(activeEx) ?? 0) - (rmPoints[rmPoints.length - 1]?.value ?? 0)) })}</Text>
       )}
     </View>
   );

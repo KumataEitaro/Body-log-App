@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import { syncEntriesForDate } from './sync';
 import { sumItems, type FoodItem } from './items';
 import { todayJST, type ExLevel } from './calc';
+import { t } from './i18n';
 
 export type QuickImage = { data: string; mime: string };
 export type ParsedResult = {
@@ -21,7 +22,7 @@ export async function analyzeFood(text: string, images: QuickImage[]): Promise<{
   const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
     '/api/parse-food', { text, lang: 'ja', images });
   if (!ok || !json?.ok || !json.result) {
-    return { ok: false, error: json?.error || '解析に失敗しました。もう一度お試しください。' };
+    return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。') };
   }
   const r = json.result;
   return {
@@ -51,7 +52,7 @@ export async function saveParsed(uid: string, p: ParsedResult, note: string, dat
     ex: p.ex ?? 'オフ', adj: p.adj, mood: p.mood || '',
     text: note, photo_urls: [],
   });
-  if (error) return { ok: false, error: '保存に失敗しました。もう一度お試しください。' };
+  if (error) return { ok: false, error: t('保存に失敗しました。もう一度お試しください。') };
   await syncEntriesForDate(uid, today);
   return { ok: true };
 }

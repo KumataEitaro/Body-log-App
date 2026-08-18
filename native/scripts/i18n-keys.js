@@ -31,9 +31,13 @@ if (!target) {
   const enPath = path.join(SRC, 'content', 'i18n', 'en.ts');
   const enSrc = fs.readFileSync(enPath, 'utf8');
   const have = new Set();
-  const KEYRE = /^\s*'((?:[^'\\]|\\.)*)':/gm;
+  const KEY_SQ = /^[ \t]*'((?:[^'\\]|\\.)*)'[ \t]*:/gm;
+  const KEY_DQ = /^[ \t]*"((?:[^"\\]|\\.)*)"[ \t]*:/gm;
   let k;
-  while ((k = KEYRE.exec(enSrc)) !== null) have.add(k[1]);
+  while ((k = KEY_SQ.exec(enSrc)) !== null) have.add(k[1]);
+  while ((k = KEY_DQ.exec(enSrc)) !== null) {
+    try { have.add(JSON.parse('"' + k[1] + '"')); } catch { have.add(k[1]); }
+  }
   const missing = sorted.filter((x) => !have.has(x));
   console.log(`t()で使用中のキー: ${sorted.length}件 / 英語辞書の登録: ${have.size}件`);
   console.log(`英語が未登録: ${missing.length}件（未登録は日本語のまま表示されます）`);

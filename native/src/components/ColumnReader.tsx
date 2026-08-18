@@ -72,7 +72,7 @@ export default function ColumnReader() {
       <View style={s.h2Row}>
         <BookOpen size={14} color={C.teal} />
         <Text style={s.h2}>{t('読みもの')}<Text style={s.h2sub}>— 全{COLUMNS.length}本</Text></Text>
-        {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>未読 {unreadCount}</Text></View>}
+        {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>{t('未読')} {unreadCount}</Text></View>}
       </View>
 
       {/* 今日のおすすめ（未読の先頭を自動で選ぶ） */}
@@ -85,7 +85,7 @@ export default function ColumnReader() {
             <Text style={s.recLead} numberOfLines={2}>{today.lead}</Text>
           </View>
         </View>
-        <Text style={s.recCta}>約{today.minutes}分で読む →</Text>
+        <Text style={s.recCta}>{t('約{n}分で読む →', { n: today.minutes })}</Text>
       </Pressable>
 
       {rest.map((c) => (
@@ -96,7 +96,7 @@ export default function ColumnReader() {
               <Text style={s.title} numberOfLines={1}>{c.title}</Text>
               {!read.has(c.id) && <View style={s.newDot} />}
             </View>
-            <Text style={s.lead} numberOfLines={1}>{c.lead}・{c.minutes}分</Text>
+            <Text style={s.lead} numberOfLines={1}>{c.lead}・{t('{n}分', { n: c.minutes })}</Text>
           </View>
           <ChevronRight size={16} color={C.faint} />
         </Pressable>
@@ -110,7 +110,7 @@ export default function ColumnReader() {
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
             <Text style={s.readerTitle}>{open?.title}</Text>
-            <Text style={s.readerMeta}>{open?.lead}・約{open?.minutes}分で読めます</Text>
+            <Text style={s.readerMeta}>{open?.lead}・{t('約{n}分で読めます', { n: open?.minutes ?? 0 })}</Text>
             {open && <Body text={open.body} />}
             {open && open.sources.length > 0 && (
               <View style={s.srcBox}>

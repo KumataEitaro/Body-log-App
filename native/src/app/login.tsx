@@ -50,7 +50,7 @@ export default function LoginScreen() {
     }
     // メール確認が有効な場合はセッションが返らない → 確認メール案内
     if (!data.session) {
-      setInfo(`確認メールを ${mail} に送りました。メール内のリンクを開いてから、ログインしてください。`);
+      setInfo(t('確認メールを {mail} に送りました。メール内のリンクを開いてから、ログインしてください。', { mail }));
       setMode('login');
     }
     // セッションが返った場合は_layoutの認証ゲートが自動遷移
@@ -104,17 +104,17 @@ export default function LoginScreen() {
         {/* ログイン/新規登録の切り替え */}
         <View style={{ marginBottom: 16 }}>
           <SegmentedControl
-            options={[{ key: 'login', label: 'ログイン' }, { key: 'signup', label: '新規登録' }]}
+            options={[{ key: 'login', label: t('ログイン') }, { key: 'signup', label: t('新規登録') }]}
             value={mode} onChange={(m) => { setMode(m); setMsg(''); setInfo(''); }}
           />
         </View>
 
-        <TextInput style={s.input} placeholder="メールアドレス" placeholderTextColor={C.faint}
+        <TextInput style={s.input} placeholder={t('メールアドレス')} placeholderTextColor={C.faint}
                    autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} />
         <TextInput style={s.input} placeholder={isLogin ? 'パスワード' : t('パスワード（8文字以上）')} placeholderTextColor={C.faint}
                    secureTextEntry autoComplete={isLogin ? 'password' : 'new-password'} value={password} onChangeText={setPassword} />
         {!isLogin && (
-          <TextInput style={s.input} placeholder="パスワード（確認用）" placeholderTextColor={C.faint}
+          <TextInput style={s.input} placeholder={t('パスワード（確認用）')} placeholderTextColor={C.faint}
                      secureTextEntry value={password2} onChangeText={setPassword2} />
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}

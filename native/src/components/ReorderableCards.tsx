@@ -14,6 +14,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { Minus } from 'lucide-react-native';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 const SPRING = { damping: 18, stiffness: 180, mass: 0.6 };
 const EDGE = 130;       // 自動スクロール発火ゾーン(px)
@@ -189,7 +190,7 @@ export default function ReorderableCards({
             onHide={onHide ? () => onHide(k) : undefined}
           >
             {renderCard(k) ?? (
-              <View style={s.ghostCard}><Text style={s.ghostT}>{ghostLabel(k)}（データが揃うと表示されます）</Text></View>
+              <View style={s.ghostCard}><Text style={s.ghostT}>{ghostLabel(k)}{t('（データが揃うと表示されます）')}</Text></View>
             )}
           </DraggableCard>
         ))}

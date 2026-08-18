@@ -238,7 +238,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
       </GestureHandlerRootView>
 
       <View style={s.foot}>
-        <Text style={s.footT}>最新 {Number(latest.value).toFixed(decimals)}{unit}（{fmtIdx(dateToIdx(latest.date))}）</Text>
+        <Text style={s.footT}>{t('最新')} {Number(latest.value).toFixed(decimals)}{unit}（{fmtIdx(dateToIdx(latest.date))}）</Text>
         <Text style={s.footHint}>{t('ピンチで拡大・ドラッグで移動・2回タップで戻す')}</Text>
       </View>
 

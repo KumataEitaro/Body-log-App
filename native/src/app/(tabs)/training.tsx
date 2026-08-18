@@ -126,7 +126,7 @@ export default function TrainingScreen() {
       const r = await importWorkouts(uid, items);
       if ('error' in r) { setHkMsg(r.error); return; }
       setHkOpen(false);
-      setMsg({ ok: true, text: `⌚ ${r.imported}件を取り込みました${r.skipped > 0 ? `（${r.skipped}件は取込済みでスキップ）` : ''}。消費kcalが目標カロリーに反映されます。` });
+      setMsg({ ok: true, text: t('⌚ {n}件を取り込みました{skip}。消費kcalが目標カロリーに反映されます。', { n: r.imported, skip: r.skipped > 0 ? t('（{n}件は取込済みでスキップ）', { n: r.skipped }) : '' }) });
     } finally { setHkBusy(false); }
   }
 
@@ -167,7 +167,7 @@ export default function TrainingScreen() {
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
       setActIdx(null); setActKm('');
-      setMsg({ ok: true, text: `${a.n} ${actMin}分${km ? ` ${km}km` : ''}を記録しました。目標カロリーに+${kcal}kcal反映されます🎉` });
+      setMsg({ ok: true, text: t('{act}を記録しました。目標カロリーに+{kcal}kcal反映されます🎉', { act: `${a.n} ${actMin}${t('分')}${km ? ` ${km}km` : ''}`, kcal }) });
     } finally { setActSaving(false); }
   }
 
@@ -217,14 +217,14 @@ export default function TrainingScreen() {
           const { data: tg } = await supabase.from('training_goals').select('target_kg').eq('name', name).maybeSingle();
           const goalKg = tg ? Math.round(Number(tg.target_kg)) : null;
           if (goalKg && est >= goalKg) {
-            fb = `🎉 目標達成！${name} 推定MAX ${est}kg（目標${goalKg}kg超え）。次の目標を設定しよう`;
+            fb = t('🎉 目標達成！{name} 推定MAX {est}kg（目標{goal}kg超え）。次の目標を設定しよう', { name, est, goal: goalKg });
           } else if (goalKg) {
             const need = repsNeededFor(goalKg, Number(first.kg));
-            fb = `おしい！RM換算だとMAX ${est}kg。目標${goalKg}kgまであと${goalKg - est}kg${need && need > Number(first.reps) ? `（${Number(first.kg)}kgなら${need}回で到達）` : ''}`;
+            fb = t('おしい！RM換算だとMAX {est}kg。目標{goal}kgまであと{left}kg', { est, goal: goalKg, left: goalKg - est }) + (need && need > Number(first.reps) ? t('（{kg}kgなら{need}回で到達）', { kg: Number(first.kg), need }) : '');
           } else if (bestPast > 0 && est > bestPast) {
-            fb = `自己ベスト更新💪 ${name} 推定MAX ${est}kg（前回比 +${est - bestPast}kg）`;
+            fb = t('自己ベスト更新💪 {name} 推定MAX {est}kg（前回比 +{d}kg）', { name, est, d: est - bestPast });
           } else {
-            fb = `保存しました。${name} 推定MAX ${est}kg（RM換算）`;
+            fb = t('保存しました。{name} 推定MAX {est}kg（RM換算）', { name, est });
           }
         }
       } catch { /* フィードバックが取れなくても保存は成功している */ }
@@ -292,7 +292,7 @@ export default function TrainingScreen() {
           <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('時間')}</Text>
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {MINUTES.map((m) => (
-              <Chip key={m} label={`${m}分`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
+              <Chip key={m} label={`${m}${t('分')}`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
             ))}
             <TextInput style={s.freeMin} placeholder="分" placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
@@ -307,10 +307,10 @@ export default function TrainingScreen() {
           )}
           <OptionButton
             style={{ marginTop: 14 }}
-            label={actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
+            label={actIdx == null ? t('運動を選んで記録') : t('記録する（約{n}kcal消費）', { n: actKcal() })}
             onPress={saveActivity} busy={actSaving} disabled={actIdx == null}
           />
-          <OptionButton style={{ marginTop: 8 }} variant="tonal" label="⌚ ヘルスケアから取り込む（Apple Watch等）" onPress={openHk} />
+          <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('⌚ ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
           {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </View>
       )}
@@ -334,7 +334,7 @@ export default function TrainingScreen() {
                   <Text style={s.hkCheck}>{on ? '☑' : '☐'}</Text>
                   <Text style={s.hkDate}>{w.date.slice(5).replace('-', '/')}</Text>
                   <Text style={s.hkName} numberOfLines={1}>{w.name}</Text>
-                  <Text style={s.hkMeta}>{w.minutes}分{w.km ? ` ${w.km}km` : ''} ・ {w.kcal}kcal</Text>
+                  <Text style={s.hkMeta}>{w.minutes}{t('分')}{w.km ? ` ${w.km}km` : ''} ・ {w.kcal}kcal</Text>
                 </Pressable>
               );
             })}

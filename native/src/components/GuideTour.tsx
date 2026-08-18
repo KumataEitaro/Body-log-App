@@ -237,8 +237,8 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
     <View style={s.card}>
       <Text style={s.cardEmoji}>👋</Text>
       <Text style={s.cardTitle}>{t('ようこそ BodyLog へ')}</Text>
-      <Text style={s.cardText}>1分で使い方をご案内します。{'\n'}ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。</Text>
-      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14, marginBottom: 8 }} label="ガイドを始める" onPress={onStart} />
+      <Text style={s.cardText}>{t('1分で使い方をご案内します。')}{'\n'}{t('ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。')}</Text>
+      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14, marginBottom: 8 }} label={t('ガイドを始める')} onPress={onStart} />
       <Pressable onPress={onSkip} hitSlop={8}><Text style={s.linkT}>{t('今はしない')}</Text></Pressable>
     </View>
   );

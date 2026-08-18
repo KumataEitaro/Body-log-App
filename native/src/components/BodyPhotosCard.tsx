@@ -76,7 +76,7 @@ export default function BodyPhotosCard() {
         '/api/analyze-body', { mode: 'assess', images: [{ data: pendingImg.base64, mime: 'image/jpeg' }] });
       if (ok && json?.ok && json.result?.bf_est != null) {
         setBfInput(String(json.result.bf_est));
-        setMsg(`AI推定 ${Number(json.result.bf_est).toFixed(1)}%（±3%程度の目安）${json.result.comment ? ` — ${json.result.comment}` : ''}`);
+        setMsg(t('AI推定 {n}%（±3%程度の目安）', { n: Number(json.result.bf_est).toFixed(1) }) + (json.result.comment ? ` — ${json.result.comment}` : ''));
       } else {
         setMsg(json?.error || t('AI推定に失敗しました。手入力もできます。'));
       }
@@ -98,7 +98,7 @@ export default function BodyPhotosCard() {
         .upload(path, b64ToBytes(pendingImg.base64), { contentType: 'image/jpeg' });
       if (upErr) {
         setMsg(/bucket|not found/i.test(upErr.message)
-          ? 'ストレージ未セットアップです（apply-pending.sqlのv16を実行してください）。'
+          ? t('ストレージ未セットアップです（apply-pending.sqlのv16を実行してください）。')
           : t('写真の保存に失敗しました。'));
         return;
       }
@@ -120,7 +120,7 @@ export default function BodyPhotosCard() {
     Alert.alert(t('この写真を削除しますか？'), p.date, [
       { text: t('キャンセル'), style: 'cancel' },
       {
-        text: '削除', style: 'destructive',
+        text: t('削除する'), style: 'destructive',
         onPress: async () => {
           await supabase.storage.from('body-photos').remove([p.path]);
           await supabase.from('body_photos').delete().eq('id', p.id);
@@ -142,7 +142,7 @@ export default function BodyPhotosCard() {
         <Text style={s.h2}>{t('体の写真')}<Text style={s.h2sub}>{t('— 週1回の見た目チェック')}</Text></Text>
         {latestBf != null && (
           <Text style={s.bfNow}>
-            体脂肪 {Number(latestBf).toFixed(1)}%{targetBf != null ? ` → 目標${targetBf.toFixed(1)}%` : ''}
+            {t('体脂肪')} {Number(latestBf).toFixed(1)}%{targetBf != null ? ` → ${t('目標')}${targetBf.toFixed(1)}%` : ''}
           </Text>
         )}
       </View>
@@ -152,14 +152,14 @@ export default function BodyPhotosCard() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {[prev, latest].map((p, i) => (
             <View key={i} style={{ flex: 1 }}>
-              <Text style={s.cmpLabel}>{p ? `${p.date.slice(5).replace('-', '/')}${i === 1 ? '（最新）' : ''}` : '—'}</Text>
+              <Text style={s.cmpLabel}>{p ? `${p.date.slice(5).replace('-', '/')}${i === 1 ? t('（最新）') : ''}` : '—'}</Text>
               {p?.url ? (
                 <Pressable onPress={() => setViewer(p)} onLongPress={() => remove(p)}>
                   <Image source={{ uri: p.url }} style={s.cmpImg} />
                   {p.bodyfat != null && <Text style={s.cmpBf}>{Number(p.bodyfat).toFixed(1)}%</Text>}
                 </Pressable>
               ) : (
-                <View style={[s.cmpImg, s.cmpEmpty]}><Text style={s.emptyT}>{i === 0 ? '前回なし' : ''}</Text></View>
+                <View style={[s.cmpImg, s.cmpEmpty]}><Text style={s.emptyT}>{i === 0 ? t('前回なし') : ''}</Text></View>
               )}
             </View>
           ))}
@@ -199,7 +199,7 @@ export default function BodyPhotosCard() {
               </Pressable>
             </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
-              <OptionButton variant="teal" label="✓ 保存" onPress={save} busy={busy} />
+              <OptionButton variant="teal" label={t('✓ 保存')} onPress={save} busy={busy} />
               <Pressable onPress={() => { setPendingImg(null); setBfInput(''); }} hitSlop={8} style={{ justifyContent: 'center' }}>
                 <Text style={s.cancelT}>{t('破棄')}</Text>
               </Pressable>
@@ -210,12 +210,12 @@ export default function BodyPhotosCard() {
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : t('今週の写真を撮る')}
                         leading={<Camera size={16} color="#fff" strokeWidth={2.2} />} onPress={() => pick(true)} />
-          <OptionButton variant="tonal" label="選ぶ"
+          <OptionButton variant="tonal" label={t('選ぶ')}
                         leading={<ImagePlus size={16} color={C.ink} strokeWidth={2.2} />} onPress={() => pick(false)} />
         </View>
       )}
       {daysSince != null && daysSince >= 7 && !pendingImg && (
-        <Text style={s.dueT}>前回から{daysSince}日。今週の1枚を撮りましょう。</Text>
+        <Text style={s.dueT}>{t('前回から{n}日。今週の1枚を撮りましょう。', { n: daysSince })}</Text>
       )}
       {msg && <Text style={s.msg}>{msg}</Text>}
 
@@ -224,7 +224,7 @@ export default function BodyPhotosCard() {
         <Pressable style={s.viewerBack} onPress={() => setViewer(null)}>
           {viewer?.url && <Image source={{ uri: viewer.url }} style={s.viewerImg} resizeMode="contain" />}
           <View style={s.viewerBar}>
-            <Text style={s.viewerT}>{viewer?.date.replace(/-/g, '/')}{viewer?.bodyfat != null ? `・体脂肪 ${Number(viewer.bodyfat).toFixed(1)}%` : ''}</Text>
+            <Text style={s.viewerT}>{viewer?.date.replace(/-/g, '/')}{viewer?.bodyfat != null ? `・${t('体脂肪')} ${Number(viewer.bodyfat).toFixed(1)}%` : ''}</Text>
             <Pressable onPress={() => setViewer(null)} hitSlop={10}><X size={22} color="#fff" /></Pressable>
           </View>
         </Pressable>

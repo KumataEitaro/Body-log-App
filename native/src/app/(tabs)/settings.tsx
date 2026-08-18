@@ -209,7 +209,7 @@ export default function SettingsScreen() {
           <Text style={s.sumName}>{name || t('ニックネーム未設定')}</Text>
           <Text style={s.sumMail}>{email || '—'}</Text>
           <Text style={s.sumMeta}>
-            {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ 基礎代謝 約{Math.round(bmr)}kcal
+            {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ {t('基礎代謝 約')}{Math.round(bmr)}kcal
           </Text>
         </View>
       </View>
@@ -250,7 +250,7 @@ export default function SettingsScreen() {
       <Text style={s.groupLabel}>{t('見た目')}</Text>
       <View style={s.group}>
         <Row icon={<Palette color={C.teal} size={19} />} label={t('テーマカラー')}
-             sub={ACCENTS.find((a) => a.key === theme.accent)?.label ?? ''}
+             sub={t(ACCENTS.find((a) => a.key === theme.accent)?.label ?? '')}
              onPress={() => openSheet('theme')} />
       </View>
 
@@ -308,7 +308,7 @@ export default function SettingsScreen() {
       {/* データ・連携 */}
       <Text style={s.groupLabel}>{t('データ・連携')}</Text>
       <View style={s.group}>
-        <Row icon={<HeartPulse color={C.teal} size={19} />} label="ヘルスケア連携"
+        <Row icon={<HeartPulse color={C.teal} size={19} />} label={t('ヘルスケア連携')}
              sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
              onPress={() => openSheet('health')} />
       </View>
@@ -316,12 +316,12 @@ export default function SettingsScreen() {
       {/* サポート */}
       <Text style={s.groupLabel}>{t('サポート')}</Text>
       <View style={s.group}>
-        <Row icon={<CircleHelp color={C.teal} size={19} />} label="使い方ガイドをもう一度見る"
-             sub="各画面の説明と初期設定をやり直せます"
+        <Row icon={<CircleHelp color={C.teal} size={19} />} label={t('使い方ガイドをもう一度見る')}
+             sub={t('各画面の説明と初期設定をやり直せます')}
              onPress={() => guide.start()} />
         <View style={s.sep} />
-        <Row icon={<BookOpen color={C.teal} size={19} />} label="読みもの"
-             sub="PFCバランス・カロリー収支・過食の心理など5本"
+        <Row icon={<BookOpen color={C.teal} size={19} />} label={t('読みもの')}
+             sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}
              onPress={() => openSheet('columns')} />
       </View>
 
@@ -339,10 +339,10 @@ export default function SettingsScreen() {
     {/* ===== プロフィール編集モーダル ===== */}
     <Modal visible={sheet === 'profile'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title="👤 プロフィール編集" />
+        <SheetHeader title={"👤 " + t("プロフィール編集")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={s.label}>{t('表示名')}</Text>
-          <TextInput style={s.input} value={name} onChangeText={setName} placeholder="表示名" placeholderTextColor={C.faint} />
+          <TextInput style={s.input} value={name} onChangeText={setName} placeholder={t('表示名')} placeholderTextColor={C.faint} />
           <Text style={s.label}>{t('性別')}</Text>
           <SegmentedControl
             options={[{ key: 'male', label: t('男性') }, { key: 'female', label: t('女性') }]}
@@ -360,7 +360,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={s.label}>{t('日常の活動量')}<Text style={{ fontWeight: '400' }}>{t('— 消費カロリーの計算に使います')}</Text></Text>
           <ActivityLevelPicker value={Number(life) || 1.375} onChange={(v) => setLife(String(v))} />
-          <OptionButton style={{ marginTop: 16 }} label="保存する" onPress={saveProfile} busy={busy} />
+          <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -453,7 +453,7 @@ export default function SettingsScreen() {
     {/* ===== マイ食品管理モーダル ===== */}
     <Modal visible={sheet === 'foods'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title="🍱 マイ食品の管理" />
+        <SheetHeader title={"🍱 " + t("マイ食品の管理")} />
         <ScrollView>
           {foods.length === 0 && <Text style={s.note}>{t('まだ登録がありません。食事タブでAI解析した品目が候補になります。')}</Text>}
           {foods.map((f) => (
@@ -472,7 +472,7 @@ export default function SettingsScreen() {
     {/* ===== ヘルスケア連携モーダル ===== */}
     <Modal visible={sheet === 'health'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title="⌚ ヘルスケア連携" />
+        <SheetHeader title={"⌚ " + t("ヘルスケア連携")} />
         {!healthAvailable() ? (
           <Text style={s.note}>{t('この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。')}</Text>
         ) : (
@@ -490,7 +490,7 @@ export default function SettingsScreen() {
     {/* ===== 体重目標モーダル ===== */}
     <Modal visible={sheet === 'goalW'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title="🎯 体重の目標" />
+        <SheetHeader title={"🎯 " + t("体重の目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="weight" weightSections="goal" />
           <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
@@ -501,7 +501,7 @@ export default function SettingsScreen() {
     {/* ===== 筋トレ目標モーダル ===== */}
     <Modal visible={sheet === 'goalT'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title="🏋️ 筋トレの目標" />
+        <SheetHeader title={"🏋️ " + t("筋トレの目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="training" />
         </ScrollView>
@@ -511,7 +511,7 @@ export default function SettingsScreen() {
     {/* ===== アカウント削除モーダル ===== */}
     <Modal visible={sheet === 'delete'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title="⚠️ アカウント削除" />
+        <SheetHeader title={"⚠️ " + t("アカウント削除")} />
         <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
         <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder="削除" placeholderTextColor={C.faint} />

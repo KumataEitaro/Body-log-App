@@ -87,7 +87,7 @@ export function HideableCard({ editing, onHide, label, children }: {
   return (
     <View>
       {children}
-      <Pressable style={s.minusBtn} onPress={onHide} hitSlop={10} accessibilityLabel={`${label}を非表示`}>
+      <Pressable style={s.minusBtn} onPress={onHide} hitSlop={10} accessibilityLabel={t('{label}を非表示', { label })}>
         <Minus size={16} color="#fff" strokeWidth={3.5} />
       </Pressable>
     </View>

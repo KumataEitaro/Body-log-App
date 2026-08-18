@@ -258,7 +258,7 @@ export default function CoachScreen() {
               <MessageCircle color={C.teal} size={17} strokeWidth={2.5} />
             </View>
           )}
-          <TextInput style={s.input} placeholder="相談してみる…" placeholderTextColor={C.faint}
+          <TextInput style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.faint}
                      value={input} onChangeText={setInput} multiline />
           <Pressable
             style={[s.sendInline, { backgroundColor: input.trim() && !busy ? C.teal : C.line }]}
@@ -283,7 +283,7 @@ export default function CoachScreen() {
             <Pressable onPress={() => setHistOpen(false)} hitSlop={10}><X size={20} color={C.sub} /></Pressable>
           </View>
           <TextInput
-            style={s.histSearch} placeholder="日付やキーワードで検索（例: 8/15、タンパク質）" placeholderTextColor={C.faint}
+            style={s.histSearch} placeholder={t('日付やキーワードで検索（例: 8/15、タンパク質）')} placeholderTextColor={C.faint}
             value={histQ} onChangeText={setHistQ} returnKeyType="search" clearButtonMode="while-editing"
           />
           {histGroups.length === 0 ? (

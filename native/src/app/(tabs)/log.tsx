@@ -337,7 +337,7 @@ export default function LogScreen() {
 
   function titleOfItems(items: FoodItem[]): string {
     const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
-    return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
+    return names + (items.length > 3 ? t(' ほか{n}品', { n: items.length - 3 }) : '');
   }
 
   // トレイの内容を確定保存
@@ -368,7 +368,7 @@ export default function LogScreen() {
       await syncEntriesForDate(uid, today);
       setWWeight('');
       await load();
-      setMsg({ ok: true, text: `体重 ${fmtWeight(w)} を記録しました。` });
+      setMsg({ ok: true, text: t('体重 {w} を記録しました。', { w: fmtWeight(w) }) });
     } finally {
       setSaving(false);
     }
@@ -468,7 +468,7 @@ export default function LogScreen() {
       setMsg({
         ok: true,
         text: extra > 0
-          ? `昨日を「食べすぎ +${extra.toLocaleString()}kcal」として記録しました。今日から立て直しましょう！`
+          ? t('昨日を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！', { n: extra.toLocaleString() })
           : t('昨日を「目安どおり（±0）」で確定しました。'),
       });
     } finally {
@@ -538,14 +538,14 @@ export default function LogScreen() {
         {vis('hero') && profile && (
           <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
             <MinusBadge editing={editing} onPress={() => cards.hide('hero')} />
-            <Text style={s.heroL}>{left < 0 ? 'オーバー' : t('あと食べられる')}{plan ? '（計画）' : t('（維持）')}</Text>
+            <Text style={s.heroL}>{left < 0 ? t('オーバー') : t('あと食べられる')}{plan ? t('（計画）') : t('（維持）')}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
             <View style={s.hline}><View style={[s.hfill, { width: `${Math.min(100, Math.max(0, (eaten / Math.max(1, goalKcal)) * 100))}%` }, left < 0 && { backgroundColor: C.coral }]} /></View>
             <View style={s.heroMeta}>
-              <Text style={s.metaT}>摂取 {eaten.toLocaleString()}</Text>
-              <Text style={s.metaT}>目標 {goalKcal.toLocaleString()}</Text>
+              <Text style={s.metaT}>{t('摂取')} {eaten.toLocaleString()}</Text>
+              <Text style={s.metaT}>{t('目標')} {goalKcal.toLocaleString()}</Text>
             </View>
             {/* 残りPFCプログレスバー（英字P/F/Cは初心者に伝わらないため日本語を主・英字は補助） */}
             {macros && (
@@ -558,11 +558,11 @@ export default function LogScreen() {
                   const over = eat > tgt;
                   return (
                     <View key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={s.pfcL} numberOfLines={1}>{ja}<Text style={s.pfcAb}> {ab}</Text></Text>
+                      <Text style={s.pfcL} numberOfLines={1}>{t(ja)}<Text style={s.pfcAb}> {ab}</Text></Text>
                       <View style={s.pfcBar}>
                         <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
                       </View>
-                      <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? `+${eat - tgt}g超過` : `あと${tgt - eat}g`}</Text>
+                      <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
                     </View>
                   );
                 })}
@@ -588,13 +588,13 @@ export default function LogScreen() {
             </Text>
             {!backfillMore ? (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <OptionButton style={{ flex: 1 }} label="目安どおり（±0）" onPress={() => backfillSave(0)} busy={backfillBusy} />
-                <OptionButton style={{ flex: 1 }} variant="tonal" label="食べすぎた…" onPress={() => setBackfillMore(true)} disabled={backfillBusy} />
+                <OptionButton style={{ flex: 1 }} label={t('目安どおり（±0）')} onPress={() => backfillSave(0)} busy={backfillBusy} />
+                <OptionButton style={{ flex: 1 }} variant="tonal" label={t('食べすぎた…')} onPress={() => setBackfillMore(true)} disabled={backfillBusy} />
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 {[500, 1000, 2000].map((n) => (
-                  <Chip key={n} label={`+${n.toLocaleString()}kcal くらい`} tone="ink" disabled={backfillBusy} onPress={() => backfillSave(n)} />
+                  <Chip key={n} label={t('+{n}kcal くらい', { n: n.toLocaleString() })} tone="ink" disabled={backfillBusy} onPress={() => backfillSave(n)} />
                 ))}
               </View>
             )}
@@ -612,12 +612,12 @@ export default function LogScreen() {
               <Text key={r.key} style={[s.mutedT, { lineHeight: 20 }]}>・{r.text}</Text>
             ))}
             <Text style={[s.mutedT, { marginTop: 6 }]}>
-              これは失敗のサインではなく、準備のサインです。たんぱく質多めの食事と「我慢しすぎない設定」が効きます。
+              {t('これは失敗のサインではなく、準備のサインです。たんぱく質多めの食事と「我慢しすぎない設定」が効きます。')}
             </Text>
             {plan && !todayEvent ? (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <OptionButton style={{ flex: 1 }} variant="teal" label="🕊 今日は+200kcal緩める" onPress={addRecoveryEvent} />
-                <OptionButton style={{ flex: 1 }} variant="tonal" label="大丈夫、気をつける" onPress={snoozeRisk} />
+                <OptionButton style={{ flex: 1 }} variant="teal" label={t('🕊 今日は+200kcal緩める')} onPress={addRecoveryEvent} />
+                <OptionButton style={{ flex: 1 }} variant="tonal" label={t('大丈夫、気をつける')} onPress={snoozeRisk} />
               </View>
             ) : (
               <OptionButton style={{ marginTop: 10 }} variant="tonal" label="OK、気をつける" onPress={snoozeRisk} />
@@ -724,16 +724,16 @@ export default function LogScreen() {
             f: macros.f - eatenF - (parsedTotal ? Math.round(parsedTotal.f) : 0),
             c: macros.c - eatenC - (parsedTotal ? Math.round(parsedTotal.c) : 0),
           } : null;
-          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb} ${v}g` : `${lb} ${-v}g超過`);
+          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb} ${v}g` : t('{lb} {n}g超過', { lb, n: -v }));
           return (
             <View style={s.preview}>
               <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
-                {parsed ? '追加後 ' : ''}{pvLeft >= 0 ? `残り ${pvLeft.toLocaleString()}kcal` : `${(-pvLeft).toLocaleString()}kcal 超過`}
+                {parsed ? t('追加後 ') : ''}{pvLeft >= 0 ? t('残り {n}kcal', { n: pvLeft.toLocaleString() }) : t('{n}kcal 超過', { n: (-pvLeft).toLocaleString() })}
               </Text>
               {pv && (
                 <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
                       style={[s.previewSub, (pv.p < 0 || pv.f < 0 || pv.c < 0) && { color: C.coral }]}>
-                  残り {fmt(pv.p, PFC_SHORT.p)}・{fmt(pv.f, PFC_SHORT.f)}・{fmt(pv.c, PFC_SHORT.c)}
+                  {t('残り')} {fmt(pv.p, t(PFC_SHORT.p))}・{fmt(pv.f, t(PFC_SHORT.f))}・{fmt(pv.c, t(PFC_SHORT.c))}
                 </Text>
               )}
             </View>
@@ -834,7 +834,7 @@ export default function LogScreen() {
                 <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
                 <Pressable style={s.traySave} onPress={save} disabled={saving}>
                   {saving ? <ActivityIndicator color="#fff" /> : (
-                    <Text style={s.traySaveT}>✓ 保存{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
+                    <Text style={s.traySaveT}>{t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
                   )}
                 </Pressable>
               </View>
@@ -855,7 +855,7 @@ export default function LogScreen() {
           <TextInput
             ref={inputRef} multiline
             style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
-            placeholder="ここをタップして食事を入力…" placeholderTextColor={C.sub}
+            placeholder={t('ここをタップして食事を入力…')} placeholderTextColor={C.sub}
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />

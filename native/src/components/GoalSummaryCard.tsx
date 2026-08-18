@@ -5,13 +5,14 @@ import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-nati
 import { Target, Dumbbell, ChevronRight, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 import GoalPanel from '@/components/GoalPanel';
 
 export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' }) {
   const [open, setOpen] = useState(false);
-  const [line, setLine] = useState('読み込み中…');
+  const [line, setLine] = useState(t('読み込み中…'));
   const Icon = mode === 'weight' ? Target : Dumbbell;
-  const title = mode === 'weight' ? '体重の目標' : '筋トレの目標';
+  const title = mode === 'weight' ? t('体重の目標') : t('筋トレの目標');
 
   const load = useCallback(async () => {
     if (mode === 'weight') {
@@ -21,14 +22,14 @@ export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' 
       ]);
       if (g.data?.target_weight) {
         const now = w.data?.length ? Number(w.data[0].weight) : null;
-        setLine(`${now != null ? `${now.toFixed(1)} → ` : ''}${Number(g.data.target_weight).toFixed(1)}kg・${String(g.data.target_date).slice(5).replace('-', '/')}まで`);
-      } else setLine('未設定 — タップして設定');
+        setLine(`${now != null ? `${now.toFixed(1)} → ` : ''}${Number(g.data.target_weight).toFixed(1)}kg・${t('{d}まで', { d: String(g.data.target_date).slice(5).replace('-', '/') })}`);
+      } else setLine(t('未設定 — タップして設定'));
     } else {
-      const t = await supabase.from('training_goals').select('name,target_kg').order('created_at', { ascending: true });
-      const list = (t.data ?? []) as { name: string; target_kg: number }[];
+      const tg = await supabase.from('training_goals').select('name,target_kg').order('created_at', { ascending: true });
+      const list = (tg.data ?? []) as { name: string; target_kg: number }[];
       setLine(list.length
-        ? list.slice(0, 2).map((x) => `${x.name} ${Number(x.target_kg)}kg`).join('・') + (list.length > 2 ? ` 他${list.length - 2}件` : '')
-        : '未設定 — タップして設定');
+        ? list.slice(0, 2).map((x) => `${x.name} ${Number(x.target_kg)}kg`).join('・') + (list.length > 2 ? t(' 他{n}件', { n: list.length - 2 }) : '')
+        : t('未設定 — タップして設定'));
     }
   }, [mode]);
   useEffect(() => { load(); }, [load]);

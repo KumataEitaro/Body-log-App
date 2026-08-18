@@ -45,8 +45,8 @@ const series = () => [
   { key: 'weight', label: t('体重'), unit: 'kg', decimals: 1 },
   { key: 'waist', label: t('ウエスト'), unit: 'cm', decimals: 1 },
   { key: 'bodyfat', label: t('体脂肪率'), unit: '%', decimals: 1 },
-  { key: 'intake', label: '摂取kcal', unit: '', decimals: 0 },
-  { key: 'burn', label: '消費kcal', unit: '', decimals: 0 },
+  { key: 'intake', label: t('摂取kcal'), unit: '', decimals: 0 },
+  { key: 'burn', label: t('消費kcal'), unit: '', decimals: 0 },
 ] as const;
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
@@ -262,18 +262,18 @@ export default function ChangesScreen() {
           <Text style={s.kpiV}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
           {latestW != null && firstW != null && (
             <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.teal : C.coral }]}>
-              30日で{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
+              {t('30日で')}{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
             </Text>
           )}
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('累計収支')}</Text>
           <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]}>{sumAll > 0 ? '+' : ''}{(sumAll / 1000).toFixed(1)}<Text style={s.kpiU}>k</Text></Text>
-          <Text style={s.kpiD}>脂肪 約{(sumAll / 7200).toFixed(1)}kg</Text>
+          <Text style={s.kpiD}>{t('脂肪 約')}{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('未記録（30日）')}</Text>
-          <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>{t('日')}</Text></Text>
+          <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>{t('{n}日', { n: '' })}</Text></Text>
           <Text style={s.kpiD}>{t('±0扱い')}</Text>
         </View>
       </View>
@@ -285,7 +285,7 @@ export default function ChangesScreen() {
         <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
         {daySel && (
           <View style={s.dayBox}>
-            <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の記録</Text>
+            <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} {t('の記録')}</Text>
             {dayDetail === null && <Text style={s.note}>{t('読み込み中…')}</Text>}
             {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>{t('この日の記録はありません。')}</Text>}
             {dayDetail?.map((l) => (
@@ -342,7 +342,7 @@ export default function ChangesScreen() {
                 ))}
                 {noneActive && (
                   <View style={[s.chip, s.chipOn, { borderStyle: 'dashed' }]}>
-                    <Text style={[s.chipT, { color: '#fff' }]}>{liveDays}日</Text>
+                    <Text style={[s.chipT, { color: '#fff' }]}>{t('{n}日', { n: liveDays })}</Text>
                   </View>
                 )}
               </>
@@ -350,7 +350,7 @@ export default function ChangesScreen() {
           })()}
         </View>
         {serie === 'weight' && goal?.target_weight != null && (
-          <Text style={s.note}>点線＝目標 {Number(goal.target_weight).toFixed(1)}kg</Text>
+          <Text style={s.note}>{t('点線＝目標')} {Number(goal.target_weight).toFixed(1)}kg</Text>
         )}
       </View>
   );

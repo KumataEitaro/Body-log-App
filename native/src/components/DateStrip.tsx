@@ -13,14 +13,14 @@ function shift(d: string, n: number): string {
   t.setDate(t.getDate() + n);
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
-const WD = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
+const WD = () => [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 export default function DateStrip({ value, onChange }: { value: string; onChange: (d: string) => void }) {
   const [open, setOpen] = useState(false);
   const today = todayJST();
   const isToday = value === today;
   const dt = new Date(value + 'T00:00:00');
-  const label = isToday ? '今日' : `${dt.getMonth() + 1}/${dt.getDate()}(${WD[dt.getDay()]})`;
+  const label = isToday ? t('今日') : `${dt.getMonth() + 1}/${dt.getDate()}(${WD()[dt.getDay()]})`;
 
   return (
     <View style={s.row}>
