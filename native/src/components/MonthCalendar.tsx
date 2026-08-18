@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
-const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+const DOW = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 export type DayMark = { logged: boolean; over: boolean; unknown?: boolean; kind?: 'lift' | 'cardio' | 'both' };
 
@@ -85,20 +86,20 @@ export default function MonthCalendar({
       <View style={s.legend}>
         {mode === 'training' ? (
           <>
-            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>筋トレ</Text>
-            <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.legT}>有酸素</Text>
+            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>{t('筋トレ')}</Text>
+            <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.legT}>{t('有酸素')}</Text>
             <View style={{ flexDirection: 'row', gap: 2 }}>
               <View style={[s.legDot, { backgroundColor: C.teal }]} />
               <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} />
-            </View><Text style={s.legT}>両方</Text>
-            <Text style={s.legT}>・タップで内容</Text>
+            </View><Text style={s.legT}>{t('両方')}</Text>
+            <Text style={s.legT}>{t('・タップで内容')}</Text>
           </>
         ) : (
           <>
-            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>記録あり</Text>
-            <View style={[s.legDot, { backgroundColor: C.coral }]} /><Text style={s.legT}>目標超過</Text>
-            <Text style={[s.legT, { fontWeight: '800' }]}>?</Text><Text style={s.legT}>未記録</Text>
-            <Text style={s.legT}>・タップで詳細</Text>
+            <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.legT}>{t('記録あり')}</Text>
+            <View style={[s.legDot, { backgroundColor: C.coral }]} /><Text style={s.legT}>{t('目標超過')}</Text>
+            <Text style={[s.legT, { fontWeight: '800' }]}>?</Text><Text style={s.legT}>{t('未記録')}</Text>
+            <Text style={s.legT}>{t('・タップで詳細')}</Text>
           </>
         )}
       </View>

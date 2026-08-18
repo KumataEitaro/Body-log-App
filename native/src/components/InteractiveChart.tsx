@@ -12,6 +12,7 @@ import {
   type RawPoint, dateToIdx, idxToDate, unitForDays, MA_WINDOW,
   binPoints, movingAvg, niceTicks, xTicks, smoothPath, linePath,
 } from '@/lib/chartMath';
+import { t } from '@/lib/i18n';
 
 export type ChartPoint = RawPoint;
 
@@ -167,7 +168,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   const gesture = Gesture.Simultaneous(pinch, Gesture.Exclusive(doubleTap, pan));
 
   if (sorted.length < 2) {
-    return <View style={[s.empty, { height }]}><Text style={s.emptyT}>記録が2件以上たまるとグラフが描かれます</Text></View>;
+    return <View style={[s.empty, { height }]}><Text style={s.emptyT}>{t('記録が2件以上たまるとグラフが描かれます')}</Text></View>;
   }
 
   const latest = sorted[sorted.length - 1];
@@ -238,7 +239,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
 
       <View style={s.foot}>
         <Text style={s.footT}>最新 {Number(latest.value).toFixed(decimals)}{unit}（{fmtIdx(dateToIdx(latest.date))}）</Text>
-        <Text style={s.footHint}>ピンチで拡大・ドラッグで移動・2回タップで戻す</Text>
+        <Text style={s.footHint}>{t('ピンチで拡大・ドラッグで移動・2回タップで戻す')}</Text>
       </View>
 
       {/* 全画面モーダル */}
@@ -246,8 +247,8 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
         <Modal visible={fs} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setFs(false)}>
           <View style={s.fsWrap}>
             <View style={s.fsHead}>
-              <Text style={s.fsTitle}>推移の詳細</Text>
-              <Pressable onPress={() => setFs(false)} hitSlop={10}><Text style={s.fsClose}>✕ 閉じる</Text></Pressable>
+              <Text style={s.fsTitle}>{t('推移の詳細')}</Text>
+              <Pressable onPress={() => setFs(false)} hitSlop={10}><Text style={s.fsClose}>{t('✕ 閉じる')}</Text></Pressable>
             </View>
             <Inner
               points={points} unit={unit} decimals={decimals} planValue={planValue}

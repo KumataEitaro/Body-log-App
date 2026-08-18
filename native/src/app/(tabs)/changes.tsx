@@ -31,25 +31,26 @@ import { logIcon, logTitle } from '@/lib/feed';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
+import { t } from '@/lib/i18n';
 type DayDetail = { id: string; at: string | null; text: string; kcal: number | null; items: FoodItem[] | null; weight: number | null; ex: string | null; mood: string | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
 
-const SERIES = [
-  { key: 'weight', label: '体重', unit: 'kg', decimals: 1 },
-  { key: 'waist', label: 'ウエスト', unit: 'cm', decimals: 1 },
-  { key: 'bodyfat', label: '体脂肪率', unit: '%', decimals: 1 },
+const series = () => [
+  { key: 'weight', label: t('体重'), unit: 'kg', decimals: 1 },
+  { key: 'waist', label: t('ウエスト'), unit: 'cm', decimals: 1 },
+  { key: 'bodyfat', label: t('体脂肪率'), unit: '%', decimals: 1 },
   { key: 'intake', label: '摂取kcal', unit: '', decimals: 0 },
   { key: 'burn', label: '消費kcal', unit: '', decimals: 0 },
 ] as const;
-const RANGES = [{ label: '30日', d: 30 }, { label: '90日', d: 90 }, { label: '全', d: 9999 }] as const;
+const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'goal', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
-  kpi: 'サマリー', calendar: 'カレンダー', chart: '推移グラフ', photos: '体の写真', goal: '目標',
-  trends: '食材の傾向', health: '歩数・睡眠',
-  tkpi: '週間サマリー', tcal: '運動カレンダー', tbal: '週別バランス', tchart: '筋トレの成長', tgoal: '運動目標',
+  kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), goal: t('目標'),
+  trends: t('食材の傾向'), health: t('歩数・睡眠'),
+  tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
 };
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -67,7 +68,7 @@ function addDays(d: string, n: number): string {
 export default function ChangesScreen() {
   const [rows, setRows] = useState<Row[]>([]);
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [serie, setSerie] = useState<typeof SERIES[number]['key']>('weight');
+  const [serie, setSerie] = useState<ReturnType<typeof series>[number]['key']>('weight');
   const [range, setRange] = useState(30);
   const [liveDays, setLiveDays] = useState<number | null>(null); // ピンチ/パン後の実表示日数
   const [liveFull, setLiveFull] = useState(false);
@@ -176,11 +177,11 @@ export default function ChangesScreen() {
   async function loadActivity() {
     setHealthBusy(true); setHealthMsg(null);
     try {
-      if (!(await requestHealthAuth())) { setHealthMsg('ヘルスケアへのアクセスが許可されませんでした。'); return; }
+      if (!(await requestHealthAuth())) { setHealthMsg(t('ヘルスケアへのアクセスが許可されませんでした。')); return; }
       const res = await readActivitySummary(7);
       if ('error' in res) { setHealthMsg(res.error); return; }
       setActivity(res);
-      if (res.length === 0) setHealthMsg('直近7日のデータが見つかりませんでした。');
+      if (res.length === 0) setHealthMsg(t('直近7日のデータが見つかりませんでした。'));
     } finally { setHealthBusy(false); }
   }
 
@@ -196,7 +197,7 @@ export default function ChangesScreen() {
       case 'burn': return rows.map((r) => ({ date: r.date, value: r.target }));
     }
   })();
-  const conf = SERIES.find((x) => x.key === serie)!;
+  const conf = series().find((x) => x.key === serie)!;
 
   // カレンダーのマーク（記録あり=緑 / 目標超過=赤 / 未記録=?）— Web版と同じ判定
   const marks = new Map<string, DayMark>(rows.map((r) => [
@@ -234,7 +235,7 @@ export default function ChangesScreen() {
   const kpiCard = (
       <View style={s.kpiRow}>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>体重</Text>
+          <Text style={s.kpiL}>{t('体重')}</Text>
           <Text style={s.kpiV}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
           {latestW != null && firstW != null && (
             <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.teal : C.coral }]}>
@@ -243,27 +244,27 @@ export default function ChangesScreen() {
           )}
         </View>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>累計収支</Text>
+          <Text style={s.kpiL}>{t('累計収支')}</Text>
           <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]}>{sumAll > 0 ? '+' : ''}{(sumAll / 1000).toFixed(1)}<Text style={s.kpiU}>k</Text></Text>
           <Text style={s.kpiD}>脂肪 約{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>未記録（30日）</Text>
-          <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>日</Text></Text>
-          <Text style={s.kpiD}>±0扱い</Text>
+          <Text style={s.kpiL}>{t('未記録（30日）')}</Text>
+          <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>{t('日')}</Text></Text>
+          <Text style={s.kpiD}>{t('±0扱い')}</Text>
         </View>
       </View>
   );
 
   const calendarCard = (
       <View style={s.card}>
-        <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>カレンダー</Text></View>
+        <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('カレンダー')}</Text></View>
         <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
         {daySel && (
           <View style={s.dayBox}>
             <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の記録</Text>
-            {dayDetail === null && <Text style={s.note}>読み込み中…</Text>}
-            {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>この日の記録はありません。</Text>}
+            {dayDetail === null && <Text style={s.note}>{t('読み込み中…')}</Text>}
+            {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>{t('この日の記録はありません。')}</Text>}
             {dayDetail?.map((l) => (
               <View key={l.id} style={s.dayRow}>
                 <Text style={{ fontSize: 13 }}>{logIcon(l)}</Text>
@@ -281,7 +282,7 @@ export default function ChangesScreen() {
   const chartCard = (
       <View style={s.card} ref={chartTarget} collapsable={false}>
         <View style={s.chips}>
-          {SERIES.map((x) => (
+          {series().map((x) => (
             <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
               <Text style={[s.chipT, serie === x.key && { color: '#fff' }]}>{x.label}</Text>
             </Pressable>
@@ -301,10 +302,10 @@ export default function ChangesScreen() {
               liveDays == null
                 ? range === d
                 : d >= 9999 ? liveFull : (!liveFull && Math.abs(liveDays - d) / d <= 0.25);
-            const noneActive = liveDays != null && !RANGES.some((r) => isActive(r.d));
+            const noneActive = liveDays != null && !ranges().some((r) => isActive(r.d));
             return (
               <>
-                {RANGES.map((r) => (
+                {ranges().map((r) => (
                   <Pressable key={r.label} style={[s.chip, isActive(r.d) && s.chipOn]}
                              onPress={() => { setRange(r.d); setLiveDays(null); setChartNonce((n) => n + 1); }}>
                     <Text style={[s.chipT, isActive(r.d) && { color: '#fff' }]}>{r.label}</Text>
@@ -332,9 +333,9 @@ export default function ChangesScreen() {
         const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
         return (
           <View style={s.card}>
-            <View style={s.h2Row}><FlaskConical size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>食材とあなたの体の傾向</Text></View>
-            <Text style={s.note}>よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。</Text>
-            {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>▼ 食べた翌日、下がりやすい</Text>}
+            <View style={s.h2Row}><FlaskConical size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食材とあなたの体の傾向')}</Text></View>
+            <Text style={s.note}>{t('よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。')}</Text>
+            {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>{t('▼ 食べた翌日、下がりやすい')}</Text>}
             {down.map((f) => (
               <View key={f.name} style={s.fxRow}>
                 <View style={{ flex: 1 }}>
@@ -344,7 +345,7 @@ export default function ChangesScreen() {
                 <Text style={[s.fxVal, { color: C.teal }]}>{g(f.effect)}</Text>
               </View>
             ))}
-            {up.length > 0 && <Text style={[s.fxHead, { color: C.coral }]}>▲ 食べた翌日、上がりやすい</Text>}
+            {up.length > 0 && <Text style={[s.fxHead, { color: C.coral }]}>{t('▲ 食べた翌日、上がりやすい')}</Text>}
             {up.map((f) => (
               <View key={f.name} style={s.fxRow}>
                 <View style={{ flex: 1 }}>
@@ -354,17 +355,17 @@ export default function ChangesScreen() {
                 <Text style={[s.fxVal, { color: C.coral }]}>{g(f.effect)}</Text>
               </View>
             ))}
-            <Text style={s.note}>※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。</Text>
+            <Text style={s.note}>{t('※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。')}</Text>
           </View>
         );
       })() : null;
 
   const healthCard = healthAvailable() ? (
         <View style={s.card}>
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>歩数・睡眠（直近7日）</Text></View>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('歩数・睡眠（直近7日）')}</Text></View>
           {activity === null ? (
             <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
-              <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : 'ヘルスケアから読み込む'}</Text>
+              <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : t('ヘルスケアから読み込む')}</Text>
             </Pressable>
           ) : (
             activity.map((a) => (
@@ -414,28 +415,28 @@ export default function ChangesScreen() {
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         {/* ⚙は固定配置のHeaderGear（右余白38で衝突回避） */}
-        <Text style={s.pageTitle}>概要</Text>
+        <Text style={s.pageTitle}>{t('概要')}</Text>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginRight: 38 }}>
           {editing ? (
             <>
-              <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>元に戻す</Text></Pressable>
-              <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>完了</Text></Pressable>
+              <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
+              <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>{t('完了')}</Text></Pressable>
             </>
           ) : (
-            <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>≡ 並べ替え</Text></Pressable>
+            <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>{t('≡ 並べ替え')}</Text></Pressable>
           )}
         </View>
       </View>
       <View style={{ marginBottom: 4 }}>
         <SegmentedControl
           options={[
-            { key: 'body', label: '身体の変化', icon: <PersonStanding size={14} color={C.sub} /> },
+            { key: 'body', label: t('身体の変化'), icon: <PersonStanding size={14} color={C.sub} /> },
             { key: 'training', label: '運動の記録', icon: <Dumbbell size={14} color={C.sub} /> },
           ]}
           value={topSeg} onChange={setTopSeg}
         />
       </View>
-      {editing && <Text style={s.editHint}>カードを長押し→そのままドラッグで移動。「完了」で保存します</Text>}
+      {editing && <Text style={s.editHint}>{t('カードを長押し→そのままドラッグで移動。「完了」で保存します')}</Text>}
     </>
   );
 

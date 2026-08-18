@@ -12,6 +12,7 @@ import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
 import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
+import { t } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 type Ev = { id: string; date: string; title: string; extra_kcal: number };
@@ -91,7 +92,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
   async function saveWeightGoal() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(gDate) || !(Number(gWeight) > 20)) {
-      setMsg({ ok: false, text: '目標日と目標体重を入力してください。' }); return;
+      setMsg({ ok: false, text: t('目標日と目標体重を入力してください。') }); return;
     }
     setBusy(true); setMsg(null);
     try {
@@ -115,27 +116,27 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       if (error && /target_bodyfat|protein_per_kg|fat_per_kg|fat_max_g|column|schema/.test(error.message)) {
         ({ error } = await supabase.from('goals').upsert(base));
       }
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await load();
-      setMsg({ ok: true, text: '目標を保存し、計画を再計算しました。' });
+      setMsg({ ok: true, text: t('目標を保存し、計画を再計算しました。') });
     } finally { setBusy(false); }
   }
 
   async function addEvent() {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(evDate)) { setMsg({ ok: false, text: 'チートデイの日付を選んでください。' }); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(evDate)) { setMsg({ ok: false, text: t('チートデイの日付を選んでください。') }); return; }
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
       const { data, error } = await supabase.from('events')
-        .insert({ user_id: uid, date: evDate, title: '🍖 チートデイ', extra_kcal: Number(evKcal) || 800 })
+        .insert({ user_id: uid, date: evDate, title: t('🍖 チートデイ'), extra_kcal: Number(evKcal) || 800 })
         .select('id,date,title,extra_kcal').single();
-      if (error) { setMsg({ ok: false, text: '登録に失敗しました。もう一度お試しください。' }); return; }
+      if (error) { setMsg({ ok: false, text: t('登録に失敗しました。もう一度お試しください。') }); return; }
       setEvents((prev) => [...prev, data as Ev].sort((a, b) => (a.date < b.date ? -1 : 1)));
       scheduleCheatDayEve(evDate); // 前日20時のリマインド（通知許可がなければ静かにスキップ）
       setEvDate('');
-      setMsg({ ok: true, text: 'チートデイを登録しました。前後の日で計画が自動的に吸収します。' });
+      setMsg({ ok: true, text: t('チートデイを登録しました。前後の日で計画が自動的に吸収します。') });
     } finally { setBusy(false); }
   }
 
@@ -146,7 +147,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
   async function addTrainingGoal() {
     const name = tName.trim(); const kg = Number(tKg);
-    if (!name || !(kg > 0)) { setMsg({ ok: false, text: '種目名と目標重量(kg)を入力してください。' }); return; }
+    if (!name || !(kg > 0)) { setMsg({ ok: false, text: t('種目名と目標重量(kg)を入力してください。') }); return; }
     // 目標はRM換算した推定1RMで保存する（例: 100kg×5回 → 1RM 117kg）
     const target = Math.round(epley1RM(kg, tReps));
     setBusy(true); setMsg(null);
@@ -188,7 +189,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
         setMsg({ ok: false, text: /ex_per_week|column|schema/i.test(error.message) ? '習慣目標はDB更新（apply-pending.sqlのv17）後に使えます。' : '保存に失敗しました。' });
         return;
       }
-      setMsg({ ok: true, text: '運動習慣の目標を保存しました。「概要」タブの運動の記録に反映されます。' });
+      setMsg({ ok: true, text: t('運動習慣の目標を保存しました。「概要」タブの運動の記録に反映されます。') });
     } finally { setHabitBusy(false); }
   }
 
@@ -205,13 +206,13 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
         <View style={s.card}>
           {showGoal && (
           <>
-          <View style={s.h2Row}><Target size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>目標設定</Text></View>
+          <View style={s.h2Row}><Target size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('目標設定')}</Text></View>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
               <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
               {status && (
                 <Text style={[s.statusSub, { color: status.state === 'behind' ? C.coral : C.teal }]}>
-                  {status.state === 'ahead' ? `${Math.abs(status.diffDays)}日先行 🎉` : status.state === 'behind' ? `${Math.abs(status.diffDays)}日遅れ` : '順調 👍'}
+                  {status.state === 'ahead' ? `${Math.abs(status.diffDays)}日先行 🎉` : status.state === 'behind' ? `${Math.abs(status.diffDays)}${t('日遅れ')}` : t('順調 👍')}
                   ・あと{Math.abs(latestWeight - Number(goal.target_weight)).toFixed(1)}kg
                 </Text>
               )}
@@ -220,17 +221,17 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           {/* 日付と体重は情報量が小さいので1行に並べる（縦積みはスペースの無駄） */}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1.3 }}>
-              <Text style={s.label}>目標日</Text>
+              <Text style={s.label}>{t('目標日')}</Text>
               <Pressable style={s.input} onPress={() => setShowDatePicker((v) => !v)}>
-                <Text style={{ fontSize: 15, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : 'タップして選ぶ'}</Text>
+                <Text style={{ fontSize: 15, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : t('タップして選ぶ')}</Text>
               </Pressable>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>目標体重（kg）</Text>
+              <Text style={s.label}>{t('目標体重（kg）')}</Text>
               <TextInput style={s.input} placeholder="82.0" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gWeight} onChangeText={setGWeight} />
             </View>
             <View style={{ flex: 0.9 }}>
-              <Text style={s.label}>体脂肪率（%）</Text>
+              <Text style={s.label}>{t('体脂肪率（%）')}</Text>
               <TextInput style={s.input} placeholder="任意" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gBf} onChangeText={setGBf} />
             </View>
           </View>
@@ -257,7 +258,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
                 <TextInput style={s.input} placeholder={String(FAT_PER_KG_DEFAULT)} placeholderTextColor={C.faint} keyboardType="decimal-pad" value={gFat} onChangeText={setGFat} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>F上限（g/日）</Text>
+                <Text style={s.label}>{t('F上限（g/日）')}</Text>
                 <TextInput style={s.input} placeholder="なし" placeholderTextColor={C.faint} keyboardType="number-pad" value={gFatMax} onChangeText={setGFatMax} />
               </View>
             </View>
@@ -270,8 +271,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           {showGoal && showCheat && <View style={s.divider} />}
           {showCheat && (
           <>
-          <View style={s.h2Row}><Beef size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>チートデイ</Text></View>
-          <Text style={s.note}>登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。</Text>
+          <View style={s.h2Row}><Beef size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('チートデイ')}</Text></View>
+          <Text style={s.note}>{t('登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。')}</Text>
           {events.map((e) => (
             <View key={e.id} style={s.evRow}>
               <Text style={s.evDate}>{e.date.slice(5).replace('-', '/')}</Text>
@@ -284,9 +285,9 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           ))}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'flex-end' }}>
             <View style={{ flex: 1.4 }}>
-              <Text style={s.label}>日付</Text>
+              <Text style={s.label}>{t('日付')}</Text>
               <Pressable style={s.input} onPress={() => setEvPicker((v) => !v)}>
-                <Text style={{ fontSize: 15, color: evDate ? C.ink : C.faint }}>{evDate ? evDate.replace(/-/g, '/') : '選ぶ'}</Text>
+                <Text style={{ fontSize: 15, color: evDate ? C.ink : C.faint }}>{evDate ? evDate.replace(/-/g, '/') : t('選ぶ')}</Text>
               </Pressable>
             </View>
             <View style={{ flex: 1 }}>
@@ -309,21 +310,21 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
       {mode === 'training' && (
         <View style={s.card}>
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>運動習慣の目標</Text></View>
-          <Text style={s.note}>散歩レベルでOK。週にどれだけ動くかを決めると「概要」の運動の記録で達成度が見えます。</Text>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動習慣の目標')}</Text></View>
+          <Text style={s.note}>{t('散歩レベルでOK。週にどれだけ動くかを決めると「概要」の運動の記録で達成度が見えます。')}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>週の回数</Text>
+              <Text style={s.label}>{t('週の回数')}</Text>
               <TextInput style={s.input} placeholder="3" placeholderTextColor={C.faint} keyboardType="number-pad"
                          value={exPerWeek} onChangeText={setExPerWeek} />
             </View>
             <View style={{ flex: 1.2 }}>
-              <Text style={s.label}>週の消費kcal</Text>
+              <Text style={s.label}>{t('週の消費kcal')}</Text>
               <TextInput style={s.input} placeholder="1000" placeholderTextColor={C.faint} keyboardType="number-pad"
                          value={exWeeklyKcal} onChangeText={setExWeeklyKcal} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>最低分数/回</Text>
+              <Text style={s.label}>{t('最低分数/回')}</Text>
               <TextInput style={s.input} placeholder="20" placeholderTextColor={C.faint} keyboardType="number-pad"
                          value={exMinMinutes} onChangeText={setExMinMinutes} />
             </View>
@@ -331,8 +332,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <OptionButton style={{ marginTop: 12 }} variant="teal" label="習慣目標を保存" onPress={saveHabitGoal} busy={habitBusy} />
 
           <View style={s.divider} />
-          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレの目標（RM換算）</Text></View>
-          {tGoals.length === 0 && <Text style={s.note}>まだ目標がありません。種目と目標重量を追加しましょう。</Text>}
+          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの目標（RM換算）')}</Text></View>
+          {tGoals.length === 0 && <Text style={s.note}>{t('まだ目標がありません。種目と目標重量を追加しましょう。')}</Text>}
           {tGoals.map((tg) => {
             const best = bests.get(tg.name) ?? 0;
             const pct = Math.min(100, Math.round((best / Number(tg.target_kg)) * 100));
@@ -353,23 +354,23 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           })}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1.5 }}>
-              <Text style={s.label}>種目名</Text>
+              <Text style={s.label}>{t('種目名')}</Text>
               <TextInput style={s.input} placeholder="ベンチプレス" placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>重量（kg）</Text>
+              <Text style={s.label}>{t('重量（kg）')}</Text>
               <TextInput style={s.input} placeholder="100" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={tKg} onChangeText={setTKg} />
             </View>
           </View>
           {/* 回数は「1回=MAX重量」を主役に大きく。5/8/10回で入れてもRM換算で1RM目標に統一される */}
-          <Text style={s.label}>回数（1回=そのままMAX目標）</Text>
+          <Text style={s.label}>{t('回数（1回=そのままMAX目標）')}</Text>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             {[1, 5, 8, 10].map((r) => (
               <Chip key={r} label={r === 1 ? '1回（MAX）' : `${r}回`} tone="ink" selected={tReps === r} onPress={() => setTReps(r)} />
             ))}
           </View>
           {Number(tKg) > 0 && tReps > 1 && (
-            <Text style={s.rmPreview}>RM換算: {tName.trim() || 'この種目'}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
+            <Text style={s.rmPreview}>RM換算: {tName.trim() || t('この種目')}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
           )}
           <OptionButton style={{ marginTop: 12 }} variant="tonal" label="筋トレ目標を追加" onPress={addTrainingGoal} busy={busy} />
         </View>

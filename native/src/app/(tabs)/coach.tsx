@@ -19,6 +19,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import ColumnReader from '@/components/ColumnReader';
+import { t } from '@/lib/i18n';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
@@ -33,11 +34,11 @@ type HistEntry = { d: string; role: 'user' | 'ai'; text: string };
 const HIST_KEY = 'bl-coach-history';
 const HIST_MAX = 800;
 
-const QUICK: { Icon: LucideIcon; t: string }[] = [
-  { Icon: Utensils, t: '過食しちゃった時の対処法' },
-  { Icon: TrendingDown, t: '体重が落ちない原因は？' },
-  { Icon: Dumbbell, t: '今日の筋トレアドバイス' },
-  { Icon: Moon, t: '気分が乗らない時は？' },
+const quickList = (): { Icon: LucideIcon; t: string }[] => [
+  { Icon: Utensils, t: t('過食しちゃった時の対処法') },
+  { Icon: TrendingDown, t: t('体重が落ちない原因は？') },
+  { Icon: Dumbbell, t: t('今日の筋トレアドバイス') },
+  { Icon: Moon, t: t('気分が乗らない時は？') },
 ];
 
 // AI回答の軽量リッチ表示: **太字**・「・」箇条書き・空行をネイティブに描画（Wall of Text対策）
@@ -126,13 +127,13 @@ export default function CoachScreen() {
       const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string }>(
         '/api/coach', { question, history });
       if (!ok || !json?.ok || !json.answer) {
-        setMsgs((m) => [...m, { role: 'ai', text: json?.error || 'うまく答えられませんでした。もう一度お試しください。' }]);
+        setMsgs((m) => [...m, { role: 'ai', text: json?.error || t('うまく答えられませんでした。もう一度お試しください。') }]);
         return;
       }
       setMsgs((m) => [...m, { role: 'ai', text: json.answer!, action: json.action ?? undefined }]);
       logHist('ai', json.answer!);
     } catch {
-      setMsgs((m) => [...m, { role: 'ai', text: '通信に失敗しました。電波状況を確認してください。' }]);
+      setMsgs((m) => [...m, { role: 'ai', text: t('通信に失敗しました。電波状況を確認してください。') }]);
     } finally {
       setBusy(false);
     }
@@ -141,9 +142,9 @@ export default function CoachScreen() {
   // AI提案の目標を承認制で適用（確認ダイアログ→goals/training_goals更新）
   function applyAction(a: CoachAction, idx: number) {
     Alert.alert('目標を更新しますか？', a.label, [
-      { text: 'キャンセル', style: 'cancel' },
+      { text: t('キャンセル'), style: 'cancel' },
       {
-        text: '適用する',
+        text: t('適用する'),
         onPress: async () => {
           const { data: { session } } = await supabase.auth.getSession();
           const uid = session?.user?.id;
@@ -164,7 +165,7 @@ export default function CoachScreen() {
               .upsert({ user_id: uid, name: a.name, target_kg: Number(a.target_kg) }, { onConflict: 'user_id,name' }));
           }
           if (error) {
-            setMsgs((m) => [...m, { role: 'ai', text: '目標の更新に失敗しました。「概要」タブから手動で設定してください。' }]);
+            setMsgs((m) => [...m, { role: 'ai', text: t('目標の更新に失敗しました。「概要」タブから手動で設定してください。') }]);
             return;
           }
           setMsgs((m) => m.map((x, i) => (i === idx ? { ...x, applied: true } : x)));
@@ -187,10 +188,10 @@ export default function CoachScreen() {
             <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}
                   onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
               <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
-              <Text style={s.welcomeTitle}>AIコーチに相談する</Text>
-              <Text style={s.welcomeSub}>直近の食事・体重・栄養ログをもとにアドバイスします</Text>
+              <Text style={s.welcomeTitle}>{t('AIコーチに相談する')}</Text>
+              <Text style={s.welcomeSub}>{t('直近の食事・体重・栄養ログをもとにアドバイスします')}</Text>
               <View style={s.quickGrid}>
-                {QUICK.map((q) => (
+                {quickList().map((q) => (
                   <Pressable key={q.t} style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.7 }]} onPress={() => send(q.t)}>
                     <q.Icon color={C.teal} size={21} strokeWidth={2.2} />
                     <Text style={s.quickT}>{q.t}</Text>
@@ -219,10 +220,10 @@ export default function CoachScreen() {
                   <View style={s.actionCard}>
                     <Text style={s.actionLabel}>💡 {m.action.label}</Text>
                     {m.applied ? (
-                      <Text style={s.actionDone}>✓ 適用しました（「概要」タブに反映）</Text>
+                      <Text style={s.actionDone}>{t('✓ 適用しました（「概要」タブに反映）')}</Text>
                     ) : (
                       <Pressable style={s.actionBtn} onPress={() => applyAction(m.action!, i)}>
-                        <Text style={s.actionBtnT}>この目標を適用する</Text>
+                        <Text style={s.actionBtnT}>{t('この目標を適用する')}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -232,7 +233,7 @@ export default function CoachScreen() {
             {busy && (
               <View style={[s.bubble, s.bAi, { flexDirection: 'row', gap: 8, alignItems: 'center' }]}>
                 <ActivityIndicator size="small" color={C.teal} />
-                <Text style={s.bubbleT}>データを確認しています…</Text>
+                <Text style={s.bubbleT}>{t('データを確認しています…')}</Text>
               </View>
             )}
           </ScrollView>
@@ -253,12 +254,12 @@ export default function CoachScreen() {
             <ArrowUp color="#fff" size={16} strokeWidth={3} />
           </Pressable>
         </View>
-        <Text style={s.disclaimer}>医療的な診断はできません。深刻な不調が続く場合は医療機関へ。</Text>
+        <Text style={s.disclaimer}>{t('医療的な診断はできません。深刻な不調が続く場合は医療機関へ。')}</Text>
       </View>
       <StatusBarMask />
       <HeaderGear />
       {/* 中央上: タブタイトル（履歴と⚙の間） */}
-      <Text style={[s.pageTitle, { top: insets.top + 12 }]} pointerEvents="none">相談</Text>
+      <Text style={[s.pageTitle, { top: insets.top + 12 }]} pointerEvents="none">{t('相談')}</Text>
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
         <History size={16} color={C.sub} />
@@ -268,7 +269,7 @@ export default function CoachScreen() {
       <Modal visible={histOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHistOpen(false)}>
         <View style={s.histWrap}>
           <View style={s.histHead}>
-            <Text style={s.histTitle}>相談履歴</Text>
+            <Text style={s.histTitle}>{t('相談履歴')}</Text>
             <Pressable onPress={() => setHistOpen(false)} hitSlop={10}><X size={20} color={C.sub} /></Pressable>
           </View>
           <TextInput
@@ -276,7 +277,7 @@ export default function CoachScreen() {
             value={histQ} onChangeText={setHistQ} returnKeyType="search" clearButtonMode="while-editing"
           />
           {histGroups.length === 0 ? (
-            <Text style={s.histEmpty}>{hist.length === 0 ? 'まだ相談履歴がありません。' : '該当する履歴が見つかりません。'}</Text>
+            <Text style={s.histEmpty}>{hist.length === 0 ? 'まだ相談履歴がありません。' : t('該当する履歴が見つかりません。')}</Text>
           ) : (
             <ScrollView style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
               {histGroups.map((g) => (

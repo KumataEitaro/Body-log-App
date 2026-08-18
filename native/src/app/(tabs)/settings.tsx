@@ -82,13 +82,13 @@ export default function SettingsScreen() {
   async function toggleDaily(on: boolean) {
     setNotifDaily(on);
     const ok = await setDailyLogReminder(on);
-    if (!ok && on) { setNotifDaily(false); Alert.alert('通知を許可してください', 'iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'); return; }
+    if (!ok && on) { setNotifDaily(false); Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。')); return; }
     AsyncStorage.setItem('bl-notif-daily', on ? '1' : '0').catch(() => {});
   }
   async function toggleWeekly(on: boolean) {
     setNotifWeekly(on);
     const ok = await setWeeklyPhotoReminder(on);
-    if (!ok && on) { setNotifWeekly(false); Alert.alert('通知を許可してください', 'iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'); return; }
+    if (!ok && on) { setNotifWeekly(false); Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。')); return; }
     AsyncStorage.setItem('bl-notif-weekly', on ? '1' : '0').catch(() => {});
   }
 
@@ -103,7 +103,7 @@ export default function SettingsScreen() {
         height_cm: Number(height) || 170, age: Number(age) || 30,
         life_factor: Number(life) || 1.3,
       }).eq('id', uid);
-      setMsg(error ? { ok: false, text: '保存に失敗しました。もう一度お試しください。' } : { ok: true, text: '保存しました。' });
+      setMsg(error ? { ok: false, text: t('保存に失敗しました。もう一度お試しください。') } : { ok: true, text: t('保存しました。') });
     } finally { setBusy(false); }
   }
 
@@ -113,18 +113,18 @@ export default function SettingsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      if (!(await requestHealthAuth())) { setMsg({ ok: false, text: 'ヘルスケアへのアクセスが許可されませんでした。' }); return; }
+      if (!(await requestHealthAuth())) { setMsg({ ok: false, text: t('ヘルスケアへのアクセスが許可されませんでした。') }); return; }
       const res = await importWeights(uid, 90);
       if ('error' in res) { setMsg({ ok: false, text: res.error }); return; }
-      setMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。「概要」タブのグラフに反映されます。` : '新しく取り込める体重データはありませんでした。' });
+      setMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。「概要」タブのグラフに反映されます。` : t('新しく取り込める体重データはありませんでした。') });
     } finally { setBusy(false); }
   }
 
   function removeFood(id: string, foodName: string) {
-    Alert.alert(`「${foodName}」を削除しますか？`, '入力画面のチップから消えます（過去の記録は変わりません）。', [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(`「${foodName}」を削除しますか？`, t('入力画面のチップから消えます（過去の記録は変わりません）。'), [
+      { text: t('キャンセル'), style: 'cancel' },
       {
-        text: '削除する', style: 'destructive',
+        text: t('削除する'), style: 'destructive',
         onPress: async () => {
           await supabase.from('my_foods').delete().eq('id', id);
           setFoods((prev) => prev.filter((f) => f.id !== id));
@@ -136,11 +136,11 @@ export default function SettingsScreen() {
   function confirmDelete() {
     if (delConfirm !== '削除') return;
     Alert.alert(
-      'アカウントを完全に削除しますか？',
-      '記録・写真・目標・マイ食品のすべてが削除されます。この操作は取り消せません。',
+      t('アカウントを完全に削除しますか？'),
+      t('記録・写真・目標・マイ食品のすべてが削除されます。この操作は取り消せません。'),
       [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '完全に削除する', style: 'destructive', onPress: deleteAccount },
+        { text: t('キャンセル'), style: 'cancel' },
+        { text: t('完全に削除する'), style: 'destructive', onPress: deleteAccount },
       ],
     );
   }
@@ -149,7 +149,7 @@ export default function SettingsScreen() {
     setBusy(true); setMsg(null);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; error?: string }>('/api/account/delete', {});
-      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || '削除に失敗しました。もう一度お試しください。' }); return; }
+      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('削除に失敗しました。もう一度お試しください。') }); return; }
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     } finally { setBusy(false); }
   }
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
     return (
       <View style={s.sheetHead}>
         <Text style={s.sheetTitle}>{title}</Text>
-        <Pressable onPress={() => setSheet(null)} hitSlop={8}><Text style={s.sheetClose}>閉じる</Text></Pressable>
+        <Pressable onPress={() => setSheet(null)} hitSlop={8}><Text style={s.sheetClose}>{t('閉じる')}</Text></Pressable>
       </View>
     );
   }
@@ -183,13 +183,13 @@ export default function SettingsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
-      <Text style={s.h}>マイページ</Text>
+      <Text style={s.h}>{t('マイページ')}</Text>
 
       {/* ヘッダーサマリーカード */}
       <View style={s.summary}>
         <View style={s.avatar}><Text style={{ fontSize: 26 }}>💪</Text></View>
         <View style={{ flex: 1 }}>
-          <Text style={s.sumName}>{name || 'ニックネーム未設定'}</Text>
+          <Text style={s.sumName}>{name || t('ニックネーム未設定')}</Text>
           <Text style={s.sumMail}>{email || '—'}</Text>
           <Text style={s.sumMeta}>
             {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ 基礎代謝 約{Math.round(bmr)}kcal
@@ -198,7 +198,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* アカウント設定 */}
-      <Text style={s.groupLabel}>アカウント設定</Text>
+      <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
         <Row icon={<UserRound color={C.teal} size={19} />} label="プロフィール編集" sub="表示名・性別・身長・年齢・活動量" onPress={() => openSheet('profile')} />
         <View style={s.sep} />
@@ -206,7 +206,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* 目標 */}
-      <Text style={s.groupLabel}>目標</Text>
+      <Text style={s.groupLabel}>{t('目標')}</Text>
       <View style={s.group}>
         <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
@@ -244,36 +244,36 @@ export default function SettingsScreen() {
       </View>
 
       {/* 通知 */}
-      <Text style={s.groupLabel}>通知</Text>
+      <Text style={s.groupLabel}>{t('通知')}</Text>
       <View style={s.group}>
         <View style={s.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={s.notifLabel}>記録リマインダー</Text>
-            <Text style={s.notifSub}>毎日21:00に「今日の記録」を通知</Text>
+            <Text style={s.notifLabel}>{t('記録リマインダー')}</Text>
+            <Text style={s.notifSub}>{t('毎日21:00に「今日の記録」を通知')}</Text>
           </View>
           <Switch value={notifDaily} onValueChange={toggleDaily} trackColor={{ true: C.teal }} />
         </View>
         <View style={s.sep} />
         <View style={s.notifRow}>
           <View style={{ flex: 1 }}>
-            <Text style={s.notifLabel}>週1回の体写真</Text>
-            <Text style={s.notifSub}>日曜19:00に撮影リマインド</Text>
+            <Text style={s.notifLabel}>{t('週1回の体写真')}</Text>
+            <Text style={s.notifSub}>{t('日曜19:00に撮影リマインド')}</Text>
           </View>
           <Switch value={notifWeekly} onValueChange={toggleWeekly} trackColor={{ true: C.teal }} />
         </View>
-        <Text style={s.notifNote}>チートデイの前日20:00にも自動でお知らせします（登録時に設定・通知許可が必要）。Expo Goでは動作せず、TestFlight版で有効です。</Text>
+        <Text style={s.notifNote}>{t('チートデイの前日20:00にも自動でお知らせします（登録時に設定・通知許可が必要）。Expo Goでは動作せず、TestFlight版で有効です。')}</Text>
       </View>
 
       {/* データ・連携 */}
-      <Text style={s.groupLabel}>データ・連携</Text>
+      <Text style={s.groupLabel}>{t('データ・連携')}</Text>
       <View style={s.group}>
         <Row icon={<HeartPulse color={C.teal} size={19} />} label="ヘルスケア連携"
-             sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : 'TestFlight版で有効になります'}
+             sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
              onPress={() => openSheet('health')} />
       </View>
 
       {/* サポート */}
-      <Text style={s.groupLabel}>サポート</Text>
+      <Text style={s.groupLabel}>{t('サポート')}</Text>
       <View style={s.group}>
         <Row icon={<CircleHelp color={C.teal} size={19} />} label="使い方ガイドをもう一度見る"
              sub="各画面の説明と初期設定をやり直せます"
@@ -288,10 +288,10 @@ export default function SettingsScreen() {
       <View style={{ height: 16 }} />
       <Pressable style={s.logoutBtn} onPress={() => supabase.auth.signOut()}>
         <LogOut color={C.sub} size={16} />
-        <Text style={s.logoutT}>ログアウト</Text>
+        <Text style={s.logoutT}>{t('ログアウト')}</Text>
       </Pressable>
       <Pressable style={s.deleteLink} onPress={() => openSheet('delete')} hitSlop={6}>
-        <Text style={s.deleteLinkT}>アカウントを削除する</Text>
+        <Text style={s.deleteLinkT}>{t('アカウントを削除する')}</Text>
       </Pressable>
     </ScrollView>
 
@@ -300,24 +300,24 @@ export default function SettingsScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
         <SheetHeader title="👤 プロフィール編集" />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          <Text style={s.label}>表示名</Text>
+          <Text style={s.label}>{t('表示名')}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="表示名" placeholderTextColor={C.faint} />
-          <Text style={s.label}>性別</Text>
+          <Text style={s.label}>{t('性別')}</Text>
           <SegmentedControl
-            options={[{ key: 'male', label: '男性' }, { key: 'female', label: '女性' }]}
+            options={[{ key: 'male', label: t('男性') }, { key: 'female', label: t('女性') }]}
             value={sex} onChange={setSex}
           />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>身長(cm)</Text>
+              <Text style={s.label}>{t('身長(cm)')}</Text>
               <TextInput style={s.input} keyboardType="number-pad" value={height} onChangeText={setHeight} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.label}>年齢</Text>
+              <Text style={s.label}>{t('年齢')}</Text>
               <TextInput style={s.input} keyboardType="number-pad" value={age} onChangeText={setAge} />
             </View>
           </View>
-          <Text style={s.label}>日常の活動量 <Text style={{ fontWeight: '400' }}>— 消費カロリーの計算に使います</Text></Text>
+          <Text style={s.label}>{t('日常の活動量')}<Text style={{ fontWeight: '400' }}>{t('— 消費カロリーの計算に使います')}</Text></Text>
           <ActivityLevelPicker value={Number(life) || 1.375} onChange={(v) => setLife(String(v))} />
           <OptionButton style={{ marginTop: 16 }} label="保存する" onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
@@ -336,7 +336,7 @@ export default function SettingsScreen() {
               {locale === l.code && <Text style={{ color: C.teal, fontWeight: '800' }}>✓</Text>}
             </Pressable>
           ))}
-          <Text style={s.note}>未翻訳の項目は日本語で表示されます。翻訳は順次追加していきます。</Text>
+          <Text style={s.note}>{t('未翻訳の項目は日本語で表示されます。翻訳は順次追加していきます。')}</Text>
         </ScrollView>
       </View>
     </Modal>
@@ -354,7 +354,7 @@ export default function SettingsScreen() {
       <View style={s.sheetBody}>
         <SheetHeader title="🍱 マイ食品の管理" />
         <ScrollView>
-          {foods.length === 0 && <Text style={s.note}>まだ登録がありません。食事タブでAI解析した品目が候補になります。</Text>}
+          {foods.length === 0 && <Text style={s.note}>{t('まだ登録がありません。食事タブでAI解析した品目が候補になります。')}</Text>}
           {foods.map((f) => (
             <View key={f.id} style={s.foodRow}>
               <Text style={s.foodName} numberOfLines={1}>{f.name}</Text>
@@ -373,12 +373,12 @@ export default function SettingsScreen() {
       <View style={s.sheetBody}>
         <SheetHeader title="⌚ ヘルスケア連携" />
         {!healthAvailable() ? (
-          <Text style={s.note}>この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。</Text>
+          <Text style={s.note}>{t('この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。')}</Text>
         ) : (
           <>
-            <Text style={s.note}>Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。</Text>
+            <Text style={s.note}>{t('Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。')}</Text>
             <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={healthImportWeights} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>⚖️ 体重を取り込む（過去90日）</Text>}
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('⚖️ 体重を取り込む（過去90日）')}</Text>}
             </Pressable>
           </>
         )}
@@ -392,7 +392,7 @@ export default function SettingsScreen() {
         <SheetHeader title="🎯 体重の目標" />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="weight" weightSections="goal" />
-          <Text style={s.note}>チートデイの登録は「概要」タブのカードから行えます。</Text>
+          <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -411,12 +411,12 @@ export default function SettingsScreen() {
     <Modal visible={sheet === 'delete'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
         <SheetHeader title="⚠️ アカウント削除" />
-        <Text style={s.note}>アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。</Text>
-        <Text style={s.label}>確認のため「削除」と入力</Text>
+        <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
+        <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder="削除" placeholderTextColor={C.faint} />
         <Pressable style={[s.btnDanger, { marginTop: 14 }, delConfirm !== '削除' && { opacity: 0.4 }]}
                    onPress={confirmDelete} disabled={busy || delConfirm !== '削除'}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>アカウントを完全に削除する</Text>}
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('アカウントを完全に削除する')}</Text>}
         </Pressable>
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>

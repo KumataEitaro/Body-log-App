@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
-import { EN } from '@/content/i18n/en';
+import { DICTS } from '@/content/i18n';
 
 export type LocaleCode = 'ja' | 'en' | 'zh' | 'ko' | 'es' | 'fr' | 'de' | 'pt' | 'id' | 'th' | 'vi';
 
@@ -22,9 +22,6 @@ export const LOCALES: { code: LocaleCode; label: string }[] = [
   { code: 'vi', label: 'Tiếng Việt' },
 ];
 
-type Dict = Record<string, string>;
-// 現状は英語辞書のみ同梱。他言語は辞書ファイルを足せば即座に有効になる。
-const DICTS: Partial<Record<LocaleCode, Dict>> = { en: EN };
 
 const KEY = 'bl-locale';
 let locale: LocaleCode = 'ja';
@@ -79,7 +76,7 @@ export function useLocale(): LocaleCode {
  * 変数は {n} 形式で差し込む: t('あと{n}g', { n: 51 })
  */
 export function t(ja: string, vars?: Record<string, string | number>): string {
-  let out = locale === 'ja' ? ja : (DICTS[locale]?.[ja] ?? DICTS.en?.[ja] ?? ja);
+  let out = locale === 'ja' ? ja : (DICTS[locale]?.[ja] || DICTS.en?.[ja] || ja);
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }

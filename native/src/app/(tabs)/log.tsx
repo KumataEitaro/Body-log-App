@@ -34,6 +34,7 @@ import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
+import { t } from '@/lib/i18n';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -222,7 +223,7 @@ export default function LogScreen() {
 
   async function takePhoto() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) { setMsg({ ok: false, text: 'カメラの許可が必要です（設定アプリ→BodyLog）。' }); return; }
+    if (!perm.granted) { setMsg({ ok: false, text: t('カメラの許可が必要です（設定アプリ→BodyLog）。') }); return; }
     const res = await ImagePicker.launchCameraAsync({ quality: 1 });
     if (res.canceled || !res.assets?.length) return;
     const p = await compressToPayload(res.assets[0].uri);
@@ -231,7 +232,7 @@ export default function LogScreen() {
 
   async function pickPhotos() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { setMsg({ ok: false, text: '写真ライブラリの許可が必要です（設定アプリ→BodyLog）。' }); return; }
+    if (!perm.granted) { setMsg({ ok: false, text: t('写真ライブラリの許可が必要です（設定アプリ→BodyLog）。') }); return; }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 - photos.length, quality: 1,
     });
@@ -249,7 +250,7 @@ export default function LogScreen() {
     const imgs = photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' }));
     setChat(''); setPhotos([]); setMsg(null);
     inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
-    setPendingTexts((p) => [...p, text || '（写真）']);
+    setPendingTexts((p) => [...p, text || t('（写真）')]);
     try {
       const res = await analyzeFood(text, imgs);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
@@ -264,7 +265,7 @@ export default function LogScreen() {
       }));
       if (text) setStagedNote((n) => (n ? `${n}、${text}` : text));
     } catch {
-      setMsg({ ok: false, text: '通信に失敗しました。電波状況を確認してください。' });
+      setMsg({ ok: false, text: t('通信に失敗しました。電波状況を確認してください。') });
       setChat(text);
     } finally {
       setPendingTexts((p) => p.slice(1));
@@ -296,10 +297,10 @@ export default function LogScreen() {
 
   // 記録の取り消し: フィード行を長押し→削除（チップ即時追加の押し間違い対策）
   function confirmDeleteLog(l: DayLog) {
-    Alert.alert('この記録を削除しますか？', logTitle(l), [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(t('この記録を削除しますか？'), logTitle(l), [
+      { text: t('キャンセル'), style: 'cancel' },
       {
-        text: '削除する', style: 'destructive',
+        text: t('削除する'), style: 'destructive',
         onPress: async () => {
           await supabase.from('logs').delete().eq('id', l.id);
           if (uid) await syncEntriesForDate(uid, today);
@@ -313,7 +314,7 @@ export default function LogScreen() {
   function reuseMeal(m: RecentMeal) {
     const items = [...(parsed?.items ?? []), ...m.items];
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
-    setMsg({ ok: true, text: '下のトレイに入れました。内容を確認して✓保存してください。' });
+    setMsg({ ok: true, text: t('下のトレイに入れました。内容を確認して✓保存してください。') });
   }
 
   function titleOfItems(items: FoodItem[]): string {
@@ -330,7 +331,7 @@ export default function LogScreen() {
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       setParsed(null); setStagedNote('');
       await load();
-      setMsg({ ok: true, text: '保存しました。' });
+      setMsg({ ok: true, text: t('保存しました。') });
     } finally {
       setSaving(false);
     }
@@ -339,7 +340,7 @@ export default function LogScreen() {
   async function saveWeight() {
     // 入力は表示単位（kg/lb）。DBは常にkgで保存する
     const w = displayToKg(Number(wWeight), units.weight);
-    if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: '体重の値を確認してください。' }); return; }
+    if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: t('体重の値を確認してください。') }); return; }
     setSaving(true);
     try {
       await supabase.from('logs').insert({
@@ -395,12 +396,12 @@ export default function LogScreen() {
   async function addRecoveryEvent() {
     if (!uid) return;
     const { data: ev, error } = await supabase.from('events')
-      .insert({ user_id: uid, date: today, title: '🕊 リカバリー枠', extra_kcal: 200 })
+      .insert({ user_id: uid, date: today, title: t('🕊 リカバリー枠'), extra_kcal: 200 })
       .select('id,date,title,extra_kcal').single();
-    if (error) { setMsg({ ok: false, text: '設定に失敗しました。もう一度お試しください。' }); return; }
+    if (error) { setMsg({ ok: false, text: t('設定に失敗しました。もう一度お試しください。') }); return; }
     setEvents((prev) => [...prev, ev as PlanEvent & { id: string }]);
     await snoozeRisk();
-    setMsg({ ok: true, text: '🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。' });
+    setMsg({ ok: true, text: t('🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。') });
   }
 
   // ===== 昨日の穴埋め（未記録の爆食日を翌日に低摩擦で回収する・Web版と同一） =====
@@ -440,17 +441,17 @@ export default function LogScreen() {
         user_id: uid, date: backfill.date, at: `${backfill.date}T21:00:00+09:00`,
         items: [], kcal: baseEst + extra, p: null, f: null, c: null, weight: null,
         ex: 'オフ', adj: 0, mood: '',
-        text: extra > 0 ? `（あとから概算: 食べすぎ +${extra}kcal）` : '（あとから確定: だいたい目安どおり）',
+        text: extra > 0 ? `（あとから概算: 食べすぎ +${extra}kcal）` : t('（あとから確定: だいたい目安どおり）'),
         photo_urls: [],
       });
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, backfill.date);
       setBackfill(null);
       setMsg({
         ok: true,
         text: extra > 0
           ? `昨日を「食べすぎ +${extra.toLocaleString()}kcal」として記録しました。今日から立て直しましょう！`
-          : '昨日を「目安どおり（±0）」で確定しました。',
+          : t('昨日を「目安どおり（±0）」で確定しました。'),
       });
     } finally {
       setBackfillBusy(false);
@@ -498,14 +499,14 @@ export default function LogScreen() {
         scrollEventThrottle={32}
       >
         <Animated.View style={[s.brandRow, enter[0], { justifyContent: 'space-between', marginRight: 38 }]}>
-          <Text style={s.pageTitle}>食事</Text>
+          <Text style={s.pageTitle}>{t('食事')}</Text>
           <DateStrip value={viewDate} onChange={setViewDate} />
         </Animated.View>
 
         {/* ヒーロー */}
         {profile && (
           <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
-            <Text style={s.heroL}>{left < 0 ? 'オーバー' : 'あと食べられる'}{plan ? '（計画）' : '（維持）'}</Text>
+            <Text style={s.heroL}>{left < 0 ? 'オーバー' : t('あと食べられる')}{plan ? '（計画）' : t('（維持）')}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
@@ -547,11 +548,11 @@ export default function LogScreen() {
         {/* 昨日の穴埋めカード（責めないトーン） */}
         {backfill && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : '📝 昨日の食事記録がありません'}</Text>
+            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : t('📝 昨日の食事記録がありません')}</Text>
             <Text style={s.mutedT}>
               {backfill.binge
-                ? '食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。'
-                : 'ざっくりでOKです。未記録の日が続くと、収支の数字と現実が少しずつズレていきます。'}
+                ? t('食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。')
+                : t('ざっくりでOKです。未記録の日が続くと、収支の数字と現実が少しずつズレていきます。')}
             </Text>
             {!backfillMore ? (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
@@ -566,7 +567,7 @@ export default function LogScreen() {
               </View>
             )}
             <Pressable onPress={backfillSnooze} style={{ marginTop: 8, alignSelf: 'center' }} hitSlop={8}>
-              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>あとで</Text>
+              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('あとで')}</Text>
             </Pressable>
           </View>
         )}
@@ -574,7 +575,7 @@ export default function LogScreen() {
         {/* 過食リスクの事前アラート（理由つき・1タップ予防） */}
         {bingeRisk && (
           <View style={[s.card, { borderColor: bingeRisk.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>{bingeRisk.level === 'high' ? '🌪 今日は食欲が爆発しやすい状態です' : '🌤 今日は食欲が乱れやすいかも'}</Text>
+            <Text style={s.h2}>{bingeRisk.level === 'high' ? '🌪 今日は食欲が爆発しやすい状態です' : t('🌤 今日は食欲が乱れやすいかも')}</Text>
             {bingeRisk.reasons.map((r) => (
               <Text key={r.key} style={[s.mutedT, { lineHeight: 20 }]}>・{r.text}</Text>
             ))}
@@ -595,7 +596,7 @@ export default function LogScreen() {
         {/* 朝の気分カード（その日1回だけ・記録かスキップで消える） */}
         {showMood && (
           <View style={s.card}>
-            <Text style={s.h2}>💭 いまの気分は？</Text>
+            <Text style={s.h2}>{t('💭 いまの気分は？')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
                 <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: '#eef0ee' }]}
@@ -604,17 +605,17 @@ export default function LogScreen() {
                 </Pressable>
               ))}
             </View>
-            <Text style={s.mutedT}>気分と食欲はつながっています。記録するとAIの過食予報が賢くなります。</Text>
+            <Text style={s.mutedT}>{t('気分と食欲はつながっています。記録するとAIの過食予報が賢くなります。')}</Text>
             <Pressable onPress={moodSnooze} style={{ marginTop: 6, alignSelf: 'center' }} hitSlop={8}>
-              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>今日は聞かないで</Text>
+              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('今日は聞かないで')}</Text>
             </Pressable>
           </View>
         )}
 
         {/* 今日のフィード */}
         <Animated.View style={[s.card, enter[2]]}>
-          <Text style={s.h2}>今日の記録 <Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
-          {dayLogs.length === 0 && <Text style={s.mutedT}>まだ記録がありません。下から1回分ずつ記録しましょう。</Text>}
+          <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
+          {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。下から1回分ずつ記録しましょう。')}</Text>}
           {dayLogs.map((l) => (
             <Pressable key={l.id} style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
@@ -624,7 +625,7 @@ export default function LogScreen() {
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
             </Pressable>
           ))}
-          {dayLogs.length > 0 && <Text style={s.hint}>行を長押しで削除できます</Text>}
+          {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
         </Animated.View>
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
@@ -634,9 +635,9 @@ export default function LogScreen() {
                        onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <History size={14} color={C.teal} />
-                <Text style={[s.h2, { marginBottom: 0 }]}>前の食事をもう一度</Text>
+                <Text style={[s.h2, { marginBottom: 0 }]}>{t('前の食事をもう一度')}</Text>
               </View>
-              <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : '▾ ひらく'}</Text>
+              <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : t('▾ ひらく')}</Text>
             </Pressable>
             {recentOpen && (
               <>
@@ -650,7 +651,7 @@ export default function LogScreen() {
                     </Pressable>
                   </View>
                 ))}
-                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。</Text>
+                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>{t('↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
               </>
             )}
           </View>
@@ -790,7 +791,7 @@ export default function LogScreen() {
             </ScrollView>
             {parsed != null && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>破棄</Text></Pressable>
+                <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
                 <Pressable style={s.traySave} onPress={save} disabled={saving}>
                   {saving ? <ActivityIndicator color="#fff" /> : (
                     <Text style={s.traySaveT}>✓ 保存{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>

@@ -16,6 +16,7 @@ import { todayJST } from '@/lib/calc';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import GoalPanel from '@/components/GoalPanel';
+import { t } from '@/lib/i18n';
 
 const DONE_KEY = 'bl-onboard-done';
 
@@ -55,7 +56,7 @@ export default function Onboarding() {
 
   async function saveProfile() {
     if (!height.trim() || !age.trim() || !weight.trim()) {
-      setMsg('身長・年齢・現在の体重を入力してください。'); return;
+      setMsg(t('身長・年齢・現在の体重を入力してください。')); return;
     }
     setBusy(true); setMsg('');
     try {
@@ -63,11 +64,11 @@ export default function Onboarding() {
       const uid = session?.user?.id;
       if (!uid) return;
       const { error } = await supabase.from('profiles').upsert({
-        id: uid, display_name: name.trim() || 'あなた', sex,
+        id: uid, display_name: name.trim() || t('あなた'), sex,
         height_cm: Number(height) || 170, age: Number(age) || 30,
         life_factor: life, init_weight: Number(weight) || null,
       });
-      if (error) { setMsg('保存に失敗しました。もう一度お試しください。'); return; }
+      if (error) { setMsg(t('保存に失敗しました。もう一度お試しください。')); return; }
       await supabase.from('entries').upsert(
         { user_id: uid, date: todayJST(), weight: Number(weight) }, { onConflict: 'user_id,date' });
       setStep(1);
@@ -82,36 +83,36 @@ export default function Onboarding() {
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[0, 1, 2].map((i) => <View key={i} style={[s.dot, step === i && s.dotOn]} />)}
           </View>
-          <Pressable onPress={done} hitSlop={10}><Text style={s.skipT}>あとで設定</Text></Pressable>
+          <Pressable onPress={done} hitSlop={10}><Text style={s.skipT}>{t('あとで設定')}</Text></Pressable>
         </View>
 
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
           {step === 0 && (
             <>
-              <Text style={s.h1}>あなたの現在地点</Text>
-              <Text style={s.sub}>基礎代謝と消費カロリーの計算に使います。あとで⚙からいつでも変更できます。</Text>
-              <Text style={s.label}>ニックネーム（任意）</Text>
+              <Text style={s.h1}>{t('あなたの現在地点')}</Text>
+              <Text style={s.sub}>{t('基礎代謝と消費カロリーの計算に使います。あとで⚙からいつでも変更できます。')}</Text>
+              <Text style={s.label}>{t('ニックネーム（任意）')}</Text>
               <TextInput style={s.input} placeholder="例: くまさん" placeholderTextColor={C.faint} value={name} onChangeText={setName} />
-              <Text style={s.label}>性別</Text>
+              <Text style={s.label}>{t('性別')}</Text>
               <SegmentedControl
-                options={[{ key: 'male', label: '男性' }, { key: 'female', label: '女性' }]}
+                options={[{ key: 'male', label: t('男性') }, { key: 'female', label: t('女性') }]}
                 value={sex} onChange={setSex}
               />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.label}>身長（cm）</Text>
+                  <Text style={s.label}>{t('身長（cm）')}</Text>
                   <TextInput style={s.input} keyboardType="number-pad" placeholder="170" placeholderTextColor={C.faint} value={height} onChangeText={setHeight} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.label}>年齢</Text>
+                  <Text style={s.label}>{t('年齢')}</Text>
                   <TextInput style={s.input} keyboardType="number-pad" placeholder="30" placeholderTextColor={C.faint} value={age} onChangeText={setAge} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.label}>今の体重（kg）</Text>
+                  <Text style={s.label}>{t('今の体重（kg）')}</Text>
                   <TextInput style={s.input} keyboardType="decimal-pad" placeholder="70.0" placeholderTextColor={C.faint} value={weight} onChangeText={setWeight} />
                 </View>
               </View>
-              <Text style={s.label}>日常の活動量</Text>
+              <Text style={s.label}>{t('日常の活動量')}</Text>
               <ActivityLevelPicker value={life} onChange={setLife} />
               {msg ? <Text style={s.err}>{msg}</Text> : null}
               <OptionButton style={{ marginTop: 18 }} label="次へ — 目標を決める" onPress={saveProfile} busy={busy} />
@@ -120,20 +121,20 @@ export default function Onboarding() {
 
           {step === 1 && (
             <>
-              <Text style={s.h1}>目標を決める</Text>
-              <Text style={s.sub}>目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。</Text>
+              <Text style={s.h1}>{t('目標を決める')}</Text>
+              <Text style={s.sub}>{t('目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
               <GoalPanel mode="weight" weightSections="goal" />
               <OptionButton style={{ marginTop: 18 }} label="次へ — 筋トレ目標（任意）" onPress={() => setStep(2)} />
               <Pressable onPress={() => setStep(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
-                <Text style={s.linkT}>目標はあとで決める</Text>
+                <Text style={s.linkT}>{t('目標はあとで決める')}</Text>
               </Pressable>
             </>
           )}
 
           {step === 2 && (
             <>
-              <Text style={s.h1}>筋トレの目標（任意）</Text>
-              <Text style={s.sub}>ベンチプレス100kgのような目標を置くと、トレのグラフに目標線が出ます。筋トレをしない人はスキップでOKです。</Text>
+              <Text style={s.h1}>{t('筋トレの目標（任意）')}</Text>
+              <Text style={s.sub}>{t('ベンチプレス100kgのような目標を置くと、トレのグラフに目標線が出ます。筋トレをしない人はスキップでOKです。')}</Text>
               <GoalPanel mode="training" />
               <OptionButton style={{ marginTop: 18 }} label="はじめる 🎉" onPress={done} />
             </>

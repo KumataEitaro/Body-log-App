@@ -3,6 +3,7 @@
 // アプリ全体を落とさない（dev client / TestFlightビルドでのみ有効になる）。
 import { supabase } from './supabase';
 import { syncEntriesForDate } from './sync';
+import { t } from '@/lib/i18n';
 
 type HK = typeof import('@kingstinct/react-native-healthkit');
 
@@ -39,7 +40,7 @@ function dateKeyJST(d: Date): string {
 
 // 体重の過去分をヘルスケア→entriesへ取込（日ごとの最終値・既存の体重は上書きしない）
 export async function importWeights(uid: string, days: number): Promise<{ imported: number } | { error: string }> {
-  if (!hk) return { error: 'この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。' };
+  if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
   try {
     const end = new Date();
     const start = new Date(end.getTime() - days * 86400000);
@@ -59,10 +60,10 @@ export async function importWeights(uid: string, days: number): Promise<{ import
       .map(([date, weight]) => ({ user_id: uid, date, weight }));
     if (rows.length === 0) return { imported: 0 };
     const { error } = await supabase.from('entries').upsert(rows, { onConflict: 'user_id,date' });
-    if (error) return { error: '保存に失敗しました。もう一度お試しください。' };
+    if (error) return { error: t('保存に失敗しました。もう一度お試しください。') };
     return { imported: rows.length };
   } catch {
-    return { error: 'ヘルスケアの読み取りに失敗しました。許可設定を確認してください。' };
+    return { error: t('ヘルスケアの読み取りに失敗しました。許可設定を確認してください。') };
   }
 }
 
@@ -78,18 +79,18 @@ export type HKWorkout = {
 
 // HKWorkoutActivityTypeの主要値→日本語名（それ以外は「ワークアウト」）
 const WORKOUT_NAMES: Record<string, string> = {
-  '37': 'ランニング', '52': 'ウォーキング', '13': '自転車', '46': '水泳',
-  '50': '筋トレ', '20': 'サーキットトレーニング', '57': 'ヨガ', '24': 'ハイキング',
-  '35': 'ピラティス', '16': 'クロストレーニング', '63': 'HIIT', '3000': 'ワークアウト',
-  running: 'ランニング', walking: 'ウォーキング', cycling: '自転車', swimming: '水泳',
-  traditionalStrengthTraining: '筋トレ', functionalStrengthTraining: 'サーキットトレーニング',
-  yoga: 'ヨガ', hiking: 'ハイキング', pilates: 'ピラティス',
-  crossTraining: 'クロストレーニング', highIntensityIntervalTraining: 'HIIT',
+  '37': t('ランニング'), '52': t('ウォーキング'), '13': t('自転車'), '46': t('水泳'),
+  '50': t('筋トレ'), '20': t('サーキットトレーニング'), '57': t('ヨガ'), '24': t('ハイキング'),
+  '35': t('ピラティス'), '16': t('クロストレーニング'), '63': 'HIIT', '3000': t('ワークアウト'),
+  running: t('ランニング'), walking: t('ウォーキング'), cycling: t('自転車'), swimming: t('水泳'),
+  traditionalStrengthTraining: t('筋トレ'), functionalStrengthTraining: t('サーキットトレーニング'),
+  yoga: t('ヨガ'), hiking: t('ハイキング'), pilates: t('ピラティス'),
+  crossTraining: t('クロストレーニング'), highIntensityIntervalTraining: 'HIIT',
 };
 
 // 直近days日のワークアウト一覧（取込プレビュー用）
 export async function listWorkouts(days: number): Promise<HKWorkout[] | { error: string }> {
-  if (!hk) return { error: 'この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。' };
+  if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
   try {
     const end = new Date();
     const start = new Date(end.getTime() - days * 86400000);
@@ -107,17 +108,17 @@ export async function listWorkouts(days: number): Promise<HKWorkout[] | { error:
       const distRaw = Number(w.totalDistance?.quantity ?? 0);
       const unit = String(w.totalDistance?.unit ?? 'm');
       const km = distRaw > 0 ? Math.round((unit === 'km' ? distRaw : distRaw / 1000) * 100) / 100 : null;
-      const t = String(w.workoutActivityType ?? '');
+      const wtype = String(w.workoutActivityType ?? '');
       out.push({
-        id: String(w.uuid ?? `${w.startDate}-${t}`),
+        id: String(w.uuid ?? `${w.startDate}-${wtype}`),
         date: dateKeyJST(new Date(w.startDate)),
-        name: WORKOUT_NAMES[t] ?? 'ワークアウト',
+        name: WORKOUT_NAMES[wtype] ?? t('ワークアウト'),
         minutes, km, kcal,
       });
     }
     return out;
   } catch {
-    return { error: 'ワークアウトの読み取りに失敗しました。許可設定を確認してください。' };
+    return { error: t('ワークアウトの読み取りに失敗しました。許可設定を確認してください。') };
   }
 }
 
@@ -139,7 +140,7 @@ export async function importWorkouts(uid: string, items: HKWorkout[]): Promise<{
     }
     if (error) {
       if (/duplicate|unique|23505/i.test(error.message)) { skipped++; continue; } // 取込済み
-      return { error: '保存に失敗しました。もう一度お試しください。' };
+      return { error: t('保存に失敗しました。もう一度お試しください。') };
     }
     imported++;
     dates.add(w.date);
@@ -152,7 +153,7 @@ export async function importWorkouts(uid: string, items: HKWorkout[]): Promise<{
 export type HealthDaySummary = { date: string; steps: number; sleepH: number };
 
 export async function readActivitySummary(days: number): Promise<HealthDaySummary[] | { error: string }> {
-  if (!hk) return { error: 'この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。' };
+  if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
   try {
     const end = new Date();
     const start = new Date(end.getTime() - days * 86400000);
@@ -179,6 +180,6 @@ export async function readActivitySummary(days: number): Promise<HealthDaySummar
     return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
       .map((v) => ({ ...v, steps: Math.round(v.steps), sleepH: Math.round(v.sleepH * 10) / 10 }));
   } catch {
-    return { error: 'ヘルスケアの読み取りに失敗しました。許可設定を確認してください。' };
+    return { error: t('ヘルスケアの読み取りに失敗しました。許可設定を確認してください。') };
   }
 }

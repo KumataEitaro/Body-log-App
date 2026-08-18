@@ -4,12 +4,13 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { LaunchProvider } from '@/components/LaunchIntro';
-import { loadLocale } from '@/lib/i18n';
+import { loadLocale, useLocale } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const locale = useLocale(); // 言語を変えたらkeyでツリーごと作り直す
   const router = useRouter();
   const segments = useSegments();
 
@@ -35,7 +36,7 @@ export default function RootLayout() {
   return (
     <LaunchProvider ready={ready}>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
+      <Stack key={locale} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
     </LaunchProvider>
   );
 }

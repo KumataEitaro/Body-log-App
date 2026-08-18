@@ -6,6 +6,7 @@
 //    相関であって因果ではないため、n数と差分を必ず添えて提示する。
 
 import { detectStruggle } from '@/lib/adaptive';
+import { t } from '@/lib/i18n';
 
 // ===== 日次特徴量 =====
 
@@ -52,7 +53,7 @@ export function preBingeStreaks(days: InsightDay[]): number[] {
 export type RiskReason = { key: string; text: string };
 export type BingeRisk = { level: 'low' | 'elevated' | 'high'; score: number; reasons: RiskReason[] };
 
-const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
+const DOW_JA = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 /**
  * 今日の過食リスクを判定する。
@@ -108,7 +109,7 @@ export function assessBingeRisk(days: InsightDay[], todayDow: number): BingeRisk
   // R5: 昨日「つらい」サイン（ストレスは過食の直接トリガー）
   if (y && detectStruggle([y.mood, y.text]) === 'hard') {
     score += 2;
-    reasons.push({ key: 'stress', text: '昨日「つらい」のサインがありました' });
+    reasons.push({ key: 'stress', text: t('昨日「つらい」のサインがありました') });
   }
 
   const level = score >= 4 ? 'high' : score >= 2 ? 'elevated' : 'low';

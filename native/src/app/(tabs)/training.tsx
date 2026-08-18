@@ -15,20 +15,21 @@ import QuickLogFab from '@/components/QuickLogFab';
 import DateStrip from '@/components/DateStrip';
 import { SegmentedControl, Chip, OptionButton, SEL } from '@/components/ui/Selectable';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
+import { t } from '@/lib/i18n';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
 
 // かんたん記録: METs換算（消費kcal = METs × 体重kg × 時間h × 1.05）
-const ACTIVITIES = [
-  { e: '🐕', n: '散歩', mets: 3.0 },
-  { e: '🚶', n: 'ウォーキング', mets: 3.5 },
-  { e: '🏃', n: 'ランニング', mets: 8.0 },
-  { e: '🚴', n: '自転車', mets: 6.0 },
-  { e: '🧘', n: 'ヨガ・ストレッチ', mets: 2.5 },
-  { e: '🏊', n: '水泳', mets: 6.0 },
-  { e: '🧹', n: '家事・掃除', mets: 3.3 },
-  { e: '⚽', n: 'スポーツ', mets: 7.0 },
+const activities = () => [
+  { e: '🐕', n: t('散歩'), mets: 3.0 },
+  { e: '🚶', n: t('ウォーキング'), mets: 3.5 },
+  { e: '🏃', n: t('ランニング'), mets: 8.0 },
+  { e: '🚴', n: t('自転車'), mets: 6.0 },
+  { e: '🧘', n: t('ヨガ・ストレッチ'), mets: 2.5 },
+  { e: '🏊', n: t('水泳'), mets: 6.0 },
+  { e: '🧹', n: t('家事・掃除'), mets: 3.3 },
+  { e: '⚽', n: t('スポーツ'), mets: 7.0 },
 ] as const;
 const MINUTES = [10, 20, 30, 45, 60, 90] as const;
 
@@ -87,15 +88,15 @@ export default function TrainingScreen() {
   const [hkBusy, setHkBusy] = useState(false);
   const [hkMsg, setHkMsg] = useState('');
   async function openHk() {
-    if (!healthAvailable()) { setMsg({ ok: false, text: 'ヘルスケア取込はTestFlight版でのみ使えます（Expo Goでは動きません）。' }); return; }
+    if (!healthAvailable()) { setMsg({ ok: false, text: t('ヘルスケア取込はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
     setHkOpen(true); setHkBusy(true); setHkMsg(''); setHkList([]);
     try {
-      if (!(await requestHealthAuth())) { setHkMsg('ヘルスケアへのアクセスが許可されませんでした。iOSの設定 > プライバシー > ヘルスケア から許可できます。'); return; }
+      if (!(await requestHealthAuth())) { setHkMsg(t('ヘルスケアへのアクセスが許可されませんでした。iOSの設定 > プライバシー > ヘルスケア から許可できます。')); return; }
       const r = await listWorkouts(30);
       if ('error' in r) { setHkMsg(r.error); return; }
       setHkList(r);
       setHkSel(new Set(r.map((w) => w.id)));
-      if (r.length === 0) setHkMsg('直近30日のワークアウトが見つかりませんでした。');
+      if (r.length === 0) setHkMsg(t('直近30日のワークアウトが見つかりませんでした。'));
     } finally { setHkBusy(false); }
   }
   async function importSelected() {
@@ -113,27 +114,27 @@ export default function TrainingScreen() {
     } finally { setHkBusy(false); }
   }
 
-  const DIST_OK = ['散歩', 'ウォーキング', 'ランニング', '自転車'];
+  const DIST_OK = [t('散歩'), t('ウォーキング'), t('ランニング'), t('自転車')];
   function actKcal(): number {
     if (actIdx == null) return 0;
-    const a = ACTIVITIES[actIdx];
+    const a = activities()[actIdx];
     const km = Number(actKm);
     // 距離が入っていれば距離ベースの推定に切替（精度が上がる）
     if (km > 0 && DIST_OK.includes(a.n)) {
-      const perKgKm = a.n === 'ランニング' ? 1.05 : a.n === '自転車' ? 0.35 : 0.55;
+      const perKgKm = a.n === t('ランニング') ? 1.05 : a.n === t('自転車') ? 0.35 : 0.55;
       return Math.round(perKgKm * myWeight * km);
     }
     return Math.round(a.mets * myWeight * (actMin / 60) * 1.05);
   }
 
   async function saveActivity() {
-    if (actIdx == null) { setMsg({ ok: false, text: '運動の種類を選んでください。' }); return; }
+    if (actIdx == null) { setMsg({ ok: false, text: t('運動の種類を選んでください。') }); return; }
     setActSaving(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const a = ACTIVITIES[actIdx];
+      const a = activities()[actIdx];
       const kcal = actKcal();
       const km = Number(actKm) > 0 && DIST_OK.includes(a.n) ? Number(actKm) : null;
       const today = viewDate;
@@ -147,7 +148,7 @@ export default function TrainingScreen() {
       if (error && /ex_minutes|ex_km|column|schema/i.test(error.message)) {
         ({ error } = await supabase.from('logs').insert(base));
       }
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
       setActIdx(null); setActKm('');
       setMsg({ ok: true, text: `${a.n} ${actMin}分${km ? ` ${km}km` : ''}を記録しました。目標カロリーに+${kcal}kcal反映されます🎉` });
@@ -172,7 +173,7 @@ export default function TrainingScreen() {
 
   async function save() {
     const tr = trainingText();
-    if (!tr) { setMsg({ ok: false, text: '種目・重量(kg)・回数を入力してください。' }); return; }
+    if (!tr) { setMsg({ ok: false, text: t('種目・重量(kg)・回数を入力してください。') }); return; }
     setSaving(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -183,11 +184,11 @@ export default function TrainingScreen() {
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
       });
-      if (error) { setMsg({ ok: false, text: '保存に失敗しました。もう一度お試しください。' }); return; }
+      if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
 
       // RMフィードバック: 推定1RM(Epley)を目標・自己ベストと照合して一言返す
-      let fb = '保存しました。継続が最強の種目です💪';
+      let fb = t('保存しました。継続が最強の種目です💪');
       try {
         const first = tRows.find((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0);
         if (first) {
@@ -230,7 +231,7 @@ export default function TrainingScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
-        <Text style={[s.pageTitle, { marginBottom: 0 }]}>運動</Text>
+        <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
         <DateStrip value={viewDate} onChange={setViewDate} />
       </View>
 
@@ -238,8 +239,8 @@ export default function TrainingScreen() {
       <View style={{ marginBottom: 14 }}>
         <SegmentedControl
           options={[
-            { key: 'easy', label: 'かんたん記録', icon: <Footprints size={14} color={C.sub} /> },
-            { key: 'lift', label: '筋トレ', icon: <Dumbbell size={14} color={C.sub} /> },
+            { key: 'easy', label: t('かんたん記録'), icon: <Footprints size={14} color={C.sub} /> },
+            { key: 'lift', label: t('筋トレ'), icon: <Dumbbell size={14} color={C.sub} /> },
           ]}
           value={seg} onChange={setSeg}
         />
@@ -248,17 +249,17 @@ export default function TrainingScreen() {
       {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
       {seg === 'easy' && (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日の運動をゆるく記録</Text></View>
-          <Text style={s.muted}>犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。</Text>
+          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
+          <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。')}</Text>
           <View style={s.actGrid}>
-            {ACTIVITIES.map((a, i) => (
+            {activities().map((a, i) => (
               <Pressable key={a.n} style={[s.actChip, actIdx === i && s.actChipOn]} onPress={() => setActIdx(i)}>
                 <Text style={{ fontSize: 17 }}>{a.e}</Text>
                 <Text style={[s.actChipT, actIdx === i && { color: C.teal }]}>{a.n}</Text>
               </Pressable>
             ))}
           </View>
-          <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>時間</Text>
+          <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('時間')}</Text>
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {MINUTES.map((m) => (
               <Chip key={m} label={`${m}分`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
@@ -267,9 +268,9 @@ export default function TrainingScreen() {
                        value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
                        onChangeText={(v) => { const n = Number(v); if (n > 0) setActMin(n); }} />
           </View>
-          {actIdx != null && DIST_OK.includes(ACTIVITIES[actIdx].n) && (
+          {actIdx != null && DIST_OK.includes(activities()[actIdx].n) && (
             <>
-              <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>距離（km・任意。入れると消費kcalの精度が上がります）</Text>
+              <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('距離（km・任意。入れると消費kcalの精度が上がります）')}</Text>
               <TextInput style={[s.freeMin, { width: 110 }]} placeholder="5.0" placeholderTextColor={C.faint}
                          keyboardType="decimal-pad" value={actKm} onChangeText={setActKm} />
             </>
@@ -288,10 +289,10 @@ export default function TrainingScreen() {
       <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
         <View style={s.hkWrap}>
           <View style={s.hkHead}>
-            <Text style={s.hkTitle}>⌚ ヘルスケアから取り込む</Text>
+            <Text style={s.hkTitle}>{t('⌚ ヘルスケアから取り込む')}</Text>
             <Pressable onPress={() => setHkOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
           </View>
-          <Text style={s.hkSub}>直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。</Text>
+          <Text style={s.hkSub}>{t('直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。')}</Text>
           {hkBusy && hkList.length === 0 && <ActivityIndicator color={C.teal} style={{ marginTop: 30 }} />}
           {hkMsg !== '' && <Text style={s.hkMsg}>{hkMsg}</Text>}
           <ScrollView style={{ flex: 1, marginTop: 8 }}>
@@ -320,20 +321,20 @@ export default function TrainingScreen() {
         <Pressable style={s.rest} onPress={() => setRestLeft(90)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Timer size={15} color={C.teal} />
-            <Text style={s.restL}>レスト</Text>
+            <Text style={s.restL}>{t('レスト')}</Text>
           </View>
           <Text style={s.restN}>
             {restLeft > 0
               ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
-              : '終了💪'}
+              : t('終了💪')}
           </Text>
-          <Text style={s.restHint}>{restLeft > 0 ? 'タップで90秒に戻す' : '次のセットへ！'}</Text>
+          <Text style={s.restHint}>{restLeft > 0 ? 'タップで90秒に戻す' : t('次のセットへ！')}</Text>
         </Pressable>
       )}
 
       {/* 入力 */}
       <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
-        <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>今日のトレーニングを記録</Text></View>
+        <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
             <TextInput style={[s.tIn, { flex: 1 }]} placeholder="種目" placeholderTextColor={C.faint}
@@ -375,13 +376,13 @@ export default function TrainingScreen() {
 
       {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
       {seg === 'lift' && history.length > 0 && (
-        <Text style={s.moveNote}>📈 挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます</Text>
+        <Text style={s.moveNote}>{t('📈 挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます')}</Text>
       )}
 
       {/* 履歴 */}
       <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
-        <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレ履歴</Text></View>
-        {history.length === 0 && <Text style={s.muted}>まだ記録がありません。今日の1セット目から始めましょう。</Text>}
+        <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
+        {history.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
         {history.slice(0, 20).map((h1) => (
           <View key={h1.id} style={s.histRow}>
             <Text style={s.histDate}>{h1.date.slice(5).replace('-', '/')}</Text>

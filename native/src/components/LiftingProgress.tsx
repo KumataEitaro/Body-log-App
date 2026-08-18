@@ -13,6 +13,7 @@ import { parse1RMs } from '@/lib/rm';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { CARDIO_GREEN, type DayMark } from '@/components/MonthCalendar';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
+import { t } from '@/lib/i18n';
 
 function shiftDate(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
@@ -112,21 +113,21 @@ export function LiftKpiCard() {
   return (
     <View style={s.card}>
       <View style={[s.h2Row, { justifyContent: 'space-between' }]}>
-        <Text style={[s.h2, { marginBottom: 0 }]}>今週の運動 <Text style={s.weekNote}>— 月曜はじまり</Text></Text>
+        <Text style={[s.h2, { marginBottom: 0 }]}>{t('今週の運動')}<Text style={s.weekNote}>{t('— 月曜はじまり')}</Text></Text>
         {streak > 0 && <Text style={s.streak}>🔥 {streak}週連続</Text>}
       </View>
       <View style={s.kpiRow}>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>回数</Text>
-          <Text style={s.kpiV}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? ` / ${habit.perWeek}回` : '回'}</Text></Text>
+          <Text style={s.kpiL}>{t('回数')}</Text>
+          <Text style={s.kpiV}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? ` / ${habit.perWeek}回` : t('回')}</Text></Text>
         </View>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>消費</Text>
+          <Text style={s.kpiL}>{t('消費')}</Text>
           <Text style={s.kpiV}>{kcal.toLocaleString()}<Text style={s.kpiU}>{habit.weeklyKcal != null ? ` / ${Number(habit.weeklyKcal).toLocaleString()}` : 'kcal'}</Text></Text>
         </View>
         <View style={s.kpi}>
-          <Text style={s.kpiL}>時間</Text>
-          <Text style={s.kpiV}>{mins}<Text style={s.kpiU}>分</Text></Text>
+          <Text style={s.kpiL}>{t('時間')}</Text>
+          <Text style={s.kpiV}>{mins}<Text style={s.kpiU}>{t('分')}</Text></Text>
         </View>
       </View>
       {kcal > 0 && <Text style={s.earnT}>🍚 今週の運動で +{kcal.toLocaleString()}kcal 食べられる分を稼ぎました</Text>}
@@ -156,13 +157,13 @@ export function LiftCalendarCard() {
   const dayItems = daySel ? all.filter((h) => h.date === daySel) : [];
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>運動カレンダー</Text></View>
+      <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動カレンダー')}</Text></View>
       <MonthCalendar today={today} marks={marks} selected={daySel} mode="training"
                      onSelect={(d) => setDaySel(daySel === d ? null : d)} />
       {daySel && (
         <View style={s.dayBox}>
           <Text style={s.dayHead}>{daySel.replace(/-/g, '/')} の運動</Text>
-          {dayItems.length === 0 && <Text style={s.muted}>この日の運動記録はありません。</Text>}
+          {dayItems.length === 0 && <Text style={s.muted}>{t('この日の運動記録はありません。')}</Text>}
           {dayItems.map((h) => (
             <Text key={h.id} style={s.dayText}>
               {h.text.startsWith('🏋️') ? '🏋️ ' : '🏃 '}{h.text.replace(/^🏋️ |^🏃 /, '')}
@@ -194,7 +195,7 @@ export function BalanceCard() {
   const max = Math.max(1, ...weeks.map((w) => w.lift + w.cardio));
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>週別バランス <Text style={s.weekNote}>— 運動時間の内訳</Text></Text></View>
+      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('週別バランス')}<Text style={s.weekNote}>{t('— 運動時間の内訳')}</Text></Text></View>
       {weeks.map((w, i) => {
         const total = w.lift + w.cardio;
         return (
@@ -210,8 +211,8 @@ export function BalanceCard() {
         );
       })}
       <View style={s.balLegend}>
-        <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.muted}>筋トレ</Text>
-        <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.muted}>有酸素</Text>
+        <View style={[s.legDot, { backgroundColor: C.teal }]} /><Text style={s.muted}>{t('筋トレ')}</Text>
+        <View style={[s.legDot, { backgroundColor: CARDIO_GREEN }]} /><Text style={s.muted}>{t('有酸素')}</Text>
         <Text style={s.muted}>・筋トレの時間未記録は1回{LIFT_MIN_DEFAULT}分換算</Text>
       </View>
     </View>
@@ -251,17 +252,17 @@ export function LiftChartCard() {
   if (exercises.length === 0) {
     return (
       <View style={s.card}>
-        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
-        <Text style={s.muted}>トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。</Text>
+        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('挙上重量の推移')}</Text></View>
+        <Text style={s.muted}>{t('トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。')}</Text>
       </View>
     );
   }
 
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>筋トレの成長</Text></View>
+      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの成長')}</Text></View>
       <View style={s.chips}>
-        {([['1rm', '推定1RM'], ['kg', '実重量'], ['volume', 'ボリューム']] as const).map(([m, l]) => (
+        {([['1rm', t('推定1RM')], ['kg', t('実重量')], ['volume', t('ボリューム')]] as const).map(([m, l]) => (
           <Chip key={m} label={l} tone="ink" selected={chartMode === m} onPress={() => setChartMode(m)} />
         ))}
       </View>

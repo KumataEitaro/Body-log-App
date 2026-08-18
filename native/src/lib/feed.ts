@@ -1,6 +1,7 @@
 // ログ行の表示ヘルパー（食事/体重/筋トレ/運動/気分をアイコン＋人間向けタイトルに整形）
 // DBの生テキストや「（メモなし）」をそのまま見せないための共通層。log.tsxとchanges.tsxで共用
 import { type FoodItem } from './items';
+import { t } from '@/lib/i18n';
 
 export type FeedLog = {
   items?: FoodItem[] | null;
@@ -30,8 +31,8 @@ export function logTitle(l: FeedLog): string {
     const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
     return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
   }
-  if (l.kcal != null) return String(l.text || '食事（概算）').replace(/^（|）$/g, '').slice(0, 60);
+  if (l.kcal != null) return String(l.text || t('食事（概算）')).replace(/^（|）$/g, '').slice(0, 60);
   if (l.weight != null) return `体重 ${Number(l.weight).toFixed(1)}kg`;
   if (l.ex && l.ex !== 'オフ') return `運動 ${l.ex}`;
-  return String(l.text || l.mood || '記録').slice(0, 60);
+  return String(l.text || l.mood || t('記録')).slice(0, 60);
 }

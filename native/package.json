@@ -57,7 +57,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest --silent"
+    "test": "jest --silent",
+    "i18n:keys": "node scripts/i18n-keys.js"
   },
   "private": true,
   "jest": {

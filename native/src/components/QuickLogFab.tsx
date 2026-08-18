@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
 import { sumItems } from '@/lib/items';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 export default function QuickLogFab() {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export default function QuickLogFab() {
 
   async function pickPhoto(fromCamera: boolean) {
     const perm = fromCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { setMsg({ ok: false, text: fromCamera ? 'カメラの許可が必要です。' : '写真の許可が必要です。' }); return; }
+    if (!perm.granted) { setMsg({ ok: false, text: fromCamera ? 'カメラの許可が必要です。' : t('写真の許可が必要です。') }); return; }
     const res = fromCamera
       ? await ImagePicker.launchCameraAsync({ quality: 1 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], selectionLimit: 4 - photos.length, allowsMultipleSelection: true, quality: 1 });
@@ -78,7 +79,7 @@ export default function QuickLogFab() {
       const res = await saveParsed(uid, staged, stagedNote);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       setStaged(null); setStagedNote('');
-      setMsg({ ok: true, text: '記録しました。' });
+      setMsg({ ok: true, text: t('記録しました。') });
     } finally {
       setSaving(false);
     }
@@ -95,7 +96,7 @@ export default function QuickLogFab() {
           <Pressable style={s.backdrop} onPress={() => setOpen(false)} />
           <View style={s.sheet}>
             <View style={s.grip} />
-            <Text style={s.title}>かんたん記録 <Text style={s.titleSub}>— 食事・体重・気分をそのまま送信</Text></Text>
+            <Text style={s.title}>{t('かんたん記録')}<Text style={s.titleSub}>{t('— 食事・体重・気分をそのまま送信')}</Text></Text>
             {photos.length > 0 && (
               <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
                 {photos.map((p, i) => (
@@ -109,7 +110,7 @@ export default function QuickLogFab() {
             {pending > 0 && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                 <ActivityIndicator size="small" color={C.teal} />
-                <Text style={s.msg}>AIが解析しています…</Text>
+                <Text style={s.msg}>{t('AIが解析しています…')}</Text>
               </View>
             )}
             {/* 保存前の確認トレイ */}
@@ -138,7 +139,7 @@ export default function QuickLogFab() {
                   <OptionButton variant="teal" busy={saving} onPress={confirmSave}
                                 label={`✓ この内容で保存${staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : ''}`} />
                   <Pressable onPress={() => { setStaged(null); setStagedNote(''); }} hitSlop={8}>
-                    <Text style={s.stagedClear}>破棄</Text>
+                    <Text style={s.stagedClear}>{t('破棄')}</Text>
                   </Pressable>
                 </View>
               </View>

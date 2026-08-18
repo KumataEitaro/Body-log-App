@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
@@ -19,28 +20,28 @@ export default function LoginScreen() {
   const [info, setInfo] = useState('');
 
   async function login() {
-    if (!email.trim() || !password) { setMsg('メールとパスワードを入力してください。'); return; }
+    if (!email.trim() || !password) { setMsg(t('メールとパスワードを入力してください。')); return; }
     setBusy(true); setMsg(''); setInfo('');
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) {
-      setMsg(/invalid login/i.test(error.message) ? 'メールまたはパスワードが違います。' : 'ログインに失敗しました。通信環境を確認してください。');
+      setMsg(/invalid login/i.test(error.message) ? 'メールまたはパスワードが違います。' : t('ログインに失敗しました。通信環境を確認してください。'));
     }
     // 成功時は_layoutの認証ゲートが自動でタブへ遷移させる
   }
 
   async function signup() {
     const mail = email.trim();
-    if (!mail || !password) { setMsg('メールとパスワードを入力してください。'); return; }
-    if (password.length < 8) { setMsg('パスワードは8文字以上にしてください。'); return; }
-    if (password !== password2) { setMsg('確認用パスワードが一致しません。'); return; }
+    if (!mail || !password) { setMsg(t('メールとパスワードを入力してください。')); return; }
+    if (password.length < 8) { setMsg(t('パスワードは8文字以上にしてください。')); return; }
+    if (password !== password2) { setMsg(t('確認用パスワードが一致しません。')); return; }
     setBusy(true); setMsg(''); setInfo('');
     const { data, error } = await supabase.auth.signUp({ email: mail, password });
     setBusy(false);
     if (error) {
-      setMsg(/already registered/i.test(error.message) ? 'このメールアドレスは登録済みです。ログインしてください。'
-        : /invalid/i.test(error.message) ? 'メールアドレスの形式を確認してください。'
-        : '登録に失敗しました。通信環境を確認してください。');
+      setMsg(/already registered/i.test(error.message) ? t('このメールアドレスは登録済みです。ログインしてください。')
+        : /invalid/i.test(error.message) ? t('メールアドレスの形式を確認してください。')
+        : t('登録に失敗しました。通信環境を確認してください。'));
       return;
     }
     // メール確認が有効な場合はセッションが返らない → 確認メール案内
@@ -63,8 +64,8 @@ export default function LoginScreen() {
       });
       if (error || !data?.url) {
         setMsg(/provider is not enabled/i.test(error?.message ?? '')
-          ? 'Googleログインは準備中です（Supabase側のプロバイダ設定待ち）。'
-          : 'Googleログインを開始できませんでした。');
+          ? t('Googleログインは準備中です（Supabase側のプロバイダ設定待ち）。')
+          : t('Googleログインを開始できませんでした。'));
         return;
       }
       const res = await WebBrowser.openAuthSessionAsync(data.url, OAUTH_REDIRECT);
@@ -73,7 +74,7 @@ export default function LoginScreen() {
       const code = url.searchParams.get('code');
       if (code) {
         const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-        if (exErr) setMsg('ログインの完了処理に失敗しました。もう一度お試しください。');
+        if (exErr) setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
         return;
       }
       // フォールバック: implicitフローで #access_token=… が返ってきた場合
@@ -83,7 +84,7 @@ export default function LoginScreen() {
       if (access_token && refresh_token) {
         await supabase.auth.setSession({ access_token, refresh_token });
       } else {
-        setMsg('ログインの完了処理に失敗しました。もう一度お試しください。');
+        setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
       }
     } finally { setGBusy(false); }
   }
@@ -94,7 +95,7 @@ export default function LoginScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
       <View style={s.inner}>
         <Text style={s.logo}>▍BodyLog</Text>
-        <Text style={s.sub}>{isLogin ? 'おかえりなさい。記録を続けましょう' : '無料アカウントを作成（Web版と共通）'}</Text>
+        <Text style={s.sub}>{isLogin ? 'おかえりなさい。記録を続けましょう' : t('無料アカウントを作成（Web版と共通）')}</Text>
 
         {/* ログイン/新規登録の切り替え */}
         <View style={{ marginBottom: 16 }}>
@@ -106,7 +107,7 @@ export default function LoginScreen() {
 
         <TextInput style={s.input} placeholder="メールアドレス" placeholderTextColor={C.faint}
                    autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} />
-        <TextInput style={s.input} placeholder={isLogin ? 'パスワード' : 'パスワード（8文字以上）'} placeholderTextColor={C.faint}
+        <TextInput style={s.input} placeholder={isLogin ? 'パスワード' : t('パスワード（8文字以上）')} placeholderTextColor={C.faint}
                    secureTextEntry autoComplete={isLogin ? 'password' : 'new-password'} value={password} onChangeText={setPassword} />
         {!isLogin && (
           <TextInput style={s.input} placeholder="パスワード（確認用）" placeholderTextColor={C.faint}
@@ -114,22 +115,22 @@ export default function LoginScreen() {
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}
         {info ? <Text style={s.info}>{info}</Text> : null}
-        <OptionButton style={{ marginTop: 8 }} label={isLogin ? 'ログイン' : 'アカウントを作成'}
+        <OptionButton style={{ marginTop: 8 }} label={isLogin ? 'ログイン' : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
         {/* SSO */}
         <View style={s.orRow}>
-          <View style={s.orLine} /><Text style={s.orT}>または</Text><View style={s.orLine} />
+          <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
         </View>
         <Pressable style={({ pressed }) => [s.ssoBtn, pressed && { opacity: 0.8 }]} onPress={googleLogin} disabled={gBusy}>
           {gBusy ? <ActivityIndicator color={C.ink} /> : (
             <>
               <Text style={s.gMark}>G</Text>
-              <Text style={s.ssoT}>Googleで続ける</Text>
+              <Text style={s.ssoT}>{t('Googleで続ける')}</Text>
             </>
           )}
         </Pressable>
         {!isLogin && (
-          <Text style={s.terms}>登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。</Text>
+          <Text style={s.terms}>{t('登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。')}</Text>
         )}
       </View>
     </KeyboardAvoidingView>

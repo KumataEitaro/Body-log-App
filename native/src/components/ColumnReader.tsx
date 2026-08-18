@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
 import { COLUMNS, type Column } from '@/content/columns';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 const READ_KEY = 'bl-columns-read';
 
@@ -70,13 +71,13 @@ export default function ColumnReader() {
     <View style={s.card}>
       <View style={s.h2Row}>
         <BookOpen size={14} color={C.teal} />
-        <Text style={s.h2}>読みもの <Text style={s.h2sub}>— 全{COLUMNS.length}本</Text></Text>
+        <Text style={s.h2}>{t('読みもの')}<Text style={s.h2sub}>— 全{COLUMNS.length}本</Text></Text>
         {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>未読 {unreadCount}</Text></View>}
       </View>
 
       {/* 今日のおすすめ（未読の先頭を自動で選ぶ） */}
       <Pressable style={({ pressed }) => [s.rec, pressed && { opacity: 0.75 }]} onPress={() => openColumn(today)}>
-        <Text style={s.recLabel}>今日のおすすめ</Text>
+        <Text style={s.recLabel}>{t('今日のおすすめ')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
           <Text style={s.recEmoji}>{today.emoji}</Text>
           <View style={{ flex: 1 }}>
@@ -113,7 +114,7 @@ export default function ColumnReader() {
             {open && <Body text={open.body} />}
             {open && open.sources.length > 0 && (
               <View style={s.srcBox}>
-                <Text style={s.srcHead}>参考にした資料</Text>
+                <Text style={s.srcHead}>{t('参考にした資料')}</Text>
                 {open.sources.map((src) => (
                   <Pressable key={src.url} onPress={() => Linking.openURL(src.url).catch(() => {})} hitSlop={6}>
                     <Text style={s.srcLink}>・{src.label}</Text>

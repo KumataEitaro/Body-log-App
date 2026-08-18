@@ -14,6 +14,7 @@ import { apiPost } from '@/lib/api';
 import { OptionButton } from '@/components/ui/Selectable';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
+import { t } from '@/lib/i18n';
 
 type PhotoRow = { id: string; date: string; path: string; bodyfat: number | null };
 type PhotoView = PhotoRow & { url: string | null };
@@ -54,7 +55,7 @@ export default function BodyPhotosCard() {
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { setMsg(fromCamera ? 'カメラの許可が必要です。' : '写真の許可が必要です。'); return; }
+    if (!perm.granted) { setMsg(fromCamera ? 'カメラの許可が必要です。' : t('写真の許可が必要です。')); return; }
     const res = fromCamera
       ? await ImagePicker.launchCameraAsync({ quality: 1 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
@@ -62,7 +63,7 @@ export default function BodyPhotosCard() {
     try {
       const out = await manipulateAsync(res.assets[0].uri, [{ resize: { width: 1080 } }], { compress: 0.8, format: SaveFormat.JPEG, base64: true });
       if (out.base64) { setPendingImg({ uri: out.uri, base64: out.base64 }); setMsg(null); }
-    } catch { setMsg('画像の処理に失敗しました。'); }
+    } catch { setMsg(t('画像の処理に失敗しました。')); }
   }
 
   // 写真からAIが体脂肪率を推定（±3%程度の目安・結果は編集可能）
@@ -77,10 +78,10 @@ export default function BodyPhotosCard() {
         setBfInput(String(json.result.bf_est));
         setMsg(`AI推定 ${Number(json.result.bf_est).toFixed(1)}%（±3%程度の目安）${json.result.comment ? ` — ${json.result.comment}` : ''}`);
       } else {
-        setMsg(json?.error || 'AI推定に失敗しました。手入力もできます。');
+        setMsg(json?.error || t('AI推定に失敗しました。手入力もできます。'));
       }
     } catch {
-      setMsg('通信に失敗しました。');
+      setMsg(t('通信に失敗しました。'));
     } finally { setAiBusy(false); }
   }
 
@@ -98,26 +99,26 @@ export default function BodyPhotosCard() {
       if (upErr) {
         setMsg(/bucket|not found/i.test(upErr.message)
           ? 'ストレージ未セットアップです（apply-pending.sqlのv16を実行してください）。'
-          : '写真の保存に失敗しました。');
+          : t('写真の保存に失敗しました。'));
         return;
       }
       const bf = bfInput.trim() === '' ? null : Number(bfInput);
       const { error: insErr } = await supabase.from('body_photos')
         .insert({ user_id: uid, date, path, bodyfat: bf });
-      if (insErr) { setMsg('記録の保存に失敗しました（v16 SQL未適用の可能性）。'); return; }
+      if (insErr) { setMsg(t('記録の保存に失敗しました（v16 SQL未適用の可能性）。')); return; }
       // 体脂肪率はグラフ用に日次サマリーへも反映
       if (bf != null && bf > 0) {
         await supabase.from('entries').upsert({ user_id: uid, date, bodyfat: bf }, { onConflict: 'user_id,date' });
       }
       setPendingImg(null); setBfInput('');
       await load();
-      setMsg('保存しました。');
+      setMsg(t('保存しました。'));
     } finally { setBusy(false); }
   }
 
   async function remove(p: PhotoView) {
-    Alert.alert('この写真を削除しますか？', p.date, [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(t('この写真を削除しますか？'), p.date, [
+      { text: t('キャンセル'), style: 'cancel' },
       {
         text: '削除', style: 'destructive',
         onPress: async () => {
@@ -138,7 +139,7 @@ export default function BodyPhotosCard() {
   return (
     <View style={s.card}>
       <View style={s.head}>
-        <Text style={s.h2}>体の写真 <Text style={s.h2sub}>— 週1回の見た目チェック</Text></Text>
+        <Text style={s.h2}>{t('体の写真')}<Text style={s.h2sub}>{t('— 週1回の見た目チェック')}</Text></Text>
         {latestBf != null && (
           <Text style={s.bfNow}>
             体脂肪 {Number(latestBf).toFixed(1)}%{targetBf != null ? ` → 目標${targetBf.toFixed(1)}%` : ''}
@@ -164,7 +165,7 @@ export default function BodyPhotosCard() {
           ))}
         </View>
       ) : (
-        <Text style={s.note}>まだ写真がありません。週1回、同じ場所・同じポーズで撮ると変化がわかりやすくなります。</Text>
+        <Text style={s.note}>{t('まだ写真がありません。週1回、同じ場所・同じポーズで撮ると変化がわかりやすくなります。')}</Text>
       )}
 
       {/* タイムライン */}
@@ -184,7 +185,7 @@ export default function BodyPhotosCard() {
         <View style={s.pendingBox}>
           <Image source={{ uri: pendingImg.uri }} style={s.pendingImg} />
           <View style={{ flex: 1 }}>
-            <Text style={s.label}>体脂肪率（%・任意）</Text>
+            <Text style={s.label}>{t('体脂肪率（%・任意）')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               <TextInput style={[s.input, { flex: 1 }]} placeholder="21.5" placeholderTextColor={C.faint}
                          keyboardType="decimal-pad" value={bfInput} onChangeText={setBfInput} />
@@ -192,7 +193,7 @@ export default function BodyPhotosCard() {
                 {aiBusy ? <ActivityIndicator size="small" color={C.teal} /> : (
                   <>
                     <Sparkles size={13} color={C.teal} strokeWidth={2.2} />
-                    <Text style={s.aiBtnT}>AIで推定</Text>
+                    <Text style={s.aiBtnT}>{t('AIで推定')}</Text>
                   </>
                 )}
               </Pressable>
@@ -200,14 +201,14 @@ export default function BodyPhotosCard() {
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
               <OptionButton variant="teal" label="✓ 保存" onPress={save} busy={busy} />
               <Pressable onPress={() => { setPendingImg(null); setBfInput(''); }} hitSlop={8} style={{ justifyContent: 'center' }}>
-                <Text style={s.cancelT}>破棄</Text>
+                <Text style={s.cancelT}>{t('破棄')}</Text>
               </Pressable>
             </View>
           </View>
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : '今週の写真を撮る'}
+          <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : t('今週の写真を撮る')}
                         leading={<Camera size={16} color="#fff" strokeWidth={2.2} />} onPress={() => pick(true)} />
           <OptionButton variant="tonal" label="選ぶ"
                         leading={<ImagePlus size={16} color={C.ink} strokeWidth={2.2} />} onPress={() => pick(false)} />

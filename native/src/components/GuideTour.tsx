@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { todayJST } from '@/lib/calc';
 import { C } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
+import { t } from '@/lib/i18n';
 
 const GUIDE_DONE_KEY = 'bl-guide-done';
 const HILITE = '#f59e0b'; // ハイライト色（ドックのティールと区別するアンバー）
@@ -29,12 +30,12 @@ type StepDef = SpotStep | CardStep;
 
 const STEPS: StepDef[] = [
   { kind: 'card', id: 'welcome' },
-  { kind: 'spot', route: '/log', target: 'hero', title: 'あと食べられる量', text: '残りカロリーとP/F/Cの残りが、いつもここに表示されます。' },
-  { kind: 'spot', route: '/log', target: 'dock', title: '記録はここに書くだけ', text: '「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。' },
+  { kind: 'spot', route: '/log', target: 'hero', title: t('あと食べられる量'), text: t('残りカロリーとP/F/Cの残りが、いつもここに表示されます。') },
+  { kind: 'spot', route: '/log', target: 'dock', title: t('記録はここに書くだけ'), text: t('「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。') },
   { kind: 'spot', route: '/training', target: 'trainInput', title: '運動の記録', text: '犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。' },
   { kind: 'spot', route: '/changes', target: 'chart', title: '変化を見る', text: '体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。' },
   { kind: 'spot', route: '/changes', target: 'gear', title: '設定はここ', text: 'プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。' },
-  { kind: 'spot', route: '/coach', target: 'welcome', title: 'AIコーチ', text: '迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。', demo: 'coach' },
+  { kind: 'spot', route: '/coach', target: 'welcome', title: t('AIコーチ'), text: t('迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。'), demo: 'coach' },
   { kind: 'card', id: 'done' },
 ];
 
@@ -199,7 +200,7 @@ function GuideOverlay({ targets, scrollers, close }: {
 
       {/* スキップ（常設） */}
       <Pressable style={s.skip} onPress={finish} hitSlop={10}>
-        <Text style={s.skipT}>スキップ ✕</Text>
+        <Text style={s.skipT}>{t('スキップ ✕')}</Text>
       </Pressable>
 
       {step.kind === 'spot' && step.demo === 'coach' && (
@@ -212,7 +213,7 @@ function GuideOverlay({ targets, scrollers, close }: {
           <Text style={s.bubbleTitle}>{step.title}</Text>
           <Text style={s.bubbleText}>{step.text}</Text>
           <Pressable style={s.nextBtn} onPress={next}>
-            <Text style={s.nextBtnT}>{lastSpot ? '最後へ' : '次へ'}</Text>
+            <Text style={s.nextBtnT}>{lastSpot ? '最後へ' : t('次へ')}</Text>
           </Pressable>
           <View style={[s.beak, bubbleBelow ? s.beakUp : s.beakDown, { left: Math.min(Math.max(hole.x + hole.w / 2 - 24, 30), W - 60) }]} />
         </View>
@@ -235,10 +236,10 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
   return (
     <View style={s.card}>
       <Text style={s.cardEmoji}>👋</Text>
-      <Text style={s.cardTitle}>ようこそ BodyLog へ</Text>
+      <Text style={s.cardTitle}>{t('ようこそ BodyLog へ')}</Text>
       <Text style={s.cardText}>1分で使い方をご案内します。{'\n'}ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。</Text>
       <OptionButton style={{ alignSelf: 'stretch', marginTop: 14, marginBottom: 8 }} label="ガイドを始める" onPress={onStart} />
-      <Pressable onPress={onSkip} hitSlop={8}><Text style={s.linkT}>今はしない</Text></Pressable>
+      <Pressable onPress={onSkip} hitSlop={8}><Text style={s.linkT}>{t('今はしない')}</Text></Pressable>
     </View>
   );
 }
@@ -248,13 +249,13 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
 function CoachDemoPanel({ title, text, onNext, last, H }: {
   title: string; text: string; onNext: () => void; last: boolean; H: number;
 }) {
-  const Q = '最近ちょっと停滞気味かも。食事に何か問題ある？';
+  const Q = t('最近ちょっと停滞気味かも。食事に何か問題ある？');
   const A =
     '直近7日の記録を見ると、気になる傾向が2つあります。\n\n' +
     '・炭水化物が平均96g/日と、目標160gの6割しか取れていません。糖質が少なすぎると筋グリコーゲンが枯れて、トレ後半で力が出ない・体重が水分で乱高下する原因になります\n' +
     '・一方、たんぱく質は平均132g（体重×1.6g）でしっかり確保できています💪\n' +
     '・摂取カロリーは平均1,690kcalで目標−70kcal。ペース自体は悪くありません\n\n' +
-    'おすすめは「トレする日だけ白米を150g（+250kcal）足す」こと。週の収支はまだ赤字のままなので、減量ペースを崩さずパフォーマンスだけ取り戻せます。まずは次のトレ日に試してみましょう。';
+    t('おすすめは「トレする日だけ白米を150g（+250kcal）足す」こと。週の収支はまだ赤字のままなので、減量ペースを崩さずパフォーマンスだけ取り戻せます。まずは次のトレ日に試してみましょう。');
   const [qLen, setQLen] = useState(0);
   const [phase, setPhase] = useState<'typing' | 'thinking' | 'answer'>('typing');
   const fade = useRef(new Animated.Value(0)).current;
@@ -309,7 +310,7 @@ function CoachDemoPanel({ title, text, onNext, last, H }: {
       <Text style={s.demoTitle}>{title}</Text>
       <Text style={s.demoLead}>{text}</Text>
       <View style={[s.demoPhone, { maxHeight: H * 0.5 }]}>
-        <View style={s.demoBar}><Text style={s.demoBarT}>AIコーチ</Text></View>
+        <View style={s.demoBar}><Text style={s.demoBarT}>{t('AIコーチ')}</Text></View>
         <ScrollView
           ref={sv}
           contentContainerStyle={{ padding: 12, paddingBottom: 18, gap: 8 }}
@@ -322,7 +323,7 @@ function CoachDemoPanel({ title, text, onNext, last, H }: {
             <Text style={s.demoUserT}>{Q.slice(0, qLen)}{phase === 'typing' ? '▍' : ''}</Text>
           </View>
           {phase === 'thinking' && (
-            <View style={s.demoAi}><Text style={s.demoAiT}>考え中…</Text></View>
+            <View style={s.demoAi}><Text style={s.demoAiT}>{t('考え中…')}</Text></View>
           )}
           {phase === 'answer' && (
             <Animated.View style={[s.demoAi, { opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }]}>
@@ -332,7 +333,7 @@ function CoachDemoPanel({ title, text, onNext, last, H }: {
         </ScrollView>
       </View>
       <Pressable style={s.demoNext} onPress={onNext}>
-        <Text style={s.nextBtnT}>{last ? '最後へ' : '次へ'}</Text>
+        <Text style={s.nextBtnT}>{last ? '最後へ' : t('次へ')}</Text>
       </Pressable>
     </View>
   );
@@ -342,7 +343,7 @@ function DoneCard({ onFinish }: { onFinish: () => void }) {
   return (
     <View style={s.card}>
       <Text style={s.cardEmoji}>🎉</Text>
-      <Text style={s.cardTitle}>準備完了！</Text>
+      <Text style={s.cardTitle}>{t('準備完了！')}</Text>
       <Text style={s.cardText}>まずは今日食べたものを1つ、下の入力欄に書いてみましょう。{'\n'}続けるほどAIのアドバイスが賢くなります。</Text>
       <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label="食事を記録してみる" onPress={onFinish} />
     </View>

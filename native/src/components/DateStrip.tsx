@@ -6,13 +6,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { todayJST } from '@/lib/calc';
 import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
 
 function shift(d: string, n: number): string {
   const t = new Date(d + 'T00:00:00');
   t.setDate(t.getDate() + n);
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
-const WD = ['日', '月', '火', '水', '木', '金', '土'];
+const WD = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 export default function DateStrip({ value, onChange }: { value: string; onChange: (d: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={s.back} onPress={() => setOpen(false)}>
           <Pressable style={s.pickerCard} onPress={() => {}}>
-            <Text style={s.pickerTitle}>記録する日付</Text>
+            <Text style={s.pickerTitle}>{t('記録する日付')}</Text>
             <DateTimePicker
               value={dt} mode="date" display="inline" maximumDate={new Date()}
               onChange={(_ev, d) => {
@@ -49,7 +50,7 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
             />
             {!isToday && (
               <Pressable style={s.todayBtn} onPress={() => { onChange(today); setOpen(false); }}>
-                <Text style={s.todayBtnT}>今日に戻る</Text>
+                <Text style={s.todayBtnT}>{t('今日に戻る')}</Text>
               </Pressable>
             )}
           </Pressable>
