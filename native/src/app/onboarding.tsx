@@ -92,7 +92,7 @@ export default function Onboarding() {
               <Text style={s.h1}>{t('あなたの現在地点')}</Text>
               <Text style={s.sub}>{t('基礎代謝と消費カロリーの計算に使います。あとで⚙からいつでも変更できます。')}</Text>
               <Text style={s.label}>{t('ニックネーム（任意）')}</Text>
-              <TextInput style={s.input} placeholder="例: くまさん" placeholderTextColor={C.faint} value={name} onChangeText={setName} />
+              <TextInput style={s.input} placeholder={t('例: くまさん')} placeholderTextColor={C.faint} value={name} onChangeText={setName} />
               <Text style={s.label}>{t('性別')}</Text>
               <SegmentedControl
                 options={[{ key: 'male', label: t('男性') }, { key: 'female', label: t('女性') }]}
@@ -115,7 +115,7 @@ export default function Onboarding() {
               <Text style={s.label}>{t('日常の活動量')}</Text>
               <ActivityLevelPicker value={life} onChange={setLife} />
               {msg ? <Text style={s.err}>{msg}</Text> : null}
-              <OptionButton style={{ marginTop: 18 }} label="次へ — 目標を決める" onPress={saveProfile} busy={busy} />
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 目標を決める')} onPress={saveProfile} busy={busy} />
             </>
           )}
 
@@ -124,7 +124,7 @@ export default function Onboarding() {
               <Text style={s.h1}>{t('目標を決める')}</Text>
               <Text style={s.sub}>{t('目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
               <GoalPanel mode="weight" weightSections="goal" />
-              <OptionButton style={{ marginTop: 18 }} label="次へ — 筋トレ目標（任意）" onPress={() => setStep(2)} />
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 筋トレ目標（任意）')} onPress={() => setStep(2)} />
               <Pressable onPress={() => setStep(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
                 <Text style={s.linkT}>{t('目標はあとで決める')}</Text>
               </Pressable>
@@ -136,7 +136,7 @@ export default function Onboarding() {
               <Text style={s.h1}>{t('筋トレの目標（任意）')}</Text>
               <Text style={s.sub}>{t('ベンチプレス100kgのような目標を置くと、トレのグラフに目標線が出ます。筋トレをしない人はスキップでOKです。')}</Text>
               <GoalPanel mode="training" />
-              <OptionButton style={{ marginTop: 18 }} label="はじめる 🎉" onPress={done} />
+              <OptionButton style={{ marginTop: 18 }} label={t('はじめる 🎉')} onPress={done} />
             </>
           )}
           <View style={{ height: 40 }} />

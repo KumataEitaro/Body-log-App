@@ -620,7 +620,7 @@ export default function LogScreen() {
                 <OptionButton style={{ flex: 1 }} variant="tonal" label={t('大丈夫、気をつける')} onPress={snoozeRisk} />
               </View>
             ) : (
-              <OptionButton style={{ marginTop: 10 }} variant="tonal" label="OK、気をつける" onPress={snoozeRisk} />
+              <OptionButton style={{ marginTop: 10 }} variant="tonal" label={t('OK、気をつける')} onPress={snoozeRisk} />
             )}
           </View>
         )}
@@ -704,7 +704,7 @@ export default function LogScreen() {
             <TextInput style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
             <Text style={s.wUnit}>{units.weight}</Text>
-            <OptionButton variant="tonal" label="体重を記録" leading={<Weight size={15} color={C.ink} />}
+            <OptionButton variant="tonal" label={t('体重を記録')} leading={<Weight size={15} color={C.ink} />}
                           onPress={saveWeight} busy={saving} disabled={!wWeight} />
           </View>
         </Animated.View>

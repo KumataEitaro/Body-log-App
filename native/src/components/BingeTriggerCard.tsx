@@ -108,7 +108,7 @@ export default function BingeTriggerCard() {
                 <Text style={s.trDetail}>{t(tr.detail)} ・ {t('{n}日中{m}日', { n: tr.n, m: tr.hits })}</Text>
               </View>
               <View style={s.liftBox}>
-                <Text style={s.liftN}>{tr.lift.toFixed(1)}<Text style={s.liftX}>倍</Text></Text>
+                <Text style={s.liftN}>{tr.lift.toFixed(1)}<Text style={s.liftX}>{t('倍')}</Text></Text>
                 <Text style={s.liftSub}>{Math.round(tr.withRate * 100)}% / {Math.round(tr.withoutRate * 100)}%</Text>
               </View>
             </View>

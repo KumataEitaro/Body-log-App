@@ -294,7 +294,7 @@ export default function TrainingScreen() {
             {MINUTES.map((m) => (
               <Chip key={m} label={`${m}${t('分')}`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
             ))}
-            <TextInput style={s.freeMin} placeholder="分" placeholderTextColor={C.faint} keyboardType="number-pad"
+            <TextInput style={s.freeMin} placeholder={t('分')} placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
                        onChangeText={(v) => { const n = Number(v); if (n > 0) setActMin(n); }} />
           </View>
@@ -340,7 +340,7 @@ export default function TrainingScreen() {
             })}
           </ScrollView>
           {hkList.length > 0 && (
-            <OptionButton variant="teal" label={`選択した${[...hkSel].length}件を取り込む`}
+            <OptionButton variant="teal" label={t('選択した{n}件を取り込む', { n: [...hkSel].length })}
                           onPress={importSelected} busy={hkBusy} disabled={hkSel.size === 0} />
           )}
         </View>
@@ -368,11 +368,11 @@ export default function TrainingScreen() {
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
-            <TextInput style={[s.tIn, { flex: 1 }]} placeholder="種目" placeholderTextColor={C.faint}
+            <TextInput style={[s.tIn, { flex: 1 }]} placeholder={t('種目')} placeholderTextColor={C.faint}
                        value={r.name} onChangeText={(v) => setT(i, { name: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder="kg" placeholderTextColor={C.faint} keyboardType="decimal-pad"
                        value={r.kg} onChangeText={(v) => setT(i, { kg: v })} />
-            <TextInput style={[s.tIn, s.tNum]} placeholder="回" placeholderTextColor={C.faint} keyboardType="number-pad"
+            <TextInput style={[s.tIn, s.tNum]} placeholder={t('回')} placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={r.reps} onChangeText={(v) => setT(i, { reps: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder="set" placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={r.sets} onChangeText={(v) => setT(i, { sets: v })} />
@@ -398,9 +398,9 @@ export default function TrainingScreen() {
           );
         })()}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          <OptionButton style={{ flex: 1 }} variant="tonal" label="＋ 種目を追加"
+          <OptionButton style={{ flex: 1 }} variant="tonal" label={t('＋ 種目を追加')}
                         onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])} />
-          <OptionButton style={{ flex: 1 }} label="保存する" onPress={save} busy={saving} />
+          <OptionButton style={{ flex: 1 }} label={t('保存する')} onPress={save} busy={saving} />
         </View>
         {msg && seg === 'lift' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>

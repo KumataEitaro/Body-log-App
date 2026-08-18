@@ -133,7 +133,7 @@ export default function SettingsScreen() {
       if (!(await requestHealthAuth())) { setMsg({ ok: false, text: t('ヘルスケアへのアクセスが許可されませんでした。') }); return; }
       const res = await importWeights(uid, 90);
       if ('error' in res) { setMsg({ ok: false, text: res.error }); return; }
-      setMsg({ ok: true, text: res.imported > 0 ? `体重を ${res.imported} 日分 取り込みました。「概要」タブのグラフに反映されます。` : t('新しく取り込める体重データはありませんでした。') });
+      setMsg({ ok: true, text: res.imported > 0 ? t('体重を {n} 日分 取り込みました。「概要」タブのグラフに反映されます。', { n: res.imported }) : t('新しく取り込める体重データはありませんでした。') });
     } finally { setBusy(false); }
   }
 
@@ -233,17 +233,17 @@ export default function SettingsScreen() {
       {/* アカウント設定 */}
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
-        <Row icon={<UserRound color={C.teal} size={19} />} label="プロフィール編集" sub="表示名・性別・身長・年齢・活動量" onPress={() => openSheet('profile')} />
+        <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
-        <Row icon={<Salad color={C.teal} size={19} />} label="マイ食品の管理" sub={`${foods.length}件 登録済み`} onPress={() => openSheet('foods')} />
+        <Row icon={<Salad color={C.teal} size={19} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
       </View>
 
       {/* 目標 */}
       <Text style={s.groupLabel}>{t('目標')}</Text>
       <View style={s.group}>
-        <Row icon={<Target color={C.teal} size={19} />} label="体重の目標" sub="目標日・目標体重・PFC詳細" onPress={() => openSheet('goalW')} />
+        <Row icon={<Target color={C.teal} size={19} />} label={t('体重の目標')} sub={t('目標日・目標体重・PFC詳細')} onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
-        <Row icon={<Dumbbell color={C.teal} size={19} />} label="運動の目標" sub="週の運動習慣・種目ごとの目標重量（RM換算）" onPress={() => openSheet('goalT')} />
+        <Row icon={<Dumbbell color={C.teal} size={19} />} label={t('運動の目標')} sub={t('週の運動習慣・種目ごとの目標重量（RM換算）')} onPress={() => openSheet('goalT')} />
       </View>
 
       {/* 見た目（テーマカラー・PFCの色） */}
@@ -445,7 +445,7 @@ export default function SettingsScreen() {
     {/* ===== 読みもの（コラム）モーダル ===== */}
     <Modal visible={sheet === 'columns'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title="📖 読みもの" />
+        <SheetHeader title={t('📖 読みもの')} />
         <ScrollView><ColumnReader /></ScrollView>
       </View>
     </Modal>
@@ -514,7 +514,7 @@ export default function SettingsScreen() {
         <SheetHeader title={"⚠️ " + t("アカウント削除")} />
         <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
         <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
-        <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder="削除" placeholderTextColor={C.faint} />
+        <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder={t('削除')} placeholderTextColor={C.faint} />
         <Pressable style={[s.btnDanger, { marginTop: 14 }, delConfirm !== '削除' && { opacity: 0.4 }]}
                    onPress={confirmDelete} disabled={busy || delConfirm !== '削除'}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('アカウントを完全に削除する')}</Text>}

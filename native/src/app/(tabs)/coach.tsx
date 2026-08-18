@@ -143,7 +143,7 @@ export default function CoachScreen() {
 
   // AI提案の目標を承認制で適用（確認ダイアログ→goals/training_goals更新）
   function applyAction(a: CoachAction, idx: number) {
-    Alert.alert('目標を更新しますか？', a.label, [
+    Alert.alert(t('目標を更新しますか？'), a.label, [
       { text: t('キャンセル'), style: 'cancel' },
       {
         text: t('適用する'),

@@ -345,7 +345,7 @@ function DoneCard({ onFinish }: { onFinish: () => void }) {
       <Text style={s.cardEmoji}>🎉</Text>
       <Text style={s.cardTitle}>{t('準備完了！')}</Text>
       <Text style={s.cardText}>まずは今日食べたものを1つ、下の入力欄に書いてみましょう。{'\n'}続けるほどAIのアドバイスが賢くなります。</Text>
-      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label="食事を記録してみる" onPress={onFinish} />
+      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label={t('食事を記録してみる')} onPress={onFinish} />
     </View>
   );
 }

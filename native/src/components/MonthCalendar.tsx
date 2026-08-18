@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
-const DOW = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
+const DOW = () => [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 export type DayMark = { logged: boolean; over: boolean; unknown?: boolean; kind?: 'lift' | 'cardio' | 'both' };
 
@@ -48,7 +48,7 @@ export default function MonthCalendar({
         </Pressable>
       </View>
       <View style={s.grid}>
-        {DOW.map((d, i) => (
+        {DOW().map((d, i) => (
           <View key={d} style={s.cell}>
             <Text style={[s.dow, i === 0 && { color: C.coral }, i === 6 && { color: '#3b82f6' }]}>{d}</Text>
           </View>

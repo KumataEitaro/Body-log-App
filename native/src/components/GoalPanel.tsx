@@ -212,7 +212,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
               {status && (
                 <Text style={[s.statusSub, { color: status.state === 'behind' ? C.coral : C.teal }]}>
-                  {status.state === 'ahead' ? `${Math.abs(status.diffDays)}日先行 🎉` : status.state === 'behind' ? `${Math.abs(status.diffDays)}${t('日遅れ')}` : t('順調 👍')}
+                  {status.state === 'ahead' ? t('{n}日先行 🎉', { n: Math.abs(status.diffDays) }) : status.state === 'behind' ? t('{n}日遅れ', { n: Math.abs(status.diffDays) }) : t('順調 👍')}
                   ・{t('あと{n}kg', { n: Math.abs(latestWeight - Number(goal.target_weight)).toFixed(1) })}
                 </Text>
               )}
@@ -329,7 +329,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
                          value={exMinMinutes} onChangeText={setExMinMinutes} />
             </View>
           </View>
-          <OptionButton style={{ marginTop: 12 }} variant="teal" label="習慣目標を保存" onPress={saveHabitGoal} busy={habitBusy} />
+          <OptionButton style={{ marginTop: 12 }} variant="teal" label={t('習慣目標を保存')} onPress={saveHabitGoal} busy={habitBusy} />
 
           <View style={s.divider} />
           <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの目標（RM換算）')}</Text></View>
@@ -355,7 +355,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1.5 }}>
               <Text style={s.label}>{t('種目名')}</Text>
-              <TextInput style={s.input} placeholder="ベンチプレス" placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
+              <TextInput style={s.input} placeholder={t('ベンチプレス')} placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.label}>{t('重量（kg）')}</Text>
@@ -366,13 +366,13 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <Text style={s.label}>{t('回数（1回=そのままMAX目標）')}</Text>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             {[1, 5, 8, 10].map((r) => (
-              <Chip key={r} label={r === 1 ? '1回（MAX）' : `${r}回`} tone="ink" selected={tReps === r} onPress={() => setTReps(r)} />
+              <Chip key={r} label={r === 1 ? t('1回（MAX）') : t('{n}回', { n: r })} tone="ink" selected={tReps === r} onPress={() => setTReps(r)} />
             ))}
           </View>
           {Number(tKg) > 0 && tReps > 1 && (
             <Text style={s.rmPreview}>RM換算: {tName.trim() || t('この種目')}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
           )}
-          <OptionButton style={{ marginTop: 12 }} variant="tonal" label="筋トレ目標を追加" onPress={addTrainingGoal} busy={busy} />
+          <OptionButton style={{ marginTop: 12 }} variant="tonal" label={t('筋トレ目標を追加')} onPress={addTrainingGoal} busy={busy} />
         </View>
       )}
 
