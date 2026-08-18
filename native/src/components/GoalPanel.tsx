@@ -12,7 +12,7 @@ import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
 import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
-import { t } from '@/lib/i18n';
+import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 type Ev = { id: string; date: string; title: string; extra_kcal: number };
@@ -237,8 +237,9 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           </View>
           {showDatePicker && (
             <DateTimePicker
+              locale={apiLang()}
               value={gDate ? new Date(gDate + 'T00:00:00') : new Date()}
-              mode="date" display="inline" minimumDate={new Date()} locale="ja-JP"
+              mode="date" display="inline" minimumDate={new Date()}
               onChange={(_, d) => { if (d) setGDate(fmt(d)); setShowDatePicker(false); }}
             />
           )}
@@ -298,8 +299,9 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           </View>
           {evPicker && (
             <DateTimePicker
+              locale={apiLang()}
               value={evDate ? new Date(evDate + 'T00:00:00') : new Date()}
-              mode="date" display="inline" minimumDate={new Date()} locale="ja-JP"
+              mode="date" display="inline" minimumDate={new Date()}
               onChange={(_, d) => { if (d) setEvDate(fmt(d)); setEvPicker(false); }}
             />
           )}

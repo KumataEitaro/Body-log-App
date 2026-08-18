@@ -18,7 +18,7 @@ import { C } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
-import { t } from '@/lib/i18n';
+import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 
 // AIが提案した目標変更（承認制で直接適用する）
@@ -127,7 +127,7 @@ export default function CoachScreen() {
     setBusy(true);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string }>(
-        '/api/coach', { question, history });
+        '/api/coach', { question, history, lang: apiLang() });
       if (!ok || !json?.ok || !json.answer) {
         setMsgs((m) => [...m, { role: 'ai', text: json?.error || t('うまく答えられませんでした。もう一度お試しください。') }]);
         return;

@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Linking } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
-import { COLUMNS, type Column } from '@/content/columns';
+import { getColumns, type Column } from '@/content/columns';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
@@ -36,10 +36,10 @@ function Body({ text }: { text: string }) {
 
 // 日替わりで1本を選ぶ（未読があれば未読の先頭。全部読んでいれば日付でローテーション）
 function pickToday(read: Set<string>): Column {
-  const unread = COLUMNS.filter((c) => !read.has(c.id));
+  const unread = getColumns().filter((c) => !read.has(c.id));
   if (unread.length > 0) return unread[0];
   const day = Math.floor(Date.now() / 86400000);
-  return COLUMNS[day % COLUMNS.length];
+  return getColumns()[day % getColumns().length];
 }
 
 export default function ColumnReader() {
@@ -64,14 +64,14 @@ export default function ColumnReader() {
   }, []);
 
   const today = pickToday(read);
-  const rest = COLUMNS.filter((c) => c.id !== today.id);
-  const unreadCount = COLUMNS.filter((c) => !read.has(c.id)).length;
+  const rest = getColumns().filter((c) => c.id !== today.id);
+  const unreadCount = getColumns().filter((c) => !read.has(c.id)).length;
 
   return (
     <View style={s.card}>
       <View style={s.h2Row}>
         <BookOpen size={14} color={C.teal} />
-        <Text style={s.h2}>{t('読みもの')}<Text style={s.h2sub}>— 全{COLUMNS.length}本</Text></Text>
+        <Text style={s.h2}>{t('読みもの')}<Text style={s.h2sub}>— 全{getColumns().length}本</Text></Text>
         {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>{t('未読')} {unreadCount}</Text></View>}
       </View>
 

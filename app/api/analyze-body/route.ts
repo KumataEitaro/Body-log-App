@@ -12,7 +12,7 @@ const MAX_IMAGE_BYTES = 1_500_000;
 export async function POST(req: Request) {
   // 認証確認（Web=Cookie / ネイティブ=Bearer 両対応）
   const { supabase, user } = await getApiAuth(req);
-  if (!user) return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
+  if (!user) return NextResponse.json({ ok: false, code: 'unauthorized', error: 'ログインが必要です。' }, { status: 401 });
 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return NextResponse.json({ ok: false, error: 'サーバーにAI用のAPIキーが未設定です。' }, { status: 500 });

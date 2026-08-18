@@ -7,8 +7,11 @@ import { LaunchProvider } from '@/components/LaunchIntro';
 import { loadLocale, useLocale } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
+import { setLocaleChangeHandler } from '@/lib/i18n';
+import { reregisterAll } from '@/lib/notify';
 
 export default function RootLayout() {
+  useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const locale = useLocale();

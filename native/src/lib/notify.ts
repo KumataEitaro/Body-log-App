@@ -76,3 +76,12 @@ export async function scheduleCheatDayEve(dateStr: string): Promise<void> {
     });
   } catch { /* Expo Go等では黙って諦める */ }
 }
+
+/** 言語変更時などに、ONになっている通知を今の言語で登録し直す */
+export async function reregisterAll(): Promise<void> {
+  try {
+    const kv = await AsyncStorage.multiGet(['bl-notif-daily', 'bl-notif-weekly']);
+    if (kv[0]?.[1] === '1') await setDailyLogReminder(true);
+    if (kv[1]?.[1] === '1') await setWeeklyPhotoReminder(true);
+  } catch { /* 失敗しても既存の通知が残るだけ */ }
+}

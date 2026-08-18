@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     req.json().catch(() => null),
   ]);
   if (!user) {
-    return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
+    return NextResponse.json({ ok: false, code: 'unauthorized', error: 'ログインが必要です。' }, { status: 401 });
   }
   if (!bodyRaw) {
     return NextResponse.json({ ok: false, error: '不正なリクエストです。' }, { status: 400 });
@@ -152,6 +152,6 @@ export async function POST(req: Request) {
     // ユーザー向けは日本語のみ。技術詳細はdetailとサーバログへ
     const detail = e instanceof Error ? e.message : String(e);
     console.log(`[parse-food] unhandled: ${detail}`);
-    return NextResponse.json({ ok: false, error: '解析に失敗しました。もう一度お試しください。', detail }, { status: 500 });
+    return NextResponse.json({ ok: false, code: 'parse_failed', error: '解析に失敗しました。もう一度お試しください。', detail }, { status: 500 });
   }
 }

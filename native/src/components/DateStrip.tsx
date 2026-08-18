@@ -6,7 +6,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { todayJST } from '@/lib/calc';
 import { C } from '@/lib/ui';
-import { t } from '@/lib/i18n';
+import { t, apiLang } from '@/lib/i18n';
 
 function shift(d: string, n: number): string {
   const t = new Date(d + 'T00:00:00');
@@ -40,6 +40,7 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
           <Pressable style={s.pickerCard} onPress={() => {}}>
             <Text style={s.pickerTitle}>{t('記録する日付')}</Text>
             <DateTimePicker
+              locale={apiLang()}
               value={dt} mode="date" display="inline" maximumDate={new Date()}
               onChange={(_ev, d) => {
                 if (d) {

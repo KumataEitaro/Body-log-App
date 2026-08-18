@@ -1,4 +1,5 @@
 import { NextResponse, after } from 'next/server';
+import { findLang } from '@/lib/langs';
 import { getApiAuth } from '@/lib/supabase/apiAuth';
 import { AI_DAILY_LIMIT, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel } from '@/lib/calc';
 import { isPremiumActive } from '@/lib/premium';
@@ -28,14 +29,17 @@ export async function POST(req: Request) {
     getApiAuth(req),
     req.json().catch(() => null),
   ]);
-  if (!user) return NextResponse.json({ ok: false, error: 'ログインが必要です。' }, { status: 401 });
+  if (!user) return NextResponse.json({ ok: false, code: 'unauthorized', error: 'ログインが必要です。' }, { status: 401 });
   if (!bodyRaw) return NextResponse.json({ ok: false, error: '不正なリクエストです。' }, { status: 400 });
 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return NextResponse.json({ ok: false, error: 'サーバーにAI用のAPIキーが未設定です。' }, { status: 500 });
 
   const question = String(bodyRaw.question ?? '').slice(0, 500).trim();
-  if (!question) return NextResponse.json({ ok: false, error: '質問を入力してください。' }, { status: 400 });
+  // 回答言語（未指定・日本語なら従来どおり日本語で返す）
+  const lang = findLang(String((bodyRaw as { lang?: unknown }).lang || ''));
+  const answerLang = lang && lang.code !== 'ja' ? `${lang.name}（${lang.native}）` : '';
+  if (!question) return NextResponse.json({ ok: false, code: 'empty_question', error: '質問を入力してください。' }, { status: 400 });
   const history: { role: string; text: string }[] = Array.isArray(bodyRaw.history) ? bodyRaw.history.slice(-6) : [];
   // 睡眠はHealthKit＝端末でしか読めないため、クライアントが取得して添えてくる
   const sleep: { date: string; min: number }[] = Array.isArray(bodyRaw.sleep)
@@ -70,7 +74,7 @@ export async function POST(req: Request) {
   const entries = entriesRes.data || [];
   const logRows = logsRes.data || [];
   const prof = profRes.data;
-  if (!prof) return NextResponse.json({ ok: false, error: 'プロフィールが見つかりません。' }, { status: 400 });
+  if (!prof) return NextResponse.json({ ok: false, code: 'no_profile', error: 'プロフィールが見つかりません。' }, { status: 400 });
 
   // 日次の目安と収支
   const weights = entries.filter((e) => e.weight != null);
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
     dataBlock + historyBlock +
     '\n【本人からの相談】\n' + question +
     '\n\n【回答ルール】\n' +
-    '- 日本語。スマホで流し読みできる構造で書く: 1行目に結論（**太字**で1文）→ 根拠を「・」の箇条書き2〜3個（データの数値を具体的に引用。例:「・直近7日の平均摂取が前3週間より230kcal少ない」）→ 空行 → 最後に「👉 今日やること:」で具体的な提案を1つだけ\n' +
+    `- ${answerLang ? `回答は必ず${answerLang}で書く。` : '日本語。'}スマホで流し読みできる構造で書く: 1行目に結論（**太字**で1文）→ 根拠を「・」の箇条書き2〜3個（データの数値を具体的に引用。例:「・直近7日の平均摂取が前3週間より230kcal少ない」）→ 空行 → 最後に「👉 今日やること:」で具体的な提案を1つだけ\n` +
     '- 段落は2文以内。長い1段落のベタ書きは禁止\n' +
     '- 「栄養素: データなし」の項目を根拠にしない。データに無いことは「記録からは分かりませんが」と断ってから一般論を短く\n' +
     '- メモに酒・睡眠不足などの手がかりがあれば言及する\n' +

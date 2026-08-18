@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 import { syncEntriesForDate } from './sync';
 import { sumItems, type FoodItem } from './items';
 import { todayJST, type ExLevel } from './calc';
-import { t } from './i18n';
+import { t, apiLang } from './i18n';
 
 export type QuickImage = { data: string; mime: string };
 export type ParsedResult = {
@@ -20,7 +20,7 @@ export type ParsedResult = {
 // テキスト/写真をAIで解析（保存はしない）
 export async function analyzeFood(text: string, images: QuickImage[]): Promise<{ ok: true; result: ParsedResult } | { ok: false; error: string }> {
   const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
-    '/api/parse-food', { text, lang: 'ja', images });
+    '/api/parse-food', { text, lang: apiLang(), images });
   if (!ok || !json?.ok || !json.result) {
     return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。') };
   }

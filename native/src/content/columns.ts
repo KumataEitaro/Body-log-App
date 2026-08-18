@@ -340,3 +340,15 @@ BodyLogが総カロリーだけでなくP/F/Cと食材の内訳まで記録す�
     ],
   },
 ];
+
+// 表示用のコラム一覧を返す。英語圏では英語版、それ以外は日本語版（フォールバック）。
+// 他言語を足すときは columns.<code>.ts を作り、ここに1行足すだけでよい。
+export function getColumns(): Column[] {
+  // 循環importを避けるため、参照は関数内で行う
+  const { getLocale } = require('@/lib/i18n') as typeof import('@/lib/i18n');
+  if (getLocale() === 'en') {
+    const { COLUMNS_EN } = require('./columns.en') as typeof import('./columns.en');
+    return COLUMNS_EN;
+  }
+  return COLUMNS;
+}

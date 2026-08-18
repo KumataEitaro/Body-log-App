@@ -14,7 +14,7 @@ import { apiPost } from '@/lib/api';
 import { OptionButton } from '@/components/ui/Selectable';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { t } from '@/lib/i18n';
+import { t, apiLang } from '@/lib/i18n';
 
 type PhotoRow = { id: string; date: string; path: string; bodyfat: number | null };
 type PhotoView = PhotoRow & { url: string | null };
@@ -73,7 +73,7 @@ export default function BodyPhotosCard() {
     setAiBusy(true); setMsg(null);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; result?: { bf_est?: number; comment?: string }; error?: string }>(
-        '/api/analyze-body', { mode: 'assess', images: [{ data: pendingImg.base64, mime: 'image/jpeg' }] });
+        '/api/analyze-body', { mode: 'assess', lang: apiLang(), images: [{ data: pendingImg.base64, mime: 'image/jpeg' }] });
       if (ok && json?.ok && json.result?.bf_est != null) {
         setBfInput(String(json.result.bf_est));
         setMsg(t('AI推定 {n}%（±3%程度の目安）', { n: Number(json.result.bf_est).toFixed(1) }) + (json.result.comment ? ` — ${json.result.comment}` : ''));

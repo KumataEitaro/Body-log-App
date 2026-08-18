@@ -52,11 +52,17 @@ export async function loadLocale(): Promise<void> {
   emit();
 }
 
+// 言語が変わったときに、予約済み通知を登録し直すための受け口
+// （通知は登録時の文言で固定されるため、言語だけ変えても古いままになる）
+let onLocaleChange: (() => void) | null = null;
+export function setLocaleChangeHandler(fn: () => void): void { onLocaleChange = fn; }
+
 export async function setLocale(code: LocaleCode): Promise<void> {
   locale = code;
   explicit = true;
   emit();
   try { await AsyncStorage.setItem(KEY, code); } catch { /* 表示は既に切り替わっている */ }
+  try { onLocaleChange?.(); } catch { /* 通知の再登録に失敗しても表示は切り替わっている */ }
 }
 
 export function getLocale(): LocaleCode { return locale; }
