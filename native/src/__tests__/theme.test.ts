@@ -1,7 +1,7 @@
 // テーマ切替: アクセントだけでなく背景・罫線まで変わり、既存スタイルにも遡って反映されること
 import { StyleSheet } from 'react-native';
 import { C, applyPalette } from '@/lib/ui';
-import { PALETTES, pfcColors } from '@/lib/theme';
+import { PALETTES, pfcColors, DEFAULT_PFC } from '@/lib/theme';
 
 describe('テーマ', () => {
   it('パレット適用で背景・罫線・アクセントがまとめて変わる', () => {
@@ -31,10 +31,10 @@ describe('テーマ', () => {
   });
 
   it('P/F/Cの配色はテーマとは独立している', () => {
-    const before = pfcColors('classic');
+    const before = pfcColors();
     applyPalette(PALETTES.pink);
-    expect(pfcColors('classic')).toEqual(before); // テーマを変えてもPFCは不変
-    expect(pfcColors('accessible').p).toBe('#0072b2');
+    expect(pfcColors()).toEqual(before); // テーマを変えてもPFCは不変
+    expect(pfcColors().p).toBe(DEFAULT_PFC.p);
     applyPalette(PALETTES.green);
   });
 

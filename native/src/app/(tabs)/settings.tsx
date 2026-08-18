@@ -13,7 +13,7 @@ import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp,
 import ColumnReader from '@/components/ColumnReader';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
-import { useTheme, setTheme, ACCENTS, PFC_PRESETS, PALETTES } from '@/lib/theme';
+import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -219,7 +219,7 @@ export default function SettingsScreen() {
       <Text style={s.groupLabel}>{t('見た目')}</Text>
       <View style={s.group}>
         <Row icon={<Palette color={C.teal} size={19} />} label={t('テーマカラー')}
-             sub={`${ACCENTS.find((a) => a.key === theme.accent)?.label ?? ''} ・ ${PFC_PRESETS.find((x) => x.key === theme.pfc)?.label ?? ''}`}
+             sub={ACCENTS.find((a) => a.key === theme.accent)?.label ?? ''}
              onPress={() => openSheet('theme')} />
       </View>
 
@@ -355,24 +355,41 @@ export default function SettingsScreen() {
           </View>
 
           <Text style={[s.label, { marginTop: 22 }]}>{t('P/F/Cバーの色')}</Text>
-          <Text style={s.note}>{t('たんぱく質・脂質・炭水化物のバーの色を選べます。合計カロリーのバーとは別の色になります。')}</Text>
-          {PFC_PRESETS.map((preset) => (
-            <Pressable key={preset.key} style={[s.pfcRow, theme.pfc === preset.key && s.pfcRowOn]}
-                       onPress={() => setTheme({ pfc: preset.key })}>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.pfcName, theme.pfc === preset.key && { color: C.teal }]}>{t(preset.label)}</Text>
-                <Text style={s.pfcNote}>{t(preset.note)}</Text>
+          <Text style={s.note}>{t('たんぱく質・脂質・炭水化物をそれぞれ好きな色にできます。目標を超えたバーは赤で表示されます。')}</Text>
+
+          {([
+            ['p', t('たんぱく質')],
+            ['f', t('脂質')],
+            ['c', t('炭水化物')],
+          ] as const).map(([macro, label]) => (
+            <View key={macro} style={s.macroBlock}>
+              <View style={s.macroHead}>
+                <View style={[s.macroDot, { backgroundColor: theme.pfc[macro] }]} />
+                <Text style={s.macroName}>{label}</Text>
+                <View style={s.macroBarTrack}>
+                  <View style={{ width: '70%', height: 6, borderRadius: 3, backgroundColor: theme.pfc[macro] }} />
+                </View>
               </View>
-              <View style={{ gap: 3, width: 92 }}>
-                {(['p', 'f', 'c'] as const).map((k) => (
-                  <View key={k} style={s.pfcSample}>
-                    <View style={{ width: k === 'p' ? '80%' : k === 'f' ? '55%' : '95%', height: 6, borderRadius: 3, backgroundColor: preset.colors[k] }} />
-                  </View>
-                ))}
+              <View style={s.macroSwatches}>
+                {PFC_SWATCHES.map((sw) => {
+                  const selected = theme.pfc[macro] === sw.color;
+                  const usedElsewhere = (['p', 'f', 'c'] as const)
+                    .some((m) => m !== macro && theme.pfc[m] === sw.color);
+                  return (
+                    <Pressable key={sw.key} onPress={() => setTheme({ pfc: { ...theme.pfc, [macro]: sw.color } })}>
+                      <View style={[s.macroSw, { backgroundColor: sw.color }, selected && s.macroSwOn,
+                                    usedElsewhere && !selected && { opacity: 0.28 }]}>
+                        {selected && <Text style={s.macroCheck}>✓</Text>}
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
-              {theme.pfc === preset.key && <Text style={{ color: C.teal, fontWeight: '800', marginLeft: 8 }}>✓</Text>}
-            </Pressable>
+            </View>
           ))}
+          {(theme.pfc.p === theme.pfc.f || theme.pfc.f === theme.pfc.c || theme.pfc.p === theme.pfc.c) && (
+            <Text style={s.dupWarn}>{t('同じ色が重複しています。見分けにくくなるので別の色をおすすめします。')}</Text>
+          )}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
@@ -495,6 +512,16 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
+  macroBlock: { marginTop: 14 },
+  macroHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  macroDot: { width: 12, height: 12, borderRadius: 6 },
+  macroName: { fontSize: 14, fontWeight: '800', color: C.ink, width: 76 },
+  macroBarTrack: { flex: 1, height: 6, backgroundColor: C.track, borderRadius: 3, overflow: 'hidden' },
+  macroSwatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  macroSw: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  macroSwOn: { borderWidth: 3, borderColor: C.ink },
+  macroCheck: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  dupWarn: { fontSize: 11.5, color: C.coral, marginTop: 12, lineHeight: 18 },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 4 },
   swatchWrap: { alignItems: 'center', width: 78 },
   swatch: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },

@@ -11,37 +11,37 @@ export const PALETTES: Record<AccentKey, Palette> = {
     bg: '#fbfbfa', panel: '#ffffff', ink: '#0e1116', sub: '#6a7280', faint: '#9aa1ab', line: '#e9eae7',
     teal: '#059669', tealWeak: '#e1f5ee', accentSoft: '#f2faf7', accentBadge: '#e6f7f2',
     accentBorder: 'rgba(5,150,105,0.30)', track: '#eceeeb', chipBg: '#f4f5f3', segTrack: '#eef0ee',
-    pressed: '#f1f3f0', calorieBar: '#3f4c5a', coral: '#e85c50', coralWeak: '#fdeeec', amber: '#b8860b',
+    pressed: '#f1f3f0', calorieBar: '#3f4c5a', coral: '#ff2d2d', coralWeak: '#fdeeec', amber: '#b8860b',
   },
   blue: {
     bg: '#fafbfd', panel: '#ffffff', ink: '#0d1219', sub: '#64707f', faint: '#98a2b0', line: '#e5e9f0',
     teal: '#2563eb', tealWeak: '#e4ecfd', accentSoft: '#f4f7fe', accentBadge: '#e8effd',
     accentBorder: 'rgba(37,99,235,0.30)', track: '#e9edf3', chipBg: '#f2f5f9', segTrack: '#eaeff5',
-    pressed: '#eef2f7', calorieBar: '#475569', coral: '#e2544f', coralWeak: '#fdeceb', amber: '#b07d0a',
+    pressed: '#eef2f7', calorieBar: '#475569', coral: '#ff2d2d', coralWeak: '#fdeceb', amber: '#b07d0a',
   },
   purple: {
     bg: '#fcfafd', panel: '#ffffff', ink: '#130f18', sub: '#6d6579', faint: '#a099ab', line: '#ebe6f0',
     teal: '#7c3aed', tealWeak: '#eee7fd', accentSoft: '#f8f5fe', accentBadge: '#f0e9fd',
     accentBorder: 'rgba(124,58,237,0.30)', track: '#eee9f2', chipBg: '#f6f3f8', segTrack: '#f0ebf4',
-    pressed: '#f2eef6', calorieBar: '#4a4257', coral: '#df5568', coralWeak: '#fceced', amber: '#a9790f',
+    pressed: '#f2eef6', calorieBar: '#4a4257', coral: '#ff2d2d', coralWeak: '#fceced', amber: '#a9790f',
   },
   orange: {
     bg: '#fdfbf9', panel: '#ffffff', ink: '#171210', sub: '#7a6d64', faint: '#ada298', line: '#f0e9e3',
     teal: '#ea580c', tealWeak: '#fdeade', accentSoft: '#fef7f2', accentBadge: '#fdeee3',
     accentBorder: 'rgba(234,88,12,0.30)', track: '#f2ece7', chipBg: '#f8f5f2', segTrack: '#f3ede8',
-    pressed: '#f5f0eb', calorieBar: '#5a4a3f', coral: '#d94436', coralWeak: '#fceae7', amber: '#a97a12',
+    pressed: '#f5f0eb', calorieBar: '#5a4a3f', coral: '#ff2d2d', coralWeak: '#fceae7', amber: '#a97a12',
   },
   pink: {
     bg: '#fdfafb', panel: '#ffffff', ink: '#171114', sub: '#7a6772', faint: '#ad9ca5', line: '#f0e6eb',
     teal: '#db2777', tealWeak: '#fce4ef', accentSoft: '#fef5f9', accentBadge: '#fce8f1',
     accentBorder: 'rgba(219,39,119,0.30)', track: '#f2eaee', chipBg: '#f8f3f5', segTrack: '#f3ecef',
-    pressed: '#f5eef1', calorieBar: '#57424c', coral: '#d6453f', coralWeak: '#fceae9', amber: '#a97a12',
+    pressed: '#f5eef1', calorieBar: '#57424c', coral: '#ff2d2d', coralWeak: '#fceae9', amber: '#a97a12',
   },
   graphite: {
     bg: '#fafafa', panel: '#ffffff', ink: '#101214', sub: '#6b7280', faint: '#9ca3af', line: '#e6e7e9',
     teal: '#475569', tealWeak: '#e7eaee', accentSoft: '#f5f6f8', accentBadge: '#eaedf1',
     accentBorder: 'rgba(71,85,105,0.32)', track: '#ebecee', chipBg: '#f4f5f6', segTrack: '#eef0f1',
-    pressed: '#f0f1f3', calorieBar: '#1e293b', coral: '#dc5348', coralWeak: '#fceceb', amber: '#a9800f',
+    pressed: '#f0f1f3', calorieBar: '#1e293b', coral: '#ff2d2d', coralWeak: '#fceceb', amber: '#a9800f',
   },
 };
 
@@ -54,36 +54,55 @@ export const ACCENTS: { key: AccentKey; label: string; color: string }[] = [
   { key: 'graphite', label: 'グラファイト', color: PALETTES.graphite.teal },
 ];
 
-// ===== P/F/Cバーの配色（テーマとは独立した設定） =====
-export type PfcKey = 'classic' | 'warm' | 'cool' | 'accessible' | 'mono';
+// ===== P/F/Cバーの配色（テーマとは独立した設定。3色を個別に選ぶ） =====
 export type PfcColors = { p: string; f: string; c: string };
 
-export const PFC_PRESETS: { key: PfcKey; label: string; note: string; colors: PfcColors }[] = [
-  { key: 'classic', label: 'スタンダード', note: '緑・橙・青', colors: { p: '#059669', f: '#d97706', c: '#3b82f6' } },
-  { key: 'warm', label: 'ウォーム', note: '赤・橙・黄', colors: { p: '#dc2626', f: '#ea580c', c: '#ca8a04' } },
-  { key: 'cool', label: 'クール', note: '藍・青・水', colors: { p: '#4f46e5', f: '#0891b2', c: '#0ea5e9' } },
-  { key: 'accessible', label: '色覚に配慮', note: '青・橙・紫（識別しやすい）', colors: { p: '#0072b2', f: '#e69f00', c: '#9061c2' } },
-  { key: 'mono', label: 'モノトーン', note: '濃淡だけで区別', colors: { p: '#1f2937', f: '#6b7280', c: '#b2b8c2' } },
+// 選択できる色（超過の赤 #ff2d2d とは十分に離した色だけを並べている）
+export const PFC_SWATCHES: { key: string; label: string; color: string }[] = [
+  { key: 'green', label: 'グリーン', color: '#059669' },
+  { key: 'teal', label: 'ティール', color: '#0d9488' },
+  { key: 'lime', label: 'ライム', color: '#65a30d' },
+  { key: 'amber', label: 'アンバー', color: '#d97706' },
+  { key: 'orange', label: 'オレンジ', color: '#ea580c' },
+  { key: 'yellow', label: 'イエロー', color: '#ca8a04' },
+  { key: 'blue', label: 'ブルー', color: '#2563eb' },
+  { key: 'sky', label: 'スカイ', color: '#0284c7' },
+  { key: 'indigo', label: 'インディゴ', color: '#4f46e5' },
+  { key: 'purple', label: 'パープル', color: '#7c3aed' },
+  { key: 'pink', label: 'ピンク', color: '#db2777' },
+  { key: 'slate', label: 'スレート', color: '#475569' },
 ];
 
-export type ThemePrefs = { accent: AccentKey; pfc: PfcKey };
-export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: 'classic' };
+export const DEFAULT_PFC: PfcColors = { p: '#059669', f: '#d97706', c: '#2563eb' };
+
+// 旧バージョンのプリセット名から個別色へ移行するための対応表
+const LEGACY_PRESETS: Record<string, PfcColors> = {
+  classic: { p: '#059669', f: '#d97706', c: '#2563eb' },
+  warm: { p: '#db2777', f: '#ea580c', c: '#ca8a04' },
+  cool: { p: '#4f46e5', f: '#0284c7', c: '#0d9488' },
+  accessible: { p: '#2563eb', f: '#d97706', c: '#7c3aed' },
+  mono: { p: '#0e1116', f: '#6b7280', c: '#b2b8c2' },
+};
+
+export type ThemePrefs = { accent: AccentKey; pfc: PfcColors };
+export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: DEFAULT_PFC };
 const KEY = 'bl-theme';
 
 let prefs: ThemePrefs = DEFAULT_THEME;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-export function pfcColors(k: PfcKey = prefs.pfc): PfcColors {
-  return (PFC_PRESETS.find((p) => p.key === k) ?? PFC_PRESETS[0]).colors;
-}
+export function pfcColors(): PfcColors { return prefs.pfc; }
 
 export async function loadTheme(): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (raw) {
-      const p = JSON.parse(raw) as Partial<ThemePrefs>;
-      prefs = { ...DEFAULT_THEME, ...p };
+      const p = JSON.parse(raw) as Partial<ThemePrefs> & { pfc?: unknown };
+      const pfc = typeof p.pfc === 'string'
+        ? (LEGACY_PRESETS[p.pfc] ?? DEFAULT_PFC)               // 旧: プリセット名
+        : { ...DEFAULT_PFC, ...(p.pfc as Partial<PfcColors>) }; // 新: 個別色
+      prefs = { ...DEFAULT_THEME, ...p, pfc };
     }
   } catch { /* 既定のまま */ }
   applyPalette(PALETTES[prefs.accent] ?? PALETTES.green);
