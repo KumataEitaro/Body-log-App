@@ -94,6 +94,16 @@ export function HideableCard({ editing, onHide, label, children }: {
   );
 }
 
+/** カード内に置く⊖バッジ（カードのJSXを包まずに済むので既存レイアウトを壊さない） */
+export function MinusBadge({ editing, onPress }: { editing: boolean; onPress: () => void }) {
+  if (!editing) return null;
+  return (
+    <Pressable style={s.minusBtn} onPress={onPress} hitSlop={10}>
+      <Minus size={16} color="#fff" strokeWidth={3.5} />
+    </Pressable>
+  );
+}
+
 /** 非表示カードを戻す画面（検索付き。ヘルスケアの「リストを編集」に相当） */
 export function AddCardSheet({ visible: open, onClose, hidden, labels, onShow, shownKeys }: {
   visible: boolean;

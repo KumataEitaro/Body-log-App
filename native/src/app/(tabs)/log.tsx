@@ -8,6 +8,8 @@ import {
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
+import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
+import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
 import { pfcColors } from '@/lib/theme';
@@ -41,6 +43,12 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
+const LOG_CARDS = ['hero', 'mood', 'feed', 'recent', 'weight'];
+const LOG_LABELS = (): Record<string, string> => ({
+  hero: t('あと食べられる量'), mood: t('💭 いまの気分は？'), feed: t('今日の記録'),
+  recent: t('前の食事をもう一度'), weight: t('体重を記録'),
+});
+
 type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
 
 function timeJST(iso: string): string {
@@ -155,6 +163,12 @@ export default function LogScreen() {
 
   // 記録先の日付（既定=今日。過去日にも記録できる。旧Web版の日付選択の復活）
   const units = useUnits();
+
+  // 表示/非表示できるカード（⊖で隠し、見出しの⊕から戻す）
+  const cards = useCardLayout('bl-cards-log', LOG_CARDS);
+  const vis = (k: string) => !cards.layout.hidden.includes(k);
+  const [editing, setEditing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [viewDate, setViewDate] = useState(todayJST());
   const today = viewDate;
 
@@ -501,12 +515,26 @@ export default function LogScreen() {
       >
         <Animated.View style={[s.brandRow, enter[0], { justifyContent: 'space-between', marginRight: 38 }]}>
           <Text style={s.pageTitle}>{t('食事')}</Text>
-          <DateStrip value={viewDate} onChange={setViewDate} />
+          {editing ? (
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
+                <Plus size={16} color="#fff" strokeWidth={3} />
+              </Pressable>
+              <Pressable onPress={() => setEditing(false)} style={s.doneBtn} hitSlop={8}>
+                <Text style={s.doneBtnT}>{t('完了')}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
+              <DateStrip value={viewDate} onChange={setViewDate} />
+            </Pressable>
+          )}
         </Animated.View>
 
         {/* ヒーロー */}
-        {profile && (
+        {vis('hero') && profile && (
           <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
+            <MinusBadge editing={editing} onPress={() => cards.hide('hero')} />
             <Text style={s.heroL}>{left < 0 ? 'オーバー' : t('あと食べられる')}{plan ? '（計画）' : t('（維持）')}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
@@ -595,8 +623,9 @@ export default function LogScreen() {
         )}
 
         {/* 朝の気分カード（その日1回だけ・記録かスキップで消える） */}
-        {showMood && (
+        {vis('mood') && showMood && (
           <View style={s.card}>
+            <MinusBadge editing={editing} onPress={() => cards.hide('mood')} />
             <Text style={s.h2}>{t('💭 いまの気分は？')}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
@@ -614,7 +643,9 @@ export default function LogScreen() {
         )}
 
         {/* 今日のフィード */}
+        {vis('feed') && (
         <Animated.View style={[s.card, enter[2]]}>
+          <MinusBadge editing={editing} onPress={() => cards.hide('feed')} />
           <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
           {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。下から1回分ずつ記録しましょう。')}</Text>}
           {dayLogs.map((l) => (
@@ -628,10 +659,12 @@ export default function LogScreen() {
           ))}
           {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
         </Animated.View>
+        )}
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
-        {recentMeals.length > 0 && (
+        {vis('recent') && recentMeals.length > 0 && (
           <View style={s.card}>
+            <MinusBadge editing={editing} onPress={() => cards.hide('recent')} />
             <Pressable style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                        onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -661,7 +694,9 @@ export default function LogScreen() {
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
 
         {/* 体重クイック入力 */}
+        {vis('weight') && (
         <Animated.View style={[s.card, enter[2]]}>
+          <MinusBadge editing={editing} onPress={() => cards.hide('weight')} />
           <View style={[s.wRow, { marginTop: 0 }]}>
             <TextInput style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
@@ -670,6 +705,7 @@ export default function LogScreen() {
                           onPress={saveWeight} busy={saving} disabled={!wWeight} />
           </View>
         </Animated.View>
+        )}
 
         <View style={{ height: 16 }} />
       </ScrollView>
@@ -827,6 +863,10 @@ export default function LogScreen() {
           </Pressable>
         </Animated.View>
       </Animated.View>
+      <AddCardSheet
+        visible={addOpen} onClose={() => setAddOpen(false)}
+        hidden={cards.layout.hidden} shownKeys={cards.visible} labels={LOG_LABELS()} onShow={cards.show}
+      />
       <StatusBarMask />
       <HeaderGear />
     </KeyboardAvoidingView>
@@ -837,6 +877,9 @@ const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
+  addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
+  doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
+  doneBtnT: { color: '#fff', fontSize: 12, fontWeight: '800' },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
   betaPill: { backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },

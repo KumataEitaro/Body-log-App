@@ -13,6 +13,8 @@ import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import DateStrip from '@/components/DateStrip';
+import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
+import { Plus } from 'lucide-react-native';
 import { SegmentedControl, Chip, OptionButton } from '@/components/ui/Selectable';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 import { t } from '@/lib/i18n';
@@ -32,6 +34,14 @@ const activities = () => [
   { e: '⚽', n: t('スポーツ'), mets: 7.0 },
 ] as const;
 const MINUTES = [10, 20, 30, 45, 60, 90] as const;
+
+// 表示/非表示できるカード（かんたん記録側と筋トレ側）
+const EX_CARDS = ['quick', 'liftInput', 'liftHistory'];
+const EX_LABELS = (): Record<string, string> => ({
+  quick: t('今日の運動をゆるく記録'),
+  liftInput: t('今日のトレーニングを記録'),
+  liftHistory: t('筋トレ履歴'),
+});
 
 export default function TrainingScreen() {
   const [tRows, setTRows] = useState<TRow[]>([{ name: '', kg: '', reps: '', sets: '' }]);
@@ -67,6 +77,10 @@ export default function TrainingScreen() {
 
   // 記録先の日付（既定=今日。過去日にも記録できる）
   const [viewDate, setViewDate] = useState(todayJST());
+  const cards = useCardLayout('bl-cards-exercise', EX_CARDS);
+  const vis = (k: string) => !cards.layout.hidden.includes(k);
+  const [editing, setEditing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   // かんたん記録の状態
   const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
@@ -232,7 +246,20 @@ export default function TrainingScreen() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
         <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
-        <DateStrip value={viewDate} onChange={setViewDate} />
+        {editing ? (
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
+              <Plus size={16} color="#fff" strokeWidth={3} />
+            </Pressable>
+            <Pressable onPress={() => setEditing(false)} style={s.doneBtn2} hitSlop={8}>
+              <Text style={s.doneBtn2T}>{t('完了')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
+            <DateStrip value={viewDate} onChange={setViewDate} />
+          </Pressable>
+        )}
       </View>
 
       {/* かんたん記録 ⇄ 筋トレ のセグメント */}
@@ -247,8 +274,9 @@ export default function TrainingScreen() {
       </View>
 
       {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
-      {seg === 'easy' && (
+      {seg === 'easy' && vis('quick') && (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
+          <MinusBadge editing={editing} onPress={() => cards.hide('quick')} />
           <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
           <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。')}</Text>
           <View style={s.actGrid}>
@@ -333,7 +361,8 @@ export default function TrainingScreen() {
       )}
 
       {/* 入力 */}
-      <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
+      <View style={[s.card, (seg !== 'lift' || !vis('liftInput')) && { display: 'none' }]}>
+        <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
@@ -380,7 +409,8 @@ export default function TrainingScreen() {
       )}
 
       {/* 履歴 */}
-      <View style={[s.card, seg !== 'lift' && { display: 'none' }]}>
+      <View style={[s.card, (seg !== 'lift' || !vis('liftHistory')) && { display: 'none' }]}>
+        <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
         <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
         {history.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
         {history.slice(0, 20).map((h1) => (
@@ -401,6 +431,9 @@ export default function TrainingScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
+  doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
+  doneBtn2T: { color: '#fff', fontSize: 12, fontWeight: '800' },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink, marginBottom: 12 },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   segBtn: {

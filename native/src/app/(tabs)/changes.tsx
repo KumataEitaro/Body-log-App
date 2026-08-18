@@ -7,6 +7,8 @@ import { C } from '@/lib/ui';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
+import { HideableCard, AddCardSheet } from '@/components/CardLayout';
+import { Plus } from 'lucide-react-native';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
@@ -85,6 +87,9 @@ export default function ChangesScreen() {
   const [editing, setEditing] = useState(false);
   const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
   const [orderTrain, setOrderTrain] = useState<string[]>(TRAIN_ORDER_DEFAULT);
+  const [hiddenBody, setHiddenBody] = useState<string[]>([]);
+  const [hiddenTrain, setHiddenTrain] = useState<string[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
 
   // 並び順の復元
   useEffect(() => {
@@ -94,6 +99,10 @@ export default function ChangesScreen() {
         if (Array.isArray(b)) setOrderBody(mergeOrder(b, BODY_ORDER_DEFAULT));
         const t = JSON.parse((await AsyncStorage.getItem('bl-order-train')) || 'null');
         if (Array.isArray(t)) setOrderTrain(mergeOrder(t, TRAIN_ORDER_DEFAULT));
+        const hb = JSON.parse((await AsyncStorage.getItem('bl-hidden-body')) || 'null');
+        if (Array.isArray(hb)) setHiddenBody(hb.filter((k: string) => BODY_ORDER_DEFAULT.includes(k)));
+        const ht = JSON.parse((await AsyncStorage.getItem('bl-hidden-train')) || 'null');
+        if (Array.isArray(ht)) setHiddenTrain(ht.filter((k: string) => TRAIN_ORDER_DEFAULT.includes(k)));
       } catch { /* 初回など */ }
     })();
   }, []);
@@ -382,6 +391,14 @@ export default function ChangesScreen() {
   ) : null;
 
   function card(key: string): ReactNode {
+    return (
+      <HideableCard editing={editing} label={CARD_LABELS[key] ?? key} onHide={() => hideCard(key)}>
+        {cardBody(key)}
+      </HideableCard>
+    );
+  }
+
+  function cardBody(key: string): ReactNode {
     switch (key) {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
@@ -401,15 +418,40 @@ export default function ChangesScreen() {
   }
 
   const order = topSeg === 'body' ? orderBody : orderTrain;
-  const setOrder = topSeg === 'body' ? setOrderBody : setOrderTrain;
+  const setOrderRaw = topSeg === 'body' ? setOrderBody : setOrderTrain;
+  const hidden = topSeg === 'body' ? hiddenBody : hiddenTrain;
+  const setHidden = topSeg === 'body' ? setHiddenBody : setHiddenTrain;
+  const hiddenKey = topSeg === 'body' ? 'bl-hidden-body' : 'bl-hidden-train';
+  const visibleOrder = order.filter((k) => !hidden.includes(k));
+
+  // 表示中カードの並べ替え結果を、非表示カードの位置を保ったまま全体の順序へ戻す
+  const setOrder = (nextVisible: string[]) => {
+    let i = 0;
+    setOrderRaw(order.map((k) => (hidden.includes(k) ? k : nextVisible[i++])));
+  };
+
+  function hideCard(key: string) {
+    const next = [...hidden, key];
+    setHidden(next);
+    AsyncStorage.setItem(hiddenKey, JSON.stringify(next)).catch(() => {});
+  }
+  function showCard(key: string) {
+    const next = hidden.filter((k) => k !== key);
+    setHidden(next);
+    AsyncStorage.setItem(hiddenKey, JSON.stringify(next)).catch(() => {});
+  }
 
   // 最初の並びに戻す
   async function resetOrder() {
     setOrderBody(BODY_ORDER_DEFAULT);
     setOrderTrain(TRAIN_ORDER_DEFAULT);
+    setHiddenBody([]);
+    setHiddenTrain([]);
     try {
       await AsyncStorage.removeItem('bl-order-body');
       await AsyncStorage.removeItem('bl-order-train');
+      await AsyncStorage.removeItem('bl-hidden-body');
+      await AsyncStorage.removeItem('bl-hidden-train');
     } catch { /* 無視 */ }
   }
 
@@ -421,6 +463,9 @@ export default function ChangesScreen() {
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginRight: 38 }}>
           {editing ? (
             <>
+              <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
+                <Plus size={16} color="#fff" strokeWidth={3} />
+              </Pressable>
               <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
               <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>{t('完了')}</Text></Pressable>
             </>
@@ -448,7 +493,7 @@ export default function ChangesScreen() {
       <ReorderableCards
         key={topSeg}
         editing={editing}
-        order={order}
+        order={visibleOrder}
         onOrderChange={setOrder}
         renderCard={card}
         ghostLabel={(k) => CARD_LABELS[k] ?? k}
@@ -459,6 +504,10 @@ export default function ChangesScreen() {
         onScroller={(fn) => guide.registerScroller('/changes', fn)}
       />
       {!editing && <QuickLogFab />}
+      <AddCardSheet
+        visible={addOpen} onClose={() => setAddOpen(false)}
+        hidden={hidden} shownKeys={visibleOrder} labels={CARD_LABELS} onShow={showCard}
+      />
       <StatusBarMask />
       <HeaderGear guideKey="gear" />
     </View>
@@ -475,6 +524,10 @@ const s = StyleSheet.create({
   gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
   topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  addBtn: {
+    width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal,
+    alignItems: 'center', justifyContent: 'center',
+  },
   editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
   editBtnT: { fontSize: 12, fontWeight: '800', color: C.sub },
   doneBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
