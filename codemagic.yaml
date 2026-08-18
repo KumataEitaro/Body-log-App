@@ -128,6 +128,17 @@ workflows:
         script: |
           cd native
           npx expo prebuild --platform ios
+      - name: aps-environmentを除去（ローカル通知のみ運用）
+        script: |
+          # expo-notificationsのpluginがリモートPush用のaps-environmentを自動付与するが、
+          # 現状の通知は全てローカル通知でありPush capabilityは不要。
+          # 署名プロファイルにPush capabilityが無くてもビルドが通るようentitlementから除去する。
+          # （将来リモートPushを使う時は、App IDにPush capabilityを追加してこのステップを削除すること）
+          ENT="native/ios/BodyLog/BodyLog.entitlements"
+          if [ -f "$ENT" ]; then
+            plutil -remove aps-environment "$ENT" 2>/dev/null && echo "aps-environment removed" || echo "aps-environment not present (ok)"
+            plutil -p "$ENT"
+          fi
       - name: Set build number
         script: |
           cd native/ios
