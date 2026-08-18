@@ -47,6 +47,14 @@ export const C: Palette = {
   amber: '#b8860b',
 };
 
+/** '#rrggbb' を 'rgba(r,g,b,a)' に変換（テーマ色から透過色を作るため） */
+export function rgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 // StyleSheet.create で作った色はその場で固定されるため、あとからテーマを変えても
 // 反映されない。そこで生成されたスタイルを控えておき、変更時に旧色→新色へ置換する。
 // （このファイルは全コンポーネントが必ずimportするので、確実に先に読み込まれる）

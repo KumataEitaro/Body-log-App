@@ -6,6 +6,7 @@ import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, type 
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
@@ -44,6 +45,7 @@ const EX_LABELS = (): Record<string, string> => ({
 });
 
 export default function TrainingScreen() {
+  const insets = useSafeAreaInsets();
   const [tRows, setTRows] = useState<TRow[]>([{ name: '', kg: '', reps: '', sets: '' }]);
   const [history, setHistory] = useState<HistRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -240,7 +242,7 @@ export default function TrainingScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
       ref={trScrollRef}
-      style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+      style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
@@ -429,7 +431,7 @@ export default function TrainingScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },

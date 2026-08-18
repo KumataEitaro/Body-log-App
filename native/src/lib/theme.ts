@@ -3,7 +3,33 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { applyPalette, type Palette } from './ui';
 
-export type AccentKey = 'green' | 'blue' | 'purple' | 'orange' | 'pink' | 'graphite';
+export type AccentKey =
+  | 'green' | 'blue' | 'purple' | 'orange' | 'pink' | 'graphite'
+  | 'teal' | 'sky' | 'indigo' | 'lime' | 'rose' | 'brown';
+
+// 白と混ぜた淡色を作る（比率は手調整済みパレットから逆算した値）
+function mixW(hex: string, ratio: number): string {
+  const ch = (i: number) => {
+    const v = parseInt(hex.slice(i, i + 2), 16);
+    return Math.round(v + (255 - v) * ratio).toString(16).padStart(2, '0');
+  };
+  return '#' + ch(1) + ch(3) + ch(5);
+}
+
+// アクセント色1つからパレット一式を導出（新規テーマはこれで量産できる）
+function derivePalette(accent: string): Palette {
+  const a = (al: number) => {
+    const r = parseInt(accent.slice(1, 3), 16), g = parseInt(accent.slice(3, 5), 16), b = parseInt(accent.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${al})`;
+  };
+  return {
+    bg: mixW(accent, 0.985), panel: '#ffffff', ink: '#0e1116', sub: '#6a7280', faint: '#9aa1ab',
+    line: mixW(accent, 0.91), teal: accent, tealWeak: mixW(accent, 0.88),
+    accentSoft: mixW(accent, 0.95), accentBadge: mixW(accent, 0.90), accentBorder: a(0.30),
+    track: mixW(accent, 0.92), chipBg: mixW(accent, 0.955), segTrack: mixW(accent, 0.93),
+    pressed: mixW(accent, 0.94), calorieBar: '#3f4c5a', coral: '#ff2d2d', coralWeak: '#fdeeec', amber: '#b8860b',
+  };
+}
 
 // アクセントだけでなく、背景・罫線・文字まで同じ色相へ寄せて雰囲気ごと変える
 export const PALETTES: Record<AccentKey, Palette> = {
@@ -43,6 +69,12 @@ export const PALETTES: Record<AccentKey, Palette> = {
     accentBorder: 'rgba(71,85,105,0.32)', track: '#ebecee', chipBg: '#f4f5f6', segTrack: '#eef0f1',
     pressed: '#f0f1f3', calorieBar: '#1e293b', coral: '#ff2d2d', coralWeak: '#fceceb', amber: '#a9800f',
   },
+  teal: derivePalette('#0d9488'),
+  sky: derivePalette('#0284c7'),
+  indigo: derivePalette('#4f46e5'),
+  lime: derivePalette('#65a30d'),
+  rose: derivePalette('#e11d48'),
+  brown: derivePalette('#92400e'),
 };
 
 export const ACCENTS: { key: AccentKey; label: string; color: string }[] = [
@@ -52,6 +84,12 @@ export const ACCENTS: { key: AccentKey; label: string; color: string }[] = [
   { key: 'orange', label: 'オレンジ', color: PALETTES.orange.teal },
   { key: 'pink', label: 'ピンク', color: PALETTES.pink.teal },
   { key: 'graphite', label: 'グラファイト', color: PALETTES.graphite.teal },
+  { key: 'teal', label: 'ティール', color: PALETTES.teal.teal },
+  { key: 'sky', label: 'スカイ', color: PALETTES.sky.teal },
+  { key: 'indigo', label: 'インディゴ', color: PALETTES.indigo.teal },
+  { key: 'lime', label: 'ライム', color: PALETTES.lime.teal },
+  { key: 'rose', label: 'ローズ', color: PALETTES.rose.teal },
+  { key: 'brown', label: 'ブラウン', color: PALETTES.brown.teal },
 ];
 
 // ===== P/F/Cバーの配色（テーマとは独立した設定。3色を個別に選ぶ） =====
@@ -71,6 +109,18 @@ export const PFC_SWATCHES: { key: string; label: string; color: string }[] = [
   { key: 'purple', label: 'パープル', color: '#7c3aed' },
   { key: 'pink', label: 'ピンク', color: '#db2777' },
   { key: 'slate', label: 'スレート', color: '#475569' },
+  { key: 'mint', label: 'ミント', color: '#10b981' },
+  { key: 'emerald', label: 'エメラルド', color: '#047857' },
+  { key: 'cyan', label: 'シアン', color: '#0891b2' },
+  { key: 'navy', label: 'ネイビー', color: '#1e40af' },
+  { key: 'violet', label: 'バイオレット', color: '#6d28d9' },
+  { key: 'fuchsia', label: 'フューシャ', color: '#c026d3' },
+  { key: 'rose', label: 'ローズ', color: '#be123c' },
+  { key: 'brown', label: 'ブラウン', color: '#92400e' },
+  { key: 'olive', label: 'オリーブ', color: '#4d7c0f' },
+  { key: 'gold', label: 'ゴールド', color: '#a16207' },
+  { key: 'charcoal', label: 'チャコール', color: '#1f2937' },
+  { key: 'gray', label: 'グレー', color: '#6b7280' },
 ];
 
 export const DEFAULT_PFC: PfcColors = { p: '#059669', f: '#d97706', c: '#2563eb' };

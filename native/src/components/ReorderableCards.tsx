@@ -12,6 +12,7 @@ import Animated, {
   withSpring, withRepeat, withSequence, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { Minus } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 
 const SPRING = { damping: 18, stiffness: 180, mass: 0.6 };
@@ -31,10 +32,11 @@ type Props = {
   refreshControl?: ReactElement<RefreshControlProps>;
   contentContainerStyle?: object;
   onScroller?: (scrollBy: (delta: number) => void) => void; // ガイドツアーの自動スクロール受け口
+  onHide?: (key: string) => void; // 編集中に⊖でカードを非表示にする
 };
 
 export default function ReorderableCards({
-  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller,
+  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide,
 }: Props) {
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollY = useSharedValue(0);
@@ -184,6 +186,7 @@ export default function ReorderableCards({
             onMove={(ty, ay) => onDragMove(k, ty, ay)}
             onEnd={() => onDragEnd(k)}
             onEnterEdit={onEnterEdit}
+            onHide={onHide ? () => onHide(k) : undefined}
           >
             {renderCard(k) ?? (
               <View style={s.ghostCard}><Text style={s.ghostT}>{ghostLabel(k)}（データが揃うと表示されます）</Text></View>
@@ -196,7 +199,7 @@ export default function ReorderableCards({
 }
 
 function DraggableCard({
-  id, editing, active, dimmed, shift, drop, resetNonce, scrollY, onFrame, onStart, onMove, onEnd, onEnterEdit, children,
+  id, editing, active, dimmed, shift, drop, resetNonce, scrollY, onFrame, onStart, onMove, onEnd, onEnterEdit, onHide, children,
 }: {
   id: string;
   editing: boolean;
@@ -211,6 +214,7 @@ function DraggableCard({
   onMove: (translationY: number, absoluteY: number) => void;
   onEnd: () => void;
   onEnterEdit: () => void;
+  onHide?: () => void;
   children: ReactNode;
 }) {
   const dragY = useSharedValue(0);
@@ -277,7 +281,14 @@ function DraggableCard({
   }));
 
   const inner = (
-    <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
+    <View>
+      <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
+      {editing && onHide && (
+        <Pressable style={s.hideBtn} onPress={onHide} hitSlop={12}>
+          <Minus size={15} color="#fff" strokeWidth={3.5} />
+        </Pressable>
+      )}
+    </View>
   );
 
   return (
@@ -296,6 +307,11 @@ function DraggableCard({
 }
 
 const s = StyleSheet.create({
+  hideBtn: {
+    position: 'absolute', top: -4, left: -4, width: 27, height: 27, borderRadius: 14,
+    backgroundColor: C.coral, alignItems: 'center', justifyContent: 'center', zIndex: 30,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 6,
+  },
   ghostCard: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',

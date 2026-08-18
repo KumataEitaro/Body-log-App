@@ -38,6 +38,13 @@ describe('テーマ', () => {
     applyPalette(PALETTES.green);
   });
 
+  it('導出パレットも発光ボーダー用のrgbaが正しく作れる', () => {
+    applyPalette(PALETTES.rose);
+    expect(C.teal).toBe('#e11d48');
+    expect(C.coral).toBe('#ff2d2d'); // 超過の赤はテーマに関係なく固定
+    applyPalette(PALETTES.green);
+  });
+
   it('全テーマがパレットの全キーを持つ', () => {
     const keys = Object.keys(PALETTES.green);
     for (const p of Object.values(PALETTES)) {

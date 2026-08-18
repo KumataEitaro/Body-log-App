@@ -23,7 +23,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C } from '@/lib/ui';
+import { C, rgba } from '@/lib/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 import { detectStruggle } from '@/lib/adaptive';
@@ -62,6 +63,7 @@ function shiftDate(d: string, n: number): string {
 }
 
 export default function LogScreen() {
+  const insets = useSafeAreaInsets();
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -116,7 +118,8 @@ export default function LogScreen() {
     loop.start();
     return () => loop.stop();
   }, [glow]);
-  const glowBorder = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(5,150,105,0.45)', 'rgba(5,150,105,1)'] });
+  // テーマ色で発光させる（ハードコードだとテーマを変えても緑のままになる）
+  const glowBorder = glow.interpolate({ inputRange: [0, 1], outputRange: [rgba(C.teal, 0.45), rgba(C.teal, 1)] });
   const glowShadow = glow.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.3] });
   function toggleFoodsView() {
     const v = foodsView === 'row' ? 'grid' : 'row';
@@ -506,7 +509,7 @@ export default function LogScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -838,7 +841,7 @@ export default function LogScreen() {
             )}
           </View>
         )}
-        <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow }]}>
+        <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow, shadowColor: C.teal }]}>
           {/* 通常時=「ここが入力欄」のペンサイン / キーボード表示中=しまうボタン */}
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
@@ -874,7 +877,7 @@ export default function LogScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 64 },
+  scroll: { padding: 16 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },

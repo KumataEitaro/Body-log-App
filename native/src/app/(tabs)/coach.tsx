@@ -236,7 +236,7 @@ export default function CoachScreen() {
         )}
 
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
-        <View style={s.inRow}>
+        <View style={[s.inRow, { borderColor: C.teal, shadowColor: C.teal }]}>
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
               <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />

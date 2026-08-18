@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
-import { HideableCard, AddCardSheet } from '@/components/CardLayout';
+import { AddCardSheet } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -71,6 +72,7 @@ function addDays(d: string, n: number): string {
 }
 
 export default function ChangesScreen() {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [serie, setSerie] = useState<ReturnType<typeof series>[number]['key']>('weight');
@@ -408,14 +410,6 @@ export default function ChangesScreen() {
   ) : null;
 
   function card(key: string): ReactNode {
-    return (
-      <HideableCard editing={editing} label={CARD_LABELS[key] ?? key} onHide={() => hideCard(key)}>
-        {cardBody(key)}
-      </HideableCard>
-    );
-  }
-
-  function cardBody(key: string): ReactNode {
     switch (key) {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
@@ -515,11 +509,12 @@ export default function ChangesScreen() {
         order={visibleOrder}
         onOrderChange={setOrder}
         renderCard={card}
+        onHide={hideCard}
         ghostLabel={(k) => CARD_LABELS[k] ?? k}
         header={headerJSX}
         onEnterEdit={() => setEditing(true)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-        contentContainerStyle={s.scroll}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
         onScroller={(fn) => guide.registerScroller('/changes', fn)}
       />
       {!editing && <QuickLogFab />}
@@ -536,7 +531,7 @@ export default function ChangesScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 40 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
