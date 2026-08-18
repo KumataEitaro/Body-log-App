@@ -17,6 +17,8 @@ import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
+import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
+import { Table2 } from 'lucide-react-native';
 import { SegmentedControl } from '@/components/ui/Selectable';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
@@ -48,11 +50,11 @@ const series = () => [
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'photos', 'binge', 'goal', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'tgoal'];
+const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'table', 'photos', 'binge', 'goal', 'trends', 'health'];
+const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'ttable', 'tgoal'];
 const CARD_LABELS: Record<string, string> = {
   kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
-  trends: t('食材の傾向'), health: t('歩数・睡眠'),
+  table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
 };
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
@@ -90,6 +92,15 @@ export default function ChangesScreen() {
   const [hiddenBody, setHiddenBody] = useState<string[]>([]);
   const [hiddenTrain, setHiddenTrain] = useState<string[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [bodyTableOpen, setBodyTableOpen] = useState(false);
+  const [liftTableOpen, setLiftTableOpen] = useState(false);
+  const [tableMetric, setTableMetric] = useState<'weight' | 'waist' | 'bodyfat'>('weight');
+
+  // グラフやKPIから「数字の一覧」へ飛ぶ
+  function openBodyTable(metric: 'weight' | 'waist' | 'bodyfat' = 'weight') {
+    setTableMetric(metric);
+    setBodyTableOpen(true);
+  }
 
   // 並び順の復元
   useEffect(() => {
@@ -291,6 +302,12 @@ export default function ChangesScreen() {
 
   const chartCard = (
       <View style={s.card} ref={chartTarget} collapsable={false}>
+        <Pressable style={s.toTable}
+                   onPress={() => openBodyTable(serie === 'waist' ? 'waist' : serie === 'bodyfat' ? 'bodyfat' : 'weight')}
+                   hitSlop={8}>
+          <Table2 size={13} color={C.teal} />
+          <Text style={s.toTableT}>{t('表で見る')}</Text>
+        </Pressable>
         <View style={s.chips}>
           {series().map((x) => (
             <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
@@ -405,6 +422,8 @@ export default function ChangesScreen() {
       case 'chart': return chartCard;
       case 'photos': return <BodyPhotosCard />;
       case 'binge': return <BingeTriggerCard />;
+      case 'table': return <TableEntryCard onOpenBody={() => openBodyTable('weight')} onOpenLift={() => setLiftTableOpen(true)} />;
+      case 'ttable': return <TableEntryCard onOpenBody={() => openBodyTable('weight')} onOpenLift={() => setLiftTableOpen(true)} />;
       case 'goal': return <GoalSummaryCard mode="weight" />;
       case 'trends': return trendsCard;
       case 'health': return healthCard;
@@ -508,6 +527,8 @@ export default function ChangesScreen() {
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={hidden} shownKeys={visibleOrder} labels={CARD_LABELS} onShow={showCard}
       />
+      <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
+      <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <StatusBarMask />
       <HeaderGear guideKey="gear" />
     </View>
@@ -524,6 +545,12 @@ const s = StyleSheet.create({
   gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
   topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  toTable: {
+    position: 'absolute', top: 12, right: 12, zIndex: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  toTableT: { fontSize: 10.5, fontWeight: '800', color: C.teal },
   addBtn: {
     width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
