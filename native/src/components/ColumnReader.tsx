@@ -1,11 +1,14 @@
-// コラム（読みもの）: 一覧カード＋全文リーダー
+// コラム（読みもの）: 今日のおすすめ1本＋一覧（未読バッジ）＋全文リーダー
 // AIに聞かなくても、数字の意味と行動が分かる状態を目指す
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
 import { COLUMNS, type Column } from '@/content/columns';
 import { C } from '@/lib/ui';
+
+const READ_KEY = 'bl-columns-read';
 
 // **太字** と ・箇条書き と空行に対応した軽量レンダラ
 function Body({ text }: { text: string }) {
@@ -30,22 +33,68 @@ function Body({ text }: { text: string }) {
   );
 }
 
-export default function ColumnReader({ compact }: { compact?: boolean }) {
+// 日替わりで1本を選ぶ（未読があれば未読の先頭。全部読んでいれば日付でローテーション）
+function pickToday(read: Set<string>): Column {
+  const unread = COLUMNS.filter((c) => !read.has(c.id));
+  if (unread.length > 0) return unread[0];
+  const day = Math.floor(Date.now() / 86400000);
+  return COLUMNS[day % COLUMNS.length];
+}
+
+export default function ColumnReader() {
   const [open, setOpen] = useState<Column | null>(null);
+  const [read, setRead] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
-  const list = compact ? COLUMNS.slice(0, 3) : COLUMNS;
+
+  useEffect(() => {
+    AsyncStorage.getItem(READ_KEY).then((v) => {
+      if (v) { try { setRead(new Set(JSON.parse(v) as string[])); } catch { /* 壊れていたら空から */ } }
+    }).catch(() => {});
+  }, []);
+
+  const openColumn = useCallback((c: Column) => {
+    setOpen(c);
+    setRead((prev) => {
+      if (prev.has(c.id)) return prev;
+      const next = new Set(prev).add(c.id);
+      AsyncStorage.setItem(READ_KEY, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const today = pickToday(read);
+  const rest = COLUMNS.filter((c) => c.id !== today.id);
+  const unreadCount = COLUMNS.filter((c) => !read.has(c.id)).length;
 
   return (
-    <View style={compact ? undefined : s.card}>
+    <View style={s.card}>
       <View style={s.h2Row}>
         <BookOpen size={14} color={C.teal} />
-        <Text style={s.h2}>読みもの <Text style={s.h2sub}>— 数字の意味がわかる5本</Text></Text>
+        <Text style={s.h2}>読みもの <Text style={s.h2sub}>— 全{COLUMNS.length}本</Text></Text>
+        {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>未読 {unreadCount}</Text></View>}
       </View>
-      {list.map((c) => (
-        <Pressable key={c.id} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]} onPress={() => setOpen(c)}>
+
+      {/* 今日のおすすめ（未読の先頭を自動で選ぶ） */}
+      <Pressable style={({ pressed }) => [s.rec, pressed && { opacity: 0.75 }]} onPress={() => openColumn(today)}>
+        <Text style={s.recLabel}>今日のおすすめ</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+          <Text style={s.recEmoji}>{today.emoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.recTitle}>{today.title}</Text>
+            <Text style={s.recLead} numberOfLines={2}>{today.lead}</Text>
+          </View>
+        </View>
+        <Text style={s.recCta}>約{today.minutes}分で読む →</Text>
+      </Pressable>
+
+      {rest.map((c) => (
+        <Pressable key={c.id} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]} onPress={() => openColumn(c)}>
           <Text style={s.emoji}>{c.emoji}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={s.title} numberOfLines={1}>{c.title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={s.title} numberOfLines={1}>{c.title}</Text>
+              {!read.has(c.id) && <View style={s.newDot} />}
+            </View>
             <Text style={s.lead} numberOfLines={1}>{c.lead}・{c.minutes}分</Text>
           </View>
           <ChevronRight size={16} color={C.faint} />
@@ -81,12 +130,24 @@ export default function ColumnReader({ compact }: { compact?: boolean }) {
 
 const s = StyleSheet.create({
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
-  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 11, fontWeight: '400', color: C.sub },
+  countBadge: { marginLeft: 'auto', backgroundColor: '#e6f7f2', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  countBadgeT: { fontSize: 10, fontWeight: '800', color: C.teal },
+  rec: {
+    backgroundColor: '#f2faf7', borderWidth: 1.5, borderColor: 'rgba(5,150,105,0.3)', borderRadius: 16,
+    padding: 12, marginBottom: 10,
+  },
+  recLabel: { fontSize: 10, fontWeight: '800', color: C.teal, letterSpacing: 0.6 },
+  recEmoji: { fontSize: 26 },
+  recTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
+  recLead: { fontSize: 11.5, color: C.sub, marginTop: 2, lineHeight: 17 },
+  recCta: { fontSize: 11.5, fontWeight: '800', color: C.teal, marginTop: 8, textAlign: 'right' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.line },
   emoji: { fontSize: 20 },
-  title: { fontSize: 13.5, fontWeight: '700', color: C.ink },
+  title: { fontSize: 13.5, fontWeight: '700', color: C.ink, flexShrink: 1 },
+  newDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.teal },
   lead: { fontSize: 11, color: C.sub, marginTop: 2 },
   readerWrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   readerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
