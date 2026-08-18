@@ -9,7 +9,7 @@ import {
 } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Dimensions, Animated,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import Svg, { Rect, Mask } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -90,6 +90,10 @@ function GuideOverlay({ targets, scrollers, close }: {
   const router = useRouter();
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rct | null>(null);
+  // ガイドを閉じた/アプリが落ちた後にタイマーやmeasureのコールバックが走っても
+  // 状態更新・画面遷移をしないためのガード（クラッシュ対策）
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const { width: W, height: H } = Dimensions.get('window');
   const step = STEPS[idx];
 
@@ -107,11 +111,11 @@ function GuideOverlay({ targets, scrollers, close }: {
 
   const finish = useCallback(() => {
     AsyncStorage.setItem(GUIDE_DONE_KEY, '1').catch(() => {});
-    close();
     // 紙芝居のあとは初回オンボーディング（プロフィール→目標）へ。済んでいれば食事タブへ
+    // ※ 遷移先を決めてから閉じる。閉じた後に遷移すると、復帰時にクラッシュすることがある
     AsyncStorage.getItem('bl-onboard-done')
-      .then((v) => router.navigate((v ? '/log' : '/onboarding') as never))
-      .catch(() => router.navigate('/log' as never));
+      .then((v) => { close(); router.navigate((v ? '/log' : '/onboarding') as never); })
+      .catch(() => { close(); router.navigate('/log' as never); });
   }, [close, router]);
 
   const next = useCallback(() => {
@@ -129,13 +133,17 @@ function GuideOverlay({ targets, scrollers, close }: {
     let scrolled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const later = (fn: () => void, ms: number) => { timers.push(setTimeout(fn, ms)); };
+    // デモ表示のステップは、測定できなくても勝手に次へ進めない（デモを見せきる）
+    const giveUp = () => { if (alive.current && !step.demo) next(); };
     const tryMeasure = () => {
+      if (!alive.current) return;
       tries += 1;
       const r = targets.current?.get(step.target);
       if (r?.current) {
         r.current.measureInWindow((x, y, w, h) => {
+          if (!alive.current) return;
           if (!(w > 0 && h > 0)) {
-            if (tries < 6) later(tryMeasure, 250); else next();
+            if (tries < 14) later(tryMeasure, 120); else giveUp();
             return;
           }
           // 吹き出し分の余白を確保した可視域: 上110px〜下(H-290)px
@@ -148,15 +156,15 @@ function GuideOverlay({ targets, scrollers, close }: {
           if (!scrolled && Math.abs(delta) > 24 && scroller) {
             scrolled = true;
             scroller(delta); // ネイティブのease(ゆっくり動き出しゆっくり止まる)でスクロール
-            later(tryMeasure, 750); // スクロール完了を待って再測定
+            later(tryMeasure, 480); // スクロール完了を待って再測定
             return;
           }
           setRect({ x, y, w, h });
         });
-      } else if (tries < 6) later(tryMeasure, 250);
-      else next();
+      } else if (tries < 14) later(tryMeasure, 120);
+      else giveUp();
     };
-    later(tryMeasure, 450);
+    later(tryMeasure, 160);
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx]);
@@ -194,20 +202,20 @@ function GuideOverlay({ targets, scrollers, close }: {
         <Text style={s.skipT}>スキップ ✕</Text>
       </Pressable>
 
+      {step.kind === 'spot' && step.demo === 'coach' && (
+        <CoachDemoPanel title={step.title} text={step.text} onNext={next} last={lastSpot} H={H} />
+      )}
+
       {/* spotの吹き出し */}
-      {step.kind === 'spot' && hole && (
+      {step.kind === 'spot' && !step.demo && hole && (
         <View style={[s.bubble, bubbleBelow ? { top: hole.y + hole.h + 14 } : { bottom: H - hole.y + 14 }]}>
           <Text style={s.bubbleTitle}>{step.title}</Text>
           <Text style={s.bubbleText}>{step.text}</Text>
-          {step.demo === 'coach' && <CoachDemo />}
           <Pressable style={s.nextBtn} onPress={next}>
             <Text style={s.nextBtnT}>{lastSpot ? '最後へ' : '次へ'}</Text>
           </Pressable>
           <View style={[s.beak, bubbleBelow ? s.beakUp : s.beakDown, { left: Math.min(Math.max(hole.x + hole.w / 2 - 24, 30), W - 60) }]} />
         </View>
-      )}
-      {step.kind === 'spot' && !hole && (
-        <View style={s.loading}><ActivityIndicator color="#fff" /></View>
       )}
 
       {/* カードステップ */}
@@ -235,11 +243,14 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
   );
 }
 
-// AIコーチの自動デモ: 質問が勝手にタイプされ→考え中→回答がふわっと現れる
-// （回答は実データ分析の雰囲気が伝わるよう、あえて具体的な数字入りの分厚い例文にしている）
-function CoachDemo() {
+// AIコーチの自動デモ: 実際のチャット画面のように、質問がタイプされ→考え中→回答が出て
+// →読み進めるようにゆっくり自動スクロールする。回答が長いので全画面パネルで見せる。
+function CoachDemoPanel({ title, text, onNext, last, H }: {
+  title: string; text: string; onNext: () => void; last: boolean; H: number;
+}) {
   const Q = '最近ちょっと停滞気味かも。食事に何か問題ある？';
-  const A = '直近7日の記録を見ると、気になる傾向が2つあります。\n\n' +
+  const A =
+    '直近7日の記録を見ると、気になる傾向が2つあります。\n\n' +
     '・炭水化物が平均96g/日と、目標160gの6割しか取れていません。糖質が少なすぎると筋グリコーゲンが枯れて、トレ後半で力が出ない・体重が水分で乱高下する原因になります\n' +
     '・一方、たんぱく質は平均132g（体重×1.6g）でしっかり確保できています💪\n' +
     '・摂取カロリーは平均1,690kcalで目標−70kcal。ペース自体は悪くありません\n\n' +
@@ -247,41 +258,82 @@ function CoachDemo() {
   const [qLen, setQLen] = useState(0);
   const [phase, setPhase] = useState<'typing' | 'thinking' | 'answer'>('typing');
   const fade = useRef(new Animated.Value(0)).current;
+  const sv = useRef<ScrollView>(null);
+  const contentH = useRef(0);
+  const viewH = useRef(0);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
 
+  // 質問をタイプする
   useEffect(() => {
     const iv = setInterval(() => {
+      if (!alive.current) { clearInterval(iv); return; }
       setQLen((n) => {
         if (n >= Q.length) { clearInterval(iv); setPhase('thinking'); return n; }
         return n + 1;
       });
-    }, 65);
+    }, 55);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 考え中 → 回答
   useEffect(() => {
     if (phase !== 'thinking') return;
-    const t = setTimeout(() => {
+    const t2 = setTimeout(() => {
+      if (!alive.current) return;
       setPhase('answer');
-      Animated.timing(fade, { toValue: 1, duration: 550, useNativeDriver: true }).start();
-    }, 1200);
-    return () => clearTimeout(t);
+      Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+    }, 1000);
+    return () => clearTimeout(t2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // 回答が出たら、指で読み進めるようにゆっくり自動スクロール
+  useEffect(() => {
+    if (phase !== 'answer') return;
+    let y = 0;
+    const iv = setInterval(() => {
+      if (!alive.current) { clearInterval(iv); return; }
+      const max = Math.max(0, contentH.current - viewH.current);
+      if (max <= 0) return;
+      y = Math.min(y + Math.max(64, viewH.current * 0.3), max);
+      sv.current?.scrollTo({ y, animated: true });
+      if (y >= max) clearInterval(iv);
+    }, 950);
+    return () => clearInterval(iv);
+  }, [phase]);
+
   return (
-    <View style={s.demoWrap}>
-      <View style={s.demoUser}>
-        <Text style={s.demoUserT}>{Q.slice(0, qLen)}{phase === 'typing' ? '▍' : ''}</Text>
+    <View style={[s.demoWrap, { top: Math.max(74, H * 0.1) }]} pointerEvents="box-none">
+      <Text style={s.demoTitle}>{title}</Text>
+      <Text style={s.demoLead}>{text}</Text>
+      <View style={[s.demoPhone, { maxHeight: H * 0.5 }]}>
+        <View style={s.demoBar}><Text style={s.demoBarT}>AIコーチ</Text></View>
+        <ScrollView
+          ref={sv}
+          contentContainerStyle={{ padding: 12, paddingBottom: 18, gap: 8 }}
+          onLayout={(e) => { viewH.current = e.nativeEvent.layout.height; }}
+          onContentSizeChange={(_w, h) => { contentH.current = h; }}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
+        >
+          <View style={s.demoUser}>
+            <Text style={s.demoUserT}>{Q.slice(0, qLen)}{phase === 'typing' ? '▍' : ''}</Text>
+          </View>
+          {phase === 'thinking' && (
+            <View style={s.demoAi}><Text style={s.demoAiT}>考え中…</Text></View>
+          )}
+          {phase === 'answer' && (
+            <Animated.View style={[s.demoAi, { opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }]}>
+              <Text style={s.demoAiT}>{A}</Text>
+            </Animated.View>
+          )}
+        </ScrollView>
       </View>
-      {phase === 'thinking' && (
-        <View style={s.demoAi}><Text style={s.demoAiT}>考え中…</Text></View>
-      )}
-      {phase === 'answer' && (
-        <Animated.View style={[s.demoAi, { opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }]}>
-          <Text style={s.demoAiT}>{A}</Text>
-        </Animated.View>
-      )}
+      <Pressable style={s.demoNext} onPress={onNext}>
+        <Text style={s.nextBtnT}>{last ? '最後へ' : '次へ'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -310,7 +362,16 @@ const s = StyleSheet.create({
   bubbleTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 5 },
   bubbleText: { fontSize: 13, color: C.sub, lineHeight: 20 },
   nextBtn: { backgroundColor: HILITE, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 12 },
-  demoWrap: { marginTop: 10, gap: 6 },
+  demoWrap: { position: 'absolute', left: 20, right: 20, alignItems: 'stretch' },
+  demoTitle: { fontSize: 20, fontWeight: '900', color: '#fff', textAlign: 'center' },
+  demoLead: { fontSize: 12.5, color: 'rgba(255,255,255,0.82)', textAlign: 'center', lineHeight: 19, marginTop: 6, marginBottom: 14 },
+  demoPhone: {
+    backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+  },
+  demoBar: { paddingVertical: 9, alignItems: 'center', backgroundColor: '#f7faf9', borderBottomWidth: 1, borderBottomColor: '#eef1f0' },
+  demoBarT: { fontSize: 11.5, fontWeight: '800', color: C.sub },
+  demoNext: { backgroundColor: HILITE, borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 16, alignSelf: 'center', paddingHorizontal: 40 },
   demoUser: { alignSelf: 'flex-end', backgroundColor: C.ink, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '90%' },
   demoUserT: { color: '#fff', fontSize: 12.5, lineHeight: 18 },
   demoAi: { alignSelf: 'flex-start', backgroundColor: '#f2f4f1', borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '92%' },
@@ -319,7 +380,6 @@ const s = StyleSheet.create({
   beak: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
   beakUp: { top: -10, borderBottomWidth: 10, borderBottomColor: '#fff' },
   beakDown: { bottom: -10, borderTopWidth: 10, borderTopColor: '#fff' },
-  loading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   cardWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
     width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 22, padding: 22, alignItems: 'stretch',

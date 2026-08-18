@@ -9,6 +9,7 @@ import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
+import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -510,14 +511,18 @@ export default function LogScreen() {
               <Text style={s.metaT}>摂取 {eaten.toLocaleString()}</Text>
               <Text style={s.metaT}>目標 {goalKcal.toLocaleString()}</Text>
             </View>
-            {/* 残りPFCプログレスバー */}
+            {/* 残りPFCプログレスバー（英字P/F/Cは初心者に伝わらないため日本語を主・英字は補助） */}
             {macros && (
               <View style={{ marginTop: 10, gap: 5 }}>
-                {([['P', eatenP, macros.p, C.teal], ['F', eatenF, macros.f, '#d97706'], ['C', eatenC, macros.c, '#3b82f6']] as const).map(([lb, eat, tgt, col]) => {
+                {([
+                  [PFC_LABEL.p, 'P', eatenP, macros.p, C.teal],
+                  [PFC_LABEL.f, 'F', eatenF, macros.f, '#d97706'],
+                  [PFC_LABEL.c, 'C', eatenC, macros.c, '#3b82f6'],
+                ] as const).map(([ja, ab, eat, tgt, col]) => {
                   const over = eat > tgt;
                   return (
-                    <View key={lb} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={s.pfcL}>{lb}</Text>
+                    <View key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={s.pfcL} numberOfLines={1}>{ja}<Text style={s.pfcAb}> {ab}</Text></Text>
                       <View style={s.pfcBar}>
                         <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
                       </View>
@@ -525,6 +530,12 @@ export default function LogScreen() {
                     </View>
                   );
                 })}
+                {/* 数字を「次の行動」に翻訳する一言（初心者がPFCの意味を調べなくても動ける） */}
+                <View style={s.adviceBox}>
+                  <Text style={s.adviceT}>
+                    {pfcAdvice({ p: macros.p - eatenP, f: macros.f - eatenF, c: macros.c - eatenC, kcal: left })}
+                  </Text>
+                </View>
               </View>
             )}
           </Animated.View>
@@ -669,15 +680,16 @@ export default function LogScreen() {
             f: macros.f - eatenF - (parsedTotal ? Math.round(parsedTotal.f) : 0),
             c: macros.c - eatenC - (parsedTotal ? Math.round(parsedTotal.c) : 0),
           } : null;
-          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb}残${v}g` : `${lb} ${-v}g超過`);
+          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb} ${v}g` : `${lb} ${-v}g超過`);
           return (
             <View style={s.preview}>
               <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
                 {parsed ? '追加後 ' : ''}{pvLeft >= 0 ? `残り ${pvLeft.toLocaleString()}kcal` : `${(-pvLeft).toLocaleString()}kcal 超過`}
               </Text>
               {pv && (
-                <Text style={[s.previewSub, (pv.p < 0 || pv.f < 0 || pv.c < 0) && { color: C.coral }]}>
-                  {fmt(pv.p, 'P')} ・ {fmt(pv.f, 'F')} ・ {fmt(pv.c, 'C')}
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
+                      style={[s.previewSub, (pv.p < 0 || pv.f < 0 || pv.c < 0) && { color: C.coral }]}>
+                  残り {fmt(pv.p, PFC_SHORT.p)}・{fmt(pv.f, PFC_SHORT.f)}・{fmt(pv.c, PFC_SHORT.c)}
                 </Text>
               )}
             </View>
@@ -904,7 +916,13 @@ const s = StyleSheet.create({
   trayClearT: { fontSize: 11, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   previewMain: { fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   previewSub: { fontSize: 11.5, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
-  pfcL: { width: 14, fontSize: 11, fontWeight: '800', color: C.sub },
+  pfcL: { width: 74, fontSize: 11, fontWeight: '800', color: C.sub },
+  pfcAb: { fontSize: 9.5, fontWeight: '700', color: C.faint },
+  adviceBox: {
+    marginTop: 8, backgroundColor: '#f2faf7', borderWidth: 1, borderColor: 'rgba(5,150,105,0.22)',
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
+  },
+  adviceT: { fontSize: 12, color: C.ink, lineHeight: 19, fontWeight: '500' },
   pfcBar: { flex: 1, height: 6, backgroundColor: '#eceeeb', borderRadius: 3, overflow: 'hidden' },
   pfcFill: { height: 6, borderRadius: 3 },
   pfcT: { width: 86, fontSize: 10.5, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
