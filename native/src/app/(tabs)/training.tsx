@@ -1,7 +1,8 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal } from 'react-native';
+import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, type HKWorkout } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
@@ -78,6 +79,39 @@ export default function TrainingScreen() {
       .order('date', { ascending: false }).limit(1)
       .then(({ data }) => { if (data?.length) setMyWeight(Number(data[0].weight)); });
   }, []);
+
+  // ヘルスケア取込モード（Apple Watch等のワークアウトを一括登録）
+  const [hkOpen, setHkOpen] = useState(false);
+  const [hkList, setHkList] = useState<HKWorkout[]>([]);
+  const [hkSel, setHkSel] = useState<Set<string>>(new Set());
+  const [hkBusy, setHkBusy] = useState(false);
+  const [hkMsg, setHkMsg] = useState('');
+  async function openHk() {
+    if (!healthAvailable()) { setMsg({ ok: false, text: 'ヘルスケア取込はTestFlight版でのみ使えます（Expo Goでは動きません）。' }); return; }
+    setHkOpen(true); setHkBusy(true); setHkMsg(''); setHkList([]);
+    try {
+      if (!(await requestHealthAuth())) { setHkMsg('ヘルスケアへのアクセスが許可されませんでした。iOSの設定 > プライバシー > ヘルスケア から許可できます。'); return; }
+      const r = await listWorkouts(30);
+      if ('error' in r) { setHkMsg(r.error); return; }
+      setHkList(r);
+      setHkSel(new Set(r.map((w) => w.id)));
+      if (r.length === 0) setHkMsg('直近30日のワークアウトが見つかりませんでした。');
+    } finally { setHkBusy(false); }
+  }
+  async function importSelected() {
+    const items = hkList.filter((w) => hkSel.has(w.id));
+    if (items.length === 0) return;
+    setHkBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const r = await importWorkouts(uid, items);
+      if ('error' in r) { setHkMsg(r.error); return; }
+      setHkOpen(false);
+      setMsg({ ok: true, text: `⌚ ${r.imported}件を取り込みました${r.skipped > 0 ? `（${r.skipped}件は取込済みでスキップ）` : ''}。消費kcalが目標カロリーに反映されます。` });
+    } finally { setHkBusy(false); }
+  }
 
   const DIST_OK = ['散歩', 'ウォーキング', 'ランニング', '自転車'];
   function actKcal(): number {
@@ -245,9 +279,41 @@ export default function TrainingScreen() {
             label={actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
             onPress={saveActivity} busy={actSaving} disabled={actIdx == null}
           />
+          <OptionButton style={{ marginTop: 8 }} variant="tonal" label="⌚ ヘルスケアから取り込む（Apple Watch等）" onPress={openHk} />
           {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </View>
       )}
+
+      {/* ===== ヘルスケア取込モーダル ===== */}
+      <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
+        <View style={s.hkWrap}>
+          <View style={s.hkHead}>
+            <Text style={s.hkTitle}>⌚ ヘルスケアから取り込む</Text>
+            <Pressable onPress={() => setHkOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
+          </View>
+          <Text style={s.hkSub}>直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。</Text>
+          {hkBusy && hkList.length === 0 && <ActivityIndicator color={C.teal} style={{ marginTop: 30 }} />}
+          {hkMsg !== '' && <Text style={s.hkMsg}>{hkMsg}</Text>}
+          <ScrollView style={{ flex: 1, marginTop: 8 }}>
+            {hkList.map((w) => {
+              const on = hkSel.has(w.id);
+              return (
+                <Pressable key={w.id} style={[s.hkRow, !on && { opacity: 0.4 }]}
+                           onPress={() => setHkSel((prev) => { const n = new Set(prev); if (n.has(w.id)) n.delete(w.id); else n.add(w.id); return n; })}>
+                  <Text style={s.hkCheck}>{on ? '☑' : '☐'}</Text>
+                  <Text style={s.hkDate}>{w.date.slice(5).replace('-', '/')}</Text>
+                  <Text style={s.hkName} numberOfLines={1}>{w.name}</Text>
+                  <Text style={s.hkMeta}>{w.minutes}分{w.km ? ` ${w.km}km` : ''} ・ {w.kcal}kcal</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {hkList.length > 0 && (
+            <OptionButton variant="teal" label={`選択した${[...hkSel].length}件を取り込む`}
+                          onPress={importSelected} busy={hkBusy} disabled={hkSel.size === 0} />
+          )}
+        </View>
+      </Modal>
 
       {/* レストタイマー（保存で自動開始・タップで90秒リスタート） */}
       {seg === 'lift' && restLeft != null && (
@@ -349,6 +415,17 @@ const s = StyleSheet.create({
   },
   actChipOn: { borderColor: C.teal, backgroundColor: SEL.tealSoft },
   actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
+  hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
+  hkHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  hkTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  hkClose: { fontSize: 24, color: C.sub, fontWeight: '600', paddingHorizontal: 6 },
+  hkSub: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 17 },
+  hkMsg: { fontSize: 12.5, fontWeight: '600', color: C.sub, marginTop: 16, textAlign: 'center' },
+  hkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line },
+  hkCheck: { fontSize: 16, color: C.teal },
+  hkDate: { width: 44, fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },
+  hkName: { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.ink },
+  hkMeta: { fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },
   freeMin: {
     width: 72, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 12, paddingVertical: 8, fontSize: 12.5, color: C.ink, textAlign: 'center',
