@@ -15,7 +15,9 @@
     "ios": {
       "bundleIdentifier": "com.gotcha.bodylog.rn",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "体重とワークアウトの記録をヘルスケアから読み取り、アプリのグラフや消費カロリー計算に反映するために使用します。",
+        "NSHealthUpdateUsageDescription": "このアプリがヘルスケアへデータを書き込むことはありません。"
       }
     },
     "android": {

@@ -10,6 +10,10 @@ import { t } from '@/lib/i18n';
 WebBrowser.maybeCompleteAuthSession();
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
 
+// v1.0はメール+パスワードのみで審査に出す。Googleを出すとApple Sign-Inの実装が必須になる
+// （App Store Review 4.8）ため、v1.1でApple/Google両対応してから true にする。
+const SHOW_GOOGLE_SSO = false;
+
 export default function LoginScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -121,6 +125,7 @@ export default function LoginScreen() {
         <View style={s.orRow}>
           <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
         </View>
+{SHOW_GOOGLE_SSO && (
         <Pressable style={({ pressed }) => [s.ssoBtn, pressed && { opacity: 0.8 }]} onPress={googleLogin} disabled={gBusy}>
           {gBusy ? <ActivityIndicator color={C.ink} /> : (
             <>
@@ -129,6 +134,7 @@ export default function LoginScreen() {
             </>
           )}
         </Pressable>
+)}
         {!isLogin && (
           <Text style={s.terms}>{t('登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。')}</Text>
         )}

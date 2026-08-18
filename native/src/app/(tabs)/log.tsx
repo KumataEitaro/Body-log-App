@@ -884,8 +884,6 @@ const s = StyleSheet.create({
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
   doneBtnT: { color: '#fff', fontSize: 12, fontWeight: '800' },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
-  betaPill: { backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  betaPillT: { fontSize: 9, fontWeight: '800', color: C.teal, letterSpacing: 0.8 },
   hero: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18, marginBottom: 12 },
   heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
