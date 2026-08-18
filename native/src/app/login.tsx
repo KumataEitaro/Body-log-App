@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 
@@ -96,12 +97,11 @@ export default function LoginScreen() {
         <Text style={s.sub}>{isLogin ? 'おかえりなさい。記録を続けましょう' : '無料アカウントを作成（Web版と共通）'}</Text>
 
         {/* ログイン/新規登録の切り替え */}
-        <View style={s.segWrap}>
-          {([['login', 'ログイン'], ['signup', '新規登録']] as const).map(([k, l]) => (
-            <Pressable key={k} style={[s.seg, mode === k && s.segOn]} onPress={() => { setMode(k); setMsg(''); setInfo(''); }}>
-              <Text style={[s.segT, mode === k && { color: '#fff' }]}>{l}</Text>
-            </Pressable>
-          ))}
+        <View style={{ marginBottom: 16 }}>
+          <SegmentedControl
+            options={[{ key: 'login', label: 'ログイン' }, { key: 'signup', label: '新規登録' }]}
+            value={mode} onChange={(m) => { setMode(m); setMsg(''); setInfo(''); }}
+          />
         </View>
 
         <TextInput style={s.input} placeholder="メールアドレス" placeholderTextColor={C.faint}
@@ -114,9 +114,8 @@ export default function LoginScreen() {
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}
         {info ? <Text style={s.info}>{info}</Text> : null}
-        <Pressable style={({ pressed }) => [s.btn, pressed && { opacity: 0.8 }]} onPress={isLogin ? login : signup} disabled={busy}>
-          <Text style={s.btnT}>{busy ? (isLogin ? 'ログイン中…' : '登録中…') : (isLogin ? 'ログイン' : 'アカウントを作成')}</Text>
-        </Pressable>
+        <OptionButton style={{ marginTop: 8 }} label={isLogin ? 'ログイン' : 'アカウントを作成'}
+                      onPress={isLogin ? login : signup} busy={busy} />
         {/* SSO */}
         <View style={s.orRow}>
           <View style={s.orLine} /><Text style={s.orT}>または</Text><View style={s.orLine} />

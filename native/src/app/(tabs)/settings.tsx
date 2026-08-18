@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
+import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell } from 'lucide-react-native';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -261,13 +262,10 @@ export default function SettingsScreen() {
           <Text style={s.label}>表示名</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder="表示名" placeholderTextColor={C.faint} />
           <Text style={s.label}>性別</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {([['male', '男性'], ['female', '女性']] as const).map(([k, l]) => (
-              <Pressable key={k} style={[s.segMini, sex === k && s.segMiniOn]} onPress={() => setSex(k)}>
-                <Text style={[s.segMiniT, sex === k && { color: '#fff' }]}>{l}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <SegmentedControl
+            options={[{ key: 'male', label: '男性' }, { key: 'female', label: '女性' }]}
+            value={sex} onChange={setSex}
+          />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
               <Text style={s.label}>身長(cm)</Text>
@@ -280,9 +278,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={s.label}>日常の活動量 <Text style={{ fontWeight: '400' }}>— 消費カロリーの計算に使います</Text></Text>
           <ActivityLevelPicker value={Number(life) || 1.375} onChange={(v) => setLife(String(v))} />
-          <Pressable style={[s.btnPrimary, { marginTop: 16 }]} onPress={saveProfile} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>保存する</Text>}
-          </Pressable>
+          <OptionButton style={{ marginTop: 16 }} label="保存する" onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>

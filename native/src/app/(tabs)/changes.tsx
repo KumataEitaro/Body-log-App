@@ -14,6 +14,7 @@ import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
+import { SegmentedControl } from '@/components/ui/Selectable';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
@@ -424,13 +425,14 @@ export default function ChangesScreen() {
           )}
         </View>
       </View>
-      <View style={s.topSegWrap}>
-        {([['body', '身体の変化', PersonStanding], ['training', '筋トレの成長', Dumbbell]] as const).map(([k, l, Icon]) => (
-          <Pressable key={k} style={[s.topSeg, topSeg === k && s.topSegOn]} onPress={() => setTopSeg(k)}>
-            <Icon size={14} color={topSeg === k ? '#fff' : C.sub} />
-            <Text style={[s.topSegT, topSeg === k && { color: '#fff' }]}>{l}</Text>
-          </Pressable>
-        ))}
+      <View style={{ marginBottom: 4 }}>
+        <SegmentedControl
+          options={[
+            { key: 'body', label: '身体の変化', icon: <PersonStanding size={14} color={C.sub} /> },
+            { key: 'training', label: '運動の記録', icon: <Dumbbell size={14} color={C.sub} /> },
+          ]}
+          value={topSeg} onChange={setTopSeg}
+        />
       </View>
       {editing && <Text style={s.editHint}>カードを長押し→そのままドラッグで移動。「完了」で保存します</Text>}
     </>

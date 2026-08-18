@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
+import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import GoalPanel from '@/components/GoalPanel';
 
 const DONE_KEY = 'bl-onboard-done';
@@ -92,13 +93,10 @@ export default function Onboarding() {
               <Text style={s.label}>ニックネーム（任意）</Text>
               <TextInput style={s.input} placeholder="例: くまさん" placeholderTextColor={C.faint} value={name} onChangeText={setName} />
               <Text style={s.label}>性別</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {([['male', '男性'], ['female', '女性']] as const).map(([k, l]) => (
-                  <Pressable key={k} style={[s.seg, sex === k && s.segOn]} onPress={() => setSex(k)}>
-                    <Text style={[s.segT, sex === k && { color: '#fff' }]}>{l}</Text>
-                  </Pressable>
-                ))}
-              </View>
+              <SegmentedControl
+                options={[{ key: 'male', label: '男性' }, { key: 'female', label: '女性' }]}
+                value={sex} onChange={setSex}
+              />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.label}>身長（cm）</Text>
@@ -116,9 +114,7 @@ export default function Onboarding() {
               <Text style={s.label}>日常の活動量</Text>
               <ActivityLevelPicker value={life} onChange={setLife} />
               {msg ? <Text style={s.err}>{msg}</Text> : null}
-              <Pressable style={s.primaryBtn} onPress={saveProfile} disabled={busy}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnT}>次へ — 目標を決める</Text>}
-              </Pressable>
+              <OptionButton style={{ marginTop: 18 }} label="次へ — 目標を決める" onPress={saveProfile} busy={busy} />
             </>
           )}
 
@@ -127,9 +123,7 @@ export default function Onboarding() {
               <Text style={s.h1}>目標を決める</Text>
               <Text style={s.sub}>目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。</Text>
               <GoalPanel mode="weight" weightSections="goal" />
-              <Pressable style={s.primaryBtn} onPress={() => setStep(2)}>
-                <Text style={s.primaryBtnT}>次へ — 筋トレ目標（任意）</Text>
-              </Pressable>
+              <OptionButton style={{ marginTop: 18 }} label="次へ — 筋トレ目標（任意）" onPress={() => setStep(2)} />
               <Pressable onPress={() => setStep(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
                 <Text style={s.linkT}>目標はあとで決める</Text>
               </Pressable>
@@ -141,9 +135,7 @@ export default function Onboarding() {
               <Text style={s.h1}>筋トレの目標（任意）</Text>
               <Text style={s.sub}>ベンチプレス100kgのような目標を置くと、トレのグラフに目標線が出ます。筋トレをしない人はスキップでOKです。</Text>
               <GoalPanel mode="training" />
-              <Pressable style={s.primaryBtn} onPress={done}>
-                <Text style={s.primaryBtnT}>はじめる 🎉</Text>
-              </Pressable>
+              <OptionButton style={{ marginTop: 18 }} label="はじめる 🎉" onPress={done} />
             </>
           )}
           <View style={{ height: 40 }} />

@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { todayJST } from '@/lib/calc';
 import { C } from '@/lib/ui';
+import { OptionButton } from '@/components/ui/Selectable';
 
 const GUIDE_DONE_KEY = 'bl-guide-done';
 const HILITE = '#f59e0b'; // ハイライト色（ドックのティールと区別するアンバー）
@@ -228,7 +229,7 @@ function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => v
       <Text style={s.cardEmoji}>👋</Text>
       <Text style={s.cardTitle}>ようこそ BodyLog へ</Text>
       <Text style={s.cardText}>1分で使い方をご案内します。{'\n'}ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。</Text>
-      <Pressable style={s.primaryBtn} onPress={onStart}><Text style={s.primaryBtnT}>ガイドを始める</Text></Pressable>
+      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14, marginBottom: 8 }} label="ガイドを始める" onPress={onStart} />
       <Pressable onPress={onSkip} hitSlop={8}><Text style={s.linkT}>今はしない</Text></Pressable>
     </View>
   );
@@ -291,7 +292,7 @@ function DoneCard({ onFinish }: { onFinish: () => void }) {
       <Text style={s.cardEmoji}>🎉</Text>
       <Text style={s.cardTitle}>準備完了！</Text>
       <Text style={s.cardText}>まずは今日食べたものを1つ、下の入力欄に書いてみましょう。{'\n'}続けるほどAIのアドバイスが賢くなります。</Text>
-      <Pressable style={s.primaryBtn} onPress={onFinish}><Text style={s.primaryBtnT}>食事を記録してみる</Text></Pressable>
+      <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label="食事を記録してみる" onPress={onFinish} />
     </View>
   );
 }

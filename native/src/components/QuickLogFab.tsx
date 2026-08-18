@@ -8,6 +8,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, Images, Weight, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
+import { OptionButton } from '@/components/ui/Selectable';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
@@ -134,11 +135,8 @@ export default function QuickLogFab() {
                   </View>
                 )}
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
-                  <Pressable style={s.stagedSave} onPress={confirmSave} disabled={saving}>
-                    {saving ? <ActivityIndicator color="#fff" /> : (
-                      <Text style={s.stagedSaveT}>✓ この内容で保存{staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : ''}</Text>
-                    )}
-                  </Pressable>
+                  <OptionButton variant="teal" busy={saving} onPress={confirmSave}
+                                label={`✓ この内容で保存${staged.items.length > 0 ? `（${Math.round(sumItems(staged.items).kcal)}kcal）` : ''}`} />
                   <Pressable onPress={() => { setStaged(null); setStagedNote(''); }} hitSlop={8}>
                     <Text style={s.stagedClear}>破棄</Text>
                   </Pressable>

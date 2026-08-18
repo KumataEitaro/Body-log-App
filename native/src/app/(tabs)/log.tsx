@@ -8,6 +8,7 @@ import {
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
+import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -519,19 +520,13 @@ export default function LogScreen() {
             </Text>
             {!backfillMore ? (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <Pressable style={[s.btnPrimary, { flex: 1, marginTop: 0 }]} disabled={backfillBusy} onPress={() => backfillSave(0)}>
-                  {backfillBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>だいたい目安どおり（±0）</Text>}
-                </Pressable>
-                <Pressable style={[s.btnGhost, { flex: 1 }]} disabled={backfillBusy} onPress={() => setBackfillMore(true)}>
-                  <Text style={s.btnGhostT}>食べすぎた…</Text>
-                </Pressable>
+                <OptionButton style={{ flex: 1 }} label="目安どおり（±0）" onPress={() => backfillSave(0)} busy={backfillBusy} />
+                <OptionButton style={{ flex: 1 }} variant="tonal" label="食べすぎた…" onPress={() => setBackfillMore(true)} disabled={backfillBusy} />
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 {[500, 1000, 2000].map((n) => (
-                  <Pressable key={n} style={s.chipBtn} disabled={backfillBusy} onPress={() => backfillSave(n)}>
-                    <Text style={s.chipBtnT}>+{n.toLocaleString()}kcal くらい</Text>
-                  </Pressable>
+                  <Chip key={n} label={`+${n.toLocaleString()}kcal くらい`} tone="ink" disabled={backfillBusy} onPress={() => backfillSave(n)} />
                 ))}
               </View>
             )}
@@ -553,17 +548,11 @@ export default function LogScreen() {
             </Text>
             {plan && !todayEvent ? (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <Pressable style={[s.btnPrimary, { flex: 1, marginTop: 0 }]} onPress={addRecoveryEvent}>
-                  <Text style={s.btnPrimaryT}>🕊 今日は+200kcal緩める</Text>
-                </Pressable>
-                <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={snoozeRisk}>
-                  <Text style={s.btnGhostT}>大丈夫、気をつける</Text>
-                </Pressable>
+                <OptionButton style={{ flex: 1 }} variant="teal" label="🕊 今日は+200kcal緩める" onPress={addRecoveryEvent} />
+                <OptionButton style={{ flex: 1 }} variant="tonal" label="大丈夫、気をつける" onPress={snoozeRisk} />
               </View>
             ) : (
-              <Pressable style={[s.btnGhost, { marginTop: 10, flex: 0 }]} onPress={snoozeRisk}>
-                <Text style={s.btnGhostT}>OK、気をつける</Text>
-              </Pressable>
+              <OptionButton style={{ marginTop: 10 }} variant="tonal" label="OK、気をつける" onPress={snoozeRisk} />
             )}
           </View>
         )}
@@ -621,10 +610,8 @@ export default function LogScreen() {
             <TextInput style={s.wInput} placeholder={latestWeight != null ? latestWeight.toFixed(1) : '73.5'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
             <Text style={s.wUnit}>kg</Text>
-            <Pressable style={({ pressed }) => [s.btnGhost, { flexDirection: 'row', gap: 6, justifyContent: 'center' }, pressed && { opacity: 0.7 }]} onPress={saveWeight} disabled={saving || !wWeight}>
-              <Weight size={15} color={C.ink} />
-              <Text style={s.btnGhostT}>体重を記録</Text>
-            </Pressable>
+            <OptionButton variant="tonal" label="体重を記録" leading={<Weight size={15} color={C.ink} />}
+                          onPress={saveWeight} busy={saving} disabled={!wWeight} />
           </View>
         </Animated.View>
 

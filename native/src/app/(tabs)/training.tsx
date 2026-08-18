@@ -12,6 +12,7 @@ import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import DateStrip from '@/components/DateStrip';
+import { SegmentedControl, Chip, OptionButton, SEL } from '@/components/ui/Selectable';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
@@ -157,13 +158,14 @@ export default function TrainingScreen() {
       </View>
 
       {/* かんたん記録 ⇄ 筋トレ のセグメント */}
-      <View style={s.segWrap}>
-        {([['easy', 'かんたん記録', Footprints], ['lift', '筋トレ', Dumbbell]] as const).map(([k, l, Icon]) => (
-          <Pressable key={k} style={[s.segBtn, seg === k && s.segBtnOn]} onPress={() => setSeg(k)}>
-            <Icon size={14} color={seg === k ? '#fff' : C.sub} />
-            <Text style={[s.segBtnT, seg === k && { color: '#fff' }]}>{l}</Text>
-          </Pressable>
-        ))}
+      <View style={{ marginBottom: 14 }}>
+        <SegmentedControl
+          options={[
+            { key: 'easy', label: 'かんたん記録', icon: <Footprints size={14} color={C.sub} /> },
+            { key: 'lift', label: '筋トレ', icon: <Dumbbell size={14} color={C.sub} /> },
+          ]}
+          value={seg} onChange={setSeg}
+        />
       </View>
 
       {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
@@ -182,18 +184,14 @@ export default function TrainingScreen() {
           <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>時間</Text>
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
             {MINUTES.map((m) => (
-              <Pressable key={m} style={[s.minChip, actMin === m && s.minChipOn]} onPress={() => setActMin(m)}>
-                <Text style={[s.minChipT, actMin === m && { color: '#fff' }]}>{m}分</Text>
-              </Pressable>
+              <Chip key={m} label={`${m}分`} tone="ink" selected={actMin === m} onPress={() => setActMin(m)} />
             ))}
           </View>
-          <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={saveActivity} disabled={actSaving || actIdx == null}>
-            {actSaving ? <ActivityIndicator color="#fff" /> : (
-              <Text style={s.btnPrimaryT}>
-                {actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
-              </Text>
-            )}
-          </Pressable>
+          <OptionButton
+            style={{ marginTop: 14 }}
+            label={actIdx == null ? '運動を選んで記録' : `記録する（約${actKcal()}kcal消費）`}
+            onPress={saveActivity} busy={actSaving} disabled={actIdx == null}
+          />
           {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </View>
       )}
@@ -249,12 +247,9 @@ export default function TrainingScreen() {
           );
         })()}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          <Pressable style={[s.btnGhost, { flex: 1 }]} onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])}>
-            <Text style={s.btnGhostT}>＋ 種目を追加</Text>
-          </Pressable>
-          <Pressable style={[s.btnPrimary, { flex: 1 }]} onPress={save} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>保存する</Text>}
-          </Pressable>
+          <OptionButton style={{ flex: 1 }} variant="tonal" label="＋ 種目を追加"
+                        onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])} />
+          <OptionButton style={{ flex: 1 }} label="保存する" onPress={save} busy={saving} />
         </View>
         {msg && seg === 'lift' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
@@ -296,10 +291,10 @@ const s = StyleSheet.create({
   segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   actChip: {
-    width: '23%', backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 14,
+    width: '23%', backgroundColor: SEL.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
     paddingVertical: 10, alignItems: 'center', gap: 3,
   },
-  actChipOn: { borderColor: C.teal, backgroundColor: '#f2faf7' },
+  actChipOn: { borderColor: C.teal, backgroundColor: SEL.tealSoft },
   actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
   minChip: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   minChipOn: { backgroundColor: C.ink, borderColor: C.ink },

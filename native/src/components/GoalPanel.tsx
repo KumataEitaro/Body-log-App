@@ -10,6 +10,7 @@ import { todayJST } from '@/lib/calc';
 import { progressStatus, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
 import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
+import { OptionButton } from '@/components/ui/Selectable';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
 type Ev = { id: string; date: string; title: string; extra_kcal: number };
@@ -223,9 +224,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             </View>
           )}
 
-          <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={saveWeightGoal} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>目標を保存する</Text>}
-          </Pressable>
+          <OptionButton style={{ marginTop: 14 }} label="目標を保存する" onPress={saveWeightGoal} busy={busy} />
           </>
           )}
 
@@ -255,9 +254,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Text style={s.label}>+kcal</Text>
               <TextInput style={s.input} keyboardType="number-pad" value={evKcal} onChangeText={setEvKcal} />
             </View>
-            <Pressable style={[s.btnGhost, { paddingHorizontal: 16 }]} onPress={addEvent} disabled={busy}>
-              <Text style={s.btnGhostT}>追加</Text>
-            </Pressable>
+            <OptionButton variant="tonal" label="追加" onPress={addEvent} busy={busy} />
           </View>
           {evPicker && (
             <DateTimePicker
@@ -303,9 +300,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Text style={s.label}>目標（kg）</Text>
               <TextInput style={s.input} placeholder="100" placeholderTextColor={C.faint} keyboardType="decimal-pad" value={tKg} onChangeText={setTKg} />
             </View>
-            <Pressable style={[s.btnGhost, { paddingHorizontal: 16 }]} onPress={addTrainingGoal} disabled={busy}>
-              {busy ? <ActivityIndicator color={C.ink} /> : <Text style={s.btnGhostT}>追加</Text>}
-            </Pressable>
+            <OptionButton variant="tonal" label="追加" onPress={addTrainingGoal} busy={busy} />
           </View>
         </View>
       )}

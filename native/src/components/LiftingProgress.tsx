@@ -10,6 +10,7 @@ import { TrendingUp, CalendarDays } from 'lucide-react-native';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
+import { Chip } from '@/components/ui/Selectable';
 
 function shiftDate(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
@@ -122,9 +123,8 @@ export function LiftChartCard() {
       <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>挙上重量の推移</Text></View>
       <View style={s.chips}>
         {(['kg', 'volume'] as const).map((m) => (
-          <Pressable key={m} style={[s.chip, chartMode === m && s.chipOn]} onPress={() => setChartMode(m)}>
-            <Text style={[s.chipT, chartMode === m && { color: '#fff' }]}>{m === 'kg' ? '重量(kg)' : 'ボリューム'}</Text>
-          </Pressable>
+          <Chip key={m} label={m === 'kg' ? '重量(kg)' : 'ボリューム'} tone="ink"
+                selected={chartMode === m} onPress={() => setChartMode(m)} />
         ))}
       </View>
       <InteractiveChart
@@ -138,9 +138,7 @@ export function LiftChartCard() {
         {exView === 'chips' ? (
           <View style={[s.chips, { flex: 1 }]}>
             {exercises.map((n) => (
-              <Pressable key={n} style={[s.chip, n === activeEx && s.chipOn]} onPress={() => setSelEx(n)}>
-                <Text style={[s.chipT, n === activeEx && { color: '#fff' }]}>{n}</Text>
-              </Pressable>
+              <Chip key={n} label={n} tone="ink" selected={n === activeEx} onPress={() => setSelEx(n)} />
             ))}
           </View>
         ) : (

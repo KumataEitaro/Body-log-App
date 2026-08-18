@@ -11,6 +11,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Camera, ImagePlus, X, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
+import { OptionButton } from '@/components/ui/Selectable';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 
@@ -196,10 +197,8 @@ export default function BodyPhotosCard() {
                 )}
               </Pressable>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              <Pressable style={s.saveBtn} onPress={save} disabled={busy}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnT}>✓ 保存</Text>}
-              </Pressable>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <OptionButton variant="teal" label="✓ 保存" onPress={save} busy={busy} />
               <Pressable onPress={() => { setPendingImg(null); setBfInput(''); }} hitSlop={8} style={{ justifyContent: 'center' }}>
                 <Text style={s.cancelT}>破棄</Text>
               </Pressable>
@@ -208,14 +207,10 @@ export default function BodyPhotosCard() {
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <Pressable style={s.addBtn} onPress={() => pick(true)}>
-            <Camera size={16} color="#fff" strokeWidth={2.2} />
-            <Text style={s.addBtnT}>{daysSince != null && daysSince < 7 ? '撮り直す' : '今週の写真を撮る'}</Text>
-          </Pressable>
-          <Pressable style={s.addGhost} onPress={() => pick(false)}>
-            <ImagePlus size={16} color={C.ink} strokeWidth={2.2} />
-            <Text style={s.addGhostT}>選ぶ</Text>
-          </Pressable>
+          <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : '今週の写真を撮る'}
+                        leading={<Camera size={16} color="#fff" strokeWidth={2.2} />} onPress={() => pick(true)} />
+          <OptionButton variant="tonal" label="選ぶ"
+                        leading={<ImagePlus size={16} color={C.ink} strokeWidth={2.2} />} onPress={() => pick(false)} />
         </View>
       )}
       {daysSince != null && daysSince >= 7 && !pendingImg && (
