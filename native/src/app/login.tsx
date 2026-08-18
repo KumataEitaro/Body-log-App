@@ -119,12 +119,14 @@ export default function LoginScreen() {
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}
         {info ? <Text style={s.info}>{info}</Text> : null}
-        <OptionButton style={{ marginTop: 8 }} label={isLogin ? 'ログイン' : t('アカウントを作成')}
+        <OptionButton style={{ marginTop: 8 }} label={isLogin ? t('ログイン') : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
-        {/* SSO */}
+        {/* SSO（v1.0では非表示。Googleを出すとApple Sign-Inの実装が必須になるため） */}
+{SHOW_GOOGLE_SSO && (
         <View style={s.orRow}>
           <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
         </View>
+)}
 {SHOW_GOOGLE_SSO && (
         <Pressable style={({ pressed }) => [s.ssoBtn, pressed && { opacity: 0.8 }]} onPress={googleLogin} disabled={gBusy}>
           {gBusy ? <ActivityIndicator color={C.ink} /> : (
