@@ -8,6 +8,9 @@ import {
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
+import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
+import { previewFill } from '@/lib/preview';
+import * as Haptics from 'expo-haptics';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
@@ -216,6 +219,8 @@ export default function LogScreen() {
 
   // ===== 目安・ヒーロー計算（Web版と同一ロジック） =====
   const summary = summarizeDay(dayLogs);
+
+
   const weightForBmr = summary.weight ?? latestWeight ?? (profile?.init_weight != null ? Number(profile.init_weight) : 70);
   const bmr = profile ? mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) : 0;
   const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) : 0;
@@ -300,6 +305,7 @@ export default function LogScreen() {
     const items = removeServing(parsed.items, fd);
     if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
     else setParsed({ ...parsed, items });
+    setFocusItem(null);   // 品目が変わったら注目を解除（消えた品を指し続けないため）
   }
 
   // トレイの個別削除
@@ -308,9 +314,10 @@ export default function LogScreen() {
     const items = parsed.items.filter((_, j) => j !== i);
     if (items.length === 0 && parsed.weight == null && !parsed.ex) setParsed(null);
     else setParsed({ ...parsed, items });
+    setFocusItem(null);   // 品目が変わったら注目を解除（消えた品を指し続けないため）
   }
   function clearTray() {
-    setParsed(null); setStagedNote('');
+    setParsed(null); setStagedNote(''); setFocusItem(null);
   }
 
   // 記録の取り消し: フィード行を長押し→削除（チップ即時追加の押し間違い対策）
@@ -347,7 +354,7 @@ export default function LogScreen() {
     try {
       const res = await saveParsed(uid, parsed, stagedNote, viewDate);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
-      setParsed(null); setStagedNote('');
+      setParsed(null); setStagedNote(''); setFocusItem(null);
       await load();
       setMsg({ ok: true, text: t('保存しました。') });
     } finally {
@@ -505,6 +512,38 @@ export default function LogScreen() {
 
   const parsedTotal = parsed ? sumItems(parsed.items) : null;
 
+  // 保存前ライブプレビュー: トレイ（未保存）の合計。バーのゴースト表示に使う
+  const pulse = usePulse(parsed != null);
+  // トレイで注目している食品（バー上でその寄与だけを光らせる）
+  const [focusItem, setFocusItem] = useState<number | null>(null);
+  const focused = focusItem != null ? parsed?.items[focusItem] ?? null : null;
+  // 注目中の1品と、それ以外に分けた寄与量
+  const split = (key: 'kcal' | 'p' | 'f' | 'c') => {
+    const all = parsedTotal ? Math.round(parsedTotal[key]) : 0;
+    const fv = focused ? Math.round(Number(focused[key]) || 0) : 0;
+    return { others: Math.max(0, all - fv), focus: fv };
+  };
+  const stagedK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
+  const stagedP = parsedTotal ? Math.round(parsedTotal.p) : 0;
+  const stagedF = parsedTotal ? Math.round(parsedTotal.f) : 0;
+  const stagedC = parsedTotal ? Math.round(parsedTotal.c) : 0;
+
+  // 目標を「超える瞬間」に一度だけ振動（超えっぱなしでは鳴らさない）
+  const prevOverRef = useRef('');
+  useEffect(() => {
+    if (!macros) return;
+    const overs = [
+      eatenP + stagedP > macros.p ? 'p' : '',
+      eatenF + stagedF > macros.f ? 'f' : '',
+      eatenC + stagedC > macros.c ? 'c' : '',
+    ].join('');
+    if (stagedK > 0 && overs.length > prevOverRef.current.length) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    prevOverRef.current = overs;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stagedP, stagedF, stagedC]);
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
@@ -542,7 +581,11 @@ export default function LogScreen() {
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
               {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
-            <View style={s.hline}><View style={[s.hfill, { width: `${Math.min(100, Math.max(0, (eaten / Math.max(1, goalKcal)) * 100))}%` }, left < 0 && { backgroundColor: C.coral }]} /></View>
+            <View style={[s.hline, { flexDirection: 'row' }]}>
+              <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: C.coral }]} />
+              <GhostPair eaten={eaten} others={split('kcal').others} focus={split('kcal').focus}
+                         target={goalKcal} color={C.calorieBar} pulse={pulse} />
+            </View>
             <View style={s.heroMeta}>
               <Text style={s.metaT}>{t('摂取')} {eaten.toLocaleString()}</Text>
               <Text style={s.metaT}>{t('目標')} {goalKcal.toLocaleString()}</Text>
@@ -566,7 +609,7 @@ export default function LogScreen() {
                     <View key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={s.pfcL} numberOfLines={1}>{t(ja)}<Text style={s.pfcAb}> {ab}</Text></Text>
                       <View style={[s.pfcBar, { flexDirection: 'row' }]}>
-                        {segs.length > 0 ? segs.map((w, i) => (
+                        {segs.length > 0 && segs.length <= 5 ? segs.map((w, i) => (
                           <View key={i} style={{
                             width: `${w * scale}%`, height: '100%',
                             backgroundColor: over ? C.coral : col,
@@ -575,6 +618,8 @@ export default function LogScreen() {
                         )) : (
                           <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
                         )}
+                        <GhostPair eaten={eat} others={split(key).others} focus={split(key).focus}
+                                   target={tgt} color={col} pulse={pulse} />
                       </View>
                       <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
                     </View>
@@ -742,22 +787,30 @@ export default function LogScreen() {
         {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
           const pvLeft = left - addK;
-          const pv = macros ? {
-            p: macros.p - eatenP - (parsedTotal ? Math.round(parsedTotal.p) : 0),
-            f: macros.f - eatenF - (parsedTotal ? Math.round(parsedTotal.f) : 0),
-            c: macros.c - eatenC - (parsedTotal ? Math.round(parsedTotal.c) : 0),
-          } : null;
-          const fmt = (v: number, lb: string) => (v >= 0 ? `${lb} ${v}g` : t('{lb} {n}g超過', { lb, n: -v }));
           return (
             <View style={s.preview}>
               <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
                 {parsed ? t('追加後 ') : ''}{pvLeft >= 0 ? t('残り {n}kcal', { n: pvLeft.toLocaleString() }) : t('{n}kcal 超過', { n: (-pvLeft).toLocaleString() })}
               </Text>
-              {pv && (
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
-                      style={[s.previewSub, (pv.p < 0 || pv.f < 0 || pv.c < 0) && { color: C.coral }]}>
-                  {t('残り')} {fmt(pv.p, t(PFC_SHORT.p))}・{fmt(pv.f, t(PFC_SHORT.f))}・{fmt(pv.c, t(PFC_SHORT.c))}
-                </Text>
+              {macros && (
+                <View style={s.previewBars}>
+                  {([
+                    ['P', eatenP, stagedP, macros.p, pfcColors().p],
+                    ['F', eatenF, stagedF, macros.f, pfcColors().f],
+                    ['C', eatenC, stagedC, macros.c, pfcColors().c],
+                  ] as const).map(([ab, eat2, stg, tgt2, col2]) => {
+                    const leftG = tgt2 - eat2 - stg;
+                    return (
+                      <View key={ab} style={s.previewBarCol}>
+                        <Text style={[s.previewBarAb, { color: leftG < 0 ? C.coral : col2 }]}>{ab}</Text>
+                        <LiveBar eaten={eat2} staged={stg} target={tgt2} color={col2} pulse={pulse} height={5} />
+                        <Text style={[s.previewBarV, leftG < 0 && { color: C.coral, fontWeight: '800' }]}>
+                          {leftG >= 0 ? `${leftG}g` : `+${-leftG}g`}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               )}
             </View>
           );
@@ -822,14 +875,25 @@ export default function LogScreen() {
         {(parsed != null || pendingTexts.length > 0) && (
           <View style={s.tray}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-              {parsed?.items.map((it, i) => (
-                <View key={i} style={s.trayChip}>
-                  <Text style={s.trayChipT} numberOfLines={1}>
-                    {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 10 }}>{Math.round(it.kcal)}kcal</Text>
-                  </Text>
-                  <Pressable hitSlop={8} onPress={() => removeTrayItem(i)}><Text style={s.trayX}>×</Text></Pressable>
-                </View>
-              ))}
+              {parsed?.items.map((it, i) => {
+                const on = focusItem === i;
+                return (
+                  <Pressable key={i} style={[s.trayChip, on && s.trayChipOn]}
+                             onPress={() => setFocusItem(on ? null : i)}>
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={s.trayChipT} numberOfLines={1}>
+                        {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 10 }}>{Math.round(it.kcal)}kcal</Text>
+                      </Text>
+                      <Text style={s.trayChipPfc}>
+                        <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(it.p)}
+                        {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(it.f)}
+                        {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(it.c)}
+                      </Text>
+                    </View>
+                    <Pressable hitSlop={8} onPress={() => removeTrayItem(i)}><Text style={s.trayX}>×</Text></Pressable>
+                  </Pressable>
+                );
+              })}
               {parsed?.weight != null && (
                 <View style={s.trayChip}>
                   <Weight size={12} color={C.sub} />
@@ -983,11 +1047,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 11.5, fontWeight: '700', color: C.ink },
+  trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
+  trayChipPfc: { fontSize: 9.5, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
   trayX: { fontSize: 14, fontWeight: '800', color: C.coral, marginLeft: 2 },
   traySave: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   traySaveT: { color: '#fff', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   trayClearT: { fontSize: 11, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   previewMain: { fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  previewBars: { flexDirection: 'row', gap: 10, flex: 1, alignItems: 'center', marginLeft: 10 },
+  previewBarCol: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  previewBarAb: { fontSize: 10, fontWeight: '900', width: 10, textAlign: 'center' },
+  previewBarV: { fontSize: 10, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 30, textAlign: 'right' },
   previewSub: { fontSize: 11.5, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
   pfcL: { width: 80, fontSize: 13, fontWeight: '800', color: C.ink },
   pfcAb: { fontSize: 9.5, fontWeight: '700', color: C.faint },
