@@ -583,4 +583,8 @@ export const EN: Record<string, string> = {
   "週の運動習慣・種目ごとの目標重量（RM換算）": "Weekly habit and per-exercise target weights",
   "選択した{n}件を取り込む": "Import {n} selected",
   "📖 読みもの": "📖 Reading",
+  "— {n}件": " — {n} entries",
+  "体重 {n}kg": "Weight {n}kg",
+  "食べた日{n}日の平均": "Avg over {n} days eaten",
+  "食べない日": "days not eaten",
 };

@@ -32,7 +32,7 @@ export function logTitle(l: FeedLog): string {
     return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
   }
   if (l.kcal != null) return String(l.text || t('食事（概算）')).replace(/^（|）$/g, '').slice(0, 60);
-  if (l.weight != null) return `体重 ${Number(l.weight).toFixed(1)}kg`;
+  if (l.weight != null) return t('体重 {n}kg', { n: Number(l.weight).toFixed(1) });
   if (l.ex && l.ex !== 'オフ') return `運動 ${l.ex}`;
   return String(l.text || l.mood || t('記録')).slice(0, 60);
 }

@@ -465,4 +465,8 @@ export const ES: Record<string, string> = {
   '鶏肉・魚・卵・大豆製品': 'pollo, pescado, huevos y soja',
   'ごはん・パン・いも類・果物': 'arroz, pan, patata y fruta',
   '脂質と炭水化物': 'grasa y carbohidratos',
+  "— {n}件": " — {n} registros",
+  "体重 {n}kg": "Peso {n} kg",
+  "食べた日{n}日の平均": "Media de {n} días con este alimento",
+  "食べない日": "días sin él",
 };

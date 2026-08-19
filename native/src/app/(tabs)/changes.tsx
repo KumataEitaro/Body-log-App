@@ -369,7 +369,7 @@ export default function ChangesScreen() {
               <View key={f.name} style={s.fxRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.fxName}>{f.name}</Text>
-                  <Text style={s.note}>食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</Text>
+                  <Text style={s.note}>{t('食べた日{n}日の平均', { n: f.withN })} {g(f.withAvg)} ／ {t('食べない日')} {g(f.withoutAvg)}</Text>
                 </View>
                 <Text style={[s.fxVal, { color: C.teal }]}>{g(f.effect)}</Text>
               </View>
@@ -379,7 +379,7 @@ export default function ChangesScreen() {
               <View key={f.name} style={s.fxRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.fxName}>{f.name}</Text>
-                  <Text style={s.note}>食べた日{f.withN}日の平均 {g(f.withAvg)} ／ 食べない日 {g(f.withoutAvg)}</Text>
+                  <Text style={s.note}>{t('食べた日{n}日の平均', { n: f.withN })} {g(f.withAvg)} ／ {t('食べない日')} {g(f.withoutAvg)}</Text>
                 </View>
                 <Text style={[s.fxVal, { color: C.coral }]}>{g(f.effect)}</Text>
               </View>

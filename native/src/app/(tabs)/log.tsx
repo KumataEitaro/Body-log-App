@@ -649,7 +649,7 @@ export default function LogScreen() {
         {vis('feed') && (
         <Animated.View style={[s.card, enter[2]]}>
           <MinusBadge editing={editing} onPress={() => cards.hide('feed')} />
-          <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>— {dayLogs.length}件</Text></Text>
+          <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>{t('— {n}件', { n: dayLogs.length })}</Text></Text>
           {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。下から1回分ずつ記録しましょう。')}</Text>}
           {dayLogs.map((l) => (
             <Pressable key={l.id} style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
