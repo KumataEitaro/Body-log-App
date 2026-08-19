@@ -551,16 +551,30 @@ export default function LogScreen() {
             {macros && (
               <View style={{ marginTop: 10, gap: 5 }}>
                 {([
-                  [PFC_LABEL.p, 'P', eatenP, macros.p, pfcColors().p],
-                  [PFC_LABEL.f, 'F', eatenF, macros.f, pfcColors().f],
-                  [PFC_LABEL.c, 'C', eatenC, macros.c, pfcColors().c],
-                ] as const).map(([ja, ab, eat, tgt, col]) => {
+                  [PFC_LABEL.p, 'P', eatenP, macros.p, pfcColors().p, 'p'],
+                  [PFC_LABEL.f, 'F', eatenF, macros.f, pfcColors().f, 'f'],
+                  [PFC_LABEL.c, 'C', eatenC, macros.c, pfcColors().c, 'c'],
+                ] as const).map(([ja, ab, eat, tgt, col, key]) => {
                   const over = eat > tgt;
+                  // 食事ごとの寄与（バーに区切り線を引き、どの食事でどれだけ摂ったか見えるように）
+                  const segs = dayLogs
+                    .filter((l) => l.kcal != null && Number(l[key] ?? 0) > 0)
+                    .map((l) => (Number(l[key]) / Math.max(1, tgt)) * 100);
+                  const total = segs.reduce((a, b) => a + b, 0);
+                  const scale = total > 100 ? 100 / total : 1;  // 超過時は全体を100%に収める
                   return (
                     <View key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={s.pfcL} numberOfLines={1}>{t(ja)}<Text style={s.pfcAb}> {ab}</Text></Text>
-                      <View style={s.pfcBar}>
-                        <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
+                      <View style={[s.pfcBar, { flexDirection: 'row' }]}>
+                        {segs.length > 0 ? segs.map((w, i) => (
+                          <View key={i} style={{
+                            width: `${w * scale}%`, height: '100%',
+                            backgroundColor: over ? C.coral : col,
+                            borderRightWidth: i < segs.length - 1 ? 1.5 : 0, borderRightColor: '#ffffff',
+                          }} />
+                        )) : (
+                          <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
+                        )}
                       </View>
                       <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
                     </View>
@@ -656,7 +670,16 @@ export default function LogScreen() {
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
               <Text style={{ fontSize: 13, marginRight: 2 }}>{logIcon(l)}</Text>
-              <Text style={s.feedTitle} numberOfLines={2}>{logTitle(l)}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.feedTitle, { flex: 0 }]} numberOfLines={2}>{logTitle(l)}</Text>
+                {l.kcal != null && l.p != null && (
+                  <Text style={s.feedPfc}>
+                    <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(Number(l.p))}
+                    {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(Number(l.f ?? 0))}
+                    {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(Number(l.c ?? 0))}
+                  </Text>
+                )}
+              </View>
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
             </Pressable>
           ))}
@@ -899,6 +922,7 @@ const s = StyleSheet.create({
   feedRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line, gap: 8 },
   feedTime: { fontSize: 11, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
   feedTitle: { flex: 1, fontSize: 14.5, color: C.ink, lineHeight: 20 },
+  feedPfc: { fontSize: 10.5, fontWeight: '800', color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
   feedKcal: { fontSize: 14, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
   feedU: { fontSize: 10, color: C.faint },
   msg: { fontSize: 13, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
