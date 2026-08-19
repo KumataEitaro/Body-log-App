@@ -11,6 +11,7 @@ import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
+import MyFoodForm from '@/components/MyFoodForm';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
@@ -85,6 +86,7 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const todo = useTodoBadge();
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [foodFormOpen, setFoodFormOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
@@ -457,6 +459,7 @@ export default function SettingsScreen() {
         <SheetHeader title={"🍱 " + t("マイ食品の管理")} />
         <ScrollView>
           {foods.length === 0 && <Text style={s.note}>{t('まだ登録がありません。食事タブでAI解析した品目が候補になります。')}</Text>}
+          <OptionButton style={{ marginBottom: 12 }} label={t('＋ 食品を追加')} onPress={() => setFoodFormOpen(true)} />
           {foods.map((f) => (
             <View key={f.id} style={s.foodRow}>
               <Text style={s.foodName} numberOfLines={1}>{f.name}</Text>
@@ -525,6 +528,8 @@ export default function SettingsScreen() {
     </Modal>
 
     <QuickLogFab />
+    <MyFoodForm visible={foodFormOpen} draft={null}
+                onClose={() => setFoodFormOpen(false)} onSaved={load} />
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
     <StatusBarMask />
     </View>

@@ -9,6 +9,9 @@ import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
+import SpotlightTip from '@/components/SpotlightTip';
+import MyFoodForm, { type MyFoodDraft } from '@/components/MyFoodForm';
+import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
 import { previewFill } from '@/lib/preview';
 import * as Haptics from 'expo-haptics';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
@@ -380,6 +383,7 @@ export default function LogScreen() {
     if (!uid || !parsed) return;
     setSaving(true); setMsg(null);
     try {
+      const items = parsed.items;   // setParsed(null)より前に控える（後段の学習で使う）
       const res = await saveParsed(uid, parsed, stagedNote, viewDate);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
@@ -396,6 +400,13 @@ export default function LogScreen() {
       setMsg(delFailed
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
         : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
+
+      // よく食べる食品の検出（保存が成功したときだけ学習する）
+      try {
+        await recordItems(items, viewDate);
+        const s2 = await pickSuggestion(myFoods.map((f) => f.name), viewDate);
+        if (s2) { setSuggest(s2); await markShown(viewDate); }
+      } catch { /* 案内は本体機能に影響させない */ }
     } finally {
       setSaving(false);
     }
@@ -557,6 +568,10 @@ export default function LogScreen() {
   const [focusItem, setFocusItem] = useState<number | null>(null);
   // 編集中の記録ID: セットされている間、✓保存はこの記録を置き換える（新規追加ではない）
   const [editingId, setEditingId] = useState<string | null>(null);
+  // よく食べる食品の登録案内（保存後に1件だけ出す）
+  const [suggest, setSuggest] = useState<Suggestion | null>(null);
+  const [foodDraft, setFoodDraft] = useState<MyFoodDraft | null>(null);
+  const chipsRef = useRef<View | null>(null);   // 案内でハイライトする対象
   // 編集を始めた日付。表示日を動かしたら編集を打ち切る（記録が別の日へ移るのを防ぐ）
   const editingDateRef = useRef<string | null>(null);
   useEffect(() => {
@@ -880,6 +895,7 @@ export default function LogScreen() {
         )}
         {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可） */}
         {myFoods.length > 0 && (() => {
+          /* 案内のハイライト対象。ScrollViewの外側のViewに付ける */
           const chipEl = (fd: MyFood) => {
             const cnt = parsed ? servingCount(parsed.items, fd) : null;
             return (
@@ -899,7 +915,7 @@ export default function LogScreen() {
           };
           const orderedFoods = foodsOrder.map((id) => myFoods.find((f) => f.id === id)).filter(Boolean) as MyFood[];
           return (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }} ref={chipsRef} collapsable={false}>
               {foodsView === 'row' ? (
                 <View style={{ flex: 1 }}>
                   <ReorderableChips
@@ -1015,6 +1031,32 @@ export default function LogScreen() {
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={cards.layout.hidden} shownKeys={cards.visible} labels={LOG_LABELS()} onShow={cards.show}
+      />
+      <SpotlightTip
+        visible={suggest != null}
+        targetRef={myFoods.length > 0 ? chipsRef : undefined}
+        title={t('{name}をよく食べるようですね', { name: suggest?.name ?? '' })}
+        text={t('直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。', { days: suggest?.days ?? 0 })}
+        primaryLabel={t('登録してみる')}
+        onPrimary={() => {
+          if (suggest) {
+            setFoodDraft({
+              name: suggest.name, unit: suggest.portion || undefined,
+              kcal: suggest.kcal, p: suggest.p, f: suggest.f, c: suggest.c,
+            });
+          }
+          setSuggest(null);
+        }}
+        secondaryLabel={t('あとで')}
+        onSecondary={() => {
+          if (suggest) markDeclined(suggest.key).catch(() => {});
+          setSuggest(null);
+        }}
+      />
+      <MyFoodForm
+        visible={foodDraft != null} draft={foodDraft}
+        onClose={() => setFoodDraft(null)}
+        onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に追加しました。下のチップから1タップで足せます。') }); }}
       />
       <StatusBarMask />
       <HeaderGear />
