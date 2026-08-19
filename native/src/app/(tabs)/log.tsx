@@ -320,12 +320,15 @@ export default function LogScreen() {
     setParsed(null); setStagedNote(''); setFocusItem(null);
   }
 
-  // 記録の取り消し: フィード行を長押し→削除（チップ即時追加の押し間違い対策）
+  // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除
   function confirmDeleteLog(l: DayLog) {
-    Alert.alert(t('この記録を削除しますか？'), logTitle(l), [
+    const items = (l.items as FoodItem[] | null) ?? [];
+    const canEdit = items.length > 0 || l.weight != null;
+    Alert.alert(canEdit ? t('この記録をどうしますか？') : t('この記録を削除しますか？'), logTitle(l), [
       { text: t('キャンセル'), style: 'cancel' },
+      ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
       {
-        text: t('削除する'), style: 'destructive',
+        text: t('削除する'), style: 'destructive' as const,
         onPress: async () => {
           await supabase.from('logs').delete().eq('id', l.id);
           if (uid) await syncEntriesForDate(uid, today);
@@ -333,6 +336,31 @@ export default function LogScreen() {
         },
       },
     ]);
+  }
+
+  // 記録をトレイへ戻して編集状態にする（保存すると元の記録を置き換える）
+  function startEditLog(l: DayLog) {
+    const items = (l.items as FoodItem[] | null) ?? [];
+    setParsed({
+      items,
+      weight: l.weight != null ? Number(l.weight) : null,
+      waist: null,
+      ex: (l.ex as ExLevel | null) ?? null,
+      adj: Number(l.adj) || 0,
+      mood: l.mood || null,
+    });
+    setStagedNote(typeof l.text === 'string' ? l.text : '');
+    setFocusItem(null);
+    setEditingId(l.id);
+    editingDateRef.current = viewDate;
+    setMsg({ ok: true, text: t('下のトレイに戻しました。直して✓保存すると置き換わります。') });
+  }
+
+  // 編集をやめる（記録は元のまま残る）
+  function cancelEdit() {
+    setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
+    editingDateRef.current = null;
+    setMsg(null);
   }
 
   // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
@@ -354,9 +382,20 @@ export default function LogScreen() {
     try {
       const res = await saveParsed(uid, parsed, stagedNote, viewDate);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
-      setParsed(null); setStagedNote(''); setFocusItem(null);
+      // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
+      let delFailed = false;
+      if (editingId) {
+        const { error } = await supabase.from('logs').delete().eq('id', editingId);
+        if (error) delFailed = true;      // 新しい記録は入っているので、古い方が残ると二重になる
+        else await syncEntriesForDate(uid, viewDate);
+      }
+      const wasEdit = editingId != null;
+      setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
+      editingDateRef.current = null;
       await load();
-      setMsg({ ok: true, text: t('保存しました。') });
+      setMsg(delFailed
+        ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
+        : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
     } finally {
       setSaving(false);
     }
@@ -516,6 +555,18 @@ export default function LogScreen() {
   const pulse = usePulse(parsed != null);
   // トレイで注目している食品（バー上でその寄与だけを光らせる）
   const [focusItem, setFocusItem] = useState<number | null>(null);
+  // 編集中の記録ID: セットされている間、✓保存はこの記録を置き換える（新規追加ではない）
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // 編集を始めた日付。表示日を動かしたら編集を打ち切る（記録が別の日へ移るのを防ぐ）
+  const editingDateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (editingId && editingDateRef.current && editingDateRef.current !== viewDate) {
+      setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
+      editingDateRef.current = null;
+      setMsg({ ok: false, text: t('日付を移動したので書き換えを取り消しました。記録はそのまま残っています。') });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewDate]);
   const focused = focusItem != null ? parsed?.items[focusItem] ?? null : null;
   // 注目中の1品と、それ以外に分けた寄与量
   const split = (key: 'kcal' | 'p' | 'f' | 'c') => {
@@ -872,6 +923,14 @@ export default function LogScreen() {
           );
         })()}
         {/* ステージングトレイ: チップ/AI解析の結果はここに積まれ、✓保存で初めてDBに書かれる */}
+        {editingId != null && (
+          <View style={s.editBanner}>
+            <Text style={s.editBannerT}>{t('✏️ 記録を書き換え中')}</Text>
+            <Pressable onPress={cancelEdit} hitSlop={8}>
+              <Text style={s.editBannerCancel}>{t('やめる')}</Text>
+            </Pressable>
+          </View>
+        )}
         {(parsed != null || pendingTexts.length > 0) && (
           <View style={s.tray}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
@@ -921,7 +980,7 @@ export default function LogScreen() {
                 <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
                 <Pressable style={s.traySave} onPress={save} disabled={saving}>
                   {saving ? <ActivityIndicator color="#fff" /> : (
-                    <Text style={s.traySaveT}>{t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
+                    <Text style={s.traySaveT}>{editingId ? t('✓ 書き換える') : t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
                   )}
                 </Pressable>
               </View>
@@ -1047,6 +1106,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 11.5, fontWeight: '700', color: C.ink },
+  editBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
+  },
+  editBannerT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
+  editBannerCancel: { fontSize: 11.5, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
   trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
   trayChipPfc: { fontSize: 9.5, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
   trayX: { fontSize: 14, fontWeight: '800', color: C.coral, marginLeft: 2 },

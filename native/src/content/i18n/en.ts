@@ -594,4 +594,13 @@ export const EN: Record<string, string> = {
   "変化を見る": "See your progress",
   "犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。": "Even a dog walk counts. Pick a type and duration and it feeds your calorie goal. Switch to Strength up top.",
   "設定はここ": "Settings live here",
+  "✏️ 記録を書き換え中": "✏️ Editing an entry",
+  "✓ 書き換える": "✓ Replace",
+  "この記録をどうしますか？": "What would you like to do?",
+  "やめる": "Cancel",
+  "下のトレイに戻しました。直して✓保存すると置き換わります。": "Moved back to the tray below. Edit it and save to replace the entry.",
+  "新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。": "The new version was saved, but the old entry could not be removed. Long-press the duplicate row to delete it.",
+  "日付を移動したので書き換えを取り消しました。記録はそのまま残っています。": "You changed the date, so the edit was cancelled. The entry is unchanged.",
+  "書き換えました。": "Replaced.",
+  "書き換える": "Edit",
 };

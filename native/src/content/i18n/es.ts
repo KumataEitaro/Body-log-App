@@ -476,4 +476,13 @@ export const ES: Record<string, string> = {
   "変化を見る": "Mira tu progreso",
   "犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。": "Hasta pasear al perro cuenta. Elige tipo y duración y suma a tu objetivo. La fuerza está en la pestaña de arriba.",
   "設定はここ": "Los ajustes están aquí",
+  "✏️ 記録を書き換え中": "✏️ Editando un registro",
+  "✓ 書き換える": "✓ Reemplazar",
+  "この記録をどうしますか？": "¿Qué quieres hacer con este registro?",
+  "やめる": "Cancelar",
+  "下のトレイに戻しました。直して✓保存すると置き換わります。": "Lo hemos devuelto a la bandeja de abajo. Edítalo y guarda para reemplazarlo.",
+  "新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。": "Se guardó la nueva versión, pero no se pudo borrar el registro anterior. Mantén pulsada la fila duplicada para eliminarla.",
+  "日付を移動したので書き換えを取り消しました。記録はそのまま残っています。": "Has cambiado de fecha, así que se canceló la edición. El registro sigue igual.",
+  "書き換えました。": "Reemplazado.",
+  "書き換える": "Editar",
 };
