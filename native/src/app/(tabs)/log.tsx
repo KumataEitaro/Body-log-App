@@ -997,7 +997,7 @@ const s = StyleSheet.create({
   },
   adviceT: { fontSize: 12, color: C.ink, lineHeight: 19, fontWeight: '500' },
   pfcBar: { flex: 1, height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden' },
-  pfcFill: { height: 6, borderRadius: 3 },
+  pfcFill: { height: '100%', borderRadius: 4 },
   pfcT: { width: 96, fontSize: 13.5, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
   hint: { fontSize: 10, color: C.faint, textAlign: 'right', marginTop: 6 },
   thumbWrap: { marginRight: 8 },

@@ -1,6 +1,7 @@
 // 言語辞書の健全性: キーの重複・空値・プレースホルダの食い違いを検出する
 // （プレースホルダが欠けると画面に {n} がそのまま出たり、数値が消えたりする）
 import { DICTS } from '@/content/i18n';
+import { t, setLocale } from '@/lib/i18n';
 
 const FILLED = ['en', 'ko', 'zh', 'es'] as const;
 
@@ -44,5 +45,13 @@ describe('言語辞書', () => {
         expect({ code, k, jp: JP.test(v) }).toEqual({ code, k, jp: false });
       }
     }
+  });
+
+  it('空文字の訳は「翻訳あり」として尊重される（曜日の接尾辞が英語で消える）', async () => {
+    await setLocale('en');
+    expect(t('曜日')).toBe('');          // 「Fri曜日」にならない
+    expect(t('食事')).toBe('Meals');     // 通常の訳はそのまま
+    expect(t('存在しないキー')).toBe('存在しないキー'); // 未登録は日本語のまま
+    await setLocale('ja');
   });
 });

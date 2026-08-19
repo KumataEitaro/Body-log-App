@@ -53,11 +53,11 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'table', 'photos', 'binge', 'goal', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tchart', 'ttable', 'tgoal'];
-const CARD_LABELS: Record<string, string> = {
+const CARD_LABELS = (): Record<string, string> => ({
   kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
-};
+});
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
   const kept = saved.filter((k) => def.includes(k));
@@ -510,7 +510,7 @@ export default function ChangesScreen() {
         onOrderChange={setOrder}
         renderCard={card}
         onHide={hideCard}
-        ghostLabel={(k) => CARD_LABELS[k] ?? k}
+        ghostLabel={(k) => CARD_LABELS()[k] ?? k}
         header={headerJSX}
         onEnterEdit={() => setEditing(true)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
@@ -520,7 +520,7 @@ export default function ChangesScreen() {
       {!editing && <QuickLogFab />}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
-        hidden={hidden} shownKeys={visibleOrder} labels={CARD_LABELS} onShow={showCard}
+        hidden={hidden} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
       />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />

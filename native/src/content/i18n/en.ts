@@ -587,4 +587,11 @@ export const EN: Record<string, string> = {
   "体重 {n}kg": "Weight {n}kg",
   "食べた日{n}日の平均": "Avg over {n} days eaten",
   "食べない日": "days not eaten",
+  "まずは今日食べたものを1つ、下の入力欄に書いてみましょう。": "Start by writing one thing you ate today in the box below.",
+  "続けるほどAIのアドバイスが賢くなります。": "The more you log, the smarter the AI advice gets.",
+  "プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。": "Profile, your foods and Health sync all live behind this ⚙.",
+  "体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。": "Weight and lift trends live here. Pinch to zoom, drag to move around.",
+  "変化を見る": "See your progress",
+  "犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。": "Even a dog walk counts. Pick a type and duration and it feeds your calorie goal. Switch to Strength up top.",
+  "設定はここ": "Settings live here",
 };

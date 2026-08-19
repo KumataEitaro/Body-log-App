@@ -469,4 +469,11 @@ export const ES: Record<string, string> = {
   "体重 {n}kg": "Peso {n} kg",
   "食べた日{n}日の平均": "Media de {n} días con este alimento",
   "食べない日": "días sin él",
+  "まずは今日食べたものを1つ、下の入力欄に書いてみましょう。": "Empieza escribiendo abajo una cosa que hayas comido hoy.",
+  "続けるほどAIのアドバイスが賢くなります。": "Cuanto más registres, más inteligentes serán los consejos de la IA.",
+  "プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。": "Perfil, tus alimentos y la conexión con Salud están detrás de este ⚙.",
+  "体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。": "La evolución de peso y cargas vive aquí. Pellizca para ampliar y arrastra para moverte.",
+  "変化を見る": "Mira tu progreso",
+  "犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。": "Hasta pasear al perro cuenta. Elige tipo y duración y suma a tu objetivo. La fuerza está en la pestaña de arriba.",
+  "設定はここ": "Los ajustes están aquí",
 };

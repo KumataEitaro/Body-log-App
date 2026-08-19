@@ -28,13 +28,13 @@ type SpotStep = { kind: 'spot'; route: string; target: string; title: string; te
 type CardStep = { kind: 'card'; id: 'welcome' | 'profile' | 'goal' | 'done' };
 type StepDef = SpotStep | CardStep;
 
-const STEPS: StepDef[] = [
+const STEPS = (): StepDef[] => [
   { kind: 'card', id: 'welcome' },
   { kind: 'spot', route: '/log', target: 'hero', title: t('あと食べられる量'), text: t('残りカロリーとP/F/Cの残りが、いつもここに表示されます。') },
   { kind: 'spot', route: '/log', target: 'dock', title: t('記録はここに書くだけ'), text: t('「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。') },
-  { kind: 'spot', route: '/training', target: 'trainInput', title: '運動の記録', text: '犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。' },
-  { kind: 'spot', route: '/changes', target: 'chart', title: '変化を見る', text: '体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。' },
-  { kind: 'spot', route: '/changes', target: 'gear', title: '設定はここ', text: 'プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。' },
+  { kind: 'spot', route: '/training', target: 'trainInput', title: t('運動の記録'), text: t('犬の散歩でもOK。種類と時間を選ぶだけで消費カロリーに反映されます。筋トレは上のセグメントで切り替え。') },
+  { kind: 'spot', route: '/changes', target: 'chart', title: t('変化を見る'), text: t('体重や挙上重量の推移はここ。グラフはピンチで拡大、ドラッグで期間移動できます。') },
+  { kind: 'spot', route: '/changes', target: 'gear', title: t('設定はここ'), text: t('プロフィールの変更・マイ食品の管理・ヘルスケア連携はこの⚙から。') },
   { kind: 'spot', route: '/coach', target: 'welcome', title: t('AIコーチ'), text: t('迷ったらAIコーチへ。あなたの記録データを根拠にアドバイスします。'), demo: 'coach' },
   { kind: 'card', id: 'done' },
 ];
@@ -96,7 +96,7 @@ function GuideOverlay({ targets, scrollers, close }: {
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
   const { width: W, height: H } = Dimensions.get('window');
-  const step = STEPS[idx];
+  const step = STEPS()[idx];
 
   // ハイライト枠のパルス
   const pulse = useRef(new Animated.Value(0)).current;
@@ -120,7 +120,7 @@ function GuideOverlay({ targets, scrollers, close }: {
   }, [close, router]);
 
   const next = useCallback(() => {
-    if (idx + 1 >= STEPS.length) finish();
+    if (idx + 1 >= STEPS().length) finish();
     else setIdx(idx + 1);
   }, [idx, finish]);
 
@@ -173,7 +173,7 @@ function GuideOverlay({ targets, scrollers, close }: {
   const pad = 6;
   const hole = rect ? { x: rect.x - pad, y: rect.y - pad, w: rect.w + pad * 2, h: rect.h + pad * 2 } : null;
   const bubbleBelow = hole ? hole.y + hole.h / 2 < H / 2 : false;
-  const lastSpot = idx === STEPS.length - 2;
+  const lastSpot = idx === STEPS().length - 2;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="auto">
@@ -344,7 +344,7 @@ function DoneCard({ onFinish }: { onFinish: () => void }) {
     <View style={s.card}>
       <Text style={s.cardEmoji}>🎉</Text>
       <Text style={s.cardTitle}>{t('準備完了！')}</Text>
-      <Text style={s.cardText}>まずは今日食べたものを1つ、下の入力欄に書いてみましょう。{'\n'}続けるほどAIのアドバイスが賢くなります。</Text>
+      <Text style={s.cardText}>{t('まずは今日食べたものを1つ、下の入力欄に書いてみましょう。')}{'\n'}{t('続けるほどAIのアドバイスが賢くなります。')}</Text>
       <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label={t('食事を記録してみる')} onPress={onFinish} />
     </View>
   );

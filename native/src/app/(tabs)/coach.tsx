@@ -229,7 +229,7 @@ export default function CoachScreen() {
                           <Text style={s.actionBtnT}>{t('この目標を適用する')}</Text>
                         </Pressable>
                         <Pressable style={s.actionAlt}
-                                   onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW' } })}>
+                                   onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW', ts: String(Date.now()) } })}>
                           <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
                         </Pressable>
                       </View>

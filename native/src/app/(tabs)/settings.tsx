@@ -48,14 +48,15 @@ export default function SettingsScreen() {
   const guide = useGuide();
 
   // 相談タブ等からのディープリンク（/settings?open=goalW）で目的のシートを直接開く
-  const { open } = useLocalSearchParams<{ open?: string }>();
+  const { open, ts } = useLocalSearchParams<{ open?: string; ts?: string }>();
   const consumedOpen = useRef<string | null>(null);
   useEffect(() => {
-    if (!open || consumedOpen.current === open) return;
-    consumedOpen.current = open;
+    const stamp = `${open}-${ts ?? ''}`;  // tsを含めると同じシートへの2回目の遷移でも開く
+    if (!open || consumedOpen.current === stamp) return;
+    consumedOpen.current = stamp;
     if (open === 'goalW' || open === 'goalT' || open === 'profile' || open === 'theme') openSheet(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, ts]);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();

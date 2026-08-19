@@ -82,7 +82,8 @@ export function useLocale(): LocaleCode {
  * 変数は {n} 形式で差し込む: t('あと{n}g', { n: 51 })
  */
 export function t(ja: string, vars?: Record<string, string | number>): string {
-  let out = locale === 'ja' ? ja : (DICTS[locale]?.[ja] || DICTS.en?.[ja] || ja);
+  // ??を使う: 空文字の訳（例: 英語で接尾辞を消す）は有効な翻訳として尊重する
+  let out = locale === 'ja' ? ja : (DICTS[locale]?.[ja] ?? DICTS.en?.[ja] ?? ja);
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }

@@ -118,7 +118,7 @@ export default function BingeTriggerCard() {
 
       {worstDow && worstDow.rate > 0 && (
         <Text style={s.dow}>
-          {t('曜日では')} <Text style={{ fontWeight: '800', color: C.ink }}>{DOW[worstDow.dow]}{t('曜日')}</Text>
+          {t('曜日では')} <Text style={{ fontWeight: '800', color: C.ink }}>{t(DOW[worstDow.dow])}{t('曜日')}</Text>
           {t('がいちばん多く、')}{Math.round(worstDow.rate * 100)}%{t('の日で食べすぎています。')}
         </Text>
       )}
