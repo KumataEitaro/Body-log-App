@@ -13,7 +13,12 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
+import {
+  ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
+} from '@/lib/activities';
+import { bumpFoodFreq, readFoodFreq, foodScores } from '@/lib/foods';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { SegmentedControl, Chip, OptionButton } from '@/components/ui/Selectable';
@@ -23,17 +28,7 @@ import { t } from '@/lib/i18n';
 type TRow = { name: string; kg: string; reps: string; sets: string };
 type HistRow = { id: string; date: string; text: string };
 
-// かんたん記録: METs換算（消費kcal = METs × 体重kg × 時間h × 1.05）
-const activities = () => [
-  { e: '🐕', n: t('散歩'), mets: 3.0 },
-  { e: '🚶', n: t('ウォーキング'), mets: 3.5 },
-  { e: '🏃', n: t('ランニング'), mets: 8.0 },
-  { e: '🚴', n: t('自転車'), mets: 6.0 },
-  { e: '🧘', n: t('ヨガ・ストレッチ'), mets: 2.5 },
-  { e: '🏊', n: t('水泳'), mets: 6.0 },
-  { e: '🧹', n: t('家事・掃除'), mets: 3.3 },
-  { e: '⚽', n: t('スポーツ'), mets: 7.0 },
-] as const;
+// 種目の定義は lib/activities.ts（54種・METsはCompendium 2011準拠）
 const MINUTES = [10, 20, 30, 45, 60, 90] as const;
 
 // 表示/非表示できるカード（かんたん記録側と筋トレ側）
@@ -80,13 +75,47 @@ export default function TrainingScreen() {
   // 記録先の日付（既定=今日。過去日にも記録できる）
   const [viewDate, setViewDate] = useState(todayJST());
   const cards = useCardLayout('bl-cards-exercise', EX_CARDS);
+
   const vis = (k: string) => !cards.layout.hidden.includes(k);
   const [editing, setEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
   // かんたん記録の状態
   const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
-  const [actIdx, setActIdx] = useState<number | null>(null);
+  const [actId, setActId] = useState<string | null>(null);
+  // 表示する種目（54種すべて出すと毎日使うものが埋もれるため既定は8種）
+  const [visibleIds, setVisibleIds] = useState<string[]>(DEFAULT_VISIBLE);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [actFreq, setActFreq] = useState<Record<string, number>>({});
+
+  // 表示する種目の設定を復元（未設定なら既定の8種）
+  useEffect(() => {
+    AsyncStorage.getItem('bl-act-visible').then((raw) => {
+      if (!raw) return;
+      try {
+        const v = JSON.parse(raw) as string[];
+        // 定義から消えたidは捨てる（種目を入れ替えても壊れない）
+        const kept = v.filter((id) => activityById(id) != null);
+        if (kept.length > 0) setVisibleIds(kept);
+      } catch { /* 既定のまま */ }
+    }).catch(() => {});
+    setActFreq(foodScores(readFoodFreq()));   // よく使う種目を前に出すため
+  }, []);
+
+  function saveVisible(ids: string[]) {
+    setVisibleIds(ids);
+    AsyncStorage.setItem('bl-act-visible', JSON.stringify(ids)).catch(() => {});
+    // 選択中の種目が非表示になったら選択を解除する（見えないものが選ばれ続けるのを防ぐ）
+    if (actId && !ids.includes(actId)) setActId(null);
+  }
+
+  // 表示中の種目を、よく使う順に並べる（設定させずに最短で押せるようにする）
+  const shownActs = visibleIds
+    .map((id) => activityById(id))
+    .filter((a): a is NonNullable<typeof a> => a != null)
+    .map((a, i) => ({ a, i, c: actFreq['act:' + a.id] ?? 0 }))
+    .sort((x, y) => (y.c - x.c) || (x.i - y.i))
+    .map((x) => x.a);
   const [actMin, setActMin] = useState<number>(30);
   const [actKm, setActKm] = useState(''); // 距離（km・徒歩/ラン/自転車のみ任意入力）
   const [actSaving, setActSaving] = useState(false);
@@ -129,35 +158,31 @@ export default function TrainingScreen() {
       setMsg({ ok: true, text: t('⌚ {n}件を取り込みました{skip}。消費kcalが目標カロリーに反映されます。', { n: r.imported, skip: r.skipped > 0 ? t('（{n}件は取込済みでスキップ）', { n: r.skipped }) : '' }) });
     } finally { setHkBusy(false); }
   }
-
-  const DIST_OK = [t('散歩'), t('ウォーキング'), t('ランニング'), t('自転車')];
   function actKcal(): number {
-    if (actIdx == null) return 0;
-    const a = activities()[actIdx];
-    const km = Number(actKm);
-    // 距離が入っていれば距離ベースの推定に切替（精度が上がる）
-    if (km > 0 && DIST_OK.includes(a.n)) {
-      const perKgKm = a.n === t('ランニング') ? 1.05 : a.n === t('自転車') ? 0.35 : 0.55;
-      return Math.round(perKgKm * myWeight * km);
-    }
-    return Math.round(a.mets * myWeight * (actMin / 60) * 1.05);
+    if (actId == null) return 0;
+    const a = activityById(actId);
+    if (!a) return 0;
+    // 距離が入っていれば距離ベースの推定に切り替わる（lib側で判定）
+    return activityKcal(a, myWeight, actMin, Number(actKm) || null);
   }
 
   async function saveActivity() {
-    if (actIdx == null) { setMsg({ ok: false, text: t('運動の種類を選んでください。') }); return; }
+    if (actId == null) { setMsg({ ok: false, text: t('運動の種類を選んでください。') }); return; }
     setActSaving(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const a = activities()[actIdx];
+      const a = activityById(actId);
+      if (!a) return;
       const kcal = actKcal();
-      const km = Number(actKm) > 0 && DIST_OK.includes(a.n) ? Number(actKm) : null;
+      const km = Number(actKm) > 0 && a.perKgKm != null ? Number(actKm) : null;
       const today = viewDate;
       const base = {
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: kcal, mood: '',
-        text: `🏃 ${a.n} ${actMin}分${km ? ` ${km}km` : ''}（約${kcal}kcal消費）`, photo_urls: [],
+        // DBには canon（日本語固定）を書く。翻訳名を書くと言語切替で集計が分断される
+        text: `🏃 ${a.canon} ${actMin}分${km ? ` ${km}km` : ''}（約${kcal}kcal消費）`, photo_urls: [],
       };
       // v17列（ex_minutes/ex_km）が無い旧DBでも保存できるようフォールバック
       let { error } = await supabase.from('logs').insert({ ...base, ex_minutes: actMin, ex_km: km });
@@ -166,8 +191,10 @@ export default function TrainingScreen() {
       }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
-      setActIdx(null); setActKm('');
-      setMsg({ ok: true, text: t('{act}を記録しました。目標カロリーに+{kcal}kcal反映されます🎉', { act: `${a.n} ${actMin}${t('分')}${km ? ` ${km}km` : ''}`, kcal }) });
+      bumpFoodFreq('act:' + a.id);            // よく使う種目を前に出すため
+      setActFreq(foodScores(readFoodFreq()));
+      setActId(null); setActKm('');
+      setMsg({ ok: true, text: t('{act}を記録しました。目標カロリーに+{kcal}kcal反映されます🎉', { act: `${activityName(a.id)} ${actMin}${t('分')}${km ? ` ${km}km` : ''}`, kcal }) });
     } finally { setActSaving(false); }
   }
 
@@ -282,12 +309,22 @@ export default function TrainingScreen() {
           <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
           <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。')}</Text>
           <View style={s.actGrid}>
-            {activities().map((a, i) => (
-              <Pressable key={a.n} style={[s.actChip, actIdx === i && s.actChipOn]} onPress={() => setActIdx(i)}>
-                <Text style={{ fontSize: 17 }}>{a.e}</Text>
-                <Text style={[s.actChipT, actIdx === i && { color: C.teal }]}>{a.n}</Text>
+            {shownActs.map((a) => (
+              <Pressable key={a.id} style={[s.actChip, actId === a.id && s.actChipOn]}
+                         onPress={() => setActId(a.id)}
+                         onLongPress={() => saveVisible(visibleIds.filter((x) => x !== a.id))}
+                         delayLongPress={450}>
+                <Text style={{ fontSize: 19 }}>{a.e}</Text>
+                <Text style={[s.actChipT, actId === a.id && { color: C.teal }]} numberOfLines={1}>
+                  {activityName(a.id)}
+                </Text>
               </Pressable>
             ))}
+            {/* 種目を足す入口。長押しで隠せることもここで伝える */}
+            <Pressable style={[s.actChip, s.actChipAdd]} onPress={() => setPickerOpen(true)}>
+              <Text style={{ fontSize: 19 }}>＋</Text>
+              <Text style={[s.actChipT, { color: C.teal }]}>{t('種目を選ぶ')}</Text>
+            </Pressable>
           </View>
           <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('時間')}</Text>
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -298,7 +335,7 @@ export default function TrainingScreen() {
                        value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
                        onChangeText={(v) => { const n = Number(v); if (n > 0) setActMin(n); }} />
           </View>
-          {actIdx != null && DIST_OK.includes(activities()[actIdx].n) && (
+          {actId != null && activityById(actId)?.perKgKm != null && (
             <>
               <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('距離（km・任意。入れると消費kcalの精度が上がります）')}</Text>
               <TextInput style={[s.freeMin, { width: 110 }]} placeholder="5.0" placeholderTextColor={C.faint}
@@ -307,8 +344,8 @@ export default function TrainingScreen() {
           )}
           <OptionButton
             style={{ marginTop: 14 }}
-            label={actIdx == null ? t('運動を選んで記録') : t('記録する（約{n}kcal消費）', { n: actKcal() })}
-            onPress={saveActivity} busy={actSaving} disabled={actIdx == null}
+            label={actId == null ? t('運動を選んで記録') : t('記録する（約{n}kcal消費）', { n: actKcal() })}
+            onPress={saveActivity} busy={actSaving} disabled={actId == null}
           />
           <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('⌚ ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
           {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
@@ -424,6 +461,49 @@ export default function TrainingScreen() {
       </View>
     </ScrollView>
     <QuickLogFab />
+    <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
+           onRequestClose={() => setPickerOpen(false)}>
+      <View style={s.hkWrap}>
+        <View style={s.hkHead}>
+          <Text style={s.hkTitle}>{t('記録できる種目を選ぶ')}</Text>
+          <Pressable onPress={() => setPickerOpen(false)} hitSlop={10}>
+            <Text style={s.actDone}>{t('完了')}</Text>
+          </Pressable>
+        </View>
+        <Text style={s.muted}>
+          {t('チェックした種目がチップに並びます。よく使うものが自動で前に出ます。')}
+        </Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+          {ACTIVITY_GROUPS.map((g) => (
+            <View key={g.key}>
+              <Text style={s.actGroupT}>{t(g.label)}</Text>
+              {g.ids.map((id) => {
+                const a = activityById(id);
+                if (!a) return null;
+                const on = visibleIds.includes(id);
+                return (
+                  <Pressable key={id} style={s.actPickRow}
+                             onPress={() => saveVisible(on
+                               ? visibleIds.filter((x) => x !== id)
+                               : [...visibleIds, id])}>
+                    <Text style={{ fontSize: 20 }}>{a.e}</Text>
+                    <Text style={s.actPickT}>{activityName(id)}</Text>
+                    <Text style={s.actPickMets}>{a.mets} METs</Text>
+                    <View style={[s.actCheck, on && s.actCheckOn]}>
+                      {on && <Text style={s.actCheckT}>✓</Text>}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+          <Text style={[s.muted, { marginTop: 14 }]}>
+            {t('消費カロリーの目安はCompendium of Physical Activities (2011) のMETs値をもとに計算しています。')}
+          </Text>
+        </ScrollView>
+      </View>
+    </Modal>
+
     <StatusBarMask />
     <HeaderGear />
     </View>
@@ -445,6 +525,21 @@ const s = StyleSheet.create({
   segBtnOn: { backgroundColor: C.teal, borderColor: C.teal },
   segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  actDone: { fontSize: 14, fontWeight: '800', color: C.teal },
+  actGroupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
+  actPickRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line,
+  },
+  actPickT: { flex: 1, fontSize: 14.5, color: C.ink, fontWeight: '600' },
+  actPickMets: { fontSize: 10.5, color: C.faint, fontWeight: '700' },
+  actCheck: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actCheckOn: { backgroundColor: C.teal, borderColor: C.teal },
+  actCheckT: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  actChipAdd: { borderStyle: 'dashed', borderColor: C.accentBorder, backgroundColor: C.accentSoft },
   actChip: {
     width: '23%', backgroundColor: C.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
     paddingVertical: 10, alignItems: 'center', gap: 3,
