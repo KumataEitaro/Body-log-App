@@ -507,4 +507,8 @@ export const ES: Record<string, string> = {
   "{n}件": "{n} guardadas",
   "今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットして、明日はたんぱく質多めから始めるのがおすすめです。": "Hoy vas {n} kcal por encima del objetivo. Un solo día no se convierte en grasa. Agua y un paseo suave ayudan a reiniciar, y empezar mañana con más proteína es una buena opción.",
   "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。": "Vas prácticamente según el objetivo ({n} kcal de más). Está dentro del margen de error, así que no te preocupes.",
+  "背景": "Fondo",
+  "カードの外側の下地だけを薄く色づけます。カード自体は白のままです。": "Tiñe solo la superficie detrás de las tarjetas. Las tarjetas siguen siendo blancas.",
+  "テーマ色を薄く": "Tono suave del tema",
+  "白": "Blanco",
 };

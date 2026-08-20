@@ -41,7 +41,7 @@ export default function RootLayout() {
   return (
     <LaunchProvider ready={ready}>
       <StatusBar style="dark" />
-      <Stack key={`${locale}-${theme.accent}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
+      <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
     </LaunchProvider>
   );
 }

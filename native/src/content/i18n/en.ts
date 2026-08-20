@@ -623,4 +623,8 @@ export const EN: Record<string, string> = {
   "{n}件": "{n} saved",
   "今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットして、明日はたんぱく質多めから始めるのがおすすめです。": "You're {n} kcal above target today. One day doesn't become body fat. Water and an easy walk help reset it, and starting tomorrow with more protein is a good option.",
   "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。": "You're basically on target ({n} kcal over). That's within the margin of error, so no need to worry.",
+  "背景": "Background",
+  "カードの外側の下地だけを薄く色づけます。カード自体は白のままです。": "Tints only the surface behind the cards. The cards themselves stay white.",
+  "テーマ色を薄く": "Soft theme tint",
+  "白": "White",
 };

@@ -16,7 +16,7 @@ import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/Notifi
 import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
-import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES } from '@/lib/theme';
+import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, BG_TINTS, paletteFor } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -388,6 +388,24 @@ export default function SettingsScreen() {
             ))}
           </View>
 
+          <Text style={[s.label, { marginTop: 22 }]}>{t('背景')}</Text>
+          <Text style={s.note}>{t('カードの外側の下地だけを薄く色づけます。カード自体は白のままです。')}</Text>
+          <View style={s.bgRow}>
+            {BG_TINTS.map((b) => {
+              const pal = paletteFor(theme.accent, b.key);
+              const on = theme.bg === b.key;
+              return (
+                <Pressable key={b.key} style={[s.bgCard, { backgroundColor: pal.bg }, on && s.bgCardOn]}
+                           onPress={() => setTheme({ bg: b.key })}>
+                  {/* 下地の上に白いカードを重ね、実際の見え方をそのまま見せる */}
+                  <View style={[s.bgMini, { borderColor: pal.line }]} />
+                  <View style={[s.bgMini, { borderColor: pal.line, marginTop: 4 }]} />
+                  <Text style={[s.bgCardT, on && { color: C.teal }]}>{t(b.label)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text style={[s.label, { marginTop: 22 }]}>{t('P/F/Cバーの色')}</Text>
           <Text style={s.note}>{t('たんぱく質・脂質・炭水化物をそれぞれ好きな色にできます。目標を超えたバーは赤で表示されます。')}</Text>
 
@@ -550,6 +568,14 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
+  bgRow: { flexDirection: 'row', gap: 10 },
+  bgCard: {
+    flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: C.line,
+    padding: 10, alignItems: 'stretch',
+  },
+  bgCardOn: { borderColor: C.teal, borderWidth: 2.5 },
+  bgMini: { height: 14, borderRadius: 5, backgroundColor: '#ffffff', borderWidth: 1 },
+  bgCardT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 8, textAlign: 'center' },
   macroBlock: { marginTop: 14 },
   macroHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   macroDot: { width: 12, height: 12, borderRadius: 6 },

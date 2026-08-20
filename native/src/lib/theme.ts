@@ -134,8 +134,29 @@ const LEGACY_PRESETS: Record<string, PfcColors> = {
   mono: { p: '#0e1116', f: '#6b7280', c: '#b2b8c2' },
 };
 
-export type ThemePrefs = { accent: AccentKey; pfc: PfcColors };
-export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: DEFAULT_PFC };
+// 背景（カードの外側の下地）。テーマ色を薄く敷くか、白のままにするか。
+// カードの面（panel）は白のまま変えない。下地だけを色づけることで
+// 「箱が浮いている」関係を保ったまま、テーマを選んだ実感が画面全体に出る。
+export type BgTint = 'white' | 'soft';
+export const BG_TINTS: { key: BgTint; label: string }[] = [
+  { key: 'soft', label: 'テーマ色を薄く' },
+  { key: 'white', label: '白' },
+];
+
+// 白を選んだときの下地（全テーマ共通。「白」は色相を持たない）
+const NEUTRAL_BG = '#fbfbfa';
+// 薄く敷くときの混合比。1.0が純白なので、0.955＝アクセント4.5%
+// （知覚できるが「色がついている」と意識には上らない濃さ）
+const SOFT_BG_MIX = 0.955;
+
+/** 選んだアクセントと背景設定から、実際に使うパレットを組む */
+export function paletteFor(accent: AccentKey, bg: BgTint): Palette {
+  const base = PALETTES[accent] ?? PALETTES.green;
+  return { ...base, bg: bg === 'white' ? NEUTRAL_BG : mixW(base.teal, SOFT_BG_MIX) };
+}
+
+export type ThemePrefs = { accent: AccentKey; pfc: PfcColors; bg: BgTint };
+export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: DEFAULT_PFC, bg: 'soft' };
 const KEY = 'bl-theme';
 
 let prefs: ThemePrefs = DEFAULT_THEME;
@@ -152,16 +173,17 @@ export async function loadTheme(): Promise<void> {
       const pfc = typeof p.pfc === 'string'
         ? (LEGACY_PRESETS[p.pfc] ?? DEFAULT_PFC)               // 旧: プリセット名
         : { ...DEFAULT_PFC, ...(p.pfc as Partial<PfcColors>) }; // 新: 個別色
-      prefs = { ...DEFAULT_THEME, ...p, pfc };
+      const bg: BgTint = p.bg === 'white' || p.bg === 'soft' ? p.bg : DEFAULT_THEME.bg;
+      prefs = { ...DEFAULT_THEME, ...p, pfc, bg };
     }
   } catch { /* 既定のまま */ }
-  applyPalette(PALETTES[prefs.accent] ?? PALETTES.green);
+  applyPalette(paletteFor(prefs.accent, prefs.bg));
   emit();
 }
 
 export async function setTheme(patch: Partial<ThemePrefs>): Promise<void> {
   prefs = { ...prefs, ...patch };
-  applyPalette(PALETTES[prefs.accent] ?? PALETTES.green);
+  applyPalette(paletteFor(prefs.accent, prefs.bg));
   emit();
   try { await AsyncStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* 表示は既に切り替わっている */ }
 }
