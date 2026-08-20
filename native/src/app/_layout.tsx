@@ -8,6 +8,7 @@ import { loadLocale, useLocale } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
+import { C } from '@/lib/ui';
 import { reregisterAll } from '@/lib/notify';
 
 export default function RootLayout() {
@@ -41,7 +42,7 @@ export default function RootLayout() {
   return (
     <LaunchProvider ready={ready}>
       <StatusBar style="dark" />
-      <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#fbfbfa' } }} />
+      <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
     </LaunchProvider>
   );
 }

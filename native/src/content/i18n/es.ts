@@ -509,6 +509,8 @@ export const ES: Record<string, string> = {
   "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。": "Vas prácticamente según el objetivo ({n} kcal de más). Está dentro del margen de error, así que no te preocupes.",
   "背景": "Fondo",
   "カードの外側の下地だけを薄く色づけます。カード自体は白のままです。": "Tiñe solo la superficie detrás de las tarjetas. Las tarjetas siguen siendo blancas.",
-  "テーマ色を薄く": "Tono suave del tema",
   "白": "Blanco",
+  "ごく薄く": "Mínimo",
+  "薄く": "Suave",
+  "しっかり": "Marcado",
 };

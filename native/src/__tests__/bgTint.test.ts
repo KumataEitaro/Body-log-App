@@ -50,13 +50,25 @@ describe('背景の色づけ', () => {
     }
   });
 
-  it('色づけは「薄い」範囲に収まる（下地と白の差が小さい）', () => {
+  it('濃さが段階どおり順に濃くなる', () => {
     for (const accent of ACCENTS) {
-      const soft = paletteFor(accent, 'soft');
-      // 白との輝度差が大きすぎると「イメージが変わった」と感じる。
-      // 0.10未満＝知覚できるが主張しない範囲
-      const diff = luminance('#ffffff') - luminance(soft.bg);
-      expect({ accent, diff: diff < 0.10 }).toEqual({ accent, diff: true });
+      const w = luminance(paletteFor(accent, 'white').bg);
+      const s1 = luminance(paletteFor(accent, 'soft').bg);
+      const s2 = luminance(paletteFor(accent, 'medium').bg);
+      const s3 = luminance(paletteFor(accent, 'strong').bg);
+      // 輝度が下がる＝濃くなる。白 > ごく薄く > 薄く > しっかり
+      expect({ accent, ok: w > s1 && s1 > s2 && s2 > s3 }).toEqual({ accent, ok: true });
+    }
+  });
+
+  it('いちばん濃い「しっかり」でも下地は十分明るく、カードが沈まない', () => {
+    for (const accent of ACCENTS) {
+      const pal = paletteFor(accent, 'strong');
+      // 白との輝度差が0.35を超えると「濃い背景」になりカードの浮きが崩れる
+      const diff = luminance('#ffffff') - luminance(pal.bg);
+      expect({ accent, diff: diff < 0.35 }).toEqual({ accent, diff: true });
+      expect({ accent, lighter: luminance(pal.panel) > luminance(pal.bg) })
+        .toEqual({ accent, lighter: true });
     }
   });
 
@@ -65,9 +77,11 @@ describe('背景の色づけ', () => {
     expect(new Set(bgs).size).toBe(1);
   });
 
-  it('テーマ色を薄くを選ぶと、テーマごとに下地が変わる', () => {
-    const bgs = ACCENTS.map((a) => paletteFor(a, 'soft').bg);
-    expect(new Set(bgs).size).toBe(ACCENTS.length);   // 12テーマすべて別の色
+  it('色を敷くとテーマごとに下地が変わる（どの濃さでも）', () => {
+    for (const lv of ['soft', 'medium', 'strong'] as const) {
+      const bgs = ACCENTS.map((a) => paletteFor(a, lv).bg);
+      expect({ lv, uniq: new Set(bgs).size }).toEqual({ lv, uniq: ACCENTS.length });
+    }
   });
 
   it('背景以外のトークンはモードで変わらない（カード面や文字色は不変）', () => {

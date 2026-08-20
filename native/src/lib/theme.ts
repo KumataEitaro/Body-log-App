@@ -137,22 +137,31 @@ const LEGACY_PRESETS: Record<string, PfcColors> = {
 // 背景（カードの外側の下地）。テーマ色を薄く敷くか、白のままにするか。
 // カードの面（panel）は白のまま変えない。下地だけを色づけることで
 // 「箱が浮いている」関係を保ったまま、テーマを選んだ実感が画面全体に出る。
-export type BgTint = 'white' | 'soft';
-export const BG_TINTS: { key: BgTint; label: string }[] = [
-  { key: 'soft', label: 'テーマ色を薄く' },
-  { key: 'white', label: '白' },
-];
+export type BgTint = 'white' | 'soft' | 'medium' | 'strong';
 
 // 白を選んだときの下地（全テーマ共通。「白」は色相を持たない）
 const NEUTRAL_BG = '#fbfbfa';
-// 薄く敷くときの混合比。1.0が純白なので、0.955＝アクセント4.5%
-// （知覚できるが「色がついている」と意識には上らない濃さ）
-const SOFT_BG_MIX = 0.955;
+
+// 濃さ＝白との混合比。1.0が純白で、下げるほどアクセント色が濃くなる。
+// カードの面(panel)は白のままなので、この値がそのまま「カードと下地の差」になる。
+const BG_MIX: Record<Exclude<BgTint, 'white'>, number> = {
+  soft: 0.955,     // アクセント4.5%。並べて初めて分かる
+  medium: 0.90,    // 10%。色がついていると分かるが主張しない
+  strong: 0.82,    // 18%。はっきり色を感じる（上限。これ以上はカードが沈む）
+};
+
+export const BG_TINTS: { key: BgTint; label: string }[] = [
+  { key: 'white', label: '白' },
+  { key: 'soft', label: 'ごく薄く' },
+  { key: 'medium', label: '薄く' },
+  { key: 'strong', label: 'しっかり' },
+];
 
 /** 選んだアクセントと背景設定から、実際に使うパレットを組む */
 export function paletteFor(accent: AccentKey, bg: BgTint): Palette {
   const base = PALETTES[accent] ?? PALETTES.green;
-  return { ...base, bg: bg === 'white' ? NEUTRAL_BG : mixW(base.teal, SOFT_BG_MIX) };
+  if (bg === 'white') return { ...base, bg: NEUTRAL_BG };
+  return { ...base, bg: mixW(base.teal, BG_MIX[bg]) };
 }
 
 export type ThemePrefs = { accent: AccentKey; pfc: PfcColors; bg: BgTint };
@@ -173,7 +182,8 @@ export async function loadTheme(): Promise<void> {
       const pfc = typeof p.pfc === 'string'
         ? (LEGACY_PRESETS[p.pfc] ?? DEFAULT_PFC)               // 旧: プリセット名
         : { ...DEFAULT_PFC, ...(p.pfc as Partial<PfcColors>) }; // 新: 個別色
-      const bg: BgTint = p.bg === 'white' || p.bg === 'soft' ? p.bg : DEFAULT_THEME.bg;
+      const bg: BgTint = BG_TINTS.some((x) => x.key === p.bg)
+        ? (p.bg as BgTint) : DEFAULT_THEME.bg;
       prefs = { ...DEFAULT_THEME, ...p, pfc, bg };
     }
   } catch { /* 既定のまま */ }

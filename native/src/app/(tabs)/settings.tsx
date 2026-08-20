@@ -399,7 +399,7 @@ export default function SettingsScreen() {
                            onPress={() => setTheme({ bg: b.key })}>
                   {/* 下地の上に白いカードを重ね、実際の見え方をそのまま見せる */}
                   <View style={[s.bgMini, { borderColor: pal.line }]} />
-                  <View style={[s.bgMini, { borderColor: pal.line, marginTop: 4 }]} />
+                  <View style={[s.bgMini, { borderColor: pal.line, marginTop: 3 }]} />
                   <Text style={[s.bgCardT, on && { color: C.teal }]}>{t(b.label)}</Text>
                 </Pressable>
               );
@@ -568,14 +568,14 @@ const s = StyleSheet.create({
   sumMeta: { fontSize: 11.5, color: C.sub, marginTop: 4, fontVariant: ['tabular-nums'] },
   // グループリスト
   groupLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
-  bgRow: { flexDirection: 'row', gap: 10 },
+  bgRow: { flexDirection: 'row', gap: 7 },
   bgCard: {
-    flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: C.line,
-    padding: 10, alignItems: 'stretch',
+    flex: 1, borderRadius: 12, borderWidth: 1.5, borderColor: C.line,
+    padding: 8, alignItems: 'stretch',
   },
   bgCardOn: { borderColor: C.teal, borderWidth: 2.5 },
-  bgMini: { height: 14, borderRadius: 5, backgroundColor: '#ffffff', borderWidth: 1 },
-  bgCardT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 8, textAlign: 'center' },
+  bgMini: { height: 11, borderRadius: 4, backgroundColor: '#ffffff', borderWidth: 1 },
+  bgCardT: { fontSize: 10, fontWeight: '800', color: C.sub, marginTop: 7, textAlign: 'center' },
   macroBlock: { marginTop: 14 },
   macroHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   macroDot: { width: 12, height: 12, borderRadius: 6 },
