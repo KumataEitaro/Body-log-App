@@ -103,6 +103,11 @@ export default function TrainingScreen() {
   }, []);
 
   function saveVisible(ids: string[]) {
+    // 全部外すとチップが空になり「記録できない画面」に見えてしまうため、最低1つは残す
+    if (ids.length === 0) {
+      setMsg({ ok: false, text: t('少なくとも1つは表示してください。') });
+      return;
+    }
     setVisibleIds(ids);
     AsyncStorage.setItem('bl-act-visible', JSON.stringify(ids)).catch(() => {});
     // 選択中の種目が非表示になったら選択を解除する（見えないものが選ばれ続けるのを防ぐ）
@@ -110,6 +115,8 @@ export default function TrainingScreen() {
   }
 
   // 表示中の種目を、よく使う順に並べる（設定させずに最短で押せるようにする）
+  // 表示順は「保存した実績」が主。選択中のものは並びを動かさない
+  // （押した瞬間にチップが動くと、次に押したい場所が変わって迷う）
   const shownActs = visibleIds
     .map((id) => activityById(id))
     .filter((a): a is NonNullable<typeof a> => a != null)
@@ -335,6 +342,7 @@ export default function TrainingScreen() {
                        value={MINUTES.includes(actMin as typeof MINUTES[number]) ? '' : String(actMin)}
                        onChangeText={(v) => { const n = Number(v); if (n > 0) setActMin(n); }} />
           </View>
+          <Text style={s.actHint}>{t('長押しで非表示にできます。「＋種目を選ぶ」で戻せます。')}</Text>
           {actId != null && activityById(actId)?.perKgKm != null && (
             <>
               <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('距離（km・任意。入れると消費kcalの精度が上がります）')}</Text>
@@ -481,6 +489,7 @@ export default function TrainingScreen() {
                 const a = activityById(id);
                 if (!a) return null;
                 const on = visibleIds.includes(id);
+                const used = (actFreq['act:' + id] ?? 0) > 0;   // 記録したことがある種目
                 return (
                   <Pressable key={id} style={s.actPickRow}
                              onPress={() => saveVisible(on
@@ -488,6 +497,7 @@ export default function TrainingScreen() {
                                : [...visibleIds, id])}>
                     <Text style={{ fontSize: 20 }}>{a.e}</Text>
                     <Text style={s.actPickT}>{activityName(id)}</Text>
+                    {used && <Text style={s.actPickUsed}>{t('記録あり')}</Text>}
                     <Text style={s.actPickMets}>{a.mets} METs</Text>
                     <View style={[s.actCheck, on && s.actCheckOn]}>
                       {on && <Text style={s.actCheckT}>✓</Text>}
@@ -525,6 +535,11 @@ const s = StyleSheet.create({
   segBtnOn: { backgroundColor: C.teal, borderColor: C.teal },
   segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  actPickUsed: {
+    fontSize: 9.5, fontWeight: '800', color: C.teal,
+    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  actHint: { fontSize: 10.5, color: C.faint, marginTop: 6 },
   actDone: { fontSize: 14, fontWeight: '800', color: C.teal },
   actGroupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
   actPickRow: {

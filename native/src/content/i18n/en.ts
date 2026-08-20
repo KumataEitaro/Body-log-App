@@ -757,4 +757,6 @@ export const EN: Record<string, string> = {
   "庭仕事": "Gardening",
   "買い物・外出": "Shopping & errands",
   "格闘技・武道": "Martial arts",
+  "少なくとも1つは表示してください。": "Keep at least one activity visible.",
+  "長押しで非表示にできます。「＋種目を選ぶ」で戻せます。": "Long-press to hide one. Bring it back from “Pick activities”.",
 };
