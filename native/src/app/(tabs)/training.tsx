@@ -16,8 +16,11 @@ import QuickLogFab from '@/components/QuickLogFab';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import LiftPicker from '@/components/LiftPicker';
-import { loadCustomLifts } from '@/lib/lifts';
-import { groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, type LiftEntry } from '@/lib/liftLog';
+import { loadCustomLifts, bwRatioOf, isBodyweightLift } from '@/lib/lifts';
+import {
+  groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, effectiveKg, weightLookup,
+  type LiftEntry,
+} from '@/lib/liftLog';
 import {
   ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
 } from '@/lib/activities';
@@ -83,12 +86,15 @@ export default function TrainingScreen() {
   }, [restLeft]);
 
   // 前回参照: 同じ種目の直近記録をテキストから抽出（例: ベンチプレス 80kg×8×3）
+  // 前回参照: 同じ種目の直近記録を探す。kgは実負荷（自重種目は体重込み）で比べる
   function lastRecordOf(name: string): { text: string; kg: number; date: string } | null {
-    if (!name.trim()) return null;
+    const nm = name.trim();
+    if (!nm) return null;
     for (const h1 of history) {
-      const re = new RegExp(`${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ([\\d.]+)kg(×\\d+(?:×\\d+)?)?`);
-      const m = h1.text.match(re);
-      if (m) return { text: `${m[1]}kg${m[2] || ''}`, kg: Number(m[1]), date: h1.date };
+      for (const e of parseLiftText(h1.text)) {
+        if (e.name !== nm) continue;
+        return { text: liftSetLabel(e, t('自重')), kg: effectiveKg(e, weightAt(h1.date)), date: h1.date };
+      }
     }
     return null;
   }
@@ -161,11 +167,20 @@ export default function TrainingScreen() {
   const [actKm, setActKm] = useState(''); // 距離（km・徒歩/ラン/自転車のみ任意入力）
   const [actSaving, setActSaving] = useState(false);
   const [myWeight, setMyWeight] = useState<number>(60);
+  // 体重が本当に記録されているか。未記録の既定値60kgで「実負荷」と言い切らないため
+  const [hasWeight, setHasWeight] = useState(false);
+  // 自重種目の負荷は体重で変わるので、履歴の日付ごとに体重を引けるようにする
+  const [weightRows, setWeightRows] = useState<{ date: string; weight: number | null }[]>([]);
   useEffect(() => {
-    supabase.from('entries').select('weight').not('weight', 'is', null)
-      .order('date', { ascending: false }).limit(1)
-      .then(({ data }) => { if (data?.length) setMyWeight(Number(data[0].weight)); });
+    supabase.from('entries').select('date,weight').not('weight', 'is', null)
+      .order('date', { ascending: false }).limit(400)
+      .then(({ data }) => {
+        const rows = (data as { date: string; weight: number | null }[] | null) ?? [];
+        setWeightRows(rows);
+        if (rows.length) { setMyWeight(Number(rows[0].weight)); setHasWeight(true); }
+      });
   }, []);
+  const weightAt = weightLookup(weightRows);
 
   // ヘルスケア取込モード（Apple Watch等のワークアウトを一括登録）
   const [hkOpen, setHkOpen] = useState(false);
@@ -249,7 +264,7 @@ export default function TrainingScreen() {
   useEffect(() => { load(); }, [load]);
 
   // 履歴を日ごとにまとめる（食事の「その日の記録」と同じ見せ方にそろえる）
-  const days = groupLiftsByDay(history);
+  const days = groupLiftsByDay(history, weightAt);
   // 直近の日は最初からひらく。ユーザーが開閉したらその選択を優先する
   const shownDay = openDay ?? days[0]?.date ?? null;
   const shownDays = days.slice(0, dayLimit);
@@ -315,16 +330,42 @@ export default function TrainingScreen() {
     setMsg(null);
   }
 
+  /** 入力1行が記録できる状態か。自重種目は加重なし（kg空欄）でも成立する */
+  function rowReady(r: TRow): boolean {
+    if (!r.name.trim() || !(Number(r.reps) > 0)) return false;
+    return Number(r.kg) > 0 || isBodyweightLift(r.name);
+  }
+
+  // よく使う種目（保存の実績順）。ほかの運動と同じで、探さずに1タップで選べるようにする
+  const favLifts = Object.entries(actFreq)
+    .filter(([k]) => k.startsWith('lift:'))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([k]) => k.slice('lift:'.length));
+
+  /** チップで選んだ種目を、名前が空の行（なければ末尾に足した行）に入れる */
+  function pickLift(name: string) {
+    setTRows((rs) => {
+      const i = rs.findIndex((r) => !r.name.trim());
+      if (i >= 0) return rs.map((r, j) => (j === i ? { ...r, name } : r));
+      return [...rs, { name, kg: '', reps: '', sets: '' }];
+    });
+  }
+
   function trainingText(): string {
-    const parts = tRows
-      .filter((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0)
-      .map((r) => `${r.name.trim()} ${Number(r.kg)}kg×${Number(r.reps)}${Number(r.sets) > 1 ? `×${Number(r.sets)}` : ''}`);
+    const parts = tRows.filter(rowReady).map((r) => {
+      const kg = Number(r.kg) || 0;
+      const bw = isBodyweightLift(r.name);
+      // 自重種目のkgは「加重」なので+を付けて残す（後で実負荷=体重+加重として読めるように）
+      const w = bw ? (kg > 0 ? `+${kg}kg` : '自重') : `${kg}kg`;
+      return `${r.name.trim()} ${w}×${Number(r.reps)}${Number(r.sets) > 1 ? `×${Number(r.sets)}` : ''}`;
+    });
     return parts.length > 0 ? `🏋️ ${parts.join('、')}` : '';
   }
 
   async function save() {
     const tr = trainingText();
-    if (!tr) { setMsg({ ok: false, text: t('種目・重量(kg)・回数を入力してください。') }); return; }
+    if (!tr) { setMsg({ ok: false, text: t('種目と回数を入力してください。（加重しない自重種目はkg空欄でOK）') }); return; }
     setSaving(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -348,12 +389,17 @@ export default function TrainingScreen() {
       // RMフィードバック: 推定1RM(Epley)を目標・自己ベストと照合して一言返す
       let fb = t('保存しました。継続が最強の種目です💪');
       try {
-        const first = tRows.find((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0);
+        const first = tRows.find(rowReady);
         if (first) {
           const name = first.name.trim();
-          const est = Math.round(epley1RM(Number(first.kg), Number(first.reps)));
-          let bestPast = 0; // 保存前の履歴から同種目の過去最高1RM
-          for (const h1 of history) for (const p of parse1RMs(h1.text)) {
+          // 自重種目は体重が負荷の大半なので、加重だけで1RMを出すと実態と合わない
+          const loadKg = effectiveKg(
+            { name, kg: Number(first.kg) || 0, reps: Number(first.reps), sets: 1, mode: 'abs' },
+            myWeight,
+          );
+          const est = Math.round(epley1RM(loadKg, Number(first.reps)));
+          let bestPast = 0; // 保存前の履歴から同種目の過去最高1RM（同じく実負荷で比べる）
+          for (const h1 of history) for (const p of parse1RMs(h1.text, weightAt(h1.date))) {
             if (p.name === name) bestPast = Math.max(bestPast, Math.round(p.est));
           }
           const { data: tg } = await supabase.from('training_goals').select('target_kg').eq('name', name).maybeSingle();
@@ -361,8 +407,8 @@ export default function TrainingScreen() {
           if (goalKg && est >= goalKg) {
             fb = t('🎉 目標達成！{name} 推定MAX {est}kg（目標{goal}kg超え）。次の目標を設定しよう', { name, est, goal: goalKg });
           } else if (goalKg) {
-            const need = repsNeededFor(goalKg, Number(first.kg));
-            fb = t('おしい！RM換算だとMAX {est}kg。目標{goal}kgまであと{left}kg', { est, goal: goalKg, left: goalKg - est }) + (need && need > Number(first.reps) ? t('（{kg}kgなら{need}回で到達）', { kg: Number(first.kg), need }) : '');
+            const need = repsNeededFor(goalKg, loadKg);
+            fb = t('おしい！RM換算だとMAX {est}kg。目標{goal}kgまであと{left}kg', { est, goal: goalKg, left: goalKg - est }) + (need && need > Number(first.reps) ? t('（{kg}kgなら{need}回で到達）', { kg: loadKg, need }) : '');
           } else if (bestPast > 0 && est > bestPast) {
             fb = t('自己ベスト更新💪 {name} 推定MAX {est}kg（前回比 +{d}kg）', { name, est, d: est - bestPast });
           } else {
@@ -371,6 +417,9 @@ export default function TrainingScreen() {
         }
       } catch { /* フィードバックが取れなくても保存は成功している */ }
 
+      // よく使う種目を前に出すため、保存した種目を数えておく（かんたん記録と同じ仕組み）
+      for (const r of tRows.filter(rowReady)) bumpFoodFreq('lift:' + r.name.trim());
+      setActFreq(foodScores(readFoodFreq()));
       setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
       await load();
       if (!wasEdit) setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
@@ -527,15 +576,25 @@ export default function TrainingScreen() {
             </Pressable>
           </View>
         )}
-        {tRows.map((r, i) => (
-          <View key={i} style={s.tRow}>
+        {favLifts.length > 0 && (
+          <View style={s.favRow}>
+            {favLifts.map((n) => (
+              <Chip key={n} label={n} selected={false} onPress={() => pickLift(n)} />
+            ))}
+          </View>
+        )}
+        {tRows.map((r, i) => {
+          const bw = isBodyweightLift(r.name);
+          return (
+          <View key={i}>
+          <View style={s.tRow}>
             <Pressable style={[s.tIn, s.tPick]} onPress={() => setLiftPickRow(i)}>
               <Text style={[s.tPickT, !r.name && { color: C.faint }]} numberOfLines={1}>
                 {r.name || t('種目を選ぶ')}
               </Text>
             </Pressable>
-            <TextInput style={[s.tIn, s.tNum]} placeholder="kg" placeholderTextColor={C.faint} keyboardType="decimal-pad"
-                       value={r.kg} onChangeText={(v) => setT(i, { kg: v })} />
+            <TextInput style={[s.tIn, s.tNum]} placeholder={bw ? t('加重') : 'kg'} placeholderTextColor={C.faint}
+                       keyboardType="decimal-pad" value={r.kg} onChangeText={(v) => setT(i, { kg: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder={t('回')} placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={r.reps} onChangeText={(v) => setT(i, { reps: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder="set" placeholderTextColor={C.faint} keyboardType="number-pad"
@@ -544,14 +603,35 @@ export default function TrainingScreen() {
               <Text style={{ color: C.coral, fontSize: 18, fontWeight: '800', padding: 4 }}>×</Text>
             </Pressable>
           </View>
-        ))}
+          {/* 自重種目は入れたkgが加重なので、実際にかかる負荷をその場で示す */}
+          {bw && (hasWeight ? (
+            <Text style={s.bwNote}>
+              {t('実負荷 約{n}kg', {
+                n: effectiveKg({ name: r.name.trim(), kg: Number(r.kg) || 0, reps: 1, sets: 1, mode: 'abs' }, myWeight),
+              })}
+              {'　'}
+              {bwRatioOf(r.name) < 1
+                ? t('体重{w}kgの{p}% + 加重{a}kg', { w: myWeight, p: Math.round(bwRatioOf(r.name) * 100), a: Number(r.kg) || 0 })
+                : t('体重{w}kg + 加重{a}kg', { w: myWeight, a: Number(r.kg) || 0 })}
+            </Text>
+          ) : (
+            <Text style={s.bwNoteMuted}>
+              {t('kgは加重ぶんです。体重を記録すると実負荷（体重＋加重）が出ます。')}
+            </Text>
+          ))}
+          </View>
+          );
+        })}
         {/* 前回参照: 同種目の直近記録と更新判定 */}
         {(() => {
           const first = tRows.find((r) => r.name.trim());
           if (!first) return null;
           const prev = lastRecordOf(first.name);
           if (!prev) return null;
-          const curKg = Number(first.kg);
+          const curKg = effectiveKg(
+            { name: first.name.trim(), kg: Number(first.kg) || 0, reps: 1, sets: 1, mode: 'abs' },
+            myWeight,
+          );
           const diff = curKg > 0 ? Math.round((curKg - prev.kg) * 10) / 10 : null;
           return (
             <Text style={s.prevRef}>
@@ -615,7 +695,7 @@ export default function TrainingScreen() {
                     <Pressable key={`${rec.id}-${ix}`} style={s.liftRow}
                                onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
                       <Text style={s.liftName} numberOfLines={1}>{e.name}</Text>
-                      <Text style={s.liftSet}>{liftSetLabel(e)}</Text>
+                      <Text style={s.liftSet}>{liftSetLabel(e, t('自重'))}</Text>
                       <Pressable onPress={() => deleteOneLift(rec, ix, d.date)} hitSlop={10}>
                         <Text style={s.liftX}>×</Text>
                       </Pressable>
@@ -806,6 +886,9 @@ const s = StyleSheet.create({
   },
   editBannerT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
   editBannerCancel: { fontSize: 11.5, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
+  bwNoteMuted: { fontSize: 11, color: C.faint, fontWeight: '600', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
+  favRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
+  bwNote: { fontSize: 11, color: C.teal, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
   moreBtnT: { fontSize: 12.5, color: C.teal, fontWeight: '800' },
   histHint: { fontSize: 11, color: C.faint, marginTop: 8 },

@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n';
 import { kgToDisplay, useUnits } from '@/lib/units';
 import { Chip } from '@/components/ui/Selectable';
 import { parse1RMs, epley1RM } from '@/lib/rm';
+import { weightLookup } from '@/lib/liftLog';
 
 type Row = { date: string; weight: number | null; waist: number | null; bodyfat: number | null };
 type Metric = 'weight' | 'waist' | 'bodyfat';
@@ -108,31 +109,39 @@ export function LiftTable({ visible, onClose }: { visible: boolean; onClose: () 
   const insets = useSafeAreaInsets();
   const units = useUnits();
   const [logs, setLogs] = useState<{ date: string; text: string }[]>([]);
+  // 自重種目の重量は体重＋加重なので、日付ごとの体重が要る
+  const [weightRows, setWeightRows] = useState<{ date: string; weight: number | null }[]>([]);
   const [ex, setEx] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('logs').select('date,text')
-        .like('text', '🏋️%').order('at', { ascending: false }).limit(300);
+      const [{ data }, wRes] = await Promise.all([
+        supabase.from('logs').select('date,text')
+          .like('text', '🏋️%').order('at', { ascending: false }).limit(300),
+        supabase.from('entries').select('date,weight').not('weight', 'is', null)
+          .order('date', { ascending: false }).limit(400),
+      ]);
       setLogs((data as { date: string; text: string }[]) ?? []);
+      setWeightRows((wRes.data as { date: string; weight: number | null }[] | null) ?? []);
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { if (visible) load(); }, [visible, load]);
 
   // 種目ごとに「日付・重量・回数・推定1RM」を展開する
   const byExercise = useMemo(() => {
+    const weightAt = weightLookup(weightRows);
     const map = new Map<string, { date: string; kg: number; reps: number; rm: number }[]>();
     for (const l of logs) {
-      for (const p of parse1RMs(l.text)) {
+      for (const p of parse1RMs(l.text, weightAt(l.date))) {
         const arr = map.get(p.name) ?? [];
         arr.push({ date: l.date, kg: p.kg, reps: p.reps, rm: Math.round(epley1RM(p.kg, p.reps)) });
         map.set(p.name, arr);
       }
     }
     return map;
-  }, [logs]);
+  }, [logs, weightRows]);
 
   const names = [...byExercise.keys()].sort((a, b) => (byExercise.get(b)!.length - byExercise.get(a)!.length));
   const active = ex && byExercise.has(ex) ? ex : names[0] ?? null;

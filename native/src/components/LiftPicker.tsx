@@ -102,6 +102,8 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
                 {items.map((l) => (
                   <Pressable key={l.id} style={s.row} onPress={() => { onPick(l.canon); onClose(); }}>
                     <Text style={s.rowT}>{liftName(l.id)}</Text>
+                    {/* 自重種目は入れるkgが加重だと選ぶ前に分かるようにする */}
+                    {l.bw != null && <Text style={s.bwTag}>{t('加重')}</Text>}
                     <Text style={s.arrow}>›</Text>
                   </Pressable>
                 ))}
@@ -139,5 +141,9 @@ const s = StyleSheet.create({
     paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: C.line,
   },
   rowT: { flex: 1, fontSize: 14.5, color: C.ink, fontWeight: '600' },
+  bwTag: {
+    fontSize: 10, fontWeight: '800', color: C.teal, backgroundColor: C.accentBadge,
+    borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
+  },
   arrow: { fontSize: 19, color: C.faint },
 });

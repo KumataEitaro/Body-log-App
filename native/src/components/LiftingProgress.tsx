@@ -10,6 +10,7 @@ import { todayJST } from '@/lib/calc';
 import { TrendingUp, CalendarDays } from 'lucide-react-native';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
+import { weightLookup } from '@/lib/liftLog';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { CARDIO_GREEN, type DayMark } from '@/components/MonthCalendar';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
@@ -59,13 +60,18 @@ function useLifting() {
   const [cardio, setCardio] = useState<HistRow[]>([]);   // 🏃 有酸素・かんたん記録
   const [goalKg, setGoalKg] = useState<Map<string, number>>(new Map());
   const [habit, setHabit] = useState<Habit>({ perWeek: null, weeklyKcal: null, minMin: null });
+  // 懸垂などの自重種目は体重が負荷の大半なので、日付ごとの体重が必要
+  const [weightRows, setWeightRows] = useState<{ date: string; weight: number | null }[]>([]);
   const load = useCallback(async () => {
-    const [lift, run, tgRes, gRes] = await Promise.all([
+    const [lift, run, tgRes, gRes, wRes] = await Promise.all([
       fetchLogs('🏋️', 120),
       fetchLogs('🏃', 240),
       supabase.from('training_goals').select('name,target_kg'),
       supabase.from('goals').select('ex_per_week,ex_weekly_kcal,ex_min_minutes').maybeSingle(),
+      supabase.from('entries').select('date,weight').not('weight', 'is', null)
+        .order('date', { ascending: false }).limit(400),
     ]);
+    setWeightRows((wRes.data as { date: string; weight: number | null }[] | null) ?? []);
     setHistory(lift);
     setCardio(run);
     if (tgRes.data) setGoalKg(new Map(tgRes.data.map((g: { name: string; target_kg: number }) => [g.name, Number(g.target_kg)])));
@@ -78,9 +84,10 @@ function useLifting() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
-  const series = trainingSeries(history);
+  const weightAt = weightLookup(weightRows);
+  const series = trainingSeries(history, weightAt);
   const exercises = [...series.entries()].sort((a, b) => b[1].length - a[1].length).map(([n]) => n);
-  return { history, cardio, goalKg, series, exercises, habit };
+  return { history, cardio, goalKg, series, exercises, habit, weightAt };
 }
 
 // ===== ① 週間サマリー（習慣目標との対比・🔥ストリーク・+食べられるkcal） =====
@@ -221,7 +228,7 @@ export function BalanceCard() {
 
 // ===== ③ 挙上重量グラフ =====
 export function LiftChartCard() {
-  const { history, goalKg, series, exercises } = useLifting();
+  const { weightAt, history, goalKg, series, exercises } = useLifting();
   const [selEx, setSelEx] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<'kg' | '1rm' | 'volume'>('1rm');
   const [exView, setExView] = useState<'chips' | 'list'>('chips');
@@ -240,7 +247,7 @@ export function LiftChartCard() {
   const rmByDate = new Map<string, number>();
   if (activeEx) {
     for (const h1 of history) {
-      for (const p of parse1RMs(h1.text)) {
+      for (const p of parse1RMs(h1.text, weightAt(h1.date))) {
         if (p.name !== activeEx) continue;
         const cur = rmByDate.get(h1.date) ?? 0;
         rmByDate.set(h1.date, Math.max(cur, Math.round(p.est)));

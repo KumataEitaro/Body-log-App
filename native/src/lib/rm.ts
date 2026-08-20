@@ -1,3 +1,4 @@
+import { parseLiftText, effectiveKg } from './liftLog';
 // RM換算（Epley式）: 挙上重量×回数から推定1RM（1回挙げられる最大重量）を計算する
 // 例: 100kg×10回 → 100×(1+10/30) ≈ 133kg
 export function epley1RM(kg: number, reps: number): number {
@@ -14,16 +15,15 @@ export function repsNeededFor(target1RM: number, kg: number): number | null {
   return reps > 30 ? null : Math.ceil(reps);
 }
 
-// 筋トレ記録テキスト（例: "ベンチプレス 100kg×10×3、スクワット 80kg×8"）から
-// 種目ごとの推定1RMを抽出する
-export function parse1RMs(text: string): { name: string; kg: number; reps: number; est: number }[] {
-  const out: { name: string; kg: number; reps: number; est: number }[] = [];
-  const re = /([^\s、]+)\s([\d.]+)kg(?:×(\d+))?(?:×\d+)?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const kg = Number(m[2]);
-    const reps = m[3] ? Number(m[3]) : 1;
-    if (kg > 0) out.push({ name: m[1], kg, reps, est: epley1RM(kg, reps) });
-  }
-  return out;
+// 筋トレ記録テキスト（例: "ベンチプレス 100kg×10×3、懸垂 +10kg×8"）から
+// 種目ごとの推定1RMを抽出する。
+// 解析は liftLog に寄せている（自重・加重の書き方をここで二重に持たないため）。
+// 自重種目は体重が負荷の大半なので、体重を渡さないと過小評価になる点に注意。
+export function parse1RMs(text: string, bodyWeight?: number | null): { name: string; kg: number; reps: number; est: number }[] {
+  return parseLiftText(text)
+    .map((e) => {
+      const kg = effectiveKg(e, bodyWeight);
+      return { name: e.name, kg, reps: e.reps, est: epley1RM(kg, e.reps) };
+    })
+    .filter((r) => r.kg > 0);
 }

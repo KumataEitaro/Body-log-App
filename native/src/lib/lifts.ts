@@ -14,6 +14,13 @@ export type Lift = {
   id: string;
   canon: string;    // DBに書く名前（日本語固定・翻訳禁止）
   part: string;     // 部位グループのキー
+  /**
+   * 自重が負荷になる種目の、体重に対する負荷の割合。
+   * 懸垂やディップスは体を全部持ち上げるので1.0、腕立て伏せは腕にかかるのが
+   * 体重の約64%（Ebben et al. 2011の実測値）。
+   * これがある種目は入力するkgを「加重」として扱い、実負荷 = 体重×bw + 加重 で見る。
+   */
+  bw?: number;
 };
 
 /** 部位。選ぶときに探しやすくする */
@@ -61,12 +68,12 @@ export const LIFTS: Lift[] = [
   { id: 'bench_dumbbell', canon: 'ダンベルプレス', part: 'chest' },
   { id: 'chest_fly', canon: 'チェストフライ', part: 'chest' },
   { id: 'chest_press', canon: 'チェストプレス', part: 'chest' },
-  { id: 'push_up', canon: '腕立て伏せ', part: 'chest' },
-  { id: 'dips', canon: 'ディップス', part: 'chest' },
+  { id: 'push_up', canon: '腕立て伏せ', part: 'chest', bw: 0.64 },
+  { id: 'dips', canon: 'ディップス', part: 'chest', bw: 1 },
   // 背中
   { id: 'deadlift', canon: 'デッドリフト', part: 'back' },
   { id: 'lat_pulldown', canon: 'ラットプルダウン', part: 'back' },
-  { id: 'pull_up', canon: '懸垂', part: 'back' },
+  { id: 'pull_up', canon: '懸垂', part: 'back', bw: 1 },
   { id: 'row_barbell', canon: 'ベントオーバーロウ', part: 'back' },
   { id: 'row_dumbbell', canon: 'ダンベルロウ', part: 'back' },
   { id: 'row_seated', canon: 'シーテッドロウ', part: 'back' },
@@ -110,6 +117,20 @@ export const LIFTS: Lift[] = [
   { id: 'burpee', canon: 'バーピー', part: 'full' },
   { id: 'kettlebell_swing', canon: 'ケトルベルスイング', part: 'full' },
 ];
+
+/**
+ * 自重が負荷になる種目なら体重に対する割合、そうでなければ0を返す。
+ * ユーザーが自分で足した種目は判断材料がないので0（入力したkgをそのまま負荷とみなす）。
+ */
+export function bwRatioOf(canonName: string): number {
+  const nm = canonName.trim();
+  return LIFTS.find((l) => l.canon === nm)?.bw ?? 0;
+}
+
+/** 加重して行う種目か（入力欄の見せ方を変えるため） */
+export function isBodyweightLift(canonName: string): boolean {
+  return bwRatioOf(canonName) > 0;
+}
 
 // ===== ユーザーが追加した種目（端末内に保存） =====
 const CUSTOM_KEY = 'bl-custom-lifts';

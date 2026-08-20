@@ -12,6 +12,7 @@ import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
 import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
+import { isBodyweightLift } from '@/lib/lifts';
 import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
@@ -371,6 +372,11 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Chip key={r} label={r === 1 ? t('1回（MAX）') : t('{n}回', { n: r })} tone="ink" selected={tReps === r} onPress={() => setTReps(r)} />
             ))}
           </View>
+          {isBodyweightLift(tName) && (
+            <Text style={s.rmPreview}>
+              {t('※ 自重種目の達成判定は実負荷（体重＋加重）で見ます。目標も体重を含めた重量で入れてください。')}
+            </Text>
+          )}
           {Number(tKg) > 0 && tReps > 1 && (
             <Text style={s.rmPreview}>RM換算: {tName.trim() || t('この種目')}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
           )}

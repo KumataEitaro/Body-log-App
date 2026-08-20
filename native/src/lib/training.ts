@@ -1,24 +1,31 @@
-// 筋トレ記録（「🏋️ ベンチプレス 80kg×8×3、スクワット 100kg×5」形式）のパースと進捗判定
+// 筋トレ記録（「🏋️ ベンチプレス 80kg×8×3、懸垂 +10kg×8」形式）の進捗判定
+//
+// 解析は lib/liftLog に一本化している。以前はここでも別の正規表現を持っていたため、
+// 記録の書き方（自重・加重）を足したときに片方だけ読めなくなる事故が起きた。
+import { parseLiftText, effectiveKg } from './liftLog';
 
 export type TrainSet = { name: string; kg: number; reps: number; sets: number };
 
-export function parseTrainingText(text: string): TrainSet[] {
-  const t = String(text ?? '');
-  if (!t.startsWith('🏋️')) return [];
-  return t.replace(/^🏋️\s*/, '').split('、').map((part) => {
-    const m = part.trim().match(/^(.+?)\s+([\d.]+)kg×(\d+)(?:×(\d+))?$/);
-    if (!m) return null;
-    return { name: m[1].trim(), kg: parseFloat(m[2]), reps: parseInt(m[3], 10), sets: m[4] ? parseInt(m[4], 10) : 1 };
-  }).filter((x): x is TrainSet => x != null);
+/** @param bodyWeight 自重種目の負荷に使う体重。省略すると加重ぶんだけが負荷になる */
+export function parseTrainingText(text: string, bodyWeight?: number | null): TrainSet[] {
+  const s = String(text ?? '');
+  if (!s.startsWith('🏋️')) return [];
+  return parseLiftText(s).map((e) => ({
+    name: e.name, kg: effectiveKg(e, bodyWeight), reps: e.reps, sets: e.sets,
+  }));
 }
 
 export type TrainPoint = { date: string; maxKg: number; volume: number }; // volume = Σ kg×回×set
 
 // 履歴（date×text）→ 種目ごとの時系列（同日複数記録は maxKg=最大 / volume=合算）
-export function trainingSeries(rows: { date: string; text: string }[]): Map<string, TrainPoint[]> {
+// 自重種目の負荷は体重で変わるので、その日の体重を引ける関数を渡せるようにしている
+export function trainingSeries(
+  rows: { date: string; text: string }[],
+  weightAt?: (date: string) => number | null,
+): Map<string, TrainPoint[]> {
   const byName = new Map<string, Map<string, TrainPoint>>();
   for (const r of rows) {
-    for (const s of parseTrainingText(r.text)) {
+    for (const s of parseTrainingText(r.text, weightAt ? weightAt(r.date) : null)) {
       if (!byName.has(s.name)) byName.set(s.name, new Map());
       const days = byName.get(s.name)!;
       const cur = days.get(r.date) ?? { date: r.date, maxKg: 0, volume: 0 };

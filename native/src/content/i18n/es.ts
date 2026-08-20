@@ -708,4 +708,12 @@ export const ES: Record<string, string> = {
   "行を長押しで書き換え・削除、×でその種目だけ削除できます": "Manten pulsada una fila para editarla o borrarla; toca × para quitar solo ese ejercicio",
   "さらに前の{n}日を見る": "Ver {n} dias mas",
   "✏️ {date}の記録を書き換え中": "✏️ Reescribiendo el registro de {date}",
+  "加重": "lastre",
+  "実負荷 約{n}kg": "Carga real ≈{n} kg",
+  "体重{w}kg + 加重{a}kg": "peso corporal {w} kg + lastre {a} kg",
+  "体重{w}kgの{p}% + 加重{a}kg": "{p}% de {w} kg de peso corporal + lastre {a} kg",
+  "種目と回数を入力してください。（加重しない自重種目はkg空欄でOK）": "Indica el ejercicio y las repeticiones. (Deja kg vacio en series de peso corporal sin lastre.)",
+  "自重": "PC",
+  "kgは加重ぶんです。体重を記録すると実負荷（体重＋加重）が出ます。": "Aqui kg es el lastre. Registra tu peso corporal para ver la carga real (cuerpo + lastre).",
+  "※ 自重種目の達成判定は実負荷（体重＋加重）で見ます。目標も体重を含めた重量で入れてください。": "Nota: los ejercicios de peso corporal se miden por la carga real (cuerpo + lastre); indica un objetivo que incluya tu peso.",
 };

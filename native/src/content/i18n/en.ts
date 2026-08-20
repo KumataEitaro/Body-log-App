@@ -823,4 +823,12 @@ export const EN: Record<string, string> = {
   "行を長押しで書き換え・削除、×でその種目だけ削除できます": "Long-press a row to edit or delete it; tap × to remove just that exercise",
   "さらに前の{n}日を見る": "See {n} more days",
   "✏️ {date}の記録を書き換え中": "✏️ Rewriting the {date} entry",
+  "加重": "+kg",
+  "実負荷 約{n}kg": "Real load ≈{n}kg",
+  "体重{w}kg + 加重{a}kg": "body {w}kg + added {a}kg",
+  "体重{w}kgの{p}% + 加重{a}kg": "{p}% of {w}kg body + added {a}kg",
+  "種目と回数を入力してください。（加重しない自重種目はkg空欄でOK）": "Enter an exercise and reps. (Leave kg empty for unweighted bodyweight sets.)",
+  "自重": "BW",
+  "kgは加重ぶんです。体重を記録すると実負荷（体重＋加重）が出ます。": "kg here is added weight. Log your body weight to see the real load (body + added).",
+  "※ 自重種目の達成判定は実負荷（体重＋加重）で見ます。目標も体重を含めた重量で入れてください。": "Note: bodyweight exercises are judged on the real load (body + added), so enter a target that includes your body weight.",
 };
