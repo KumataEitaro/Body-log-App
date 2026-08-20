@@ -77,11 +77,16 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
               text: t('上書きする'),
               onPress: async () => {
                 setBusy(true);
-                const { error } = await supabase.from('my_foods').update(row).eq('id', dup.id);
-                setBusy(false);
-                if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
-                onSaved();
-                onClose();
+                try {
+                  const { error } = await supabase.from('my_foods').update(row).eq('id', dup.id);
+                  if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
+                  onSaved();
+                  onClose();
+                } catch {
+                  setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') });
+                } finally {
+                  setBusy(false);   // 例外でもボタンを必ず戻す
+                }
               },
             },
           ],

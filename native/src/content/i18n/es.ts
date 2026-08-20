@@ -513,4 +513,7 @@ export const ES: Record<string, string> = {
   "ごく薄く": "Mínimo",
   "薄く": "Suave",
   "しっかり": "Marcado",
+  "時間内に解析できませんでした。文章を短くするか、もう一度お試しください。": "No se pudo analizar a tiempo. Prueba con un texto más corto o inténtalo de nuevo.",
+  "通信できませんでした。電波状況を確認してもう一度お試しください。": "No se pudo conectar. Comprueba tu cobertura e inténtalo de nuevo.",
+  "ログインに失敗しました。通信環境を確認してください。": "No se pudo iniciar sesión. Comprueba tu conexión.",
 };

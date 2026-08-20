@@ -27,12 +27,17 @@ export default function LoginScreen() {
   async function login() {
     if (!email.trim() || !password) { setMsg(t('メールとパスワードを入力してください。')); return; }
     setBusy(true); setMsg(''); setInfo('');
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setBusy(false);
-    if (error) {
-      setMsg(/invalid login/i.test(error.message) ? 'メールまたはパスワードが違います。' : t('ログインに失敗しました。通信環境を確認してください。'));
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        setMsg(/invalid login/i.test(error.message) ? t('メールまたはパスワードが違います。') : t('ログインに失敗しました。通信環境を確認してください。'));
+      }
+      // 成功時は_layoutの認証ゲートが自動でタブへ遷移させる
+    } catch {
+      setMsg(t('ログインに失敗しました。通信環境を確認してください。'));
+    } finally {
+      setBusy(false);   // 例外でもボタンを必ず戻す（回り続けると操作不能になる）
     }
-    // 成功時は_layoutの認証ゲートが自動でタブへ遷移させる
   }
 
   async function signup() {
@@ -41,8 +46,8 @@ export default function LoginScreen() {
     if (password.length < 8) { setMsg(t('パスワードは8文字以上にしてください。')); return; }
     if (password !== password2) { setMsg(t('確認用パスワードが一致しません。')); return; }
     setBusy(true); setMsg(''); setInfo('');
+    try {
     const { data, error } = await supabase.auth.signUp({ email: mail, password });
-    setBusy(false);
     if (error) {
       setMsg(/already registered/i.test(error.message) ? t('このメールアドレスは登録済みです。ログインしてください。')
         : /invalid/i.test(error.message) ? t('メールアドレスの形式を確認してください。')
@@ -55,6 +60,11 @@ export default function LoginScreen() {
       setMode('login');
     }
     // セッションが返った場合は_layoutの認証ゲートが自動遷移
+    } catch {
+      setMsg(t('登録に失敗しました。通信環境を確認してください。'));
+    } finally {
+      setBusy(false);   // 例外でもボタンを必ず戻す
+    }
   }
 
   // Google SSO: Supabase→Googleの認可ページをアプリ内ブラウザで開き、

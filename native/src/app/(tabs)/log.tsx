@@ -87,7 +87,10 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
-  const [pendingTexts, setPendingTexts] = useState<string[]>([]);
+  // 解析中の行。連投できるため配列。idで管理し、完了した本人の分だけを消す
+  // （以前は slice(1) で先頭を消していたため、2件目が先に終わると1件目の表示が残り続けた）
+  const [pendingTexts, setPendingTexts] = useState<{ id: number; text: string }[]>([]);
+  const pendingSeq = useRef(0);
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
@@ -276,7 +279,8 @@ export default function LogScreen() {
     const imgs = photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' }));
     setChat(''); setPhotos([]); setMsg(null);
     inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
-    setPendingTexts((p) => [...p, text || t('（写真）')]);
+    const pid = ++pendingSeq.current;
+    setPendingTexts((p) => [...p, { id: pid, text: text || t('（写真）') }]);
     try {
       const res = await analyzeFood(text, imgs);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
@@ -291,10 +295,11 @@ export default function LogScreen() {
       }));
       if (text) setStagedNote((n) => (n ? `${n}、${text}` : text));
     } catch {
+      // analyzeFoodは例外を投げない作りだが、想定外の失敗でも必ずここで拾う
       setMsg({ ok: false, text: t('通信に失敗しました。電波状況を確認してください。') });
       setChat(text);
     } finally {
-      setPendingTexts((p) => p.slice(1));
+      setPendingTexts((p) => p.filter((x) => x.id !== pid));   // 自分の分だけ消す
     }
   }
 
@@ -985,10 +990,10 @@ export default function LogScreen() {
                   <Text style={s.trayChipT}>{parsed.ex}</Text>
                 </View>
               )}
-              {pendingTexts.map((t, i) => (
-                <View key={`p${i}`} style={s.trayChip}>
+              {pendingTexts.map((pt) => (
+                <View key={`p${pt.id}`} style={s.trayChip}>
                   <ActivityIndicator size="small" color={C.teal} />
-                  <Text style={[s.trayChipT, { marginLeft: 4 }]} numberOfLines={1}>{t}</Text>
+                  <Text style={[s.trayChipT, { marginLeft: 4 }]} numberOfLines={1}>{pt.text}</Text>
                 </View>
               ))}
             </ScrollView>

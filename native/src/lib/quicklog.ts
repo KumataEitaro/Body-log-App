@@ -19,9 +19,16 @@ export type ParsedResult = {
 
 // テキスト/写真をAIで解析（保存はしない）
 export async function analyzeFood(text: string, images: QuickImage[]): Promise<{ ok: true; result: ParsedResult } | { ok: false; error: string }> {
-  const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
+  const { ok, json, failure } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
     '/api/parse-food', { text, lang: apiLang(), images });
   if (!ok || !json?.ok || !json.result) {
+    // 何が起きたかで文言を変える。原因が分かれば次の行動が決まる
+    if (failure === 'timeout') {
+      return { ok: false, error: t('時間内に解析できませんでした。文章を短くするか、もう一度お試しください。') };
+    }
+    if (failure === 'offline') {
+      return { ok: false, error: t('通信できませんでした。電波状況を確認してもう一度お試しください。') };
+    }
     return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。') };
   }
   const r = json.result;
