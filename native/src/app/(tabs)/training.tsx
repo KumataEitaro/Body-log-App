@@ -15,6 +15,8 @@ import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
+import LiftPicker from '@/components/LiftPicker';
+import { loadCustomLifts } from '@/lib/lifts';
 import {
   ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
 } from '@/lib/activities';
@@ -30,6 +32,8 @@ type HistRow = { id: string; date: string; text: string };
 
 // 種目の定義は lib/activities.ts（54種・METsはCompendium 2011準拠）
 const MINUTES = [10, 20, 30, 45, 60, 90] as const;
+// レストの選択肢（秒）。45秒=追い込み / 90秒=標準 / 180秒=高重量
+const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
 
 // 表示/非表示できるカード（かんたん記録側と筋トレ側）
 const EX_CARDS = ['quick', 'liftInput', 'liftHistory'];
@@ -45,6 +49,10 @@ export default function TrainingScreen() {
   const [history, setHistory] = useState<HistRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒
+  // レストの長さは人と種目で違う（高重量なら3分、追い込みなら45秒）。選べるようにして記憶する
+  const [restSec, setRestSec] = useState(90);
+  // 種目ピッカーを開いている行（nullなら閉じている）
+  const [liftPickRow, setLiftPickRow] = useState<number | null>(null);
   const trainInputTarget = useGuideTarget('trainInput');
   const trScrollRef = useRef<ScrollView>(null);
   const trY = useRef(0);
@@ -100,7 +108,18 @@ export default function TrainingScreen() {
       } catch { /* 既定のまま */ }
     }).catch(() => {});
     setActFreq(foodScores(readFoodFreq()));   // よく使う種目を前に出すため
+    loadCustomLifts();                       // ユーザーが追加した筋トレ種目
+    AsyncStorage.getItem('bl-rest-sec').then((v) => {
+      const n = Number(v);
+      if (REST_OPTIONS.includes(n)) setRestSec(n);
+    }).catch(() => {});
   }, []);
+
+  function pickRest(n: number) {
+    setRestSec(n);
+    AsyncStorage.setItem('bl-rest-sec', String(n)).catch(() => {});
+    if (restLeft != null) setRestLeft(n);   // 動作中なら新しい長さで測り直す
+  }
 
   function saveVisible(ids: string[]) {
     // 全部外すとチップが空になり「記録できない画面」に見えてしまうため、最低1つは残す
@@ -265,7 +284,7 @@ export default function TrainingScreen() {
 
       setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
       await load();
-      setRestLeft(90); // 保存でレストタイマー自動開始
+      setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
       setMsg({ ok: true, text: fb });
     } finally {
       setSaving(false);
@@ -391,9 +410,9 @@ export default function TrainingScreen() {
         </View>
       </Modal>
 
-      {/* レストタイマー（保存で自動開始・タップで90秒リスタート） */}
+      {/* レストタイマー（保存で自動開始・タップで設定した長さにリスタート） */}
       {seg === 'lift' && restLeft != null && (
-        <Pressable style={s.rest} onPress={() => setRestLeft(90)}>
+        <Pressable style={s.rest} onPress={() => setRestLeft(restSec)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Timer size={15} color={C.teal} />
             <Text style={s.restL}>{t('レスト')}</Text>
@@ -403,7 +422,7 @@ export default function TrainingScreen() {
               ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
               : t('終了💪')}
           </Text>
-          <Text style={s.restHint}>{restLeft > 0 ? 'タップで90秒に戻す' : t('次のセットへ！')}</Text>
+          <Text style={s.restHint}>{restLeft > 0 ? t('タップで{n}秒に戻す', { n: restSec }) : t('次のセットへ！')}</Text>
         </Pressable>
       )}
 
@@ -413,8 +432,11 @@ export default function TrainingScreen() {
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
-            <TextInput style={[s.tIn, { flex: 1 }]} placeholder={t('種目')} placeholderTextColor={C.faint}
-                       value={r.name} onChangeText={(v) => setT(i, { name: v })} />
+            <Pressable style={[s.tIn, s.tPick]} onPress={() => setLiftPickRow(i)}>
+              <Text style={[s.tPickT, !r.name && { color: C.faint }]} numberOfLines={1}>
+                {r.name || t('種目を選ぶ')}
+              </Text>
+            </Pressable>
             <TextInput style={[s.tIn, s.tNum]} placeholder="kg" placeholderTextColor={C.faint} keyboardType="decimal-pad"
                        value={r.kg} onChangeText={(v) => setT(i, { kg: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder={t('回')} placeholderTextColor={C.faint} keyboardType="number-pad"
@@ -436,9 +458,11 @@ export default function TrainingScreen() {
           const diff = curKg > 0 ? Math.round((curKg - prev.kg) * 10) / 10 : null;
           return (
             <Text style={s.prevRef}>
-              前回: {first.name.trim()} {prev.text}（{prev.date.slice(5).replace('-', '/')}）
-              {diff != null && diff > 0 && <Text style={{ color: C.teal, fontWeight: '800' }}> → +{diff}kg 更新💪</Text>}
-              {diff != null && diff < 0 && <Text style={{ color: C.sub }}> → {diff}kg</Text>}
+              {t('前回: {name} {rec}（{date}）', {
+                name: first.name.trim(), rec: prev.text, date: prev.date.slice(5).replace('-', '/'),
+              })}
+              {diff != null && diff > 0 && <Text style={{ color: C.teal, fontWeight: '800' }}>{' '}{t('→ +{n}kg 更新💪', { n: diff })}</Text>}
+              {diff != null && diff < 0 && <Text style={{ color: C.sub }}>{' '}{t('→ {n}kg', { n: diff })}</Text>}
             </Text>
           );
         })()}
@@ -446,6 +470,16 @@ export default function TrainingScreen() {
           <OptionButton style={{ flex: 1 }} variant="tonal" label={t('＋ 種目を追加')}
                         onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])} />
           <OptionButton style={{ flex: 1 }} label={t('保存する')} onPress={save} busy={saving} />
+        </View>
+        <Text style={s.muted}>{t('レストの長さ')}</Text>
+        <View style={s.restRow}>
+          {REST_OPTIONS.map((n) => (
+            <Pressable key={n} style={[s.restOpt, restSec === n && s.restOptOn]} onPress={() => pickRest(n)}>
+              <Text style={[s.restOptT, restSec === n && s.restOptTOn]}>
+                {n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n })}
+              </Text>
+            </Pressable>
+          ))}
         </View>
         {msg && seg === 'lift' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
@@ -514,6 +548,13 @@ export default function TrainingScreen() {
       </View>
     </Modal>
 
+    <LiftPicker
+      visible={liftPickRow != null}
+      onClose={() => setLiftPickRow(null)}
+      history={history.flatMap((h) => parse1RMs(h.text).map((x) => x.name))}
+      onPick={(name) => { if (liftPickRow != null) setT(liftPickRow, { name }); }}
+    />
+
     <StatusBarMask />
     <HeaderGear />
     </View>
@@ -539,6 +580,16 @@ const s = StyleSheet.create({
     fontSize: 9.5, fontWeight: '800', color: C.teal,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2,
   },
+  tPick: { flex: 1, justifyContent: 'center' },
+  tPickT: { fontSize: 14, color: C.ink, fontWeight: '600' },
+  restRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' },
+  restOpt: {
+    borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
+    borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
+  },
+  restOptOn: { borderColor: C.teal, backgroundColor: C.accentBadge, borderWidth: 1.5 },
+  restOptT: { fontSize: 12, fontWeight: '800', color: C.sub },
+  restOptTOn: { color: C.teal },
   actHint: { fontSize: 10.5, color: C.faint, marginTop: 6 },
   actDone: { fontSize: 14, fontWeight: '800', color: C.teal },
   actGroupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
