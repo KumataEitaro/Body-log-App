@@ -1,7 +1,7 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert } from 'react-native';
 import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, type HKWorkout } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import LiftPicker from '@/components/LiftPicker';
 import { loadCustomLifts } from '@/lib/lifts';
+import { groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, type LiftEntry } from '@/lib/liftLog';
 import {
   ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
 } from '@/lib/activities';
@@ -28,6 +29,14 @@ import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 import { t } from '@/lib/i18n';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
+
+// 履歴の日見出し（例: 8/20(水)）。t()はモジュール読み込み時に評価すると言語切替に追従しないため関数内で呼ぶ
+function dayLabel(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
+  const dow = wd[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return t('{m}/{d}({w})', { m, d, w: dow });
+}
 type HistRow = { id: string; date: string; text: string };
 
 // 種目の定義は lib/activities.ts（54種・METsはCompendium 2011準拠）
@@ -53,6 +62,12 @@ export default function TrainingScreen() {
   const [restSec, setRestSec] = useState(90);
   // 種目ピッカーを開いている行（nullなら閉じている）
   const [liftPickRow, setLiftPickRow] = useState<number | null>(null);
+  // 履歴でひらいている日（食事と同じで、直近の日は最初からひらいておく）
+  const [openDay, setOpenDay] = useState<string | null>(null);
+  // 履歴に出す日数。ひと目で見渡せる量から始めて、必要なら遡れるようにする
+  const [dayLimit, setDayLimit] = useState(10);
+  // 書き換え中の記録。保存すると元の記録を置き換える（食事の「書き換える」と同じ考え方）
+  const [rewriting, setRewriting] = useState<{ id: string; date: string } | null>(null);
   const trainInputTarget = useGuideTarget('trainInput');
   const trScrollRef = useRef<ScrollView>(null);
   const trY = useRef(0);
@@ -233,6 +248,73 @@ export default function TrainingScreen() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // 履歴を日ごとにまとめる（食事の「その日の記録」と同じ見せ方にそろえる）
+  const days = groupLiftsByDay(history);
+  // 直近の日は最初からひらく。ユーザーが開閉したらその選択を優先する
+  const shownDay = openDay ?? days[0]?.date ?? null;
+  const shownDays = days.slice(0, dayLimit);
+
+  // 記録から1種目だけ取り除く（他の種目は残す）
+  function deleteOneLift(rec: { id: string; entries: LiftEntry[] }, index: number, date: string) {
+    const e = rec.entries[index];
+    if (!e) return;
+    Alert.alert(t('「{name}」を削除しますか？', { name: e.name }), t('この記録の他の種目は残ります。'), [
+      { text: t('キャンセル'), style: 'cancel' },
+      {
+        text: t('削除する'),
+        style: 'destructive' as const,
+        onPress: async () => {
+          const r = removeLiftAt(rec.entries, index);
+          const q = r.kind === 'delete'
+            ? supabase.from('logs').delete().eq('id', rec.id)
+            : supabase.from('logs').update({ text: r.text }).eq('id', rec.id);
+          const { error } = await q;
+          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
+          if (rewriting?.id === rec.id) cancelRewrite();   // 書き換え中の記録が消えたら編集も解除
+          await load();
+        },
+      },
+    ]);
+  }
+
+  // 記録の長押しメニュー: 書き換え（入力欄へ戻す）と削除
+  function confirmRecord(rec: { id: string; text: string; entries: LiftEntry[] }, date: string) {
+    Alert.alert(t('この記録をどうしますか？'), rec.text.replace(/^🏋️ /, ''), [
+      { text: t('キャンセル'), style: 'cancel' },
+      ...(rec.entries.length > 0 ? [{ text: t('書き換える'), onPress: () => startEditRecord(rec, date) }] : []),
+      {
+        text: t('削除する'),
+        style: 'destructive' as const,
+        onPress: async () => {
+          const { error } = await supabase.from('logs').delete().eq('id', rec.id);
+          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
+          if (rewriting?.id === rec.id) cancelRewrite();
+          await load();
+        },
+      },
+    ]);
+  }
+
+  // 記録を入力欄へ戻して書き換え状態にする（保存すると元の記録を置き換える）
+  function startEditRecord(rec: { id: string; entries: LiftEntry[] }, date: string) {
+    setTRows(rec.entries.map((e) => ({
+      name: e.name, kg: String(e.kg), reps: String(e.reps), sets: e.sets > 1 ? String(e.sets) : '',
+    })));
+    setRewriting({ id: rec.id, date });
+    setMsg({ ok: true, text: t('入力欄に戻しました。直して保存すると置き換わります。') });
+    trScrollRef.current?.scrollTo({ y: 0, animated: true });
+  }
+
+  function cancelRewrite() {
+    setRewriting(null);
+    setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
+    setMsg(null);
+  }
+
   function trainingText(): string {
     const parts = tRows
       .filter((r) => r.name.trim() && Number(r.kg) > 0 && Number(r.reps) > 0)
@@ -248,13 +330,20 @@ export default function TrainingScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const today = viewDate;
+      // 書き換えのときは元の記録の日付を保つ（過去の記録を今日に移動させない）
+      const today = rewriting?.date ?? viewDate;
+      if (rewriting) {
+        const { error: delErr } = await supabase.from('logs').delete().eq('id', rewriting.id);
+        if (delErr) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
+      }
       const { error } = await supabase.from('logs').insert({
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
       });
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
+      const wasEdit = rewriting != null;
+      setRewriting(null);
 
       // RMフィードバック: 推定1RM(Epley)を目標・自己ベストと照合して一言返す
       let fb = t('保存しました。継続が最強の種目です💪');
@@ -284,8 +373,8 @@ export default function TrainingScreen() {
 
       setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
       await load();
-      setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
-      setMsg({ ok: true, text: fb });
+      if (!wasEdit) setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
+      setMsg({ ok: true, text: wasEdit ? t('書き換えました。') : fb });
     } finally {
       setSaving(false);
     }
@@ -430,6 +519,14 @@ export default function TrainingScreen() {
       <View style={[s.card, (seg !== 'lift' || !vis('liftInput')) && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
         <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
+        {rewriting && (
+          <View style={s.editBanner}>
+            <Text style={s.editBannerT}>{t('✏️ {date}の記録を書き換え中', { date: dayLabel(rewriting.date) })}</Text>
+            <Pressable onPress={cancelRewrite} hitSlop={8}>
+              <Text style={s.editBannerCancel}>{t('やめる')}</Text>
+            </Pressable>
+          </View>
+        )}
         {tRows.map((r, i) => (
           <View key={i} style={s.tRow}>
             <Pressable style={[s.tIn, s.tPick]} onPress={() => setLiftPickRow(i)}>
@@ -469,7 +566,7 @@ export default function TrainingScreen() {
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
           <OptionButton style={{ flex: 1 }} variant="tonal" label={t('＋ 種目を追加')}
                         onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])} />
-          <OptionButton style={{ flex: 1 }} label={t('保存する')} onPress={save} busy={saving} />
+          <OptionButton style={{ flex: 1 }} label={rewriting ? t('✓ 書き換える') : t('保存する')} onPress={save} busy={saving} />
         </View>
         <Text style={s.muted}>{t('レストの長さ')}</Text>
         <View style={s.restRow}>
@@ -493,13 +590,48 @@ export default function TrainingScreen() {
       <View style={[s.card, (seg !== 'lift' || !vis('liftHistory')) && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
         <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
-        {history.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
-        {history.slice(0, 20).map((h1) => (
-          <View key={h1.id} style={s.histRow}>
-            <Text style={s.histDate}>{h1.date.slice(5).replace('-', '/')}</Text>
-            <Text style={s.histText}>{h1.text.replace(/^🏋️ /, '')}</Text>
-          </View>
-        ))}
+        {days.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
+        {shownDays.map((d) => {
+          const open = shownDay === d.date;
+          return (
+            <View key={d.date}>
+              {/* 日の見出し: たたんだままでもその日の手応えが数字で分かる */}
+              <Pressable style={s.dayHead} onPress={() => setOpenDay(open ? '' : d.date)} hitSlop={4}>
+                <Text style={s.dayDate}>{dayLabel(d.date)}</Text>
+                <Text style={s.daySum} numberOfLines={1}>
+                  {t('{n}種目', { n: d.lifts })}・{t('{n}セット', { n: d.sets })}
+                  {d.volume > 0 ? `・${d.volume.toLocaleString()}kg` : ''}
+                </Text>
+                <Text style={s.dayCaret}>{open ? '▴' : '▾'}</Text>
+              </Pressable>
+              {open && d.records.map((rec) => (
+                <View key={rec.id}>
+                  {rec.entries.length === 0 && (
+                    <Pressable style={s.liftRow} onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
+                      <Text style={s.liftName}>{rec.text.replace(/^🏋️ /, '')}</Text>
+                    </Pressable>
+                  )}
+                  {rec.entries.map((e, ix) => (
+                    <Pressable key={`${rec.id}-${ix}`} style={s.liftRow}
+                               onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
+                      <Text style={s.liftName} numberOfLines={1}>{e.name}</Text>
+                      <Text style={s.liftSet}>{liftSetLabel(e)}</Text>
+                      <Pressable onPress={() => deleteOneLift(rec, ix, d.date)} hitSlop={10}>
+                        <Text style={s.liftX}>×</Text>
+                      </Pressable>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </View>
+          );
+        })}
+        {days.length > shownDays.length && (
+          <Pressable style={s.moreBtn} onPress={() => setDayLimit((n) => n + 10)} hitSlop={6}>
+            <Text style={s.moreBtnT}>{t('さらに前の{n}日を見る', { n: Math.min(10, days.length - shownDays.length) })}</Text>
+          </Pressable>
+        )}
+        {days.length > 0 && <Text style={s.histHint}>{t('行を長押しで書き換え・削除、×でその種目だけ削除できます')}</Text>}
       </View>
     </ScrollView>
     <QuickLogFab />
@@ -551,7 +683,7 @@ export default function TrainingScreen() {
     <LiftPicker
       visible={liftPickRow != null}
       onClose={() => setLiftPickRow(null)}
-      history={history.flatMap((h) => parse1RMs(h.text).map((x) => x.name))}
+      history={history.flatMap((h) => parseLiftText(h.text).map((x) => x.name))}
       onPick={(name) => { if (liftPickRow != null) setT(liftPickRow, { name }); }}
     />
 
@@ -654,7 +786,27 @@ const s = StyleSheet.create({
   verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
   moveNote: { fontSize: 11.5, color: C.sub, marginBottom: 12, paddingHorizontal: 4, lineHeight: 17 },
   muted: { fontSize: 13, color: C.sub },
-  histRow: { flexDirection: 'row', gap: 10, paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line },
-  histDate: { fontSize: 11, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
-  histText: { flex: 1, fontSize: 13.5, color: C.ink, lineHeight: 20 },
+  dayHead: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 9, borderTopWidth: 0.5, borderTopColor: C.line,
+  },
+  dayDate: { fontSize: 12.5, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  daySum: { flex: 1, fontSize: 11.5, color: C.sub, fontWeight: '700' },
+  dayCaret: { fontSize: 13, color: C.sub, fontWeight: '800' },
+  liftRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 7, paddingLeft: 10, borderTopWidth: 0.5, borderTopColor: C.line,
+  },
+  liftName: { flex: 1, fontSize: 13.5, color: C.ink, fontWeight: '600' },
+  liftSet: { fontSize: 13, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  liftX: { fontSize: 17, color: C.coral, fontWeight: '800', paddingHorizontal: 2 },
+  editBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginTop: 6,
+  },
+  editBannerT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
+  editBannerCancel: { fontSize: 11.5, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
+  moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
+  moreBtnT: { fontSize: 12.5, color: C.teal, fontWeight: '800' },
+  histHint: { fontSize: 11, color: C.faint, marginTop: 8 },
 });

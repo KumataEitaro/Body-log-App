@@ -815,4 +815,12 @@ export const EN: Record<string, string> = {
   "前回: {name} {rec}（{date}）": "Last time: {name} {rec} ({date})",
   "→ +{n}kg 更新💪": "→ +{n}kg PR 💪",
   "→ {n}kg": "→ {n}kg",
+  "{m}/{d}({w})": "{m}/{d} ({w})",
+  "{n}セット": "{n} sets",
+  "{n}種目": "{n} exercises",
+  "この記録の他の種目は残ります。": "The other exercises in this entry will stay.",
+  "入力欄に戻しました。直して保存すると置き換わります。": "Loaded into the form. Edit and save to replace it.",
+  "行を長押しで書き換え・削除、×でその種目だけ削除できます": "Long-press a row to edit or delete it; tap × to remove just that exercise",
+  "さらに前の{n}日を見る": "See {n} more days",
+  "✏️ {date}の記録を書き換え中": "✏️ Rewriting the {date} entry",
 };

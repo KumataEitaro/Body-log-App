@@ -700,4 +700,12 @@ export const ES: Record<string, string> = {
   "前回: {name} {rec}（{date}）": "La vez anterior: {name} {rec} ({date})",
   "→ +{n}kg 更新💪": "→ +{n}kg record 💪",
   "→ {n}kg": "→ {n}kg",
+  "{m}/{d}({w})": "{d}/{m} ({w})",
+  "{n}セット": "{n} series",
+  "{n}種目": "{n} ejercicios",
+  "この記録の他の種目は残ります。": "Los demas ejercicios de este registro se mantienen.",
+  "入力欄に戻しました。直して保存すると置き換わります。": "Cargado en el formulario. Editalo y guarda para reemplazarlo.",
+  "行を長押しで書き換え・削除、×でその種目だけ削除できます": "Manten pulsada una fila para editarla o borrarla; toca × para quitar solo ese ejercicio",
+  "さらに前の{n}日を見る": "Ver {n} dias mas",
+  "✏️ {date}の記録を書き換え中": "✏️ Reescribiendo el registro de {date}",
 };
