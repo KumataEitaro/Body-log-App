@@ -27,10 +27,10 @@ export function pfcAdvice(left: PfcLeft): string {
 
   // カロリー超過: 数字より気持ちの立て直しを優先
   if (kcal < -200) {
-    return t('今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットし、明日はたんぱく質多めから始めましょう。', { n: short(-kcal).toLocaleString() });
+    return t('今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットして、明日はたんぱく質多めから始めるのがおすすめです。', { n: short(-kcal).toLocaleString() });
   }
   if (kcal < 0) {
-    return t('ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫。あとは水分を意識しましょう。', { n: short(-kcal) });
+    return t('ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。', { n: short(-kcal) });
   }
 
   // まだほとんど食べていない

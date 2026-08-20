@@ -505,4 +505,6 @@ export const ES: Record<string, string> = {
   "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。": "Ha aparecido {days} de los últimos 7 días. Guárdalo y podrás añadirlo con un toque.",
   "＋ 食品を追加": "＋ Añadir alimento",
   "{n}件": "{n} guardadas",
+  "今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットして、明日はたんぱく質多めから始めるのがおすすめです。": "Hoy vas {n} kcal por encima del objetivo. Un solo día no se convierte en grasa. Agua y un paseo suave ayudan a reiniciar, y empezar mañana con más proteína es una buena opción.",
+  "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。": "Vas prácticamente según el objetivo ({n} kcal de más). Está dentro del margen de error, así que no te preocupes.",
 };

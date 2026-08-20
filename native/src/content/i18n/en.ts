@@ -508,7 +508,6 @@ export const EN: Record<string, string> = {
   "なし": "None",
   "の記録": "log",
   "の運動": "activity",
-  "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫。あとは水分を意識しましょう。": "You're basically on target ({n} kcal over) — well within noise. Just keep your fluids up.",
   "ストレージ未セットアップです（apply-pending.sqlのv16を実行してください）。": "Storage is not set up yet (run v16 in apply-pending.sql).",
   "ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。": "After the tour, we'll set your starting point and goal together.",
   "バナナ、コーヒー など…": "banana, coffee, …",
@@ -517,7 +516,6 @@ export const EN: Record<string, string> = {
   "今日の記録、忘れていませんか？": "Forgetting to log today?",
   "今日はこれから。{foods}を毎食に入れると、あと{n}gのたんぱく質を無理なく達成できます。": "The day is young. Put {foods} in every meal and the remaining {n}g of protein comes easily.",
   "今日は普段どおりでOK。明日は罪悪感なく楽しみましょう。前後の日で計画が自動調整されます。": "Keep today normal. Enjoy tomorrow guilt-free — the surrounding days adjust automatically.",
-  "今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットし、明日はたんぱく質多めから始めましょう。": "You're {n} kcal over today. One day doesn't become body fat. Reset with water and a short walk, and start tomorrow with protein.",
   "体脂肪": "Body fat",
   "体重 {w} を記録しました。": "Logged your weight: {w}.",
   "保存しました。{name} 推定MAX {est}kg（RM換算）": "Saved. {name} — estimated max {est}kg.",
@@ -623,4 +621,6 @@ export const EN: Record<string, string> = {
   "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。": "It showed up on {days} of the last 7 days. Save it and you can add it with one tap next time.",
   "＋ 食品を追加": "＋ Add a food",
   "{n}件": "{n} saved",
+  "今日は目標より{n}kcal多めです。1日では体脂肪になりません。水分と軽い散歩でリセットして、明日はたんぱく質多めから始めるのがおすすめです。": "You're {n} kcal above target today. One day doesn't become body fat. Water and an easy walk help reset it, and starting tomorrow with more protein is a good option.",
+  "ほぼ目標どおりです（{n}kcal超過）。誤差の範囲なので気にしなくて大丈夫です。": "You're basically on target ({n} kcal over). That's within the margin of error, so no need to worry.",
 };
