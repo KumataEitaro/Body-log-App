@@ -12,6 +12,7 @@ import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import MyFoodForm, { type MyFoodDraft } from '@/components/MyFoodForm';
 import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
+import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
 import * as Haptics from 'expo-haptics';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
@@ -371,6 +372,28 @@ export default function LogScreen() {
     setMsg(null);
   }
 
+  // 記録から1品目だけを取り除く（合計は残りから再計算される）
+  async function deleteOneItem(l: DayLog, index: number) {
+    const items = (l.items ?? []) as FoodItem[];
+    const name = items[index]?.name ?? '';
+    Alert.alert(t('「{name}」を削除しますか？', { name }), t('この食事の他の品目は残ります。'), [
+      { text: t('キャンセル'), style: 'cancel' },
+      {
+        text: t('削除する'), style: 'destructive',
+        onPress: async () => {
+          const r = removeItemAt(items, index);
+          const q = r.kind === 'delete'
+            ? supabase.from('logs').delete().eq('id', l.id)
+            : supabase.from('logs').update({ items: r.items, kcal: r.kcal, p: r.p, f: r.f, c: r.c }).eq('id', l.id);
+          const { error } = await q;
+          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+          if (uid) await syncEntriesForDate(uid, viewDate);   // 日次サマリーを合わせる
+          await load();
+        },
+      },
+    ]);
+  }
+
   // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
   function reuseMeal(m: RecentMeal) {
     const items = [...(parsed?.items ?? []), ...m.items];
@@ -575,6 +598,8 @@ export default function LogScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   // よく食べる食品の登録案内（保存後に1件だけ出す）
   const [suggest, setSuggest] = useState<Suggestion | null>(null);
+  // 品目単位で操作するために展開している記録行（1回の食事＝1レコードのまま、中身を開く）
+  const [openLog, setOpenLog] = useState<string | null>(null);
   const [foodDraft, setFoodDraft] = useState<MyFoodDraft | null>(null);
   const chipsRef = useRef<View | null>(null);   // 案内でハイライトする対象
   // 編集を始めた日付。表示日を動かしたら編集を打ち切る（記録が別の日へ移るのを防ぐ）
@@ -782,7 +807,13 @@ export default function LogScreen() {
           <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>{t('— {n}件', { n: dayLogs.length })}</Text></Text>
           {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。下から1回分ずつ記録しましょう。')}</Text>}
           {dayLogs.map((l) => (
-            <Pressable key={l.id} style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
+            <View key={l.id}>
+            <Pressable style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
+                       onPress={() => {
+                         // 品目が2つ以上あるときだけ展開する意味がある
+                         const n = ((l.items ?? []) as FoodItem[]).length;
+                         if (n >= 2) setOpenLog((cur) => (cur === l.id ? null : l.id));
+                       }}
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
               <Text style={{ fontSize: 13, marginRight: 2 }}>{logIcon(l)}</Text>
@@ -798,6 +829,26 @@ export default function LogScreen() {
               </View>
               {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
             </Pressable>
+
+            {/* 展開: 品目ごとに栄養素を出し、1品だけ消せるようにする
+                （1回の食事というまとまりは保ったまま、中身を個別に扱う） */}
+            {openLog === l.id && ((l.items ?? []) as FoodItem[]).map((it, ix) => (
+              <View key={`${l.id}-${ix}`} style={s.itemRow}>
+                <Text style={s.itemName} numberOfLines={1}>
+                  {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''}
+                </Text>
+                <Text style={s.itemPfc}>
+                  <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(Number(it.p) || 0)}
+                  {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(Number(it.f) || 0)}
+                  {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(Number(it.c) || 0)}
+                </Text>
+                <Text style={s.itemKcal}>{Math.round(Number(it.kcal) || 0)}</Text>
+                <Pressable onPress={() => deleteOneItem(l, ix)} hitSlop={10}>
+                  <Text style={s.itemX}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+            </View>
           ))}
           {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
         </Animated.View>
@@ -1095,6 +1146,16 @@ const s = StyleSheet.create({
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, letterSpacing: 0.8, marginBottom: 8 },
   h2sub: { fontWeight: '400', color: C.sub, letterSpacing: 0 },
   mutedT: { fontSize: 13, color: C.sub, lineHeight: 20 },
+  // 展開した品目行。記録行より一段内側に置き、従属関係を見せる
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 6, paddingLeft: 48, paddingRight: 2,
+    borderTopWidth: 0.5, borderTopColor: C.line,
+  },
+  itemName: { flex: 1, fontSize: 13, color: C.ink },
+  itemPfc: { fontSize: 10, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  itemKcal: { fontSize: 12, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'right' },
+  itemX: { fontSize: 15, fontWeight: '800', color: C.coral, paddingHorizontal: 4 },
   feedRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line, gap: 8 },
   feedTime: { fontSize: 11, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
   feedTitle: { flex: 1, fontSize: 14.5, color: C.ink, lineHeight: 20 },

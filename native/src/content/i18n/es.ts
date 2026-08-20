@@ -516,4 +516,6 @@ export const ES: Record<string, string> = {
   "時間内に解析できませんでした。文章を短くするか、もう一度お試しください。": "No se pudo analizar a tiempo. Prueba con un texto más corto o inténtalo de nuevo.",
   "通信できませんでした。電波状況を確認してもう一度お試しください。": "No se pudo conectar. Comprueba tu cobertura e inténtalo de nuevo.",
   "ログインに失敗しました。通信環境を確認してください。": "No se pudo iniciar sesión. Comprueba tu conexión.",
+  "「{name}」を削除しますか？": "¿Quitar «{name}»?",
+  "この食事の他の品目は残ります。": "Los demás alimentos de esta comida se mantienen.",
 };

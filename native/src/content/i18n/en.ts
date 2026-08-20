@@ -631,4 +631,6 @@ export const EN: Record<string, string> = {
   "しっかり": "Bold",
   "時間内に解析できませんでした。文章を短くするか、もう一度お試しください。": "Couldn't finish analysing in time. Try a shorter description, or try again.",
   "通信できませんでした。電波状況を確認してもう一度お試しください。": "Couldn't connect. Check your signal and try again.",
+  "「{name}」を削除しますか？": "Remove “{name}”?",
+  "この食事の他の品目は残ります。": "The other items in this meal stay.",
 };
