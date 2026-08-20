@@ -12,6 +12,7 @@ import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import MyFoodForm from '@/components/MyFoodForm';
+import { AVATARS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
@@ -87,6 +88,8 @@ export default function SettingsScreen() {
   const todo = useTodoBadge();
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [foodFormOpen, setFoodFormOpen] = useState(false);
+  const avatar = useAvatar();
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
@@ -207,7 +210,11 @@ export default function SettingsScreen() {
 
       {/* ヘッダーサマリーカード */}
       <View style={s.summary}>
-        <View style={s.avatar}><Text style={{ fontSize: 26 }}>💪</Text></View>
+        <Pressable style={({ pressed }) => [s.avatar, pressed && { opacity: 0.7 }]}
+                   onPress={() => setAvatarOpen(true)} hitSlop={6}>
+          <Text style={{ fontSize: 26 }}>{avatar}</Text>
+          <View style={s.avatarEdit}><Text style={s.avatarEditT}>✎</Text></View>
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={s.sumName}>{name || t('ニックネーム未設定')}</Text>
           <Text style={s.sumMail}>{email || '—'}</Text>
@@ -546,6 +553,23 @@ export default function SettingsScreen() {
     </Modal>
 
     <QuickLogFab />
+    <Modal visible={avatarOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAvatarOpen(false)}>
+      <View style={s.sheetBody}>
+        <SheetHeader title={"🙂 " + t("アイコンを選ぶ")} />
+        <ScrollView>
+          <View style={s.avatarGrid}>
+            {AVATARS.map((a) => (
+              <Pressable key={a} onPress={() => { setAvatar(a); setAvatarOpen(false); }}
+                         style={({ pressed }) => [s.avatarCell, avatar === a && s.avatarCellOn, pressed && { opacity: 0.6 }]}>
+                <Text style={{ fontSize: 27 }}>{a}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </View>
+    </Modal>
+
     <MyFoodForm visible={foodFormOpen} draft={null}
                 onClose={() => setFoodFormOpen(false)} onSaved={load} />
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
@@ -562,6 +586,20 @@ const s = StyleSheet.create({
     flexDirection: 'row', gap: 12, alignItems: 'center',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 18,
   },
+  avatarEdit: {
+    position: 'absolute', bottom: -2, right: -2,
+    width: 19, height: 19, borderRadius: 10, backgroundColor: C.teal,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: C.panel,
+  },
+  avatarEditT: { fontSize: 9, color: '#fff', fontWeight: '900' },
+  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  avatarCell: {
+    width: 56, height: 56, borderRadius: 16, backgroundColor: C.chipBg,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  avatarCellOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   sumName: { fontSize: 16, fontWeight: '800', color: C.ink },
   sumMail: { fontSize: 11.5, color: C.sub, marginTop: 1 },

@@ -8,7 +8,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, type LucideIcon } from 'lucide-react-native';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, Sparkles, type LucideIcon } from 'lucide-react-native';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
@@ -20,6 +20,8 @@ import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
+import AskCatalog from '@/components/AskCatalog';
+import { featuredQuestions } from '@/content/askExamples';
 
 // AIが提案した目標変更（承認制で直接適用する）
 type CoachAction =
@@ -35,12 +37,12 @@ type HistEntry = { d: string; role: 'user' | 'ai'; text: string };
 const HIST_KEY = 'bl-coach-history';
 const HIST_MAX = 800;
 
-const quickList = (): { Icon: LucideIcon; t: string }[] => [
-  { Icon: Utensils, t: t('過食しちゃった時の対処法') },
-  { Icon: TrendingDown, t: t('体重が落ちない原因は？') },
-  { Icon: Dumbbell, t: t('今日の筋トレアドバイス') },
-  { Icon: Moon, t: t('気分が乗らない時は？') },
-];
+// 毎回同じ4つでは飽きるので日付で入れ替える（カタログから巡回して取る）
+const ICONS: LucideIcon[] = [Utensils, TrendingDown, Dumbbell, Moon];
+const quickList = (): { Icon: LucideIcon; t: string }[] => {
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  return featuredQuestions(dayIndex, 4).map((q, i) => ({ Icon: ICONS[i % ICONS.length], t: q }));
+};
 
 // AI回答の軽量リッチ表示: **太字**・「・」箇条書き・空行をネイティブに描画（Wall of Text対策）
 function RichText({ text, style }: { text: string; style: object }) {
@@ -67,6 +69,7 @@ function RichText({ text, style }: { text: string; style: object }) {
 
 export default function CoachScreen() {
   const router = useRouter();
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -204,6 +207,13 @@ export default function CoachScreen() {
                   </Pressable>
                 ))}
               </View>
+
+              {/* 例が4つだけでは「自分の記録を読んで答える」ことが伝わらないため、全体をここから見せる */}
+              <Pressable style={({ pressed }) => [s.moreBtn, pressed && { opacity: 0.7 }]}
+                         onPress={() => setCatalogOpen(true)}>
+                <Sparkles size={15} color={C.teal} />
+                <Text style={s.moreBtnT}>{t('ほかに何が聞ける？')}</Text>
+              </Pressable>
             </View>
           </ScrollView>
         ) : (
@@ -248,6 +258,8 @@ export default function CoachScreen() {
         )}
 
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
+        <AskCatalog visible={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={(q) => send(q)} />
+
         <View style={[s.inRow, { borderColor: C.teal, shadowColor: C.teal }]}>
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
@@ -321,6 +333,13 @@ const s = StyleSheet.create({
   welcomeTitle: { fontSize: 19, fontWeight: '800', color: C.ink },
   welcomeSub: { fontSize: 12.5, color: C.sub, marginTop: 6, marginBottom: 20, textAlign: 'center', lineHeight: 19 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  moreBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    alignSelf: 'center', marginTop: 16,
+    borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
+    borderRadius: 999, paddingVertical: 10, paddingHorizontal: 18,
+  },
+  moreBtnT: { fontSize: 13, fontWeight: '800', color: C.teal },
   quickCard: {
     width: '46%', backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,
     paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center', gap: 6,

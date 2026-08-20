@@ -9,10 +9,12 @@ import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
 import { C } from '@/lib/ui';
+import { loadAvatar } from '@/lib/avatar';
 import { reregisterAll } from '@/lib/notify';
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
+  useEffect(() => { loadAvatar(); }, []);   // 保存済みのアイコンを反映
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const locale = useLocale();
