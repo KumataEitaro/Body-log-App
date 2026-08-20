@@ -504,4 +504,5 @@ export const ES: Record<string, string> = {
   "登録する": "Guardar",
   "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。": "Ha aparecido {days} de los últimos 7 días. Guárdalo y podrás añadirlo con un toque.",
   "＋ 食品を追加": "＋ Añadir alimento",
+  "{n}件": "{n} guardadas",
 };

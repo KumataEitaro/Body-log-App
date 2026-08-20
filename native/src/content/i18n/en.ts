@@ -622,4 +622,5 @@ export const EN: Record<string, string> = {
   "登録する": "Save",
   "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。": "It showed up on {days} of the last 7 days. Save it and you can add it with one tap next time.",
   "＋ 食品を追加": "＋ Add a food",
+  "{n}件": "{n} saved",
 };

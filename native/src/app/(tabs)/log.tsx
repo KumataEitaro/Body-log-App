@@ -91,7 +91,7 @@ export default function LogScreen() {
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
-  const [inputH, setInputH] = useState(40);
+  const [inputH, setInputH] = useState(54);   // 空でも2行分の余裕を見せる
 
   // マイ食品の並び順（保存済み順とサーバーの食品一覧をマージ・新規は末尾）
   useEffect(() => {
@@ -807,6 +807,7 @@ export default function LogScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <History size={14} color={C.teal} />
                 <Text style={[s.h2, { marginBottom: 0 }]}>{t('前の食事をもう一度')}</Text>
+                <Text style={s.h2sub}>{t('{n}件', { n: recentMeals.length })}</Text>
               </View>
               <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : t('▾ ひらく')}</Text>
             </Pressable>
@@ -1016,7 +1017,7 @@ export default function LogScreen() {
           )}
           <TextInput
             ref={inputRef} multiline
-            style={[s.dockInput, { height: Math.max(38, Math.min(112, inputH)) }]}
+            style={[s.dockInput, { height: Math.max(54, Math.min(112, inputH)) }]}
             placeholder={t('ここをタップして食事を入力…')} placeholderTextColor={C.sub}
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
@@ -1072,7 +1073,12 @@ const s = StyleSheet.create({
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
   doneBtnT: { color: '#fff', fontSize: 12, fontWeight: '800' },
   pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
-  hero: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18, marginBottom: 12 },
+  hero: {
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18,
+    marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
+    // 今日の要点だけをわずかに浮かせる。色は足さず奥行きだけで優先順位を出す
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2,
+  },
   heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 15, color: C.sub, fontWeight: '600' },
@@ -1124,8 +1130,8 @@ const s = StyleSheet.create({
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
-    backgroundColor: '#ffffff', borderWidth: 2, borderColor: C.teal, borderRadius: 18,
-    paddingHorizontal: 8, paddingVertical: 6,
+    backgroundColor: '#ffffff', borderWidth: 2.5, borderColor: C.teal, borderRadius: 18,
+    paddingHorizontal: 9, paddingVertical: 8,
     shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, elevation: 8,
   },
   dockIconBtn: { padding: 4 },
