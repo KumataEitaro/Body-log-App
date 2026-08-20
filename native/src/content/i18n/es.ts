@@ -581,4 +581,10 @@ export const ES: Record<string, string> = {
   "いちばん良かった日は？": "¿Cuál fue mi mejor día?",
   "改善すべき点を1つ挙げて": "Dime una cosa que deba mejorar",
   "よくできていることを教えて": "Dime qué estoy haciendo bien",
+  "体づくり": "Entrenamiento",
+  "食べもの": "Comida",
+  "飲みもの": "Bebidas",
+  "気分": "Ánimo",
+  "自然": "Naturaleza",
+  "どうぶつ": "Animales",
 };

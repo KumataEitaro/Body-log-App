@@ -12,7 +12,7 @@ import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import MyFoodForm from '@/components/MyFoodForm';
-import { AVATARS, useAvatar, setAvatar } from '@/lib/avatar';
+import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
@@ -557,14 +557,19 @@ export default function SettingsScreen() {
       <View style={s.sheetBody}>
         <SheetHeader title={"🙂 " + t("アイコンを選ぶ")} />
         <ScrollView>
-          <View style={s.avatarGrid}>
-            {AVATARS.map((a) => (
-              <Pressable key={a} onPress={() => { setAvatar(a); setAvatarOpen(false); }}
-                         style={({ pressed }) => [s.avatarCell, avatar === a && s.avatarCellOn, pressed && { opacity: 0.6 }]}>
-                <Text style={{ fontSize: 27 }}>{a}</Text>
-              </Pressable>
-            ))}
-          </View>
+          {AVATAR_GROUPS.map((g) => (
+            <View key={g.key}>
+              <Text style={s.avatarGroupT}>{t(g.label)}</Text>
+              <View style={s.avatarGrid}>
+                {g.items.map((a) => (
+                  <Pressable key={a} onPress={() => { setAvatar(a); setAvatarOpen(false); }}
+                             style={({ pressed }) => [s.avatarCell, avatar === a && s.avatarCellOn, pressed && { opacity: 0.6 }]}>
+                    <Text style={{ fontSize: 26 }}>{a}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ))}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
@@ -593,9 +598,10 @@ const s = StyleSheet.create({
     borderWidth: 2, borderColor: C.panel,
   },
   avatarEditT: { fontSize: 9, color: '#fff', fontWeight: '900' },
-  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  avatarGroupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 8 },
+  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   avatarCell: {
-    width: 56, height: 56, borderRadius: 16, backgroundColor: C.chipBg,
+    width: 52, height: 52, borderRadius: 15, backgroundColor: C.chipBg,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'transparent',
   },
