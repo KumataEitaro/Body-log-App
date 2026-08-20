@@ -17,13 +17,21 @@ export const EX_ADD: Record<ExLevel, number> = {
 export const LIFE_FACTOR_DEFAULT = 1.3;
 export const FAT_KCAL_PER_KG = 7700;
 export const WEEKLY_STD = -3500; // 週の標準進捗（-500/日）
-export const AI_DAILY_LIMIT = 15; // AI解析の1人1日あたり回数
+export const AI_DAILY_LIMIT = 15; // AI解析の1人1日あたり回数（AI_LIMITS_ENABLED=false の間は使われない）
 // 全ユーザー合計の1日上限（課金の安全弁＝これ以上は誰が使っても止まる。1日の最大コストを固定する本当の天井）
 export const GLOBAL_AI_DAILY_CAP = 200;
+
+// ===== AI利用上限のマスタースイッチ =====
+// false = 個人上限も全体上限も無効（＝実質無制限）。
+// 【注意】Gemini APIの請求は開発者持ちのため、これをfalseにしている間は
+// 1日あたりの最大コストに天井が無い。公開後の請求が読めるようになったら true に戻す。
+// 使用回数の記録（ai_usage）は false でも続けるので、実績を見てから判断できる。
+export const AI_LIMITS_ENABLED = false;
 
 // AI回数無制限のアカウント（管理者）。上限チェックのみスキップし、使用回数の記録など他の挙動は全ユーザー共通
 export const UNLIMITED_EMAILS = ['gotcha429@gmail.com'];
 export function isUnlimited(email?: string | null): boolean {
+  if (!AI_LIMITS_ENABLED) return true;   // 上限撤廃中は全員が無制限
   return !!email && UNLIMITED_EMAILS.includes(email.toLowerCase());
 }
 

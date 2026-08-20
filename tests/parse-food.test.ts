@@ -89,13 +89,13 @@ describe('POST /api/parse-food', () => {
     expect(res.status).toBe(400);
   });
 
-  it('1日の上限に達していたら429・remaining 0・Geminiを呼ばない', async () => {
-    state.usage = { count: AI_DAILY_LIMIT };
+  it('上限撤廃中は回数を使い切っていても解析できる（AI_LIMITS_ENABLED=false）', async () => {
+    state.usage = { count: AI_DAILY_LIMIT * 10 };
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(GEMINI_OK({ items: [], total: { kcal: 1, p: 0, f: 0, c: 0 } }));
     const res = await POST(req({ text: 'ごはん' }));
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(200);
     const j = await res.json();
-    expect(j.remaining).toBe(0);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(j.remaining).toBeNull();   // 無制限を表す
   });
 
   it('正常系: 解析結果を返し、使用回数を+1、remainingを返す', async () => {
@@ -110,7 +110,7 @@ describe('POST /api/parse-food', () => {
     const j = await res.json();
     expect(j.ok).toBe(true);
     expect(j.result.total.kcal).toBe(302);
-    expect(j.remaining).toBe(AI_DAILY_LIMIT - 1);
+    expect(j.remaining).toBeNull();   // 上限撤廃中は無制限
     expect(state.upserted[0]).toMatchObject({ user_id: 'user-1', count: 1 });
   });
 
@@ -156,13 +156,13 @@ describe('POST /api/parse-food', () => {
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('2回目の利用でremainingが正しく減る', async () => {
+  it('上限撤廃中でも使用回数の記録は続く（実績を見て上限を戻せるように）', async () => {
     state.usage = { count: 1 };
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(GEMINI_OK({ items: [], total: { kcal: 1, p: 0, f: 0, c: 0 } }));
     const res = await POST(req({ text: 'みかん' }));
     const j = await res.json();
-    expect(j.remaining).toBe(AI_DAILY_LIMIT - 2);
-    expect(state.upserted[0]).toMatchObject({ count: 2 });
+    expect(j.remaining).toBeNull();
+    expect(state.upserted[0]).toMatchObject({ count: 2 });   // ai_usageへの記録は継続
   });
 
   it('不正な形式の画像は無視される（jpeg/png/webp以外）', async () => {
@@ -208,11 +208,12 @@ describe('POST /api/parse-food', () => {
     expect(state.upserted.length).toBe(1); // 使用回数の記録は一般ユーザーと同じく行われる
   });
 
-  it('一般ユーザーは上限で429のまま（無制限化の影響を受けない）', async () => {
+  it('管理者以外のユーザーも上限撤廃の対象になる', async () => {
     state.user = { id: 'user-2', email: 'friend@example.com' } as { id: string };
     state.usage = { count: 15 };
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(GEMINI_OK({ items: [], total: { kcal: 1, p: 0, f: 0, c: 0 } }));
     const res = await POST(req({ text: 'ごはん' }));
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(200);
   });
 
   it('AIからのquestions（分量の確認質問）がレスポンスに含まれる', async () => {
