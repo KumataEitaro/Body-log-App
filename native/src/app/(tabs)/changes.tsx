@@ -304,18 +304,22 @@ export default function ChangesScreen() {
 
   const chartCard = (
       <View style={s.card} ref={chartTarget} collapsable={false}>
-        <Pressable style={s.toTable}
-                   onPress={() => openBodyTable(serie === 'waist' ? 'waist' : serie === 'bodyfat' ? 'bodyfat' : 'weight')}
-                   hitSlop={8}>
-          <Table2 size={13} color={C.teal} />
-          <Text style={s.toTableT}>{t('表で見る')}</Text>
-        </Pressable>
-        <View style={s.chips}>
-          {series().map((x) => (
-            <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
-              <Text style={[s.chipT, serie === x.key && { color: '#fff' }]}>{x.label}</Text>
-            </Pressable>
-          ))}
+        {/* 系列チップと「表で見る」は同じ行に並べる。絶対配置にするとチップが折り返したときや
+            並び替え中の⊖ボタンと重なるため、レイアウトに乗せて重なりが起きない形にしている */}
+        <View style={s.chipsHead}>
+          <View style={[s.chips, s.chipsFlex]}>
+            {series().map((x) => (
+              <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
+                <Text style={[s.chipT, serie === x.key && { color: '#fff' }]}>{x.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable style={s.toTable}
+                     onPress={() => openBodyTable(serie === 'waist' ? 'waist' : serie === 'bodyfat' ? 'bodyfat' : 'weight')}
+                     hitSlop={8}>
+            <Table2 size={13} color={C.teal} />
+            <Text style={s.toTableT}>{t('表で見る')}</Text>
+          </Pressable>
         </View>
         <InteractiveChart
           key={chartNonce}
@@ -540,9 +544,11 @@ const s = StyleSheet.create({
   gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
   topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  // 系列チップと同じ行に置く（チップが折り返しても重ならない）
+  chipsHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  chipsFlex: { flex: 1, marginRight: 0 },
   toTable: {
-    position: 'absolute', top: 12, right: 12, zIndex: 5,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
   },
   toTableT: { fontSize: 10.5, fontWeight: '800', color: C.teal },
