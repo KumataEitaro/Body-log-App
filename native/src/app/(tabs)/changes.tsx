@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { AddCardSheet } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
@@ -529,8 +530,11 @@ export default function ChangesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* インプレイスのドラッグ並び替え（通常時は普通のスクロール・カード長押しで編集モードへ） */}
+      {/* セグメント切替はクロスフェード。ヘッダーは両側で同一なので静止して見え、
+          中身だけが入れ替わる。key再マウントは意図的（編集状態や開閉を持ち越さない） */}
+      <Animated.View key={topSeg} style={{ flex: 1 }}
+                     entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
       <ReorderableCards
-        key={topSeg}
         editing={editing}
         order={visibleOrder}
         onOrderChange={setOrder}
@@ -543,6 +547,7 @@ export default function ChangesScreen() {
         contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
         onScroller={(fn) => guide.registerScroller('/changes', fn)}
       />
+      </Animated.View>
       {!editing && <QuickLogFab />}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}

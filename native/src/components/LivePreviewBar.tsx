@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
 import { C } from '@/lib/ui';
+import { useReduceMotion } from '@/lib/motion';
 import { previewFill, previewFillSplit } from '@/lib/preview';
 
 /**
@@ -13,17 +14,20 @@ import { previewFill, previewFillSplit } from '@/lib/preview';
  */
 export function usePulse(active = true): Animated.Value {
   const pulse = useRef(new Animated.Value(0.5)).current;
+  const reduce = useReduceMotion();
   useEffect(() => {
-    if (!active) { pulse.setValue(0.5); return; }
+    // 「視差効果を減らす」ON時は明滅させない（未保存分は半透明の静止で示す）
+    if (!active || reduce) { pulse.setValue(0.6); return; }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.95, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
-        Animated.timing(pulse, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        // opacityだけを動かすのでネイティブ駆動できる（JSスレッドの毎フレーム負荷をゼロに）
+        Animated.timing(pulse, { toValue: 0.95, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.35, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse, active]);
+  }, [pulse, active, reduce]);
   return pulse;
 }
 
@@ -57,9 +61,13 @@ export function LiveBar({ eaten, staged, target, color, height = 5, pulse, radiu
       {staged > 0 && (
         <Animated.View style={{
           width: ghostW.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
-          height: '100%', backgroundColor: fill, opacity: pulse,
-          borderTopRightRadius: radius, borderBottomRightRadius: radius,
-        }} />
+          height: '100%',
+        }}>
+          <Animated.View style={{
+            flex: 1, backgroundColor: fill, opacity: pulse,
+            borderTopRightRadius: radius, borderBottomRightRadius: radius,
+          }} />
+        </Animated.View>
       )}
     </View>
   );
@@ -75,8 +83,10 @@ export function GhostSegment({ pct, color, pulse }: { pct: number; color: string
   return (
     <Animated.View style={{
       width: w.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
-      height: '100%', backgroundColor: color, opacity: pulse,
-    }} />
+      height: '100%',
+    }}>
+      <Animated.View style={{ flex: 1, backgroundColor: color, opacity: pulse }} />
+    </Animated.View>
   );
 }
 
@@ -109,10 +119,11 @@ export function GhostPair({ eaten, others, focus, target, color, pulse }: {
   return (
     <>
       {others > 0 && (
-        <Animated.View style={{
-          width: pct(oW), height: '100%', backgroundColor: fill,
-          opacity: focusing ? 0.28 : pulse,   // 注目中は他を沈める
-        }} />
+        <Animated.View style={{ width: pct(oW), height: '100%' }}>
+          {focusing
+            ? <View style={{ flex: 1, backgroundColor: fill, opacity: 0.28 }} />
+            : <Animated.View style={{ flex: 1, backgroundColor: fill, opacity: pulse }} />}
+        </Animated.View>
       )}
       {focusing && (
         <Animated.View style={{

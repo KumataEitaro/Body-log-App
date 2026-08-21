@@ -1,6 +1,7 @@
 // ネイティブタブバー（4タブ構成）。設定は「概要」ヘッダーの⚙から（タブ非表示のルートとして残す）
 // GuideProviderで包み、初回ガイドのスポットライトがタブバーごと覆えるようにする
 import { Tabs } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Utensils, Activity, ChartLine, MessageCircle } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { GuideProvider } from '@/components/GuideTour';
@@ -17,6 +18,14 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: C.faint,
         tabBarStyle: { backgroundColor: C.panel },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+        // タブ間はシフト遷移（無アニメの瞬間差し替えだと安っぽく見える）。
+        // freezeOnBlurで非表示タブの再レンダーを止め、遷移中のJS負荷を抑える
+        animation: 'shift',
+        freezeOnBlur: true,
+      }}
+      screenListeners={{
+        // 切り替えの手応え（音のない小さなクリック感）
+        tabPress: () => { Haptics.selectionAsync().catch(() => {}); },
       }}
     >
       <Tabs.Screen name="log" options={{ title: t('食事'), tabBarIcon: ({ color, size }) => <Utensils color={color} size={size - 2} /> }} />

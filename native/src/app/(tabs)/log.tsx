@@ -46,6 +46,7 @@ import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
+import { useReduceMotion } from '@/lib/motion';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -118,19 +119,20 @@ export default function LogScreen() {
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
 
-  // 入力ドックのパルス発光（画面を開いた瞬間に「ここが入力欄」と分かるように）
+  // 入力ドックのパルス発光（画面を開いた瞬間に「ここが入力欄」と分かるように）。
+  // 以前はborderColor/shadowOpacityを直接補間していたが、色はネイティブ駆動できず
+  // 常時60fpsのJS負荷になっていた。全開の縁を重ねてopacityだけ動かす方式に変更
   const glow = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
   useEffect(() => {
+    if (reduceMotion) { glow.setValue(0.4); return; }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(glow, { toValue: 1, duration: 1250, useNativeDriver: false }),
-      Animated.timing(glow, { toValue: 0, duration: 1250, useNativeDriver: false }),
+      Animated.timing(glow, { toValue: 1, duration: 1250, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0, duration: 1250, useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [glow]);
-  // テーマ色で発光させる（ハードコードだとテーマを変えても緑のままになる）
-  const glowBorder = glow.interpolate({ inputRange: [0, 1], outputRange: [rgba(C.teal, 0.45), rgba(C.teal, 1)] });
-  const glowShadow = glow.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.3] });
+  }, [glow, reduceMotion]);
   function toggleFoodsView() {
     const v = foodsView === 'row' ? 'grid' : 'row';
     setFoodsView(v);
@@ -1069,7 +1071,9 @@ export default function LogScreen() {
             )}
           </View>
         )}
-        <Animated.View style={[s.dock, { borderColor: glowBorder, shadowOpacity: glowShadow, shadowColor: C.teal }]}>
+        <View style={s.dock}>
+          {/* 発光レイヤ: 全開の縁と影を重ね、opacityだけをネイティブで往復させる */}
+          <Animated.View pointerEvents="none" style={[s.dockGlow, { opacity: glow }]} />
           {/* 通常時=「ここが入力欄」のペンサイン / キーボード表示中=しまうボタン */}
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
@@ -1092,7 +1096,7 @@ export default function LogScreen() {
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <ArrowUp color="#fff" size={17} strokeWidth={3} />
           </Pressable>
-        </Animated.View>
+        </View>
       </Animated.View>
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
@@ -1205,9 +1209,14 @@ const s = StyleSheet.create({
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
-    backgroundColor: '#ffffff', borderWidth: 2.5, borderColor: C.teal, borderRadius: 18,
+    backgroundColor: '#ffffff', borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
     paddingHorizontal: 9, paddingVertical: 8,
-    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, elevation: 8,
+    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.12, elevation: 8,
+  },
+  dockGlow: {
+    position: 'absolute', top: -2.5, left: -2.5, right: -2.5, bottom: -2.5,
+    borderWidth: 2.5, borderColor: C.teal, borderRadius: 18,
+    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.25,
   },
   dockIconBtn: { padding: 4 },
   dockIcon: { fontSize: 21 },

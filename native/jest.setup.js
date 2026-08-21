@@ -53,6 +53,11 @@ jest.mock('react-native-reanimated', () => {
     withRepeat: (v) => v,
     withSequence: (...args) => args[0],
     Easing: { linear: (t) => t },
+    // entering/exiting用のビルダー（.duration().delay()…とチェーンできる形だけ再現）
+    FadeIn: { duration: () => ({ delay: () => ({}) }) },
+    FadeOut: { duration: () => ({ delay: () => ({}) }) },
+    FadeInDown: { duration: () => ({ delay: () => ({}) }) },
+    LinearTransition: { springify: () => ({}) },
   };
 });
 
