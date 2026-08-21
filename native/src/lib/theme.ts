@@ -27,7 +27,7 @@ function derivePalette(accent: string): Palette {
     line: mixW(accent, 0.91), teal: accent, tealWeak: mixW(accent, 0.88),
     accentSoft: mixW(accent, 0.95), accentBadge: mixW(accent, 0.90), accentBorder: a(0.30),
     track: mixW(accent, 0.92), chipBg: mixW(accent, 0.955), segTrack: mixW(accent, 0.93),
-    pressed: mixW(accent, 0.94), calorieBar: '#3f4c5a', coral: '#ff2d2d', coralWeak: '#fdeeec', amber: '#b8860b',
+    pressed: mixW(accent, 0.94), calorieBar: '#3f4c5a', coral: '#e5484d', coralWeak: '#fdeeec', amber: '#b8860b',
   };
 }
 
@@ -37,37 +37,37 @@ export const PALETTES: Record<AccentKey, Palette> = {
     bg: '#fbfbfa', panel: '#ffffff', ink: '#0e1116', sub: '#6a7280', faint: '#9aa1ab', line: '#e9eae7',
     teal: '#059669', tealWeak: '#e1f5ee', accentSoft: '#f2faf7', accentBadge: '#e6f7f2',
     accentBorder: 'rgba(5,150,105,0.30)', track: '#eceeeb', chipBg: '#f4f5f3', segTrack: '#eef0ee',
-    pressed: '#f1f3f0', calorieBar: '#3f4c5a', coral: '#ff2d2d', coralWeak: '#fdeeec', amber: '#b8860b',
+    pressed: '#f1f3f0', calorieBar: '#3f4c5a', coral: '#e5484d', coralWeak: '#fdeeec', amber: '#b8860b',
   },
   blue: {
     bg: '#fafbfd', panel: '#ffffff', ink: '#0d1219', sub: '#64707f', faint: '#98a2b0', line: '#e5e9f0',
     teal: '#2563eb', tealWeak: '#e4ecfd', accentSoft: '#f4f7fe', accentBadge: '#e8effd',
     accentBorder: 'rgba(37,99,235,0.30)', track: '#e9edf3', chipBg: '#f2f5f9', segTrack: '#eaeff5',
-    pressed: '#eef2f7', calorieBar: '#475569', coral: '#ff2d2d', coralWeak: '#fdeceb', amber: '#b07d0a',
+    pressed: '#eef2f7', calorieBar: '#475569', coral: '#e5484d', coralWeak: '#fdeceb', amber: '#b07d0a',
   },
   purple: {
     bg: '#fcfafd', panel: '#ffffff', ink: '#130f18', sub: '#6d6579', faint: '#a099ab', line: '#ebe6f0',
     teal: '#7c3aed', tealWeak: '#eee7fd', accentSoft: '#f8f5fe', accentBadge: '#f0e9fd',
     accentBorder: 'rgba(124,58,237,0.30)', track: '#eee9f2', chipBg: '#f6f3f8', segTrack: '#f0ebf4',
-    pressed: '#f2eef6', calorieBar: '#4a4257', coral: '#ff2d2d', coralWeak: '#fceced', amber: '#a9790f',
+    pressed: '#f2eef6', calorieBar: '#4a4257', coral: '#e5484d', coralWeak: '#fceced', amber: '#a9790f',
   },
   orange: {
     bg: '#fdfbf9', panel: '#ffffff', ink: '#171210', sub: '#7a6d64', faint: '#ada298', line: '#f0e9e3',
     teal: '#ea580c', tealWeak: '#fdeade', accentSoft: '#fef7f2', accentBadge: '#fdeee3',
     accentBorder: 'rgba(234,88,12,0.30)', track: '#f2ece7', chipBg: '#f8f5f2', segTrack: '#f3ede8',
-    pressed: '#f5f0eb', calorieBar: '#5a4a3f', coral: '#ff2d2d', coralWeak: '#fceae7', amber: '#a97a12',
+    pressed: '#f5f0eb', calorieBar: '#5a4a3f', coral: '#e5484d', coralWeak: '#fceae7', amber: '#a97a12',
   },
   pink: {
     bg: '#fdfafb', panel: '#ffffff', ink: '#171114', sub: '#7a6772', faint: '#ad9ca5', line: '#f0e6eb',
     teal: '#db2777', tealWeak: '#fce4ef', accentSoft: '#fef5f9', accentBadge: '#fce8f1',
     accentBorder: 'rgba(219,39,119,0.30)', track: '#f2eaee', chipBg: '#f8f3f5', segTrack: '#f3ecef',
-    pressed: '#f5eef1', calorieBar: '#57424c', coral: '#ff2d2d', coralWeak: '#fceae9', amber: '#a97a12',
+    pressed: '#f5eef1', calorieBar: '#57424c', coral: '#e5484d', coralWeak: '#fceae9', amber: '#a97a12',
   },
   graphite: {
     bg: '#fafafa', panel: '#ffffff', ink: '#101214', sub: '#6b7280', faint: '#9ca3af', line: '#e6e7e9',
     teal: '#475569', tealWeak: '#e7eaee', accentSoft: '#f5f6f8', accentBadge: '#eaedf1',
     accentBorder: 'rgba(71,85,105,0.32)', track: '#ebecee', chipBg: '#f4f5f6', segTrack: '#eef0f1',
-    pressed: '#f0f1f3', calorieBar: '#1e293b', coral: '#ff2d2d', coralWeak: '#fceceb', amber: '#a9800f',
+    pressed: '#f0f1f3', calorieBar: '#1e293b', coral: '#e5484d', coralWeak: '#fceceb', amber: '#a9800f',
   },
   teal: derivePalette('#0d9488'),
   sky: derivePalette('#0284c7'),
@@ -95,7 +95,7 @@ export const ACCENTS: { key: AccentKey; label: string; color: string }[] = [
 // ===== P/F/Cバーの配色（テーマとは独立した設定。3色を個別に選ぶ） =====
 export type PfcColors = { p: string; f: string; c: string };
 
-// 選択できる色（超過の赤 #ff2d2d とは十分に離した色だけを並べている）
+// 選択できる色（超過の赤 #e5484d とは十分に離した色だけを並べている）
 export const PFC_SWATCHES: { key: string; label: string; color: string }[] = [
   { key: 'green', label: 'グリーン', color: '#059669' },
   { key: 'teal', label: 'ティール', color: '#0d9488' },

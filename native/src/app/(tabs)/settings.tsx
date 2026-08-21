@@ -589,7 +589,7 @@ const s = StyleSheet.create({
   // サマリー
   summary: {
     flexDirection: 'row', gap: 12, alignItems: 'center',
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 18,
   },
   avatarEdit: {
     position: 'absolute', bottom: -2, right: -2,

@@ -396,7 +396,7 @@ const s = StyleSheet.create({
   pvBarTrack: { height: 92, width: '100%', justifyContent: 'flex-end' },
   pvBar: { width: '100%', borderRadius: 5, backgroundColor: C.teal },
   pvBarL: { fontSize: 11, color: C.faint, marginTop: 4, fontVariant: ['tabular-nums'] },
-  card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },

@@ -933,7 +933,7 @@ const s = StyleSheet.create({
   restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
   restHint: { fontSize: 11, color: C.sub },
   prevRef: { fontSize: 13, color: C.sub, marginTop: 4, lineHeight: 18 },
-  card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
   tRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
   tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 17, color: C.ink },
   tNum: { width: 56, textAlign: 'center' },

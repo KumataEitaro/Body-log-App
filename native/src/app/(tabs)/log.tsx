@@ -1143,10 +1143,8 @@ const s = StyleSheet.create({
   doneBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
   hero: {
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
-    // 今日の要点だけをわずかに浮かせる。色は足さず奥行きだけで優先順位を出す
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
   heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
@@ -1155,7 +1153,7 @@ const s = StyleSheet.create({
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
-  card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, letterSpacing: 0.8, marginBottom: 8 },
   h2sub: { fontWeight: '400', color: C.sub, letterSpacing: 0 },
   mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },

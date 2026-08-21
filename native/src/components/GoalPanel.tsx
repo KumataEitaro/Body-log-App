@@ -394,7 +394,7 @@ const s = StyleSheet.create({
   seg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   segOn: { backgroundColor: C.ink, borderColor: C.ink },
   segT: { fontSize: 15, fontWeight: '800', color: C.sub },
-  card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   divider: { height: 0.5, backgroundColor: C.line, marginVertical: 14 },

@@ -42,7 +42,7 @@ export const C: Palette = {
   segTrack: '#eef0ee',
   pressed: '#f1f3f0',
   calorieBar: '#3f4c5a',
-  coral: '#ff2d2d',
+  coral: '#e5484d',
   coralWeak: '#fdeeec',
   amber: '#b8860b',
 };

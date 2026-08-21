@@ -67,7 +67,7 @@ export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' 
 const s = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
     paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12,
   },
   iconWrap: {

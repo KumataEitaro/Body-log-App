@@ -41,7 +41,7 @@ describe('テーマ', () => {
   it('導出パレットも発光ボーダー用のrgbaが正しく作れる', () => {
     applyPalette(PALETTES.rose);
     expect(C.teal).toBe('#e11d48');
-    expect(C.coral).toBe('#ff2d2d'); // 超過の赤はテーマに関係なく固定
+    expect(C.coral).toBe('#e5484d'); // 超過の赤はテーマに関係なく固定
     applyPalette(PALETTES.green);
   });
 
