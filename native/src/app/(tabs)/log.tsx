@@ -825,7 +825,7 @@ export default function LogScreen() {
                        }}
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
-              <Text style={{ fontSize: 13, marginRight: 2 }}>{logIcon(l)}</Text>
+              <Text style={{ fontSize: 15, marginRight: 2 }}>{logIcon(l)}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[s.feedTitle, { flex: 0 }]} numberOfLines={2}>{logTitle(l)}</Text>
                 {l.kcal != null && l.p != null && (
@@ -870,11 +870,11 @@ export default function LogScreen() {
             <Pressable style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                        onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <History size={14} color={C.teal} />
+                <History size={16} color={C.teal} />
                 <Text style={[s.h2, { marginBottom: 0 }]}>{t('前の食事をもう一度')}</Text>
                 <Text style={s.h2sub}>{t('{n}件', { n: recentMeals.length })}</Text>
               </View>
-              <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : t('▾ ひらく')}</Text>
+              <Text style={{ color: C.sub, fontSize: 15, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : t('▾ ひらく')}</Text>
             </Pressable>
             {recentOpen && (
               <>
@@ -888,7 +888,7 @@ export default function LogScreen() {
                     </Pressable>
                   </View>
                 ))}
-                <Text style={[s.mutedT, { fontSize: 11.5, marginTop: 6 }]}>{t('↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
+                <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
               </>
             )}
           </View>
@@ -953,7 +953,7 @@ export default function LogScreen() {
               <View key={i} style={s.thumbWrap}>
                 <Image source={{ uri: p.uri }} style={s.thumb} />
                 <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>×</Text>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>×</Text>
                 </Pressable>
               </View>
             ))}
@@ -973,7 +973,7 @@ export default function LogScreen() {
                 </Pressable>
                 {cnt != null && (
                   <Pressable onPress={() => decFood(fd)} style={s.chipMinus} hitSlop={4}>
-                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 15 }}>−</Text>
+                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17 }}>−</Text>
                   </Pressable>
                 )}
               </View>
@@ -1023,7 +1023,7 @@ export default function LogScreen() {
                              onPress={() => setFocusItem(on ? null : i)}>
                     <View style={{ flexShrink: 1 }}>
                       <Text style={s.trayChipT} numberOfLines={1}>
-                        {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 10 }}>{Math.round(it.kcal)}kcal</Text>
+                        {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 11 }}>{Math.round(it.kcal)}kcal</Text>
                       </Text>
                       <Text style={s.trayChipPfc}>
                         <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(it.p)}
@@ -1136,45 +1136,45 @@ const s = StyleSheet.create({
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
-  doneBtnT: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
+  doneBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
   hero: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
     // 今日の要点だけをわずかに浮かせる。色は足さず奥行きだけで優先順位を出す
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
-  heroL: { fontSize: 11, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
+  heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
-  heroU: { fontSize: 15, color: C.sub, fontWeight: '600' },
+  heroU: { fontSize: 17, color: C.sub, fontWeight: '600' },
   hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
-  metaT: { fontSize: 12, color: C.sub, fontVariant: ['tabular-nums'] },
+  metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink, letterSpacing: 0.8, marginBottom: 8 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink, letterSpacing: 0.8, marginBottom: 8 },
   h2sub: { fontWeight: '400', color: C.sub, letterSpacing: 0 },
-  mutedT: { fontSize: 13, color: C.sub, lineHeight: 20 },
+  mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },
   // 展開した品目行。記録行より一段内側に置き、従属関係を見せる
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 6, paddingLeft: 48, paddingRight: 2,
     borderTopWidth: 0.5, borderTopColor: C.line,
   },
-  itemName: { flex: 1, fontSize: 13, color: C.ink },
-  itemPfc: { fontSize: 10, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  itemKcal: { fontSize: 12, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'right' },
-  itemX: { fontSize: 15, fontWeight: '800', color: C.coral, paddingHorizontal: 4 },
+  itemName: { flex: 1, fontSize: 15, color: C.ink },
+  itemPfc: { fontSize: 11, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  itemKcal: { fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'right' },
+  itemX: { fontSize: 17, fontWeight: '800', color: C.coral, paddingHorizontal: 4 },
   feedRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line, gap: 8 },
-  feedTime: { fontSize: 11, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
-  feedTitle: { flex: 1, fontSize: 14.5, color: C.ink, lineHeight: 20 },
-  feedPfc: { fontSize: 10.5, fontWeight: '800', color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
-  feedKcal: { fontSize: 14, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
-  feedU: { fontSize: 10, color: C.faint },
-  msg: { fontSize: 13, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
+  feedTime: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
+  feedTitle: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
+  feedPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
+  feedKcal: { fontSize: 15, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
+  feedU: { fontSize: 11, color: C.faint },
+  msg: { fontSize: 15, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
   ta: {
     minHeight: 88, maxHeight: 180, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line,
-    borderRadius: 14, padding: 12, fontSize: 16, color: C.ink, textAlignVertical: 'top',
+    borderRadius: 14, padding: 12, fontSize: 17, color: C.ink, textAlignVertical: 'top',
   },
   chip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.panel,
@@ -1183,25 +1183,25 @@ const s = StyleSheet.create({
   chipOn: { borderColor: C.ink },
   chipMain: { paddingVertical: 9, paddingLeft: 13, paddingRight: 11 },
   chipMinus: { paddingVertical: 9, paddingHorizontal: 12, borderLeftWidth: 1.5, borderLeftColor: C.line },
-  chipT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
+  chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   moodBtn: {
     flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, marginBottom: 8,
   },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  btnPrimaryT: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
   wRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   wInput: {
     width: 90, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12,
-    padding: 10, fontSize: 16, color: C.ink, textAlign: 'center', fontVariant: ['tabular-nums'],
+    padding: 10, fontSize: 17, color: C.ink, textAlign: 'center', fontVariant: ['tabular-nums'],
   },
-  wUnit: { fontSize: 13, color: C.sub, fontWeight: '600' },
+  wUnit: { fontSize: 15, color: C.sub, fontWeight: '600' },
   btnGhost: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
+  btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
   chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
-  chipBtnT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
+  chipBtnT: { fontSize: 13, fontWeight: '700', color: C.sub },
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
-  reuseBtnT: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  reuseBtnT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
@@ -1210,13 +1210,13 @@ const s = StyleSheet.create({
     shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, elevation: 8,
   },
   dockIconBtn: { padding: 4 },
-  dockIcon: { fontSize: 18 },
-  dockInput: { flex: 1, fontSize: 16, fontWeight: '600', color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
+  dockIcon: { fontSize: 21 },
+  dockInput: { flex: 1, fontSize: 17, fontWeight: '600', color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
   pencilBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
   dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
-  viewToggleT: { fontSize: 12, color: C.sub, fontWeight: '700' },
+  viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
   preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
   tray: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1228,36 +1228,36 @@ const s = StyleSheet.create({
     backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
-  trayChipT: { fontSize: 11.5, fontWeight: '700', color: C.ink },
+  trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
   },
-  editBannerT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
-  editBannerCancel: { fontSize: 11.5, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
+  editBannerT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
   trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
-  trayChipPfc: { fontSize: 9.5, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
-  trayX: { fontSize: 14, fontWeight: '800', color: C.coral, marginLeft: 2 },
+  trayChipPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
+  trayX: { fontSize: 15, fontWeight: '800', color: C.coral, marginLeft: 2 },
   traySave: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
-  traySaveT: { color: '#fff', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  trayClearT: { fontSize: 11, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
-  previewMain: { fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  traySaveT: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  trayClearT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
+  previewMain: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   previewBars: { flexDirection: 'row', gap: 10, flex: 1, alignItems: 'center', marginLeft: 10 },
   previewBarCol: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  previewBarAb: { fontSize: 10, fontWeight: '900', width: 10, textAlign: 'center' },
-  previewBarV: { fontSize: 10, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 30, textAlign: 'right' },
-  previewSub: { fontSize: 11.5, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
+  previewBarAb: { fontSize: 11, fontWeight: '900', width: 10, textAlign: 'center' },
+  previewBarV: { fontSize: 11, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 30, textAlign: 'right' },
+  previewSub: { fontSize: 13, fontWeight: '600', color: C.sub, fontVariant: ['tabular-nums'] },
   pfcL: { width: 80, fontSize: 13, fontWeight: '800', color: C.ink },
-  pfcAb: { fontSize: 9.5, fontWeight: '700', color: C.faint },
+  pfcAb: { fontSize: 11, fontWeight: '700', color: C.faint },
   adviceBox: {
     marginTop: 8, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
   },
-  adviceT: { fontSize: 12, color: C.ink, lineHeight: 19, fontWeight: '500' },
+  adviceT: { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '500' },
   pfcBar: { flex: 1, height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden' },
   pfcFill: { height: '100%', borderRadius: 4 },
-  pfcT: { width: 96, fontSize: 13.5, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  hint: { fontSize: 10, color: C.faint, textAlign: 'right', marginTop: 6 },
+  pfcT: { width: 96, fontSize: 13, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  hint: { fontSize: 11, color: C.faint, textAlign: 'right', marginTop: 6 },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },

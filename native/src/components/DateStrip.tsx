@@ -69,10 +69,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 5, minWidth: 74, alignItems: 'center',
   },
   midPast: { borderColor: '#f59e0b', backgroundColor: '#fef7e8' },
-  midT: { fontSize: 12.5, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
+  midT: { fontSize: 13, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
   back: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)', justifyContent: 'center', padding: 24 },
   pickerCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
-  pickerTitle: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
+  pickerTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
   todayBtn: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
-  todayBtnT: { fontSize: 12.5, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
+  todayBtnT: { fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
 });

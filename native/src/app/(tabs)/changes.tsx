@@ -292,7 +292,7 @@ export default function ChangesScreen() {
 
   const calendarCard = (
       <View style={s.card}>
-        <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('カレンダー')}</Text></View>
+        <View style={s.h2Row}><CalendarDays size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('カレンダー')}</Text></View>
         <MonthCalendar today={today} marks={marks} selected={daySel} onSelect={openDay} />
         {daySel && (
           <View style={s.dayBox}>
@@ -301,7 +301,7 @@ export default function ChangesScreen() {
             {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>{t('この日の記録はありません。')}</Text>}
             {dayDetail?.map((l) => (
               <View key={l.id} style={s.dayRow}>
-                <Text style={{ fontSize: 13 }}>{logIcon(l)}</Text>
+                <Text style={{ fontSize: 15 }}>{logIcon(l)}</Text>
                 <Text style={s.dayText} numberOfLines={2}>{logTitle(l)}</Text>
                 {l.kcal != null && (
                   <View style={s.kcalBadge}><Text style={s.kcalBadgeT}>{Math.round(Number(l.kcal)).toLocaleString()} kcal</Text></View>
@@ -377,7 +377,7 @@ export default function ChangesScreen() {
         const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
         return (
           <View style={s.card}>
-            <View style={s.h2Row}><FlaskConical size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食材とあなたの体の傾向')}</Text></View>
+            <View style={s.h2Row}><FlaskConical size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食材とあなたの体の傾向')}</Text></View>
             <Text style={s.note}>{t('よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。')}</Text>
             {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>{t('▼ 食べた翌日、下がりやすい')}</Text>}
             {down.map((f) => (
@@ -406,7 +406,7 @@ export default function ChangesScreen() {
 
   const healthCard = healthAvailable() ? (
         <View style={s.card}>
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('歩数・睡眠（直近7日）')}</Text></View>
+          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('歩数・睡眠（直近7日）')}</Text></View>
           {activity === null ? (
             <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
               <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : t('ヘルスケアから読み込む')}</Text>
@@ -558,14 +558,14 @@ export default function ChangesScreen() {
 
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
-  h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink },
+  h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
-  topSegT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  topSegT: { fontSize: 15, fontWeight: '800', color: C.sub },
   // 系列チップと同じ行に置く（チップが折り返しても重ならない）
   chipsHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   chipsFlex: { flex: 1, marginRight: 0 },
@@ -573,16 +573,16 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
   },
-  toTableT: { fontSize: 10.5, fontWeight: '800', color: C.teal },
+  toTableT: { fontSize: 11, fontWeight: '800', color: C.teal },
   addBtn: {
     width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
   },
   editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
-  editBtnT: { fontSize: 12, fontWeight: '800', color: C.sub },
+  editBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   doneBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
-  doneBtnT: { fontSize: 12.5, fontWeight: '800', color: '#fff' },
-  editHint: { fontSize: 11, color: C.sub, marginBottom: 10, textAlign: 'center' },
+  doneBtnT: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
   lifted: {
     shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 },
     elevation: 12, borderRadius: 20, backgroundColor: C.bg,
@@ -591,41 +591,41 @@ const s = StyleSheet.create({
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
   },
-  ghostT: { fontSize: 12.5, color: C.sub, fontWeight: '600' },
+  ghostT: { fontSize: 13, color: C.sub, fontWeight: '600' },
   moveCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,
     paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10,
   },
-  moveLabel: { fontSize: 14, fontWeight: '700', color: C.ink },
+  moveLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   moveBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  moveBtnT: { fontSize: 16, fontWeight: '800', color: C.teal },
+  moveBtnT: { fontSize: 17, fontWeight: '800', color: C.teal },
   actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
-  actBtnT: { fontSize: 12.5, fontWeight: '800', color: C.ink },
+  actBtnT: { fontSize: 13, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
-  actDate: { fontSize: 11.5, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
-  actVal: { fontSize: 12.5, color: C.ink, fontVariant: ['tabular-nums'] },
+  actDate: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
+  actVal: { fontSize: 13, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   kpi: { flex: 1, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12 },
-  kpiL: { fontSize: 10, fontWeight: '700', color: C.sub },
-  kpiV: { fontSize: 20, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
-  kpiU: { fontSize: 11, color: C.sub, fontWeight: '600' },
-  kpiD: { fontSize: 10, color: C.sub, marginTop: 2 },
+  kpiL: { fontSize: 11, fontWeight: '700', color: C.sub },
+  kpiV: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
+  kpiU: { fontSize: 13, color: C.sub, fontWeight: '600' },
+  kpiD: { fontSize: 11, color: C.sub, marginTop: 2 },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
-  dayHead: { fontSize: 12.5, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
+  dayHead: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
   dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
-  dayText: { flex: 1, fontSize: 13, color: C.ink, lineHeight: 19 },
+  dayText: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
   kcalBadge: { backgroundColor: '#eef4f0', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
-  kcalBadgeT: { fontSize: 11.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
-  fxHead: { fontSize: 11.5, fontWeight: '800', marginTop: 8, marginBottom: 2 },
+  kcalBadgeT: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  fxHead: { fontSize: 13, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
-  fxName: { fontSize: 13.5, fontWeight: '700', color: C.ink },
-  fxVal: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  fxName: { fontSize: 15, fontWeight: '700', color: C.ink },
+  fxVal: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
-  chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
-  note: { fontSize: 11, color: C.faint, lineHeight: 18 },
+  chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
+  note: { fontSize: 13, color: C.faint, lineHeight: 18 },
 });

@@ -207,7 +207,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
         <View style={s.card}>
           {showGoal && (
           <>
-          <View style={s.h2Row}><Target size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('目標設定')}</Text></View>
+          <View style={s.h2Row}><Target size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('目標設定')}</Text></View>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
               <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
@@ -224,7 +224,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             <View style={{ flex: 1.3 }}>
               <Text style={s.label}>{t('目標日')}</Text>
               <Pressable style={s.input} onPress={() => setShowDatePicker((v) => !v)}>
-                <Text style={{ fontSize: 15, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : t('タップして選ぶ')}</Text>
+                <Text style={{ fontSize: 17, color: gDate ? C.ink : C.faint }}>{gDate ? gDate.replace(/-/g, '/') : t('タップして選ぶ')}</Text>
               </Pressable>
             </View>
             <View style={{ flex: 1 }}>
@@ -273,7 +273,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           {showGoal && showCheat && <View style={s.divider} />}
           {showCheat && (
           <>
-          <View style={s.h2Row}><Beef size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('チートデイ')}</Text></View>
+          <View style={s.h2Row}><Beef size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('チートデイ')}</Text></View>
           <Text style={s.note}>{t('登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。')}</Text>
           {events.map((e) => (
             <View key={e.id} style={s.evRow}>
@@ -281,7 +281,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
               <Text style={s.evTitle}>{e.title}</Text>
               <Text style={s.evKcal}>+{Number(e.extra_kcal).toLocaleString()}kcal</Text>
               <Pressable onPress={() => removeEvent(e.id)} hitSlop={6}>
-                <Text style={{ color: C.coral, fontWeight: '800', fontSize: 16 }}>×</Text>
+                <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17 }}>×</Text>
               </Pressable>
             </View>
           ))}
@@ -289,7 +289,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             <View style={{ flex: 1.4 }}>
               <Text style={s.label}>{t('日付')}</Text>
               <Pressable style={s.input} onPress={() => setEvPicker((v) => !v)}>
-                <Text style={{ fontSize: 15, color: evDate ? C.ink : C.faint }}>{evDate ? evDate.replace(/-/g, '/') : t('選ぶ')}</Text>
+                <Text style={{ fontSize: 17, color: evDate ? C.ink : C.faint }}>{evDate ? evDate.replace(/-/g, '/') : t('選ぶ')}</Text>
               </Pressable>
             </View>
             <View style={{ flex: 1 }}>
@@ -313,7 +313,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 
       {mode === 'training' && (
         <View style={s.card}>
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動習慣の目標')}</Text></View>
+          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動習慣の目標')}</Text></View>
           <Text style={s.note}>{t('散歩レベルでOK。週にどれだけ動くかを決めると「概要」の運動の記録で達成度が見えます。')}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1 }}>
@@ -335,7 +335,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <OptionButton style={{ marginTop: 12 }} variant="teal" label={t('習慣目標を保存')} onPress={saveHabitGoal} busy={habitBusy} />
 
           <View style={s.divider} />
-          <View style={s.h2Row}><Dumbbell size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの目標（RM換算）')}</Text></View>
+          <View style={s.h2Row}><Dumbbell size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの目標（RM換算）')}</Text></View>
           {tGoals.length === 0 && <Text style={s.note}>{t('まだ目標がありません。種目と目標重量を追加しましょう。')}</Text>}
           {tGoals.map((tg) => {
             const best = bests.get(tg.name) ?? 0;
@@ -347,7 +347,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={s.tgNum}>{best > 0 ? best : '—'} / {Number(tg.target_kg)}kg（{pct}%）</Text>
                     <Pressable onPress={() => removeTrainingGoal(tg.id)}>
-                      <Text style={{ color: C.coral, fontWeight: '800', fontSize: 16, padding: 2 }}>×</Text>
+                      <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17, padding: 2 }}>×</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -393,31 +393,31 @@ const s = StyleSheet.create({
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   seg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   segOn: { backgroundColor: C.ink, borderColor: C.ink },
-  segT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  segT: { fontSize: 15, fontWeight: '800', color: C.sub },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 6 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   divider: { height: 0.5, backgroundColor: C.line, marginVertical: 14 },
   statusRow: { marginBottom: 14 },
   statusBig: { fontSize: 24, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  statusSub: { fontSize: 13, fontWeight: '700', marginTop: 2 },
-  label: { fontSize: 11, fontWeight: '700', color: C.sub, marginTop: 10, marginBottom: 4 },
-  rmPreview: { fontSize: 12, fontWeight: '700', color: C.teal, marginTop: 8 },
-  input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 16, color: C.ink },
-  pfcToggle: { fontSize: 12.5, fontWeight: '800', color: C.sub },
+  statusSub: { fontSize: 15, fontWeight: '700', marginTop: 2 },
+  label: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 10, marginBottom: 4 },
+  rmPreview: { fontSize: 13, fontWeight: '700', color: C.teal, marginTop: 8 },
+  input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 17, color: C.ink },
+  pfcToggle: { fontSize: 13, fontWeight: '800', color: C.sub },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
-  btnPrimaryT: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800' },
   btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
-  btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
-  note: { fontSize: 11.5, color: C.sub, lineHeight: 18, marginBottom: 6 },
+  btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
+  note: { fontSize: 13, color: C.sub, lineHeight: 18, marginBottom: 6 },
   evRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 6, borderTopWidth: 0.5, borderTopColor: C.line },
-  evDate: { fontSize: 12.5, fontWeight: '800', color: C.ink, width: 44, fontVariant: ['tabular-nums'] },
-  evTitle: { flex: 1, fontSize: 13.5, color: C.ink },
-  evKcal: { fontSize: 12.5, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
+  evDate: { fontSize: 13, fontWeight: '800', color: C.ink, width: 44, fontVariant: ['tabular-nums'] },
+  evTitle: { flex: 1, fontSize: 15, color: C.ink },
+  evKcal: { fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
   tgRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tgName: { fontSize: 14, fontWeight: '700', color: C.ink },
-  tgNum: { fontSize: 12.5, color: C.sub, fontVariant: ['tabular-nums'] },
+  tgName: { fontSize: 15, fontWeight: '700', color: C.ink },
+  tgNum: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   bar: { height: 8, backgroundColor: C.track, borderRadius: 4, marginTop: 5, overflow: 'hidden' },
   barFill: { height: 8, backgroundColor: C.teal, borderRadius: 4 },
-  msg: { fontSize: 13, fontWeight: '600', paddingHorizontal: 4 },
+  msg: { fontSize: 15, fontWeight: '600', paddingHorizontal: 4 },
 });

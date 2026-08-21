@@ -166,7 +166,7 @@ export function LiftCalendarCard() {
   const dayItems = daySel ? all.filter((h) => h.date === daySel) : [];
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><CalendarDays size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動カレンダー')}</Text></View>
+      <View style={s.h2Row}><CalendarDays size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動カレンダー')}</Text></View>
       <MonthCalendar today={today} marks={marks} selected={daySel} mode="training"
                      onSelect={(d) => setDaySel(daySel === d ? null : d)} />
       {daySel && (
@@ -204,7 +204,7 @@ export function BalanceCard() {
   const max = Math.max(1, ...weeks.map((w) => w.lift + w.cardio));
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('週別バランス')}<Text style={s.weekNote}>{t('— 運動時間の内訳')}</Text></Text></View>
+      <View style={s.h2Row}><TrendingUp size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('週別バランス')}<Text style={s.weekNote}>{t('— 運動時間の内訳')}</Text></Text></View>
       {weeks.map((w, i) => {
         const total = w.lift + w.cardio;
         return (
@@ -249,7 +249,7 @@ export function PartVolumeCard() {
   return (
     <View style={s.card}>
       <View style={s.h2Row}>
-        <TrendingUp size={14} color={C.teal} />
+        <TrendingUp size={16} color={C.teal} />
         <Text style={[s.h2, { marginBottom: 0, flex: 1 }]}>{t('部位別ボリューム')}<Text style={s.weekNote}>{t('— 週ごとの総挙上量')}</Text></Text>
       </View>
       <View style={s.pvChips}>
@@ -323,7 +323,7 @@ export function LiftChartCard() {
   if (exercises.length === 0) {
     return (
       <View style={s.card}>
-        <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('挙上重量の推移')}</Text></View>
+        <View style={s.h2Row}><TrendingUp size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('挙上重量の推移')}</Text></View>
         <Text style={s.muted}>{t('トレタブで筋トレを記録すると、実施カレンダーと種目ごとの成長グラフがここに描かれます。')}</Text>
       </View>
     );
@@ -331,7 +331,7 @@ export function LiftChartCard() {
 
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><TrendingUp size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの成長')}</Text></View>
+      <View style={s.h2Row}><TrendingUp size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの成長')}</Text></View>
       <View style={s.chips}>
         {([['1rm', t('推定1RM')], ['kg', t('実重量')], ['volume', t('ボリューム')]] as const).map(([m, l]) => (
           <Chip key={m} label={l} tone="ink" selected={chartMode === m} onPress={() => setChartMode(m)} />
@@ -385,45 +385,45 @@ const s = StyleSheet.create({
   pvChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   pvChip: { paddingHorizontal: 11, paddingVertical: 6 },
   pvChipOn: { backgroundColor: C.ink, borderColor: C.ink },
-  pvChipT: { fontSize: 12, fontWeight: '700', color: C.sub },
+  pvChipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   pvChipTOn: { color: '#fff' },
   pvHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 6 },
-  pvNow: { fontSize: 22, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  pvUnit: { fontSize: 12, color: C.sub, fontWeight: '700' },
-  pvDelta: { fontSize: 11.5, color: C.sub, fontWeight: '700' },
+  pvNow: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  pvUnit: { fontSize: 13, color: C.sub, fontWeight: '700' },
+  pvDelta: { fontSize: 13, color: C.sub, fontWeight: '700' },
   pvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 2 },
   pvBarCol: { flex: 1, alignItems: 'center' },
   pvBarTrack: { height: 92, width: '100%', justifyContent: 'flex-end' },
   pvBar: { width: '100%', borderRadius: 5, backgroundColor: C.teal },
-  pvBarL: { fontSize: 9.5, color: C.faint, marginTop: 4, fontVariant: ['tabular-nums'] },
+  pvBarL: { fontSize: 11, color: C.faint, marginTop: 4, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
-  chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
-  verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
-  muted: { fontSize: 11, color: C.faint, marginTop: 4 },
+  chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
+  verdict: { fontSize: 13, fontWeight: '600', lineHeight: 19, marginTop: 4 },
+  muted: { fontSize: 13, color: C.faint, marginTop: 4 },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 10, marginTop: 4 },
   kpi: { flex: 1, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12 },
-  weekNote: { fontSize: 10.5, fontWeight: '400', color: C.faint },
-  streak: { fontSize: 12, fontWeight: '800', color: '#d97706' },
-  earnT: { fontSize: 12.5, fontWeight: '700', color: C.teal, marginTop: 2, lineHeight: 19 },
+  weekNote: { fontSize: 11, fontWeight: '400', color: C.faint },
+  streak: { fontSize: 13, fontWeight: '800', color: '#d97706' },
+  earnT: { fontSize: 13, fontWeight: '700', color: C.teal, marginTop: 2, lineHeight: 19 },
   balRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  balLabel: { width: 38, fontSize: 11, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
+  balLabel: { width: 38, fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
   balTrack: { flex: 1, height: 14, borderRadius: 7, backgroundColor: C.bg, flexDirection: 'row', overflow: 'hidden' },
-  balMin: { width: 48, fontSize: 10.5, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  balMin: { width: 48, fontSize: 11, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
   balLegend: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, flexWrap: 'wrap' },
   legDot: { width: 8, height: 8, borderRadius: 4 },
-  kpiL: { fontSize: 10, fontWeight: '700', color: C.sub },
-  kpiV: { fontSize: 20, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
-  kpiU: { fontSize: 11, color: C.sub, fontWeight: '600' },
+  kpiL: { fontSize: 11, fontWeight: '700', color: C.sub },
+  kpiV: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
+  kpiU: { fontSize: 13, color: C.sub, fontWeight: '600' },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
-  dayHead: { fontSize: 12.5, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
-  dayText: { fontSize: 13, color: C.ink, lineHeight: 20, paddingVertical: 3 },
+  dayHead: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
+  dayText: { fontSize: 15, color: C.ink, lineHeight: 21, paddingVertical: 3 },
   listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  listT: { fontSize: 13.5, color: C.sub, fontWeight: '600' },
+  listT: { fontSize: 15, color: C.sub, fontWeight: '600' },
   viewToggle: { marginLeft: 6, marginTop: 8, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
-  viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
+  viewToggleT: { fontSize: 15, color: C.sub, fontWeight: '700' },
 });

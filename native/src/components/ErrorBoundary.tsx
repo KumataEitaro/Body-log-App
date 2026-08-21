@@ -85,21 +85,21 @@ export default class ErrorBoundary extends Component<Props, State> {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 20, justifyContent: 'center', gap: 12 },
-  title: { fontSize: 18, fontWeight: '800', color: C.ink },
-  body: { fontSize: 13.5, color: C.sub, lineHeight: 21 },
+  title: { fontSize: 21, fontWeight: '800', color: C.ink },
+  body: { fontSize: 15, color: C.sub, lineHeight: 21 },
   box: {
     maxHeight: 220, backgroundColor: C.panel, borderRadius: 12,
     borderWidth: 1, borderColor: C.line,
   },
-  code: { fontSize: 11.5, color: C.coral, fontWeight: '700' },
-  codeDim: { fontSize: 10.5, color: C.faint, marginTop: 6, lineHeight: 15 },
+  code: { fontSize: 13, color: C.coral, fontWeight: '700' },
+  codeDim: { fontSize: 11, color: C.faint, marginTop: 6, lineHeight: 15 },
   btn: { backgroundColor: C.teal, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
-  btnT: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   compact: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 14,
     padding: 14, marginBottom: 12,
   },
-  compactT: { flex: 1, fontSize: 12.5, color: C.sub, fontWeight: '600' },
-  retryT: { fontSize: 12.5, color: C.teal, fontWeight: '800', textDecorationLine: 'underline' },
+  compactT: { flex: 1, fontSize: 13, color: C.sub, fontWeight: '600' },
+  retryT: { fontSize: 13, color: C.teal, fontWeight: '800', textDecorationLine: 'underline' },
 });

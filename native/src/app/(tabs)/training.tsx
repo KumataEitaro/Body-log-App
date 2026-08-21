@@ -503,7 +503,7 @@ export default function TrainingScreen() {
       {seg === 'easy' && vis('quick') && (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
           <MinusBadge editing={editing} onPress={() => cards.hide('quick')} />
-          <View style={s.h2Row}><Footprints size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
+          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
           <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。')}</Text>
           <View style={s.actGrid}>
             {shownActs.map((a) => (
@@ -511,7 +511,7 @@ export default function TrainingScreen() {
                          onPress={() => setActId(a.id)}
                          onLongPress={() => saveVisible(visibleIds.filter((x) => x !== a.id))}
                          delayLongPress={450}>
-                <Text style={{ fontSize: 19 }}>{a.e}</Text>
+                <Text style={{ fontSize: 21 }}>{a.e}</Text>
                 <Text style={[s.actChipT, actId === a.id && { color: C.teal }]} numberOfLines={1}>
                   {activityName(a.id)}
                 </Text>
@@ -519,7 +519,7 @@ export default function TrainingScreen() {
             ))}
             {/* 種目を足す入口。長押しで隠せることもここで伝える */}
             <Pressable style={[s.actChip, s.actChipAdd]} onPress={() => setPickerOpen(true)}>
-              <Text style={{ fontSize: 19 }}>＋</Text>
+              <Text style={{ fontSize: 21 }}>＋</Text>
               <Text style={[s.actChipT, { color: C.teal }]}>{t('種目を選ぶ')}</Text>
             </Pressable>
           </View>
@@ -600,7 +600,7 @@ export default function TrainingScreen() {
       {/* 入力 */}
       <View style={[s.card, (seg !== 'lift' || !vis('liftInput')) && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
-        <View style={s.h2Row}><ClipboardList size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
+        <View style={s.h2Row}><ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {rewriting && (
           <View style={s.editBanner}>
             <Text style={s.editBannerT}>{t('✏️ {date}の記録を書き換え中', { date: dayLabel(rewriting.date) })}</Text>
@@ -636,7 +636,7 @@ export default function TrainingScreen() {
             <TextInput style={[s.tIn, s.tNum]} placeholder="set" placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={r.sets} onChangeText={(v) => setT(i, { sets: v })} />
             <Pressable onPress={() => setTRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs))}>
-              <Text style={{ color: C.coral, fontSize: 18, fontWeight: '800', padding: 4 }}>×</Text>
+              <Text style={{ color: C.coral, fontSize: 21, fontWeight: '800', padding: 4 }}>×</Text>
             </Pressable>
           </View>
           {/* 自重種目は入れたkgが加重なので、実際にかかる負荷をその場で示す */}
@@ -703,7 +703,7 @@ export default function TrainingScreen() {
       {/* 履歴 */}
       <View style={[s.card, (seg !== 'lift' || !vis('liftHistory')) && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
-        <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
+        <View style={s.h2Row}><BookOpen size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
         {days.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
         {/* 部位フィルタ: 「肩の日はいつだったか」を部位ごとに遡れるようにする */}
         {days.length > 0 && (() => {
@@ -794,7 +794,7 @@ export default function TrainingScreen() {
                              onPress={() => saveVisible(on
                                ? visibleIds.filter((x) => x !== id)
                                : [...visibleIds, id])}>
-                    <Text style={{ fontSize: 20 }}>{a.e}</Text>
+                    <Text style={{ fontSize: 21 }}>{a.e}</Text>
                     <Text style={s.actPickT}>{activityName(id)}</Text>
                     {used && <Text style={s.actPickUsed}>{t('記録あり')}</Text>}
                     <Text style={s.actPickMets}>{a.mets} METs</Text>
@@ -855,124 +855,124 @@ export default function TrainingScreen() {
 
 const s = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
-  h: { fontSize: 22, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
-  doneBtn2T: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  pageTitle: { fontSize: 21, fontWeight: '600', color: C.ink, marginBottom: 12 },
+  doneBtn2T: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 12 },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   segBtn: {
     flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
     paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
   },
   segBtnOn: { backgroundColor: C.teal, borderColor: C.teal },
-  segBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  segBtnT: { fontSize: 15, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   actPickUsed: {
-    fontSize: 9.5, fontWeight: '800', color: C.teal,
+    fontSize: 11, fontWeight: '800', color: C.teal,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2,
   },
   tDial: { justifyContent: 'center', alignItems: 'center' },
-  tDialT: { fontSize: 14, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  tDialT: { fontSize: 15, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
   partRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
   tPick: { flex: 1, justifyContent: 'center' },
-  tPickT: { fontSize: 14, color: C.ink, fontWeight: '600' },
+  tPickT: { fontSize: 15, color: C.ink, fontWeight: '600' },
   restRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' },
   restOpt: {
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
     borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
   },
   restOptOn: { borderColor: C.teal, backgroundColor: C.accentBadge, borderWidth: 1.5 },
-  restOptT: { fontSize: 12, fontWeight: '800', color: C.sub },
+  restOptT: { fontSize: 13, fontWeight: '800', color: C.sub },
   restOptTOn: { color: C.teal },
-  actHint: { fontSize: 10.5, color: C.faint, marginTop: 6 },
-  actDone: { fontSize: 14, fontWeight: '800', color: C.teal },
-  actGroupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
+  actHint: { fontSize: 11, color: C.faint, marginTop: 6 },
+  actDone: { fontSize: 15, fontWeight: '800', color: C.teal },
+  actGroupT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
   actPickRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line,
   },
-  actPickT: { flex: 1, fontSize: 14.5, color: C.ink, fontWeight: '600' },
-  actPickMets: { fontSize: 10.5, color: C.faint, fontWeight: '700' },
+  actPickT: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
+  actPickMets: { fontSize: 11, color: C.faint, fontWeight: '700' },
   actCheck: {
     width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.line,
     alignItems: 'center', justifyContent: 'center',
   },
   actCheckOn: { backgroundColor: C.teal, borderColor: C.teal },
-  actCheckT: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  actCheckT: { color: '#fff', fontSize: 13, fontWeight: '900' },
   actChipAdd: { borderStyle: 'dashed', borderColor: C.accentBorder, backgroundColor: C.accentSoft },
   actChip: {
     width: '23%', backgroundColor: C.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
     paddingVertical: 10, alignItems: 'center', gap: 3,
   },
   actChipOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
-  actChipT: { fontSize: 10, fontWeight: '700', color: C.sub, textAlign: 'center' },
+  actChipT: { fontSize: 11, fontWeight: '700', color: C.sub, textAlign: 'center' },
   hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
   hkHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   hkTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   hkClose: { fontSize: 24, color: C.sub, fontWeight: '600', paddingHorizontal: 6 },
-  hkSub: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 17 },
-  hkMsg: { fontSize: 12.5, fontWeight: '600', color: C.sub, marginTop: 16, textAlign: 'center' },
+  hkSub: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
+  hkMsg: { fontSize: 13, fontWeight: '600', color: C.sub, marginTop: 16, textAlign: 'center' },
   hkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  hkCheck: { fontSize: 16, color: C.teal },
-  hkDate: { width: 44, fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },
-  hkName: { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.ink },
-  hkMeta: { fontSize: 11.5, color: C.sub, fontVariant: ['tabular-nums'] },
+  hkCheck: { fontSize: 17, color: C.teal },
+  hkDate: { width: 44, fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
+  hkName: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink },
+  hkMeta: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   freeMin: {
     width: 72, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 8, fontSize: 12.5, color: C.ink, textAlign: 'center',
+    paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: C.ink, textAlign: 'center',
   },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 10 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 10 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
   },
-  restL: { fontSize: 12, fontWeight: '800', color: C.ink },
-  restN: { fontSize: 20, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
-  restHint: { fontSize: 10, color: C.sub },
-  prevRef: { fontSize: 11.5, color: C.sub, marginTop: 4, lineHeight: 17 },
+  restL: { fontSize: 13, fontWeight: '800', color: C.ink },
+  restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
+  restHint: { fontSize: 11, color: C.sub },
+  prevRef: { fontSize: 13, color: C.sub, marginTop: 4, lineHeight: 18 },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
   tRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
-  tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 15, color: C.ink },
+  tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 17, color: C.ink },
   tNum: { width: 56, textAlign: 'center' },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
-  btnPrimaryT: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800' },
   btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
-  btnGhostT: { color: C.ink, fontSize: 13, fontWeight: '800' },
-  msg: { fontSize: 13, fontWeight: '600', marginTop: 8 },
+  btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
+  msg: { fontSize: 15, fontWeight: '600', marginTop: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
-  chipT: { fontSize: 12, fontWeight: '700', color: C.sub },
-  verdict: { fontSize: 12.5, fontWeight: '600', lineHeight: 19, marginTop: 4 },
-  moveNote: { fontSize: 11.5, color: C.sub, marginBottom: 12, paddingHorizontal: 4, lineHeight: 17 },
-  muted: { fontSize: 13, color: C.sub },
+  chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
+  verdict: { fontSize: 13, fontWeight: '600', lineHeight: 19, marginTop: 4 },
+  moveNote: { fontSize: 13, color: C.sub, marginBottom: 12, paddingHorizontal: 4, lineHeight: 18 },
+  muted: { fontSize: 15, color: C.sub },
   dayHead: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 9, borderTopWidth: 0.5, borderTopColor: C.line,
   },
-  dayDate: { fontSize: 12.5, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  daySum: { flex: 1, fontSize: 11.5, color: C.sub, fontWeight: '700' },
-  dayCaret: { fontSize: 13, color: C.sub, fontWeight: '800' },
+  dayDate: { fontSize: 13, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  daySum: { flex: 1, fontSize: 13, color: C.sub, fontWeight: '700' },
+  dayCaret: { fontSize: 15, color: C.sub, fontWeight: '800' },
   liftRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 7, paddingLeft: 10, borderTopWidth: 0.5, borderTopColor: C.line,
   },
-  liftName: { flex: 1, fontSize: 13.5, color: C.ink, fontWeight: '600' },
-  liftSet: { fontSize: 13, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  liftName: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
+  liftSet: { fontSize: 15, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
   liftX: { fontSize: 17, color: C.coral, fontWeight: '800', paddingHorizontal: 2 },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginTop: 6,
   },
-  editBannerT: { fontSize: 11.5, fontWeight: '800', color: C.teal },
-  editBannerCancel: { fontSize: 11.5, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
-  bwNoteMuted: { fontSize: 11, color: C.faint, fontWeight: '600', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
+  editBannerT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
+  bwNoteMuted: { fontSize: 13, color: C.faint, fontWeight: '600', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   favRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
-  bwNote: { fontSize: 11, color: C.teal, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
+  bwNote: { fontSize: 13, color: C.teal, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
-  moreBtnT: { fontSize: 12.5, color: C.teal, fontWeight: '800' },
-  histHint: { fontSize: 11, color: C.faint, marginTop: 8 },
+  moreBtnT: { fontSize: 13, color: C.teal, fontWeight: '800' },
+  histHint: { fontSize: 13, color: C.faint, marginTop: 8 },
 });

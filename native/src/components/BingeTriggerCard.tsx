@@ -66,7 +66,7 @@ export default function BingeTriggerCard() {
   if (loading) {
     return (
       <View style={s.card}>
-        <View style={s.h2Row}><Tornado size={14} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
+        <View style={s.h2Row}><Tornado size={16} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
         <ActivityIndicator color={C.teal} style={{ marginTop: 10 }} />
       </View>
     );
@@ -76,7 +76,7 @@ export default function BingeTriggerCard() {
   if (!report.enough) {
     return (
       <View style={s.card}>
-        <View style={s.h2Row}><Tornado size={14} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
+        <View style={s.h2Row}><Tornado size={16} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
         <Text style={s.muted}>
           {t('3週間ほど記録が貯まると、食べすぎた日の前後に何が起きていたかを分析できます。')}
           {'\n'}{t('いまの記録')}: {t('{n}日', { n: report.totalDays })}
@@ -91,7 +91,7 @@ export default function BingeTriggerCard() {
   return (
     <View style={s.card}>
       <View style={s.h2Row}>
-        <Tornado size={14} color={C.teal} />
+        <Tornado size={16} color={C.teal} />
         <Text style={s.h2}>{t('過食の引き金')}</Text>
         <Text style={s.count}>{t('{n}日', { n: report.bingeDays })} / {t('{n}日', { n: report.totalDays })}</Text>
       </View>
@@ -158,20 +158,20 @@ export default function BingeTriggerCard() {
 const s = StyleSheet.create({
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink },
-  count: { marginLeft: 'auto', fontSize: 11, color: C.sub, fontVariant: ['tabular-nums'] },
-  lead: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 4, marginBottom: 6 },
-  muted: { fontSize: 12, color: C.sub, lineHeight: 19 },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink },
+  count: { marginLeft: 'auto', fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
+  lead: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 4, marginBottom: 6 },
+  muted: { fontSize: 13, color: C.sub, lineHeight: 19 },
   trRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  trLabel: { fontSize: 13.5, fontWeight: '700', color: C.ink },
-  trDetail: { fontSize: 10.5, color: C.faint, marginTop: 2 },
+  trLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
+  trDetail: { fontSize: 11, color: C.faint, marginTop: 2 },
   liftBox: { alignItems: 'flex-end', width: 78 },
   liftN: { fontSize: 17, fontWeight: '800', color: C.coral, fontVariant: ['tabular-nums'] },
-  liftX: { fontSize: 10, fontWeight: '700', color: C.sub },
-  liftSub: { fontSize: 9.5, color: C.faint, fontVariant: ['tabular-nums'] },
-  dow: { fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 19 },
+  liftX: { fontSize: 11, fontWeight: '700', color: C.sub },
+  liftSub: { fontSize: 11, color: C.faint, fontVariant: ['tabular-nums'] },
+  dow: { fontSize: 13, color: C.sub, marginTop: 10, lineHeight: 19 },
   afterBox: { marginTop: 14, borderTopWidth: 0.5, borderTopColor: C.line, paddingTop: 10 },
-  afterT: { fontSize: 12.5, color: C.sub, lineHeight: 21 },
+  afterT: { fontSize: 13, color: C.sub, lineHeight: 21 },
   afterN: { fontWeight: '800', color: C.ink },
-  note: { fontSize: 10.5, color: C.faint, marginTop: 12, lineHeight: 16 },
+  note: { fontSize: 11, color: C.faint, marginTop: 12, lineHeight: 16 },
 });

@@ -70,7 +70,7 @@ export default function ColumnReader() {
   return (
     <View style={s.card}>
       <View style={s.h2Row}>
-        <BookOpen size={14} color={C.teal} />
+        <BookOpen size={16} color={C.teal} />
         <Text style={s.h2}>{t('読みもの')}<Text style={s.h2sub}>— 全{getColumns().length}本</Text></Text>
         {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>{t('未読')} {unreadCount}</Text></View>}
       </View>
@@ -132,31 +132,31 @@ export default function ColumnReader() {
 const s = StyleSheet.create({
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink },
-  h2sub: { fontSize: 11, fontWeight: '400', color: C.sub },
+  h2: { fontSize: 15, fontWeight: '800', color: C.ink },
+  h2sub: { fontSize: 13, fontWeight: '400', color: C.sub },
   countBadge: { marginLeft: 'auto', backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  countBadgeT: { fontSize: 10, fontWeight: '800', color: C.teal },
+  countBadgeT: { fontSize: 11, fontWeight: '800', color: C.teal },
   rec: {
     backgroundColor: C.accentSoft, borderWidth: 1.5, borderColor: C.accentBorder, borderRadius: 16,
     padding: 12, marginBottom: 10,
   },
-  recLabel: { fontSize: 10, fontWeight: '800', color: C.teal, letterSpacing: 0.6 },
+  recLabel: { fontSize: 11, fontWeight: '800', color: C.teal, letterSpacing: 0.6 },
   recEmoji: { fontSize: 26 },
-  recTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
-  recLead: { fontSize: 11.5, color: C.sub, marginTop: 2, lineHeight: 17 },
-  recCta: { fontSize: 11.5, fontWeight: '800', color: C.teal, marginTop: 8, textAlign: 'right' },
+  recTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  recLead: { fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 18 },
+  recCta: { fontSize: 13, fontWeight: '800', color: C.teal, marginTop: 8, textAlign: 'right' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  emoji: { fontSize: 20 },
-  title: { fontSize: 13.5, fontWeight: '700', color: C.ink, flexShrink: 1 },
+  emoji: { fontSize: 21 },
+  title: { fontSize: 15, fontWeight: '700', color: C.ink, flexShrink: 1 },
   newDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.teal },
-  lead: { fontSize: 11, color: C.sub, marginTop: 2 },
+  lead: { fontSize: 13, color: C.sub, marginTop: 2 },
   readerWrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   readerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   readerEmoji: { fontSize: 30 },
-  readerTitle: { fontSize: 22, fontWeight: '800', color: C.ink, lineHeight: 32, marginBottom: 6 },
-  readerMeta: { fontSize: 11.5, color: C.faint, marginBottom: 18 },
-  p: { fontSize: 15, lineHeight: 26, color: C.ink },
+  readerTitle: { fontSize: 21, fontWeight: '800', color: C.ink, lineHeight: 32, marginBottom: 6 },
+  readerMeta: { fontSize: 13, color: C.faint, marginBottom: 18 },
+  p: { fontSize: 17, lineHeight: 26, color: C.ink },
   srcBox: { marginTop: 26, borderTopWidth: 0.5, borderTopColor: C.line, paddingTop: 14 },
-  srcHead: { fontSize: 11, fontWeight: '800', color: C.sub, marginBottom: 6 },
-  srcLink: { fontSize: 11.5, color: C.teal, lineHeight: 20, textDecorationLine: 'underline' },
+  srcHead: { fontSize: 13, fontWeight: '800', color: C.sub, marginBottom: 6 },
+  srcLink: { fontSize: 13, color: C.teal, lineHeight: 20, textDecorationLine: 'underline' },
 });

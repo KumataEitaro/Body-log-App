@@ -14,6 +14,6 @@ export default function Placeholder({ title, note }: { title: string; note?: str
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  title: { fontSize: 18, fontWeight: '800', color: C.ink, marginBottom: 10 },
-  note: { fontSize: 13, color: C.sub, textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 10 },
+  note: { fontSize: 15, color: C.sub, textAlign: 'center', lineHeight: 22 },
 });

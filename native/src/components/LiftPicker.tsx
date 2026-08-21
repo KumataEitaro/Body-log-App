@@ -124,7 +124,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.chipBg,
     borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 8,
   },
-  search: { flex: 1, fontSize: 15, color: C.ink, padding: 0 },
+  search: { flex: 1, fontSize: 17, color: C.ink, padding: 0 },
   addRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: C.accentSoft, borderWidth: 1.5, borderColor: C.accentBorder,
@@ -134,16 +134,16 @@ const s = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
   },
-  addT: { flex: 1, fontSize: 14, fontWeight: '700', color: C.teal },
-  groupT: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 3 },
+  addT: { flex: 1, fontSize: 15, fontWeight: '700', color: C.teal },
+  groupT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 3 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: C.line,
   },
-  rowT: { flex: 1, fontSize: 14.5, color: C.ink, fontWeight: '600' },
+  rowT: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   bwTag: {
-    fontSize: 10, fontWeight: '800', color: C.teal, backgroundColor: C.accentBadge,
+    fontSize: 11, fontWeight: '800', color: C.teal, backgroundColor: C.accentBadge,
     borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
   },
-  arrow: { fontSize: 19, color: C.faint },
+  arrow: { fontSize: 21, color: C.faint },
 });

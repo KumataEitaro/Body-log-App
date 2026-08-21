@@ -156,13 +156,13 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: 18 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
-  note: { fontSize: 12, color: C.sub, marginTop: 6, marginBottom: 10, lineHeight: 18 },
-  label: { fontSize: 11.5, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 5 },
+  note: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 10, lineHeight: 18 },
+  label: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 5 },
   input: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, color: C.ink,
+    paddingHorizontal: 12, paddingVertical: 11, fontSize: 17, color: C.ink,
   },
   row: { flexDirection: 'row', gap: 8 },
   col: { flex: 1 },
-  msg: { fontSize: 12.5, fontWeight: '700', marginTop: 12 },
+  msg: { fontSize: 13, fontWeight: '700', marginTop: 12 },
 });

@@ -317,5 +317,5 @@ const s = StyleSheet.create({
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
   },
-  ghostT: { fontSize: 12.5, color: C.sub, fontWeight: '600' },
+  ghostT: { fontSize: 13, color: C.sub, fontWeight: '600' },
 });

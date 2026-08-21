@@ -198,7 +198,7 @@ export function TableEntryCard({ onOpenBody, onOpenLift }: { onOpenBody: () => v
   return (
     <View style={s.card}>
       <View style={s.h2Row}>
-        <Table2 size={14} color={C.teal} />
+        <Table2 size={16} color={C.teal} />
         <Text style={s.h2}>{t('数字で見る')}</Text>
       </View>
       <Pressable style={s.entryRow} onPress={onOpenBody}>
@@ -222,19 +222,19 @@ const s = StyleSheet.create({
     flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.line,
     backgroundColor: C.chipBg, borderRadius: 8, paddingHorizontal: 8,
   },
-  th: { flex: 1, fontSize: 10.5, fontWeight: '800', color: C.sub },
+  th: { flex: 1, fontSize: 11, fontWeight: '800', color: C.sub },
   tr: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  td: { flex: 1, fontSize: 13.5, color: C.ink, fontVariant: ['tabular-nums'] },
+  td: { flex: 1, fontSize: 15, color: C.ink, fontVariant: ['tabular-nums'] },
   num: { textAlign: 'right' },
   strong: { fontWeight: '800' },
-  empty: { fontSize: 13, color: C.sub, marginTop: 24, textAlign: 'center', lineHeight: 20 },
+  empty: { fontSize: 15, color: C.sub, marginTop: 24, textAlign: 'center', lineHeight: 21 },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  h2: { fontSize: 13, fontWeight: '800', color: C.ink },
+  h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   entryRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: C.line,
   },
-  entryT: { fontSize: 14, color: C.ink, fontWeight: '600' },
-  entryArrow: { fontSize: 20, color: C.faint },
+  entryT: { fontSize: 15, color: C.ink, fontWeight: '600' },
+  entryArrow: { fontSize: 21, color: C.faint },
 });

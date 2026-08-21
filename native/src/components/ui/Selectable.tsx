@@ -109,7 +109,7 @@ const s = StyleSheet.create({
     shadowColor: '#141815', shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   segBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999 },
-  segT: { fontSize: 13, fontWeight: '600', color: C.sub },
+  segT: { fontSize: 15, fontWeight: '600', color: C.sub },
   segTOn: { color: C.ink, fontWeight: '700' },
   // Chip
   chip: {
@@ -117,7 +117,7 @@ const s = StyleSheet.create({
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 9,
   },
-  chipT: { fontSize: 12.5, fontWeight: '600', color: C.sub },
+  chipT: { fontSize: 13, fontWeight: '600', color: C.sub },
   chipOnTeal: {
     backgroundColor: C.teal, borderColor: C.teal,
     shadowColor: C.teal, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
@@ -141,5 +141,5 @@ const s = StyleSheet.create({
     shadowColor: C.teal, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   optTonal: { backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
-  optT: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  optT: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
 });
