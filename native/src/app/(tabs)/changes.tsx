@@ -1,6 +1,6 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -29,6 +29,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard } from '@/components/LiftingProgress';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
@@ -223,16 +224,26 @@ export default function ChangesScreen() {
   const conf = series().find((x) => x.key === serie)!;
 
   // カレンダーのマーク（記録あり=緑 / 目標超過=赤 / 未記録=?）— Web版と同じ判定
-  const marks = new Map<string, DayMark>(rows.map((r) => [
-    r.date,
-    { logged: r.intake != null, over: r.diff != null && judge(r.diff) === 'NG', unknown: r.intake == null },
-  ]));
-  if (rows.length > 0) {
-    const yest = addDays(today, -1);
-    for (let d = rows[0].date; d <= yest; d = addDays(d, 1)) {
-      if (!marks.has(d)) marks.set(d, { logged: false, over: false, unknown: true });
+  //
+  // 未記録日の穴埋めは、以前は「最古の記録日から昨日まで」を描画のたびに1日ずつ回していた。
+  // 取込データで数年ぶんあると1描画で数千回まわり、グラフをピンチしている間は
+  // フレームごとに再計算されて操作が固まる。useMemoに入れ、表示に必要な範囲だけ埋める。
+  const marks = useMemo(() => {
+    const m = new Map<string, DayMark>(rows.map((r) => [
+      r.date,
+      { logged: r.intake != null, over: r.diff != null && judge(r.diff) === 'NG', unknown: r.intake == null },
+    ]));
+    if (rows.length > 0) {
+      const yest = addDays(today, -1);
+      // カレンダーは1か月ずつ見るものなので、穴埋めは直近14か月ぶんで足りる
+      const from = addDays(today, -430);
+      const start = rows[0].date > from ? rows[0].date : from;
+      for (let d = start; d <= yest; d = addDays(d, 1)) {
+        if (!m.has(d)) m.set(d, { logged: false, over: false, unknown: true });
+      }
     }
-  }
+    return m;
+  }, [rows, today]);
 
   // KPI
   const weights = rows.filter((r) => r.weight != null);
@@ -413,7 +424,17 @@ export default function ChangesScreen() {
         </View>
   ) : null;
 
+  // カード1枚の例外で概要タブ全体が落ちないよう、1枚ずつ境界で包む。
+  // どのカードで起きたかを名前で出せるので、原因の切り分けにもなる
   function card(key: string): ReactNode {
+    return (
+      <ErrorBoundary compact name={CARD_LABELS()[key] ?? key}>
+        {cardBody(key)}
+      </ErrorBoundary>
+    );
+  }
+
+  function cardBody(key: string): ReactNode {
     switch (key) {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;

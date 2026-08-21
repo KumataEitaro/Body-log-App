@@ -850,4 +850,10 @@ export const EN: Record<string, string> = {
   "目標の更新に失敗しました（{msg}）。「概要」タブから手動で設定してください。": "Could not update the goal ({msg}). Please set it manually from the Overview tab.",
   "目標の更新中に問題が起きました（{msg}）。もう一度お試しください。": "Something went wrong while updating the goal ({msg}). Please try again.",
   "目標がまだ登録されていないため更新できませんでした。「概要」タブの目標から先に登録してください。": "There is no goal to update yet. Please create one from Goals in the Overview tab first.",
+  "アプリ": "the app",
+  "この部分": "this section",
+  "再読み込み": "Reload",
+  "{name}の表示でエラーが起きました。": "Something went wrong showing {name}.",
+  "画面の表示に失敗しました": "This screen couldn't be shown",
+  "記録は保存されています。下のボタンでやり直せます。何度も出る場合はこの内容をお知らせください。": "Your records are safe. Tap below to try again. If this keeps happening, please send us this message.",
 };

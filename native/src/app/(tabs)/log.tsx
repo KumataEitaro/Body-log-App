@@ -254,7 +254,9 @@ export default function LogScreen() {
   async function takePhoto() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) { setMsg({ ok: false, text: t('カメラの許可が必要です（設定アプリ→BodyLog）。') }); return; }
-    const res = await ImagePicker.launchCameraAsync({ quality: 1 });
+    // quality:1 は端末の最大解像度そのまま（48MP級）。デコードだけで数百MB使うため落としておく。
+    // このあと1280pxへ縮小するので、取り込み段階の解像度は画質に影響しない
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (res.canceled || !res.assets?.length) return;
     const p = await compressToPayload(res.assets[0].uri);
     if (p) setPhotos((prev) => [...prev, p].slice(0, 4));
@@ -264,10 +266,17 @@ export default function LogScreen() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setMsg({ ok: false, text: t('写真ライブラリの許可が必要です（設定アプリ→BodyLog）。') }); return; }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 - photos.length, quality: 1,
+      mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 - photos.length, quality: 0.8,
     });
     if (res.canceled || !res.assets?.length) return;
-    const list = (await Promise.all(res.assets.map((a) => compressToPayload(a.uri)))).filter(Boolean) as { uri: string; base64: string }[];
+    // Promise.allだと4枚を同時にデコードしてしまい、高画素の写真ではメモリ不足で
+    // アプリが強制終了する（JSの例外ではないので境界でも受けられない）。1枚ずつ処理する
+    const list: { uri: string; base64: string }[] = [];
+    for (const a of res.assets) {
+      const p = await compressToPayload(a.uri);
+      if (p) list.push(p);
+      if (list.length >= 4 - photos.length) break;
+    }
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 

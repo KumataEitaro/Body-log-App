@@ -735,4 +735,10 @@ export const ES: Record<string, string> = {
   "目標の更新に失敗しました（{msg}）。「概要」タブから手動で設定してください。": "No se pudo actualizar el objetivo ({msg}). Configuralo manualmente en la pestana Resumen.",
   "目標の更新中に問題が起きました（{msg}）。もう一度お試しください。": "Hubo un problema al actualizar el objetivo ({msg}). Intentalo de nuevo.",
   "目標がまだ登録されていないため更新できませんでした。「概要」タブの目標から先に登録してください。": "Todavia no hay un objetivo que actualizar. Crealo primero en Objetivos, en la pestana Resumen.",
+  "アプリ": "la app",
+  "この部分": "esta seccion",
+  "再読み込み": "Recargar",
+  "{name}の表示でエラーが起きました。": "Algo fallo al mostrar {name}.",
+  "画面の表示に失敗しました": "No se pudo mostrar esta pantalla",
+  "記録は保存されています。下のボタンでやり直せます。何度も出る場合はこの内容をお知らせください。": "Tus registros estan a salvo. Toca abajo para reintentar. Si vuelve a pasar, envianos este mensaje.",
 };

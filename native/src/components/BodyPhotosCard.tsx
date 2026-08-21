@@ -57,8 +57,9 @@ export default function BodyPhotosCard() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setMsg(fromCamera ? 'カメラの許可が必要です。' : t('写真の許可が必要です。')); return; }
     const res = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 1 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      // quality:1 は最大解像度のまま。このあと1080pxへ縮小するので落として構わない
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     if (res.canceled || !res.assets?.length) return;
     try {
       const out = await manipulateAsync(res.assets[0].uri, [{ resize: { width: 1080 } }], { compress: 0.8, format: SaveFormat.JPEG, base64: true });

@@ -1,4 +1,5 @@
 // マイ食品の「よく使う量」まわりのロジック
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { qtyNumber, rescaleByQty } from '@/lib/items';
 
 export type MyFoodRow = {
@@ -76,7 +77,6 @@ export function matchFoodsLocally(text: string, foods: MyFoodRow[]): LocalItem[]
 // タップで+1点、スコアは14日で半減。毎日使う定番は高スコアを維持し、
 // たまたま1回タップした食品（1点）は定番を追い越せず、数週間で自然に沈む。
 const FREQ_KEY = 'bl-food-freq-v2';
-const FREQ_KEY_V1 = 'bl-food-freq';
 const HALF_LIFE_DAYS = 14;
 
 export type FreqEntry = { s: number; t: number }; // s=スコア, t=最終更新(epoch ms)
@@ -86,17 +86,33 @@ function decayedScore(e: FreqEntry, now: number): number {
   return (Number(e.s) || 0) * Math.pow(0.5, days / HALF_LIFE_DAYS);
 }
 
-export function readFoodFreq(): Record<string, FreqEntry> {
+// 保存先は AsyncStorage。
+//
+// 以前は localStorage を読み書きしていたが、React Native には localStorage が無く、
+// アクセスすると例外になる。try/catch で囲まれていたため落ちはしないものの、
+// 端末では常に「記録0件」として振る舞い、よく使う順の並びが一切効いていなかった。
+//
+// 呼び出し側は描画中に同期で読むので、起動時に読み込んだ内容をメモリに持ち、
+// 読みはメモリから、書きは非同期で追いかける形にしている。
+let freqCache: Record<string, FreqEntry> = {};
+
+/**
+ * 起動時に一度呼ぶ。保存内容をそのままキャッシュに反映する。
+ * 保存が無い・壊れている場合は空にする（読み込みなのに古い内容が残るほうが紛らわしい）。
+ * 実績が消えても並び順が既定に戻るだけで、記録そのものには影響しない。
+ */
+export async function loadFoodFreq(): Promise<void> {
+  let next: Record<string, FreqEntry> = {};
   try {
-    const v2 = localStorage.getItem(FREQ_KEY);
-    if (v2) return JSON.parse(v2);
-    // 旧形式（累積カウント）からの移行。過去の積み上げを引きずり過ぎないよう5点でキャップ
-    const v1: Record<string, number> = JSON.parse(localStorage.getItem(FREQ_KEY_V1) || '{}');
-    const now = Date.now();
-    const out: Record<string, FreqEntry> = {};
-    for (const [id, c] of Object.entries(v1)) out[id] = { s: Math.min(Number(c) || 0, 5), t: now };
-    return out;
-  } catch { return {}; }
+    const raw = await AsyncStorage.getItem(FREQ_KEY);
+    const v = raw ? (JSON.parse(raw) as unknown) : null;
+    if (v && typeof v === 'object' && !Array.isArray(v)) next = v as Record<string, FreqEntry>;
+  } catch { /* 空にする */ }
+  freqCache = next;
+}
+
+export function readFoodFreq(): Record<string, FreqEntry> {
+  return freqCache;
 }
 
 // 現在時点の実効スコア（減衰適用後）に変換する
@@ -108,13 +124,12 @@ export function foodScores(freq: Record<string, FreqEntry>, now = Date.now()): R
 
 // チップ使用時に呼ぶ（減衰させてから+1点）
 export function bumpFoodFreq(id: string): void {
-  try {
-    const f = readFoodFreq();
-    const now = Date.now();
-    const s = (f[id] ? decayedScore(f[id], now) : 0) + 1;
-    f[id] = { s: Math.round(s * 1000) / 1000, t: now };
-    localStorage.setItem(FREQ_KEY, JSON.stringify(f));
-  } catch { /* 無視 */ }
+  const now = Date.now();
+  const prev = freqCache[id];
+  const score = (prev ? decayedScore(prev, now) : 0) + 1;
+  // 先にメモリを更新する。保存が失敗しても、その場の並び順には反映される
+  freqCache = { ...freqCache, [id]: { s: Math.round(score * 1000) / 1000, t: now } };
+  AsyncStorage.setItem(FREQ_KEY, JSON.stringify(freqCache)).catch(() => {});
 }
 
 // 頻度の多い順に並び替え（同数は元の順序を維持＝安定ソート）

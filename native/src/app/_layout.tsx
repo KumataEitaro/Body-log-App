@@ -4,17 +4,20 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { LaunchProvider } from '@/components/LaunchIntro';
-import { loadLocale, useLocale } from '@/lib/i18n';
+import { loadLocale, useLocale, t } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
 import { C } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
+import { loadFoodFreq } from '@/lib/foods';
 import { reregisterAll } from '@/lib/notify';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
   useEffect(() => { loadAvatar(); }, []);   // 保存済みのアイコンを反映
+  useEffect(() => { loadFoodFreq(); }, []); // よく使う順の並びに使う実績
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const locale = useLocale();
@@ -42,9 +45,12 @@ export default function RootLayout() {
   }, [ready, authed, segments, router]);
 
   return (
-    <LaunchProvider ready={ready}>
-      <StatusBar style="dark" />
-      <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
-    </LaunchProvider>
+    // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿
+    <ErrorBoundary name={t('アプリ')}>
+      <LaunchProvider ready={ready}>
+        <StatusBar style="dark" />
+        <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+      </LaunchProvider>
+    </ErrorBoundary>
   );
 }
