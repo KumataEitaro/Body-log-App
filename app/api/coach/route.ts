@@ -155,6 +155,8 @@ export async function POST(req: Request) {
     '  PFC変更: {"kind":"pfc","protein_per_kg":2.2,"fat_per_kg":0.8,"label":"たんぱく質係数を2.2g/kgへ"}（変更しない側のキーは省略）\n' +
     '  体重目標: {"kind":"weight","target_weight":80,"target_date":"2026-10-31","label":"目標を80kg/10月末へ"}\n' +
     '  筋トレ目標: {"kind":"training","name":"ベンチプレス","target_kg":100,"label":"ベンチプレス目標を100kgへ"}\n' +
+    '  ※1日のカロリー目標は目標体重と期限から自動計算されるので、カロリーを変えたい場合も weight を使う（他の kind は作らない）\n' +
+    '  ※提案値は現実的な範囲に収める（たんぱく質0.5〜4.0g/kg・脂質0.2〜2.0g/kg・目標体重25〜300kg・挙上重量1〜500kg・目標日は未来の実在する日付）\n' +
     '\n必ず {"answer":"回答本文","action":{...}} のJSONのみを返す（actionは任意。answer内の改行は\\n、強調は**text**）。';
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
@@ -165,7 +167,7 @@ export async function POST(req: Request) {
     const j = parseJsonLoose(r.text) as { answer?: string; action?: Record<string, unknown> };
     answer = String(j.answer || '').trim();
     // actionは想定kindのみ通す（プロンプトインジェクション等での任意データ書込を防ぐ）
-    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training', 'kcal'].includes(String(j.action.kind))) {
+    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training'].includes(String(j.action.kind))) {
       action = j.action;
     }
   } catch { /* JSON崩れ時は生テキストを使う */ }

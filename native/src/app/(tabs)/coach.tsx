@@ -22,13 +22,8 @@ import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
 import { featuredQuestions } from '@/content/askExamples';
-
-// AIが提案した目標変更（承認制で直接適用する）
-type CoachAction =
-  | { kind: 'pfc'; protein_per_kg?: number; fat_per_kg?: number; label: string }
-  | { kind: 'weight'; target_weight?: number; target_date?: string; label: string }
-  | { kind: 'training'; name: string; target_kg: number; label: string }
-  | { kind: 'kcal'; target_date: string; label: string };
+import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '@/lib/coachAction';
+import { todayJST } from '@/lib/calc';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
 
@@ -135,7 +130,9 @@ export default function CoachScreen() {
         setMsgs((m) => [...m, { role: 'ai', text: json?.error || t('うまく答えられませんでした。もう一度お試しください。') }]);
         return;
       }
-      setMsgs((m) => [...m, { role: 'ai', text: json.answer!, action: json.action ?? undefined }]);
+      // 検証を通らない提案はカードを出さない（押しても何も起きないボタンを見せないため）
+      const action = json.action && isApplicable(json.action, todayJST()) ? json.action : undefined;
+      setMsgs((m) => [...m, { role: 'ai', text: json.answer!, action }]);
       logHist('ai', json.answer!);
     } catch {
       setMsgs((m) => [...m, { role: 'ai', text: t('通信に失敗しました。電波状況を確認してください。') }]);
@@ -144,42 +141,67 @@ export default function CoachScreen() {
     }
   }
 
-  // AI提案の目標を承認制で適用（確認ダイアログ→goals/training_goals更新）
-  function applyAction(a: CoachAction, idx: number) {
+  // 目標の適用中フラグ。確認ダイアログを二重に開いて二重に書き込むのを防ぐ
+  const [applying, setApplying] = useState(false);
+
+  /** 結果を必ず画面に出す。無言で終わる経路を作らないための共通口 */
+  function note(text: string) {
+    setMsgs((m) => [...m, { role: 'ai', text }]);
+  }
+
+  /**
+   * AI提案の目標を承認制で適用する（確認ダイアログ→goals/training_goals更新）。
+   *
+   * ここは「押したのに何も起きない」が起きやすい場所なので、次を守っている：
+   *  ・書き込む前に lib/coachAction で検証し、弾いた理由を必ず表示する
+   *  ・更新後は影響行数を確認する。goalsは1ユーザー1行で、行が無いときの
+   *    update はエラーなしの0件更新になるため、成功と区別できない
+   *  ・成功・失敗・弾いた、のどの経路でも必ずメッセージか適用済み表示が出る
+   */
+  function applyAction(a: CoachAction) {
+    if (applying) return;
+    const v = validateAction(a, todayJST());
+    if (!v.ok) {
+      note(v.reason + t('（「概要」タブの目標から手動で設定できます）'));
+      return;
+    }
     Alert.alert(t('目標を更新しますか？'), a.label, [
       { text: t('キャンセル'), style: 'cancel' },
-      {
-        text: t('適用する'),
-        onPress: async () => {
-          const { data: { session } } = await supabase.auth.getSession();
-          const uid = session?.user?.id;
-          if (!uid) return;
-          let error: { message: string } | null = null;
-          if (a.kind === 'pfc') {
-            const patch: Record<string, number> = {};
-            if (a.protein_per_kg != null) patch.protein_per_kg = Number(a.protein_per_kg);
-            if (a.fat_per_kg != null) patch.fat_per_kg = Number(a.fat_per_kg);
-            ({ error } = await supabase.from('goals').update(patch).eq('user_id', uid));
-          } else if (a.kind === 'weight') {
-            const patch: Record<string, number | string> = {};
-            if (a.target_weight != null) patch.target_weight = Number(a.target_weight);
-            if (a.target_date) patch.target_date = a.target_date;
-            ({ error } = await supabase.from('goals').update(patch).eq('user_id', uid));
-          } else if (a.kind === 'kcal') {
-            if (!/^d{4}-d{2}-d{2}$/.test(a.target_date)) return;
-            ({ error } = await supabase.from('goals').update({ target_date: a.target_date }).eq('user_id', uid));
-          } else if (a.kind === 'training') {
-            ({ error } = await supabase.from('training_goals')
-              .upsert({ user_id: uid, name: a.name, target_kg: Number(a.target_kg) }, { onConflict: 'user_id,name' }));
-          }
-          if (error) {
-            setMsgs((m) => [...m, { role: 'ai', text: t('目標の更新に失敗しました。「概要」タブから手動で設定してください。') }]);
-            return;
-          }
-          setMsgs((m) => m.map((x, i) => (i === idx ? { ...x, applied: true } : x)));
-        },
-      },
+      { text: t('適用する'), onPress: () => runApply(v.plan, a) },
     ]);
+  }
+
+  async function runApply(plan: ApplyPlan, a: CoachAction) {
+    setApplying(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) { note(t('ログインの有効期限が切れています。もう一度ログインしてからお試しください。')); return; }
+
+      // 影響した行を返させて、本当に書き換わったかを確かめる
+      const res = plan.table === 'goals'
+        ? await supabase.from('goals').update(plan.patch).eq('user_id', uid).select('user_id')
+        : await supabase.from('training_goals')
+            .upsert({ user_id: uid, name: plan.name, target_kg: plan.targetKg }, { onConflict: 'user_id,name' })
+            .select('id');
+
+      if (res.error) {
+        note(t('目標の更新に失敗しました（{msg}）。「概要」タブから手動で設定してください。', { msg: res.error.message }));
+        return;
+      }
+      if (!res.data || res.data.length === 0) {
+        // goalsの行がまだ無い場合。開始体重や開始日が必要なのでここでは作らず、設定へ案内する
+        note(t('目標がまだ登録されていないため更新できませんでした。「概要」タブの目標から先に登録してください。'));
+        return;
+      }
+      setMsgs((m) => m.map((x) => (x.action === a ? { ...x, applied: true } : x)));
+    } catch (e) {
+      note(t('目標の更新中に問題が起きました（{msg}）。もう一度お試しください。', {
+        msg: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setApplying(false);
+    }
   }
 
   const empty = msgs.length === 0 && !busy;
@@ -235,8 +257,9 @@ export default function CoachScreen() {
                       <Text style={s.actionDone}>{t('✓ 適用しました（「概要」タブに反映）')}</Text>
                     ) : (
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                        <Pressable style={s.actionBtn} onPress={() => applyAction(m.action!, i)}>
-                          <Text style={s.actionBtnT}>{t('この目標を適用する')}</Text>
+                        <Pressable style={[s.actionBtn, applying && { opacity: 0.5 }]} disabled={applying}
+                                   onPress={() => applyAction(m.action!)}>
+                          <Text style={s.actionBtnT}>{applying ? t('適用中…') : t('この目標を適用する')}</Text>
                         </Pressable>
                         <Pressable style={s.actionAlt}
                                    onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW', ts: String(Date.now()) } })}>
