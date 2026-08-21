@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
@@ -54,7 +54,7 @@ type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
 const LOG_CARDS = ['hero', 'mood', 'feed', 'recent', 'weight'];
 const LOG_LABELS = (): Record<string, string> => ({
-  hero: t('あと食べられる量'), mood: t('💭 いまの気分は？'), feed: t('今日の記録'),
+  hero: t('あと食べられる量'), mood: t('いまの気分は？'), feed: t('今日の記録'),
   recent: t('前の食事をもう一度'), weight: t('体重を記録'),
 });
 
@@ -795,7 +795,10 @@ export default function LogScreen() {
         {vis('mood') && showMood && (
           <View style={s.card}>
             <MinusBadge editing={editing} onPress={() => cards.hide('mood')} />
-            <Text style={s.h2}>{t('💭 いまの気分は？')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Smile size={16} color={C.teal} />
+              <Text style={[s.h2, { marginBottom: 0 }]}>{t('いまの気分は？')}</Text>
+            </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
                 <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}

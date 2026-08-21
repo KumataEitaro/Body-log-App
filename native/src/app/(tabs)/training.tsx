@@ -545,7 +545,7 @@ export default function TrainingScreen() {
             label={actId == null ? t('運動を選んで記録') : t('記録する（約{n}kcal消費）', { n: actKcal() })}
             onPress={saveActivity} busy={actSaving} disabled={actId == null}
           />
-          <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('⌚ ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
+          <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
           {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </View>
       )}
@@ -554,7 +554,7 @@ export default function TrainingScreen() {
       <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
         <View style={s.hkWrap}>
           <View style={s.hkHead}>
-            <Text style={s.hkTitle}>{t('⌚ ヘルスケアから取り込む')}</Text>
+            <Text style={s.hkTitle}>{t('ヘルスケアから取り込む')}</Text>
             <Pressable onPress={() => setHkOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
           </View>
           <Text style={s.hkSub}>{t('直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。')}</Text>
@@ -697,7 +697,7 @@ export default function TrainingScreen() {
 
       {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
       {seg === 'lift' && history.length > 0 && (
-        <Text style={s.moveNote}>{t('📈 挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます')}</Text>
+        <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます')}</Text>
       )}
 
       {/* 履歴 */}

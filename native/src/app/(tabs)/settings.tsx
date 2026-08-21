@@ -473,7 +473,7 @@ export default function SettingsScreen() {
     {/* ===== 読みもの（コラム）モーダル ===== */}
     <Modal visible={sheet === 'columns'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={t('📖 読みもの')} />
+        <SheetHeader title={t('読みもの')} />
         <ScrollView><ColumnReader /></ScrollView>
       </View>
     </Modal>
@@ -508,7 +508,7 @@ export default function SettingsScreen() {
           <>
             <Text style={s.note}>{t('Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。')}</Text>
             <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={healthImportWeights} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('⚖️ 体重を取り込む（過去90日）')}</Text>}
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('体重を取り込む（過去90日）')}</Text>}
             </Pressable>
           </>
         )}
