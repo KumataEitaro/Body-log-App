@@ -11,6 +11,8 @@ import { TrendingUp, CalendarDays } from 'lucide-react-native';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
+import { weeklyPartVolumes } from '@/lib/training';
+import { LIFT_PARTS, liftPartLabel } from '@/lib/lifts';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { CARDIO_GREEN, type DayMark } from '@/components/MonthCalendar';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
@@ -226,6 +228,68 @@ export function BalanceCard() {
   );
 }
 
+// ===== 部位別ボリューム（週ごとの総挙上量を部位で遡る） =====
+export function PartVolumeCard() {
+  const { history, weightAt } = useLifting();
+  const [selPart, setSelPart] = useState<string | null>(null);
+  const data = weeklyPartVolumes(history, weightAt, 8, todayJST());
+  // ボリュームが付いたことのある部位だけチップに出す（空の部位で埋めない）
+  const present = new Set<string>();
+  for (const w of data) for (const k of Object.keys(w.byPart)) if (w.byPart[k] > 0) present.add(k);
+  const parts = [...LIFT_PARTS.map((x) => x.key), 'other'].filter((k) => present.has(k));
+  if (parts.length === 0) return null;
+
+  const valOf = (w: (typeof data)[number]) => (selPart ? (w.byPart[selPart] ?? 0) : w.total);
+  const vals = data.map(valOf);
+  const max = Math.max(1, ...vals);
+  const cur = vals[vals.length - 1];
+  const prev = vals[vals.length - 2] ?? 0;
+  const delta = prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
+
+  return (
+    <View style={s.card}>
+      <View style={s.h2Row}>
+        <TrendingUp size={14} color={C.teal} />
+        <Text style={[s.h2, { marginBottom: 0, flex: 1 }]}>{t('部位別ボリューム')}<Text style={s.weekNote}>{t('— 週ごとの総挙上量')}</Text></Text>
+      </View>
+      <View style={s.pvChips}>
+        <Pressable style={[s.chip, s.pvChip, selPart == null && s.pvChipOn]} onPress={() => setSelPart(null)}>
+          <Text style={[s.pvChipT, selPart == null && s.pvChipTOn]}>{t('合計')}</Text>
+        </Pressable>
+        {parts.map((k) => (
+          <Pressable key={k} style={[s.chip, s.pvChip, selPart === k && s.pvChipOn]}
+                     onPress={() => setSelPart((cur2) => (cur2 === k ? null : k))}>
+            <Text style={[s.pvChipT, selPart === k && s.pvChipTOn]}>{t(liftPartLabel(k))}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {/* 今週の到達点と先週比。棒より先に「増えたか減ったか」を言葉で返す */}
+      <View style={s.pvHead}>
+        <Text style={s.pvNow}>{cur.toLocaleString()}<Text style={s.pvUnit}> kg</Text></Text>
+        <Text style={s.pvDelta}>
+          {delta == null ? t('今週') : delta >= 0 ? t('今週（先週比 +{p}%）', { p: delta }) : t('今週（先週比 {p}%）', { p: delta })}
+        </Text>
+      </View>
+      <View style={s.pvBars}>
+        {data.map((w, i) => {
+          const v = vals[i];
+          const hPct = Math.max(v > 0 ? 6 : 2, Math.round((v / max) * 100));
+          const isLast = i === data.length - 1;
+          return (
+            <View key={w.week} style={s.pvBarCol}>
+              <View style={[s.pvBarTrack]}>
+                <View style={[s.pvBar, { height: `${hPct}%` }, !isLast && { opacity: 0.45 }, v === 0 && { backgroundColor: C.line, opacity: 1 }]} />
+              </View>
+              <Text style={s.pvBarL}>{Number(w.week.slice(5, 7))}/{Number(w.week.slice(8, 10))}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <Text style={[s.muted, { marginTop: 8 }]}>{t('自重種目（懸垂など）はその週の体重で実負荷に換算しています。')}</Text>
+    </View>
+  );
+}
+
 // ===== ③ 挙上重量グラフ =====
 export function LiftChartCard() {
   const { weightAt, history, goalKg, series, exercises } = useLifting();
@@ -318,6 +382,20 @@ export function LiftChartCard() {
 }
 
 const s = StyleSheet.create({
+  pvChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  pvChip: { paddingHorizontal: 11, paddingVertical: 6 },
+  pvChipOn: { backgroundColor: C.ink, borderColor: C.ink },
+  pvChipT: { fontSize: 12, fontWeight: '700', color: C.sub },
+  pvChipTOn: { color: '#fff' },
+  pvHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 6 },
+  pvNow: { fontSize: 22, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  pvUnit: { fontSize: 12, color: C.sub, fontWeight: '700' },
+  pvDelta: { fontSize: 11.5, color: C.sub, fontWeight: '700' },
+  pvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 2 },
+  pvBarCol: { flex: 1, alignItems: 'center' },
+  pvBarTrack: { height: 92, width: '100%', justifyContent: 'flex-end' },
+  pvBar: { width: '100%', borderRadius: 5, backgroundColor: C.teal },
+  pvBarL: { fontSize: 9.5, color: C.faint, marginTop: 4, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 20, padding: 14, marginBottom: 12 },
   h2: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 8 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },

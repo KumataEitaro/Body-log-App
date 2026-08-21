@@ -63,3 +63,45 @@ describe('trainingSeries', () => {
     expect(s.get('スクワット')!.map((p) => p.date)).toEqual(['2026-08-18', '2026-08-20']);
   });
 });
+
+describe('weeklyPartVolumes', () => {
+  const rows = [
+    { date: '2026-08-17', text: '🏋️ ショルダープレス 60kg×8×2' },   // 月曜（今週）
+    { date: '2026-08-19', text: '🏋️ ベンチプレス 80kg×8×3' },       // 水曜（今週）
+    { date: '2026-08-11', text: '🏋️ ショルダープレス 50kg×8×2' },   // 先週
+  ];
+
+  it('週×部位で集計され、最新週が末尾に来る', () => {
+    const w = require('../training').weeklyPartVolumes(rows, undefined, 2, '2026-08-21');
+    expect(w).toHaveLength(2);
+    expect(w[0].week).toBe('2026-08-10');
+    expect(w[1].week).toBe('2026-08-17');
+    expect(w[1].byPart.shoulder).toBe(60 * 8 * 2);
+    expect(w[1].byPart.chest).toBe(80 * 8 * 3);
+    expect(w[1].total).toBe(60 * 8 * 2 + 80 * 8 * 3);
+    expect(w[0].byPart.shoulder).toBe(50 * 8 * 2);
+  });
+
+  it('記録がない週は0で埋める（休んだ週が見える）', () => {
+    const w = require('../training').weeklyPartVolumes(rows, undefined, 4, '2026-08-21');
+    expect(w[0].total).toBe(0);
+    expect(w[1].total).toBe(0);
+  });
+
+  it('自重種目はその週の体重で実負荷に換算する', () => {
+    const at = (d) => (d < '2026-08-17' ? 70 : 62);
+    const w = require('../training').weeklyPartVolumes(
+      [
+        { date: '2026-08-18', text: '🏋️ 懸垂 自重×8×3' },
+        { date: '2026-08-11', text: '🏋️ 懸垂 自重×8×3' },
+      ], at, 2, '2026-08-21');
+    expect(w[1].byPart.back).toBe(62 * 8 * 3);
+    expect(w[0].byPart.back).toBe(70 * 8 * 3);
+  });
+
+  it('ユーザー追加の種目は「その他」に入る', () => {
+    const w = require('../training').weeklyPartVolumes(
+      [{ date: '2026-08-18', text: '🏋️ ジャンプスクワット 20kg×10×3' }], undefined, 1, '2026-08-21');
+    expect(w[0].byPart.other).toBe(20 * 10 * 3);
+  });
+});

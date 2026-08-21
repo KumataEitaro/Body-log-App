@@ -16,9 +16,10 @@ import QuickLogFab from '@/components/QuickLogFab';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import LiftPicker from '@/components/LiftPicker';
-import { loadCustomLifts, bwRatioOf, isBodyweightLift } from '@/lib/lifts';
+import WeightDial from '@/components/WeightDial';
+import { loadCustomLifts, bwRatioOf, isBodyweightLift, liftPartOf, liftPartLabel, LIFT_PARTS } from '@/lib/lifts';
 import {
-  groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, effectiveKg, weightLookup,
+  groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, effectiveKg, weightLookup, volumeOf,
   type LiftEntry,
 } from '@/lib/liftLog';
 import {
@@ -44,8 +45,11 @@ type HistRow = { id: string; date: string; text: string };
 
 // 種目の定義は lib/activities.ts（54種・METsはCompendium 2011準拠）
 const MINUTES = [10, 20, 30, 45, 60, 90] as const;
-// レストの選択肢（秒）。45秒=追い込み / 90秒=標準 / 180秒=高重量
-const REST_OPTIONS = [30, 45, 60, 90, 120, 180];
+// レストの選択肢（秒）。30秒=追い込み / 90秒=標準 / 3〜5分=高重量 / 10分=神経系
+const REST_OPTIONS = [30, 60, 90, 120, 180, 300, 600];
+
+// レスト秒数の表示（60の倍数は「分」、90秒などはそのまま「秒」）
+const fmtRest = (n: number) => (n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n }));
 
 // 表示/非表示できるカード（かんたん記録側と筋トレ側）
 const EX_CARDS = ['quick', 'liftInput', 'liftHistory'];
@@ -65,6 +69,10 @@ export default function TrainingScreen() {
   const [restSec, setRestSec] = useState(90);
   // 種目ピッカーを開いている行（nullなら閉じている）
   const [liftPickRow, setLiftPickRow] = useState<number | null>(null);
+  // 重量ダイアルを開いている行（nullなら閉じている）
+  const [dialRow, setDialRow] = useState<number | null>(null);
+  // 履歴の部位フィルタ（nullなら全部）
+  const [partFilter, setPartFilter] = useState<string | null>(null);
   // 履歴でひらいている日（食事と同じで、直近の日は最初からひらいておく）
   const [openDay, setOpenDay] = useState<string | null>(null);
   // 履歴に出す日数。ひと目で見渡せる量から始めて、必要なら遡れるようにする
@@ -85,15 +93,15 @@ export default function TrainingScreen() {
     return () => clearInterval(t);
   }, [restLeft]);
 
-  // 前回参照: 同じ種目の直近記録をテキストから抽出（例: ベンチプレス 80kg×8×3）
-  // 前回参照: 同じ種目の直近記録を探す。kgは実負荷（自重種目は体重込み）で比べる
-  function lastRecordOf(name: string): { text: string; kg: number; date: string } | null {
+  // 前回参照: 同じ種目の直近記録を探す。
+  // kgは実負荷（自重種目は体重込み）、rawKgは入力そのまま（ダイアルの初期位置に使う）
+  function lastRecordOf(name: string): { text: string; kg: number; rawKg: number; date: string } | null {
     const nm = name.trim();
     if (!nm) return null;
     for (const h1 of history) {
       for (const e of parseLiftText(h1.text)) {
         if (e.name !== nm) continue;
-        return { text: liftSetLabel(e, t('自重')), kg: effectiveKg(e, weightAt(h1.date)), date: h1.date };
+        return { text: liftSetLabel(e, t('自重')), kg: effectiveKg(e, weightAt(h1.date)), rawKg: e.kg, date: h1.date };
       }
     }
     return null;
@@ -269,6 +277,22 @@ export default function TrainingScreen() {
   const shownDay = openDay ?? days[0]?.date ?? null;
   const shownDays = days.slice(0, dayLimit);
 
+  // 部位フィルタ。削除は元の並びのindexで行うため、entriesは絞らず描画時に飛ばす
+  const matchPart = (e: LiftEntry) => partFilter == null || liftPartOf(e.name) === partFilter;
+  // 日の見出しの数字は、フィルタ中はその部位ぶんだけで数え直す
+  function dayStats(d: (typeof days)[number]) {
+    if (partFilter == null) return { lifts: d.lifts, sets: d.sets, volume: d.volume, any: true };
+    const w = weightAt(d.date);
+    const names = new Set<string>();
+    let sets = 0; let volume = 0; let any = false;
+    for (const rec of d.records) for (const e of rec.entries) {
+      if (!matchPart(e)) continue;
+      any = true; names.add(e.name); sets += e.sets; volume += volumeOf(e, w);
+    }
+    return { lifts: names.size, sets, volume: Math.round(volume), any };
+  }
+  const visDays = partFilter == null ? shownDays : shownDays.filter((d) => dayStats(d).any);
+
   // 記録から1種目だけ取り除く（他の種目は残す）
   function deleteOneLift(rec: { id: string; entries: LiftEntry[] }, index: number, date: string) {
     const e = rec.entries[index];
@@ -342,6 +366,12 @@ export default function TrainingScreen() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([k]) => k.slice('lift:'.length));
+
+  /** 行を足して、そのまま種目ピッカーを開く（追加→選択が1操作で済むように） */
+  function addLiftRow() {
+    setLiftPickRow(tRows.length);
+    setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }]);
+  }
 
   /** チップで選んだ種目を、名前が空の行（なければ末尾に足した行）に入れる */
   function pickLift(name: string) {
@@ -420,7 +450,10 @@ export default function TrainingScreen() {
       // よく使う種目を前に出すため、保存した種目を数えておく（かんたん記録と同じ仕組み）
       for (const r of tRows.filter(rowReady)) bumpFoodFreq('lift:' + r.name.trim());
       setActFreq(foodScores(readFoodFreq()));
-      setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
+      // 同じ種目を重量やセットを変えながら重ねて記録する使い方が主流なので、
+      // 保存後も種目とkgは残して回数だけ空ける（書き換えのときはまっさらに戻す）
+      const lastRow = wasEdit ? null : tRows.filter(rowReady).slice(-1)[0] ?? null;
+      setTRows([lastRow ? { name: lastRow.name, kg: lastRow.kg, reps: '', sets: '' } : { name: '', kg: '', reps: '', sets: '' }]);
       await load();
       if (!wasEdit) setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
       setMsg({ ok: true, text: wasEdit ? t('書き換えました。') : fb });
@@ -560,7 +593,7 @@ export default function TrainingScreen() {
               ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
               : t('終了💪')}
           </Text>
-          <Text style={s.restHint}>{restLeft > 0 ? t('タップで{n}秒に戻す', { n: restSec }) : t('次のセットへ！')}</Text>
+          <Text style={s.restHint}>{restLeft > 0 ? t('タップで{d}に戻す', { d: fmtRest(restSec) }) : t('次のセットへ！')}</Text>
         </Pressable>
       )}
 
@@ -593,8 +626,11 @@ export default function TrainingScreen() {
                 {r.name || t('種目を選ぶ')}
               </Text>
             </Pressable>
-            <TextInput style={[s.tIn, s.tNum]} placeholder={bw ? t('加重') : 'kg'} placeholderTextColor={C.faint}
-                       keyboardType="decimal-pad" value={r.kg} onChangeText={(v) => setT(i, { kg: v })} />
+            <Pressable style={[s.tIn, s.tNum, s.tDial]} onPress={() => setDialRow(i)}>
+              <Text style={[s.tDialT, !r.kg && { color: C.faint, fontWeight: '600' }]} numberOfLines={1}>
+                {r.kg || (bw ? t('加重') : 'kg')}
+              </Text>
+            </Pressable>
             <TextInput style={[s.tIn, s.tNum]} placeholder={t('回')} placeholderTextColor={C.faint} keyboardType="number-pad"
                        value={r.reps} onChangeText={(v) => setT(i, { reps: v })} />
             <TextInput style={[s.tIn, s.tNum]} placeholder="set" placeholderTextColor={C.faint} keyboardType="number-pad"
@@ -644,17 +680,15 @@ export default function TrainingScreen() {
           );
         })()}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          <OptionButton style={{ flex: 1 }} variant="tonal" label={t('＋ 種目を追加')}
-                        onPress={() => setTRows((rs) => [...rs, { name: '', kg: '', reps: '', sets: '' }])} />
+          <OptionButton style={{ flex: 1 }} variant="tonal" label={rewriting ? t('やめる') : t('＋ 種目を追加')}
+                        onPress={() => (rewriting ? cancelRewrite() : addLiftRow())} />
           <OptionButton style={{ flex: 1 }} label={rewriting ? t('✓ 書き換える') : t('保存する')} onPress={save} busy={saving} />
         </View>
         <Text style={s.muted}>{t('レストの長さ')}</Text>
         <View style={s.restRow}>
           {REST_OPTIONS.map((n) => (
             <Pressable key={n} style={[s.restOpt, restSec === n && s.restOptOn]} onPress={() => pickRest(n)}>
-              <Text style={[s.restOptT, restSec === n && s.restOptTOn]}>
-                {n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n })}
-              </Text>
+              <Text style={[s.restOptT, restSec === n && s.restOptTOn]}>{fmtRest(n)}</Text>
             </Pressable>
           ))}
         </View>
@@ -671,27 +705,46 @@ export default function TrainingScreen() {
         <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
         <View style={s.h2Row}><BookOpen size={14} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
         {days.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
-        {shownDays.map((d) => {
+        {/* 部位フィルタ: 「肩の日はいつだったか」を部位ごとに遡れるようにする */}
+        {days.length > 0 && (() => {
+          const present = new Set<string>();
+          for (const d of days) for (const rec of d.records) for (const e of rec.entries) present.add(liftPartOf(e.name));
+          const keys = [...LIFT_PARTS.map((x) => x.key), 'other'].filter((k) => present.has(k));
+          if (keys.length < 2) return null;
+          return (
+            <View style={s.partRow}>
+              <Chip label={t('全部')} selected={partFilter == null} onPress={() => setPartFilter(null)} />
+              {keys.map((k) => (
+                <Chip key={k} label={t(liftPartLabel(k))} selected={partFilter === k}
+                      onPress={() => setPartFilter((cur) => (cur === k ? null : k))} />
+              ))}
+            </View>
+          );
+        })()}
+        {visDays.map((d) => {
           const open = shownDay === d.date;
+          const st = dayStats(d);
           return (
             <View key={d.date}>
               {/* 日の見出し: たたんだままでもその日の手応えが数字で分かる */}
               <Pressable style={s.dayHead} onPress={() => setOpenDay(open ? '' : d.date)} hitSlop={4}>
                 <Text style={s.dayDate}>{dayLabel(d.date)}</Text>
                 <Text style={s.daySum} numberOfLines={1}>
-                  {t('{n}種目', { n: d.lifts })}・{t('{n}セット', { n: d.sets })}
-                  {d.volume > 0 ? `・${d.volume.toLocaleString()}kg` : ''}
+                  {t('{n}種目', { n: st.lifts })}・{t('{n}セット', { n: st.sets })}
+                  {st.volume > 0 ? `・${st.volume.toLocaleString()}kg` : ''}
                 </Text>
                 <Text style={s.dayCaret}>{open ? '▴' : '▾'}</Text>
               </Pressable>
-              {open && d.records.map((rec) => (
+              {open && d.records
+                .filter((rec) => partFilter == null || rec.entries.some(matchPart))
+                .map((rec) => (
                 <View key={rec.id}>
-                  {rec.entries.length === 0 && (
+                  {rec.entries.length === 0 && partFilter == null && (
                     <Pressable style={s.liftRow} onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
                       <Text style={s.liftName}>{rec.text.replace(/^🏋️ /, '')}</Text>
                     </Pressable>
                   )}
-                  {rec.entries.map((e, ix) => (
+                  {rec.entries.map((e, ix) => (matchPart(e) ? (
                     <Pressable key={`${rec.id}-${ix}`} style={s.liftRow}
                                onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
                       <Text style={s.liftName} numberOfLines={1}>{e.name}</Text>
@@ -700,7 +753,7 @@ export default function TrainingScreen() {
                         <Text style={s.liftX}>×</Text>
                       </Pressable>
                     </Pressable>
-                  ))}
+                  ) : null))}
                 </View>
               ))}
             </View>
@@ -760,6 +813,33 @@ export default function TrainingScreen() {
       </View>
     </Modal>
 
+    {dialRow != null && tRows[dialRow] && (() => {
+      const r = tRows[dialRow];
+      const prev = lastRecordOf(r.name);
+      const bw = isBodyweightLift(r.name);
+      // 初期位置: 入力済み > 前回の入力kg > 40kg。前回から±で合わせるのが最短になる
+      const init = Number(r.kg) > 0 ? Number(r.kg) : (prev ? prev.rawKg : 40);
+      return (
+        <WeightDial
+          title={r.name.trim() || t('重量を選ぶ')}
+          subtitle={prev ? t('前回: {name} {rec}（{date}）', {
+            name: r.name.trim(), rec: prev.text, date: prev.date.slice(5).replace('-', '/'),
+          }) : undefined}
+          unitLabel={bw ? t('加重') : 'kg'}
+          initial={init}
+          allowZero={bw}
+          hint={bw && hasWeight ? (v) => t('実負荷 約{n}kg', {
+            n: effectiveKg({ name: r.name.trim(), kg: v, reps: 1, sets: 1, mode: 'abs' }, myWeight),
+          }) : undefined}
+          onClose={() => setDialRow(null)}
+          onPick={(v) => {
+            setT(dialRow, { kg: v === 0 ? '' : (v % 1 === 0 ? String(v) : v.toFixed(1)) });
+            setDialRow(null);
+          }}
+        />
+      );
+    })()}
+
     <LiftPicker
       visible={liftPickRow != null}
       onClose={() => setLiftPickRow(null)}
@@ -792,6 +872,9 @@ const s = StyleSheet.create({
     fontSize: 9.5, fontWeight: '800', color: C.teal,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2,
   },
+  tDial: { justifyContent: 'center', alignItems: 'center' },
+  tDialT: { fontSize: 14, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  partRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
   tPick: { flex: 1, justifyContent: 'center' },
   tPickT: { fontSize: 14, color: C.ink, fontWeight: '600' },
   restRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' },

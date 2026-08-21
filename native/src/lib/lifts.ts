@@ -132,6 +132,20 @@ export function isBodyweightLift(canonName: string): boolean {
   return bwRatioOf(canonName) > 0;
 }
 
+/**
+ * 種目名から部位キーを引く。基本47種以外（ユーザー追加）は 'other'。
+ * 部位別の履歴フィルタと週間ボリューム統計が使う。
+ */
+export function liftPartOf(canonName: string): string {
+  const nm = canonName.trim();
+  return LIFTS.find((l) => l.canon === nm)?.part ?? 'other';
+}
+
+/** 部位キーの表示名（t()に通す前の日本語）。'other' はユーザー追加種目の受け皿 */
+export function liftPartLabel(key: string): string {
+  return LIFT_PARTS.find((p) => p.key === key)?.label ?? 'その他';
+}
+
 // ===== ユーザーが追加した種目（端末内に保存） =====
 const CUSTOM_KEY = 'bl-custom-lifts';
 
