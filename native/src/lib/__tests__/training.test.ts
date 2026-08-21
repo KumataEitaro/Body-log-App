@@ -89,7 +89,7 @@ describe('weeklyPartVolumes', () => {
   });
 
   it('自重種目はその週の体重で実負荷に換算する', () => {
-    const at = (d) => (d < '2026-08-17' ? 70 : 62);
+    const at = (d: string) => (d < '2026-08-17' ? 70 : 62);
     const w = require('../training').weeklyPartVolumes(
       [
         { date: '2026-08-18', text: '🏋️ 懸垂 自重×8×3' },
