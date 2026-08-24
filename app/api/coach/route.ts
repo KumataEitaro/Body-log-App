@@ -5,6 +5,7 @@ import { AI_DAILY_LIMIT, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel
 import { isPremiumActive } from '@/lib/premium';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
+import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
 import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
@@ -176,30 +177,7 @@ export async function POST(req: Request) {
     ? '\n【これまでの会話】\n' + history.map((h) => `${h.role === 'user' ? '本人' : 'コーチ'}: ${String(h.text).slice(0, 200)}`).join('\n')
     : '';
 
-  const prompt =
-    'あなたはBodyLog（減量トラッカー）のパーソナルコーチです。管理栄養士と行動科学コーチの知見で、本人の記録データだけを根拠に質問へ答えます。\n' +
-    dataBlock + historyBlock +
-    '\n【本人からの相談】\n' + question +
-    '\n\n【回答ルール】\n' +
-    `- ${answerLang ? `回答は必ず${answerLang}で書く。` : '日本語。'}スマホで流し読みできる構造で書く: 1行目に結論（**太字**で1文）→ 根拠を「・」の箇条書き2〜3個（データの数値を具体的に引用。例:「・直近7日の平均摂取が前3週間より230kcal少ない」）→ 空行 → 最後に「👉 AIからのアドバイス:」で具体的な提案を1つだけ\n` +
-    '- 提案の語尾を指示形にしない。「〜しましょう」「〜してください」「〜すべきです」は使わず、「〜という手があります」「〜が向いていそうです」「〜だと無理がないかもしれません」のように選択肢として差し出す\n' +
-    '- 相手は自分で決められる大人。判断を代わりに下さず、材料と選択肢を渡す姿勢で書く\n' +
-    '- 段落は2文以内。長い1段落のベタ書きは禁止\n' +
-    '- 「栄養素: データなし」の項目を根拠にしない。データに無いことは「記録からは分かりませんが」と断ってから一般論を短く\n' +
-    '- メモに酒・睡眠不足などの手がかりがあれば言及する\n' +
-    '- 責めない・寄り添うトーン\n' +
-    '- 医療的な診断・疾患名の断定はしない。深刻な不調が続く場合は受診を勧める\n' +
-    '- 「次に何を食べる？」「あと何が食べられる？」「夕食の提案」など献立系の相談には、【今日のいま】の残りカロリーと残りPFCに収まる具体的な献立を出す: 食材と分量(g)の箇条書き→合計のkcal/P/F/Cを1行で明記→残りにどう収まるかを1行。マイ食品や今日食べたものに寄せると再現しやすい。時刻が朝なら1日の残り配分、夜なら最後の1食として考える\n' +
-    '- 献立を提案したときは action に献立を付ける（本人がワンタップで食事トレイに載せられる）:\n' +
-    '  {"kind":"meal","label":"鶏むね肉と豆腐のボリュームサラダ","items":[{"name":"皮なし鶏むね肉","qty":"200g","kcal":216,"p":45,"f":3,"c":0},{"name":"木綿豆腐","qty":"100g","kcal":73,"p":7,"f":5,"c":1}]}\n' +
-    '  ※itemsは2〜8品・qtyは分量の文字列・数値は概算でよい。外食など分量が決められない相談では付けない\n' +
-    '- 回答の中で「具体的な新しい目標値」を提案した場合のみ、JSONに action を1つ追加する（提案が無ければ含めない）:\n' +
-    '  PFC変更: {"kind":"pfc","protein_per_kg":2.2,"fat_per_kg":0.8,"label":"たんぱく質係数を2.2g/kgへ"}（変更しない側のキーは省略）\n' +
-    '  体重目標: {"kind":"weight","target_weight":80,"target_date":"2026-10-31","label":"目標を80kg/10月末へ"}\n' +
-    '  筋トレ目標: {"kind":"training","name":"ベンチプレス","target_kg":100,"label":"ベンチプレス目標を100kgへ"}\n' +
-    '  ※1日のカロリー目標は目標体重と期限から自動計算されるので、カロリーを変えたい場合も weight を使う（他の kind は作らない）\n' +
-    '  ※提案値は現実的な範囲に収める（たんぱく質0.5〜4.0g/kg・脂質0.2〜2.0g/kg・目標体重25〜300kg・挙上重量1〜500kg・目標日は未来の実在する日付）\n' +
-    '\n必ず {"answer":"回答本文","action":{...}} のJSONのみを返す（actionは任意。answer内の改行は\\n、強調は**text**）。';
+  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang });
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
@@ -209,7 +187,7 @@ export async function POST(req: Request) {
     const j = parseJsonLoose(r.text) as { answer?: string; action?: Record<string, unknown> };
     answer = String(j.answer || '').trim();
     // actionは想定kindのみ通す（プロンプトインジェクション等での任意データ書込を防ぐ）
-    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training', 'meal'].includes(String(j.action.kind))) {
+    if (j.action && typeof j.action === 'object' && (COACH_ACTION_KINDS as readonly string[]).includes(String(j.action.kind))) {
       action = j.action;
     }
   } catch { /* JSON崩れ時は生テキストを使う */ }
