@@ -40,6 +40,10 @@ const SCENARIOS = [
     q: '残り180kcalしかない。何か食べられる？', expectMeal: true },
   { id: 'S5超過', hour: 21, goal: 1580, eaten: 1630, leftP: -5,  leftF: -3, leftC: -8,  ate: '（3食＋間食）',
     q: 'もう50kcalオーバーしてる。夜どうすればいい？', expectMeal: false },
+  { id: 'S6曖昧', hour: 21, goal: 1580, eaten: 1200, leftP: 30,  leftF: 10, leftC: 20,  ate: '（3食記録済み）',
+    q: '最近つらい', expectMeal: false, expectFollowUp: true },
+  { id: 'S7曖昧', hour: 12, goal: 1580, eaten: 420,  leftP: 118, leftF: 32, leftC: 130, ate: 'オートミール40g、卵2個',
+    q: 'なんかやる気が出ない', expectMeal: false, expectFollowUp: true },
 ];
 
 let pass = 0, fail = 0;
@@ -56,9 +60,11 @@ for (const sc of SCENARIOS) {
 
   const checks = [];
   checks.push(['APIがokを返した', !!j.ok]);
-  checks.push(['結論が太字で始まる', /^\*\*/.test(ans.trim())]);
-  checks.push(['箇条書きがある', /・/.test(ans)]);
-  checks.push(['👉がある', ans.includes('👉')]);
+  if (!sc.expectFollowUp) {
+    checks.push(['結論が太字で始まる', /^\*\*/.test(ans.trim())]);
+    checks.push(['箇条書きがある', /・/.test(ans)]);
+    checks.push(['👉がある', ans.includes('👉')]);
+  }
   checks.push(['指示形を使っていない', !/しましょう|してください|すべきです/.test(ans)]);
   if (sc.expectMeal) {
     const hasMeal = act && act.kind === 'meal' && Array.isArray(act.items) && act.items.length >= 1;
@@ -70,9 +76,14 @@ for (const sc of SCENARIOS) {
       checks.push([`P合計${totP}gが過剰でない`, totP <= Math.max(sc.leftP, 0) * 1.2 + 8]);
       checks.push(['品目が2〜8個', act.items.length >= 2 && act.items.length <= 8]);
     }
+  } else if (sc.expectFollowUp) {
+    checks.push(['mealアクションを付けていない（曖昧な相談）', !(act && act.kind === 'meal')]);
+    checks.push(['聞き返しがある（？で本人に確かめる）', /[？?]s*$|[？?]」?s*$/.test(ans.trim()) || (ans.match(/[？?]/g) || []).length >= 1]);
+    checks.push(['短い（4文・200字以内目安）', ans.length <= 260]);
+    checks.push(['長文分析の構造を使っていない', !ans.includes('👉')]);
   } else {
     checks.push(['mealアクションを付けていない（超過時）', !(act && act.kind === 'meal')]);
-    checks.push(['「今日はここまで」の趣旨がある', /ここまで|十分|よくやって|大丈夫/.test(ans)]);
+    checks.push(['「今日はここまで」の趣旨がある', /ここまで|十分|よくやって|大丈夫|これ以上食べず|締めくく|誤差/.test(ans)]);
   }
 
   const ng = checks.filter(([, ok]) => !ok);

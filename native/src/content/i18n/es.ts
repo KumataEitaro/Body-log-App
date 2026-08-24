@@ -568,7 +568,6 @@ export const ES: Record<string, string> = {
   "休みすぎていない？": "¿Descanso demasiado?",
   "気分と続けやすさ": "Ánimo y constancia",
   "無理が出ていないかの確認": "Comprobar si se está volviendo demasiado duro",
-  "最近つらくなっていない？": "¿Se me está haciendo cuesta arriba últimamente?",
   "記録が続かない原因は？": "¿Por qué me cuesta seguir registrando?",
   "目標がきつすぎない？": "¿Mi objetivo es demasiado exigente?",
   "睡眠は足りている？": "¿Duermo lo suficiente?",
@@ -767,4 +766,5 @@ export const ES: Record<string, string> = {
   "献立に名前のない品目が含まれていました。": "El menu contenia un item sin nombre.",
   "献立のカロリーが現実的な範囲を超えています。": "Las calorias del menu superan un rango realista.",
   "献立の栄養素が現実的な範囲を超えています。": "Los macros del menu superan un rango realista.",
+  "最近ちょっとつらい。データに原因は出てる？": "Ultimamente me siento algo mal. Mis datos muestran por que?",
 };
