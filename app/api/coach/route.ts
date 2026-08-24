@@ -6,6 +6,7 @@ import { isPremiumActive } from '@/lib/premium';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
+import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 
 // AIコーチ相談: 本人の実データ（摂取推移・栄養素・気分・メモ・体重）を根拠に質問へ答える。
 // 「気分がすぐれない」→ 直近のカロリー不足・栄養素・昨日のメモ（酒等）から仮説を提示する。
@@ -65,11 +66,13 @@ export async function POST(req: Request) {
   // ===== 本人データを収集して要約（直近28日） =====
   const from28 = addDays(today, -28);
   const from7 = addDays(today, -7);
-  const [entriesRes, logsRes, goalRes, profRes] = await Promise.all([
+  const [entriesRes, logsRes, goalRes, profRes, evRes, foodsRes] = await Promise.all([
     supabase.from('entries').select('date,intake,p,f,c,weight,mood,ex,adj,food_text').gte('date', from28).lte('date', today).order('date', { ascending: true }),
     supabase.from('logs').select('date,items,text,mood').gte('date', from7).order('at', { ascending: true }),
-    supabase.from('goals').select('target_weight,target_date').maybeSingle(),
+    supabase.from('goals').select('*').maybeSingle(),
     supabase.from('profiles').select('sex,height_cm,age,life_factor,init_weight').eq('id', user.id).maybeSingle(),
+    supabase.from('events').select('id,date,title,extra_kcal').gte('date', today).order('date', { ascending: true }),
+    supabase.from('foods').select('name,unit,kcal,p,f,c').limit(24),
   ]);
   const entries = entriesRes.data || [];
   const logRows = logsRes.data || [];
@@ -117,11 +120,46 @@ export async function POST(req: Request) {
     return `${label}: 約${perDay}${unit}/日 (目安${ref}${unit}・記録${t.days.size}日分)`;
   }).join(' / ');
 
+  // ===== 今日のいま（残りkcal・残りPFC・食べたもの） =====
+  // アプリのヒーローと同じ式で計算する（維持カロリー＋運動 − 計画の必要赤字）。
+  // 「次に何を食べるか」の相談は、この残量が根拠のすべてになる。
+  const goalRow = (goalRes.data ?? null) as (Goal & { protein_per_kg?: number | null; fat_per_kg?: number | null; fat_max_g?: number | null; absorb_days?: number | null }) | null;
+  const todayEntry = entries.find((e) => String(e.date) === today) ?? null;
+  const exAdd = (EX_ADD[(todayEntry?.ex as ExLevel) || 'オフ'] ?? 0) + (Number(todayEntry?.adj) || 0);
+  const targetToday = base + exAdd;
+  const planEvents = (evRes.data ?? []) as PlanEvent[];
+  const plan = goalRow ? computePlan(goalRow, today, latestW, planEvents, goalRow.absorb_days) : null;
+  const planBase = plan ? Math.max(targetToday - plan.requiredDailyWithEvents, Math.round(bmr)) : null;
+  const todayEvent = planEvents.find((e) => String(e.date) === today) ?? null;
+  const goalKcalToday = planBase != null
+    ? planBase + (todayEvent ? Math.round(Number(todayEvent.extra_kcal)) : 0)
+    : targetToday;
+  const m = macroTargets(latestW, goalKcalToday, goalRow?.protein_per_kg, goalRow?.fat_per_kg, goalRow?.fat_max_g);
+  const eatenK = Math.round(Number(todayEntry?.intake) || 0);
+  const eatenP = Math.round(Number(todayEntry?.p) || 0);
+  const eatenF = Math.round(Number(todayEntry?.f) || 0);
+  const eatenC = Math.round(Number(todayEntry?.c) || 0);
+  const eatenNames = logRows
+    .filter((r) => String(r.date) === today)
+    .flatMap((r) => ((r.items as FoodItem[]) || []).map((it) => `${it.name}${it.qty && it.qty !== '×1' ? it.qty : ''}`))
+    .slice(0, 24);
+  const jstHour = new Date(Date.now() + 9 * 3600_000).getUTCHours();
+  const myFoods = (foodsRes.data ?? []) as { name: string; unit: string; kcal: number; p: number; f: number; c: number }[];
+  const todayBlock =
+    `【今日のいま（${jstHour}時時点）】\n` +
+    `今日の目標: ${goalKcalToday}kcal${plan ? '（計画）' : '（維持）'} / 摂取済み: ${eatenK}kcal → 残り ${goalKcalToday - eatenK}kcal\n` +
+    `残りPFC: P あと${Math.round(m.p) - eatenP}g / F あと${Math.round(m.f) - eatenF}g / C あと${Math.round(m.c) - eatenC}g\n` +
+    `今日食べたもの: ${eatenNames.length ? eatenNames.join('、') : 'まだ記録なし'}\n` +
+    (myFoods.length
+      ? `本人のマイ食品（よく食べる定番）: ${myFoods.map((f) => `${f.name}(${f.unit} ${Math.round(f.kcal)}kcal P${Math.round(f.p)})`).join(' / ')}\n`
+      : '');
+
   const dayLines = days.slice(-7).map((d) =>
     `${d.date.slice(5)}: 摂取${d.intake ?? '未記録'}${d.diff != null ? `(収支${d.diff > 0 ? '+' : ''}${d.diff})` : ''} P${d.p ?? '-'}g ${d.mood ? `気分:${d.mood} ` : ''}${d.memo ? `メモ:${d.memo}` : ''}`
   ).join('\n');
 
   const dataBlock =
+    todayBlock + '\n' +
     `【本人データ（直近28日・今日=${today}）】\n` +
     `維持カロリー目安: ${base}kcal/日（基礎代謝${Math.round(bmr)}）\n` +
     (goalRes.data ? `目標: ${goalRes.data.target_weight}kgまで（${goalRes.data.target_date}まで）\n` : '目標: 未設定\n') +
@@ -151,6 +189,10 @@ export async function POST(req: Request) {
     '- メモに酒・睡眠不足などの手がかりがあれば言及する\n' +
     '- 責めない・寄り添うトーン\n' +
     '- 医療的な診断・疾患名の断定はしない。深刻な不調が続く場合は受診を勧める\n' +
+    '- 「次に何を食べる？」「あと何が食べられる？」「夕食の提案」など献立系の相談には、【今日のいま】の残りカロリーと残りPFCに収まる具体的な献立を出す: 食材と分量(g)の箇条書き→合計のkcal/P/F/Cを1行で明記→残りにどう収まるかを1行。マイ食品や今日食べたものに寄せると再現しやすい。時刻が朝なら1日の残り配分、夜なら最後の1食として考える\n' +
+    '- 献立を提案したときは action に献立を付ける（本人がワンタップで食事トレイに載せられる）:\n' +
+    '  {"kind":"meal","label":"鶏むね肉と豆腐のボリュームサラダ","items":[{"name":"皮なし鶏むね肉","qty":"200g","kcal":216,"p":45,"f":3,"c":0},{"name":"木綿豆腐","qty":"100g","kcal":73,"p":7,"f":5,"c":1}]}\n' +
+    '  ※itemsは2〜8品・qtyは分量の文字列・数値は概算でよい。外食など分量が決められない相談では付けない\n' +
     '- 回答の中で「具体的な新しい目標値」を提案した場合のみ、JSONに action を1つ追加する（提案が無ければ含めない）:\n' +
     '  PFC変更: {"kind":"pfc","protein_per_kg":2.2,"fat_per_kg":0.8,"label":"たんぱく質係数を2.2g/kgへ"}（変更しない側のキーは省略）\n' +
     '  体重目標: {"kind":"weight","target_weight":80,"target_date":"2026-10-31","label":"目標を80kg/10月末へ"}\n' +
@@ -167,7 +209,7 @@ export async function POST(req: Request) {
     const j = parseJsonLoose(r.text) as { answer?: string; action?: Record<string, unknown> };
     answer = String(j.answer || '').trim();
     // actionは想定kindのみ通す（プロンプトインジェクション等での任意データ書込を防ぐ）
-    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training'].includes(String(j.action.kind))) {
+    if (j.action && typeof j.action === 'object' && ['pfc', 'weight', 'training', 'meal'].includes(String(j.action.kind))) {
       action = j.action;
     }
   } catch { /* JSON崩れ時は生テキストを使う */ }

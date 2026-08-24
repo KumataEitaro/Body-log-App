@@ -16,6 +16,20 @@ export type AskCategory = {
 
 export const askCategories = (): AskCategory[] => [
   {
+    key: 'meal-plan',
+    emoji: '🍽',
+    title: t('次の食事を決める'),
+    lead: t('残りカロリーとPFCに収まる献立を、そのままトレイへ'),
+    questions: [
+      t('今日の残りに収まる夕食を提案して'),
+      t('コンビニで買える組み合わせで、残りに収まるものは？'),
+      t('たんぱく質だけ足りない。あと1品なら何を足す？'),
+      t('自炊せずに残りのカロリーを埋めるなら？'),
+      t('明日の朝食を、今日の不足を補う形で提案して'),
+      t('マイ食品だけで今日の残りを組み立てて'),
+    ],
+  },
+  {
     key: 'nutrition',
     emoji: '🥗',
     title: t('栄養の偏り'),

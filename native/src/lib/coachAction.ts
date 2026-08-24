@@ -12,16 +12,22 @@
 //     存在しない日付（2026-13-45）を、そのまま目標として書き込ませない。
 import { t } from './i18n';
 
+/** AIが提案した献立の1品（食事トレイの品目と同じ形） */
+export type MealItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
+
 /** AIが返す目標変更の提案。サーバ側の許可リストと同じ種類だけを扱う */
 export type CoachAction =
   | { kind: 'pfc'; protein_per_kg?: number; fat_per_kg?: number; label: string }
   | { kind: 'weight'; target_weight?: number; target_date?: string; label: string }
-  | { kind: 'training'; name: string; target_kg: number; label: string };
+  | { kind: 'training'; name: string; target_kg: number; label: string }
+  | { kind: 'meal'; label: string; items: MealItem[] };
 
 /** 検証を通った書き込み内容。どのテーブルに何を書くかまで確定させる */
 export type ApplyPlan =
   | { table: 'goals'; patch: Record<string, number | string> }
-  | { table: 'training_goals'; name: string; targetKg: number };
+  | { table: 'training_goals'; name: string; targetKg: number }
+  // 献立はDBに書かない。食事トレイに載せるだけで、確定は本人の✓保存
+  | { table: 'tray'; items: MealItem[] };
 
 export type Validated = { ok: true; plan: ApplyPlan } | { ok: false; reason: string };
 
@@ -33,6 +39,10 @@ const RANGE = {
   targetWeight: [25, 300],    // kg
   targetKg: [1, 500],         // 挙上重量kg（世界記録級でも500未満）
   nameLen: 40,                // 種目名の長さ
+  itemKcal: [0, 2000],        // 献立1品のkcal
+  itemGram: [0, 300],         // 献立1品のP/F/C(g)
+  mealItems: [1, 8],          // 献立の品数
+  mealKcal: 3500,             // 献立全体のkcal上限（1食としてありえない値を弾く）
   dateYears: 10,              // 目標日は今日〜10年後まで
 } as const;
 
@@ -130,6 +140,37 @@ export function validateAction(a: unknown, todayISO: string): Validated {
         return { ok: false, reason: t('目標重量（{v}kg）が現実的な範囲を超えています。', { v: kg }) };
       }
       return { ok: true, plan: { table: 'training_goals', name, targetKg: kg } };
+    }
+
+    case 'meal': {
+      // 献立はDBに書かないが、トレイに載れば✓保存で記録になるため数値は同じ厳しさで見る
+      const raw = Array.isArray(act.items) ? act.items : null;
+      if (!raw || raw.length < RANGE.mealItems[0] || raw.length > RANGE.mealItems[1]) {
+        return { ok: false, reason: t('献立の品目を読み取れませんでした。') };
+      }
+      const items: MealItem[] = [];
+      let total = 0;
+      for (const it of raw as Record<string, unknown>[]) {
+        const name = typeof it?.name === 'string' ? it.name.trim().slice(0, RANGE.nameLen) : '';
+        if (!name) return { ok: false, reason: t('献立に名前のない品目が含まれていました。') };
+        const kcal = num(it.kcal); const gp = num(it.p); const gf = num(it.f); const gc = num(it.c);
+        if (kcal == null || !inRange(kcal, RANGE.itemKcal)) {
+          return { ok: false, reason: t('献立のカロリーが現実的な範囲を超えています。') };
+        }
+        for (const g of [gp, gf, gc]) {
+          if (g == null || !inRange(g, RANGE.itemGram)) {
+            return { ok: false, reason: t('献立の栄養素が現実的な範囲を超えています。') };
+          }
+        }
+        total += kcal;
+        items.push({
+          name,
+          qty: typeof it.qty === 'string' && it.qty.trim() ? it.qty.trim().slice(0, 20) : '×1',
+          kcal: Math.round(kcal), p: Math.round(gp!), f: Math.round(gf!), c: Math.round(gc!),
+        });
+      }
+      if (total > RANGE.mealKcal) return { ok: false, reason: t('献立のカロリーが現実的な範囲を超えています。') };
+      return { ok: true, plan: { table: 'tray', items } };
     }
 
     default:

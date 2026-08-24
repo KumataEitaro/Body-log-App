@@ -27,10 +27,16 @@ describe('コラムの日英対応', () => {
     }
   });
 
-  it('どの記事にも出典が付いている', () => {
+  it('どの記事にも出典が付いている（使い方ガイドは除く: 医学的な主張をしないため）', () => {
+    const GUIDE_IDS = ['a-day-with-bodylog'];
     for (const c of COLUMNS_EN) {
+      if (GUIDE_IDS.includes(c.id)) continue;
       expect(c.sources.length).toBeGreaterThan(0);
       for (const s of c.sources) expect(s.url).toMatch(/^https:\/\//);
+    }
+    for (const c of COLUMNS) {
+      if (GUIDE_IDS.includes(c.id)) continue;
+      expect(c.sources.length).toBeGreaterThan(0);
     }
   });
 });

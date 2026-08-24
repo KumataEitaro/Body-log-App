@@ -42,7 +42,7 @@ function pickToday(read: Set<string>): Column {
   return getColumns()[day % getColumns().length];
 }
 
-export default function ColumnReader() {
+export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 'compact' } = {}) {
   const [open, setOpen] = useState<Column | null>(null);
   const [read, setRead] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
@@ -66,6 +66,57 @@ export default function ColumnReader() {
   const today = pickToday(read);
   const rest = getColumns().filter((c) => c.id !== today.id);
   const unreadCount = getColumns().filter((c) => !read.has(c.id)).length;
+
+  const reader = (
+      <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
+        <View style={[s.readerWrap, { paddingTop: 14 }]}>
+          <View style={s.readerHead}>
+            <Text style={s.readerEmoji}>{open?.emoji}</Text>
+            <Pressable onPress={() => setOpen(null)} hitSlop={10}><X size={22} color={C.sub} /></Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+            <Text style={s.readerTitle}>{open?.title}</Text>
+            <Text style={s.readerMeta}>{open?.lead}・{t('約{n}分で読めます', { n: open?.minutes ?? 0 })}</Text>
+            {open && <Body text={open.body} />}
+            {open && open.sources.length > 0 && (
+              <View style={s.srcBox}>
+                <Text style={s.srcHead}>{t('参考にした資料')}</Text>
+                {open.sources.map((src) => (
+                  <Pressable key={src.url} onPress={() => Linking.openURL(src.url).catch(() => {})} hitSlop={6}>
+                    <Text style={s.srcLink}>・{src.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+  );
+
+  // compact: 相談タブのウェルカムに置く「今日のおすすめ」1枚。
+  // AIに聞く画面と読みものは同じ「分からないことを解消する場所」なので隣に置く
+  if (variant === 'compact') {
+    return (
+      <View style={s.compactWrap}>
+        <View style={[s.h2Row, { marginBottom: 6 }]}>
+          <BookOpen size={15} color={C.teal} />
+          <Text style={s.compactH}>{t('読みもの')}</Text>
+          {unreadCount > 0 && <View style={s.countBadge}><Text style={s.countBadgeT}>{t('未読')} {unreadCount}</Text></View>}
+        </View>
+        <Pressable style={({ pressed }) => [s.rec, { marginBottom: 0 }, pressed && { opacity: 0.75 }]} onPress={() => openColumn(today)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={s.recEmoji}>{today.emoji}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.recTitle} numberOfLines={1}>{today.title}</Text>
+              <Text style={s.recLead} numberOfLines={1}>{today.lead}</Text>
+            </View>
+          </View>
+          <Text style={s.recCta}>{t('約{n}分で読む →', { n: today.minutes })}</Text>
+        </Pressable>
+        {reader}
+      </View>
+    );
+  }
 
   return (
     <View style={s.card}>
@@ -102,34 +153,14 @@ export default function ColumnReader() {
         </Pressable>
       ))}
 
-      <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
-        <View style={[s.readerWrap, { paddingTop: 14 }]}>
-          <View style={s.readerHead}>
-            <Text style={s.readerEmoji}>{open?.emoji}</Text>
-            <Pressable onPress={() => setOpen(null)} hitSlop={10}><X size={22} color={C.sub} /></Pressable>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-            <Text style={s.readerTitle}>{open?.title}</Text>
-            <Text style={s.readerMeta}>{open?.lead}・{t('約{n}分で読めます', { n: open?.minutes ?? 0 })}</Text>
-            {open && <Body text={open.body} />}
-            {open && open.sources.length > 0 && (
-              <View style={s.srcBox}>
-                <Text style={s.srcHead}>{t('参考にした資料')}</Text>
-                {open.sources.map((src) => (
-                  <Pressable key={src.url} onPress={() => Linking.openURL(src.url).catch(() => {})} hitSlop={6}>
-                    <Text style={s.srcLink}>・{src.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
+      {reader}
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  compactWrap: { alignSelf: 'stretch', marginTop: 18 },
+  compactH: { fontSize: 13, fontWeight: '800', color: C.sub },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 15, fontWeight: '800', color: C.ink },

@@ -21,8 +21,10 @@ import HeaderGear from '@/components/HeaderGear';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
+import ColumnReader from '@/components/ColumnReader';
 import { featuredQuestions } from '@/content/askExamples';
 import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '@/lib/coachAction';
+import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
@@ -165,6 +167,13 @@ export default function CoachScreen() {
       note(v.reason + t('（「概要」タブの目標から手動で設定できます）'));
       return;
     }
+    // 献立はトレイに載せるだけ（確定は食事タブの✓保存）なので確認ダイアログを挟まない
+    if (v.plan.table === 'tray') {
+      setPendingMeal(v.plan.items);
+      setMsgs((m) => m.map((x) => (x.action === a ? { ...x, applied: true } : x)));
+      router.push('/(tabs)/log');
+      return;
+    }
     Alert.alert(t('目標を更新しますか？'), a.label, [
       { text: t('キャンセル'), style: 'cancel' },
       { text: t('適用する'), onPress: () => runApply(v.plan, a) },
@@ -179,6 +188,8 @@ export default function CoachScreen() {
       if (!uid) { note(t('ログインの有効期限が切れています。もう一度ログインしてからお試しください。')); return; }
 
       // 影響した行を返させて、本当に書き換わったかを確かめる
+      // 献立（tray）はapplyActionで処理済み。ここに来るのはDBに書く2種類だけ
+      if (plan.table === 'tray') return;
       const res = plan.table === 'goals'
         ? await supabase.from('goals').update(plan.patch).eq('user_id', uid).select('user_id')
         : await supabase.from('training_goals')
@@ -236,6 +247,9 @@ export default function CoachScreen() {
                 <Sparkles size={15} color={C.teal} />
                 <Text style={s.moreBtnT}>{t('ほかに何が聞ける？')}</Text>
               </Pressable>
+
+              {/* 読みもの: 質問する前に読んで分かることも多いので、聞く場所の隣に置く */}
+              <ColumnReader variant="compact" />
             </View>
           </ScrollView>
         ) : (
@@ -254,17 +268,25 @@ export default function CoachScreen() {
                   <View style={s.actionCard}>
                     <Text style={s.actionLabel}>💡 {m.action.label}</Text>
                     {m.applied ? (
-                      <Text style={s.actionDone}>{t('✓ 適用しました（「概要」タブに反映）')}</Text>
+                      <Text style={s.actionDone}>
+                        {m.action.kind === 'meal'
+                          ? t('✓ トレイに入れました（食事タブで量を調整して保存）')
+                          : t('✓ 適用しました（「概要」タブに反映）')}
+                      </Text>
                     ) : (
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                         <Pressable style={[s.actionBtn, applying && { opacity: 0.5 }]} disabled={applying}
                                    onPress={() => applyAction(m.action!)}>
-                          <Text style={s.actionBtnT}>{applying ? t('適用中…') : t('この目標を適用する')}</Text>
+                          <Text style={s.actionBtnT}>
+                            {applying ? t('適用中…') : m.action.kind === 'meal' ? t('🍽 この献立を食事トレイに入れる') : t('この目標を適用する')}
+                          </Text>
                         </Pressable>
-                        <Pressable style={s.actionAlt}
-                                   onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW', ts: String(Date.now()) } })}>
-                          <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
-                        </Pressable>
+                        {m.action.kind !== 'meal' && (
+                          <Pressable style={s.actionAlt}
+                                     onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW', ts: String(Date.now()) } })}>
+                            <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
+                          </Pressable>
+                        )}
                       </View>
                     )}
                   </View>

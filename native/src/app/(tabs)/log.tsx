@@ -26,7 +26,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -47,6 +47,7 @@ import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
+import { consumePendingMeal } from '@/lib/pendingMeal';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -406,6 +407,18 @@ export default function LogScreen() {
   }
 
   // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
+  // 相談タブでAIが提案した献立を受け取ってトレイに載せる（確定は本人の✓保存）
+  useFocusEffect(useCallback(() => {
+    const items = consumePendingMeal();
+    if (!items || items.length === 0) return;
+    setParsed((p2) => ({
+      items: [...(p2?.items ?? []), ...items],
+      weight: p2?.weight ?? null, waist: p2?.waist ?? null,
+      ex: p2?.ex ?? null, adj: p2?.adj ?? 0, mood: p2?.mood ?? null,
+    }));
+    setMsg({ ok: true, text: t('AIの献立をトレイに入れました。量を調整して✓保存してください。') });
+  }, []));
+
   function reuseMeal(m: RecentMeal) {
     const items = [...(parsed?.items ?? []), ...m.items];
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));

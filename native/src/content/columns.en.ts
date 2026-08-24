@@ -4,6 +4,33 @@ import type { Column } from './columns';
 
 export const COLUMNS_EN: Column[] = [
   {
+    id: 'a-day-with-bodylog',
+    emoji: '📱',
+    title: 'A day with BodyLog (how-to guide)',
+    lead: 'From a morning check-in to planning dinner with AI',
+    minutes: 5,
+    body:
+`This app works best when you log lightly and let the AI do the heavy lifting. Here is one real day.
+
+**7:10 — Step on the scale.** Type the number into the weight field on the Food tab. Skipping days is fine; the chart connects the gaps.
+
+**7:15 — Pick a mood.** One face on "How do you feel?". It feeds the binge-risk forecast — worth doing most on short-sleep mornings.
+
+**7:30 — Breakfast as a sentence.** Type "banana, plain yogurt, two boiled eggs" and hit ↑ (a photo works too). The AI splits it into items with calories and macros. Fix any amounts, then save with ✓.
+
+**12:00 — Stuck at the convenience store.** Open the Coach tab and ask "What combination from a convenience store fits my remaining budget?" — it answers from your actual remaining calories and macros.
+
+**16:00 — Gym.** Pick the exercise, dial the weight from last time, save. The rest timer starts automatically; the next set only needs reps.
+
+**19:00 — Deciding dinner.** Check the remaining bar above the input, then ask the Coach: "Suggest a dinner that fits what I have left." When a meal with amounts comes back, tap **"Add this meal to the food tray"** — the items appear on the Food tab, ready to adjust and save.
+
+**23:00 — Done.** If a day goes unlogged, tomorrow's AI won't scold you. It states the fact and moves on.
+
+**The one habit that matters:** not perfect logging — asking the AI whenever you hesitate. Everything it can answer is listed under "What else can I ask?".`,
+    sources: [],
+  },
+
+  {
     id: 'pfc-basics',
     emoji: '🍽',
     title: 'What macros actually are',

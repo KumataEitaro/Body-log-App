@@ -172,3 +172,54 @@ describe('isApplicable', () => {
     expect(isApplicable(null, TODAY)).toBe(false);
   });
 });
+
+describe('meal（献立をトレイへ）', () => {
+  const TODAY = '2026-08-21';
+  const item = (over: Partial<{ name: unknown; qty: unknown; kcal: unknown; p: unknown; f: unknown; c: unknown }> = {}) =>
+    ({ name: '皮なし鶏むね肉', qty: '200g', kcal: 216, p: 45, f: 3, c: 0, ...over });
+
+  it('妥当な献立はトレイ行きの計画になる', () => {
+    const v = validateAction({ kind: 'meal', label: 'サラダ', items: [item(), item({ name: '木綿豆腐', qty: '100g', kcal: 73, p: 7, f: 5, c: 1 })] }, TODAY);
+    expect(v.ok).toBe(true);
+    if (v.ok && v.plan.table === 'tray') {
+      expect(v.plan.items).toHaveLength(2);
+      expect(v.plan.items[0]).toEqual({ name: '皮なし鶏むね肉', qty: '200g', kcal: 216, p: 45, f: 3, c: 0 });
+    } else { throw new Error('trayでない'); }
+  });
+
+  it('品目が空なら理由つきで弾く', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [] }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('9品以上は弾く（1食としておかしい）', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: Array.from({ length: 9 }, () => item()) }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('名前のない品目は弾く', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [item({ name: '' })] }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('桁違いのカロリーは弾く', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [item({ kcal: 21600 })] }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('数値でない栄養素は弾く', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [item({ p: '45g' })] }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('合計が1食としてありえない量なら弾く', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [item({ kcal: 1900 }), item({ kcal: 1900 })] }, TODAY);
+    expect(v.ok).toBe(false);
+  });
+
+  it('qtyが無ければ×1で補う', () => {
+    const v = validateAction({ kind: 'meal', label: 'x', items: [item({ qty: undefined })] }, TODAY);
+    expect(v.ok).toBe(true);
+    if (v.ok && v.plan.table === 'tray') expect(v.plan.items[0].qty).toBe('×1');
+  });
+});
