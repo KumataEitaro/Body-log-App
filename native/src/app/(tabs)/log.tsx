@@ -48,6 +48,7 @@ import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
+import { usePurpose, purposeOf } from '@/lib/purpose';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -241,7 +242,14 @@ export default function LogScreen() {
   const goalKcal = planIntake ?? target;
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
-  const macros = profile ? macroTargets(weightForBmr, goalKcal, goal?.protein_per_kg, goal?.fat_per_kg, goal?.fat_max_g) : null;
+  // 係数が未設定の間は、選んだ目的の既定値を使う（未選択なら従来の既定 P2.0/F0.9）
+  const purposePreset = purposeOf(usePurpose());
+  const macros = profile ? macroTargets(
+    weightForBmr, goalKcal,
+    goal?.protein_per_kg ?? purposePreset?.p,
+    goal?.fat_per_kg ?? purposePreset?.f,
+    goal?.fat_max_g,
+  ) : null;
   const eatenP = Math.round(summary.p ?? 0);
   const eatenF = Math.round(summary.f ?? 0);
   const eatenC = Math.round(summary.c ?? 0);

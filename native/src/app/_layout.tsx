@@ -11,13 +11,14 @@ import { setLocaleChangeHandler } from '@/lib/i18n';
 import { C } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
 import { loadFoodFreq } from '@/lib/foods';
+import { loadPurpose } from '@/lib/purpose';
 import { reregisterAll } from '@/lib/notify';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
   useEffect(() => { loadAvatar(); }, []);   // 保存済みのアイコンを反映
-  useEffect(() => { loadFoodFreq(); }, []); // よく使う順の並びに使う実績
+  useEffect(() => { loadFoodFreq(); loadPurpose(); }, []); // よく使う順の実績＋ダイエット目的
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const locale = useLocale();

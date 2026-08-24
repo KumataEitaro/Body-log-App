@@ -8,6 +8,7 @@ import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
 import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
+import { PURPOSE_PRESETS } from '@/lib/purpose';
 
 // AIコーチ相談: 本人の実データ（摂取推移・栄養素・気分・メモ・体重）を根拠に質問へ答える。
 // 「気分がすぐれない」→ 直近のカロリー不足・栄養素・昨日のメモ（酒等）から仮説を提示する。
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
     supabase.from('entries').select('date,intake,p,f,c,weight,mood,ex,adj,food_text').gte('date', from28).lte('date', today).order('date', { ascending: true }),
     supabase.from('logs').select('date,items,text,mood').gte('date', from7).order('at', { ascending: true }),
     supabase.from('goals').select('*').maybeSingle(),
-    supabase.from('profiles').select('sex,height_cm,age,life_factor,init_weight').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('events').select('id,date,title,extra_kcal').gte('date', today).order('date', { ascending: true }),
     supabase.from('foods').select('name,unit,kcal,p,f,c').limit(24),
   ]);
@@ -135,7 +136,10 @@ export async function POST(req: Request) {
   const goalKcalToday = planBase != null
     ? planBase + (todayEvent ? Math.round(Number(todayEvent.extra_kcal)) : 0)
     : targetToday;
-  const m = macroTargets(latestW, goalKcalToday, goalRow?.protein_per_kg, goalRow?.fat_per_kg, goalRow?.fat_max_g);
+  // 目的（オンボーディングで選択）。係数が未設定の間は目的の既定値を使う
+  const purpose = PURPOSE_PRESETS[String((prof as { purpose?: string | null }).purpose ?? '')] ?? null;
+  const m = macroTargets(latestW, goalKcalToday,
+    goalRow?.protein_per_kg ?? purpose?.p, goalRow?.fat_per_kg ?? purpose?.f, goalRow?.fat_max_g);
   const eatenK = Math.round(Number(todayEntry?.intake) || 0);
   const eatenP = Math.round(Number(todayEntry?.p) || 0);
   const eatenF = Math.round(Number(todayEntry?.f) || 0);
@@ -164,6 +168,7 @@ export async function POST(req: Request) {
     `【本人データ（直近28日・今日=${today}）】\n` +
     `維持カロリー目安: ${base}kcal/日（基礎代謝${Math.round(bmr)}）\n` +
     (goalRes.data ? `目標: ${goalRes.data.target_weight}kgまで（${goalRes.data.target_date}まで）\n` : '目標: 未設定\n') +
+    (purpose ? `本人の目的: ${purpose.label}\n` : '') +
     `直近7日: 平均摂取${avg(last7.map((d) => d.intake)) ?? '記録なし'}kcal・平均収支${avg(last7.map((d) => d.diff)) ?? '-'}kcal・P平均${avg(last7.map((d) => d.p)) ?? '-'}g・未記録${last7.filter((d) => d.intake == null).length}日\n` +
     `その前3週間: 平均摂取${avg(prev21.map((d) => d.intake)) ?? '記録なし'}kcal・平均収支${avg(prev21.map((d) => d.diff)) ?? '-'}kcal\n` +
     (wDelta != null ? `体重: 28日間で${Number(wDelta) > 0 ? '+' : ''}${wDelta}kg（現在${latestW}kg）\n` : '') +

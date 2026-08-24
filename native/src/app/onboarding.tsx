@@ -1,7 +1,8 @@
-// 初回オンボーディング: 使い方ガイド（紙芝居）のあとに開く3ステップウィザード
+// 初回オンボーディング: 使い方ガイド（紙芝居）のあとに開く4ステップウィザード
 // ① あなたの現在地点（プロフィール＋活動量カード選択＋現在の体重）
-// ② 目標（体重・期日・体脂肪率は任意）
-// ③ 筋トレ目標（任意・スキップ可）
+// ② ダイエット目的（PFC係数の既定とAI相談の前提を決める）
+// ③ 目標（体重・期日・体脂肪率は任意）
+// ④ 筋トレ目標（任意・スキップ可）
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
@@ -17,6 +18,7 @@ import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import GoalPanel from '@/components/GoalPanel';
 import { t } from '@/lib/i18n';
+import { PURPOSES, setPurpose, usePurpose, type PurposeKey } from '@/lib/purpose';
 
 const DONE_KEY = 'bl-onboard-done';
 
@@ -31,6 +33,7 @@ export default function Onboarding() {
   const [weight, setWeight] = useState('');
   const [life, setLife] = useState(1.375);
   const [busy, setBusy] = useState(false);
+  const purpose = usePurpose();
   const [msg, setMsg] = useState('');
 
   // 既存値があればプリフィル（ガイド再実行などで再訪しても壊れない）
@@ -81,7 +84,7 @@ export default function Onboarding() {
         {/* 進捗ドット＋スキップ */}
         <View style={s.topRow}>
           <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[0, 1, 2].map((i) => <View key={i} style={[s.dot, step === i && s.dotOn]} />)}
+            {[0, 1, 2, 3].map((i) => <View key={i} style={[s.dot, step === i && s.dotOn]} />)}
           </View>
           <Pressable onPress={done} hitSlop={10}><Text style={s.skipT}>{t('あとで設定')}</Text></Pressable>
         </View>
@@ -121,17 +124,42 @@ export default function Onboarding() {
 
           {step === 1 && (
             <>
-              <Text style={s.h1}>{t('目標を決める')}</Text>
-              <Text style={s.sub}>{t('目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
-              <GoalPanel mode="weight" weightSections="goal" />
-              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 筋トレ目標（任意）')} onPress={() => setStep(2)} />
+              <Text style={s.h1}>{t('なんのために使う？')}</Text>
+              <Text style={s.sub}>{t('目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「設定→体重の目標」からいつでも変えられます。')}</Text>
+              {PURPOSES.map((pu) => {
+                const on = purpose === pu.key;
+                return (
+                  <Pressable key={pu.key} style={[s.purposeCard, on && s.purposeCardOn]}
+                             onPress={() => setPurpose(pu.key as PurposeKey)}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.purposeT, on && { color: C.teal }]}>{t(pu.label)}</Text>
+                      <Text style={s.purposeD}>{t(pu.desc)}</Text>
+                    </View>
+                    <Text style={s.purposeCoef}>P {pu.p} / F {pu.f} g/kg</Text>
+                  </Pressable>
+                );
+              })}
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 目標を決める')}
+                            onPress={() => setStep(2)} disabled={purpose == null} />
               <Pressable onPress={() => setStep(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
-                <Text style={s.linkT}>{t('目標はあとで決める')}</Text>
+                <Text style={s.linkT}>{t('目的はあとで決める')}</Text>
               </Pressable>
             </>
           )}
 
           {step === 2 && (
+            <>
+              <Text style={s.h1}>{t('目標を決める')}</Text>
+              <Text style={s.sub}>{t('目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
+              <GoalPanel mode="weight" weightSections="goal" />
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 筋トレ目標（任意）')} onPress={() => setStep(3)} />
+              <Pressable onPress={() => setStep(3)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
+                <Text style={s.linkT}>{t('目標はあとで決める')}</Text>
+              </Pressable>
+            </>
+          )}
+
+          {step === 3 && (
             <>
               <Text style={s.h1}>{t('筋トレの目標（任意）')}</Text>
               <Text style={s.sub}>{t('ベンチプレス100kgのような目標を置くと、トレのグラフに目標線が出ます。筋トレをしない人はスキップでOKです。')}</Text>
@@ -147,6 +175,15 @@ export default function Onboarding() {
 }
 
 const s = StyleSheet.create({
+  purposeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
+    padding: 14, marginTop: 10,
+  },
+  purposeCardOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
+  purposeT: { fontSize: 15, fontWeight: '800', color: C.ink },
+  purposeD: { fontSize: 13, color: C.sub, marginTop: 2 },
+  purposeCoef: { fontSize: 11, color: C.faint, fontWeight: '700', fontVariant: ['tabular-nums'] },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.line },
   dotOn: { backgroundColor: C.teal, width: 22 },

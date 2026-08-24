@@ -13,6 +13,7 @@ import { scheduleCheatDayEve } from '@/lib/notify';
 import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
 import { isBodyweightLift } from '@/lib/lifts';
+import { PURPOSES, setPurpose, usePurpose, purposeOf } from '@/lib/purpose';
 import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
@@ -37,6 +38,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   const [gFat, setGFat] = useState('');
   const [gFatMax, setGFatMax] = useState('');
   const [pfcOpen, setPfcOpen] = useState(false);
+  const purposeKey = usePurpose();
   const [events, setEvents] = useState<Ev[]>([]);
   const [evDate, setEvDate] = useState('');
   const [evKcal, setEvKcal] = useState('800');
@@ -77,8 +79,9 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       if (gx.ex_min_minutes != null) setExMinMinutes(String(gx.ex_min_minutes));
       const bf = (g as Goal & { target_bodyfat?: number | null }).target_bodyfat;
       setGBf(bf != null ? String(bf) : '');
-      setGProtein(g.protein_per_kg != null ? String(g.protein_per_kg) : '');
-      setGFat(g.fat_per_kg != null ? String(g.fat_per_kg) : '');
+      const pp = purposeOf(purposeKey);
+      setGProtein(g.protein_per_kg != null ? String(g.protein_per_kg) : (pp ? String(pp.p) : ''));
+      setGFat(g.fat_per_kg != null ? String(g.fat_per_kg) : (pp ? String(pp.f) : ''));
       setGFatMax(g.fat_max_g != null ? String(g.fat_max_g) : '');
     }
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
@@ -245,6 +248,26 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             />
           )}
 
+          {/* 目的プリセット: タップでP/F係数を流し込む（数値の意味を知らなくても選べる） */}
+          <Text style={[s.label, { marginTop: 12 }]}>{t('目的からPFCを決める')}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {PURPOSES.map((pu) => {
+              const on = purposeKey === pu.key
+                && Number(gProtein) === pu.p && Number(gFat) === pu.f;
+              return (
+                <Pressable key={pu.key} style={[s.puChip, on && s.puChipOn]}
+                           onPress={() => {
+                             setPurpose(pu.key);
+                             setGProtein(String(pu.p));
+                             setGFat(String(pu.f));
+                             setPfcOpen(true);
+                           }}>
+                  <Text style={[s.puChipT, on && { color: '#fff' }]}>{t(pu.label)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* PFC詳細（折りたたみ） */}
           <Pressable style={{ marginTop: 12 }} onPress={() => setPfcOpen((v) => !v)} hitSlop={6}>
             <Text style={s.pfcToggle}>{pfcOpen ? '▴' : '▾'} {t('PFC詳細設定（任意）')}</Text>
@@ -390,6 +413,12 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
 }
 
 const s = StyleSheet.create({
+  puChip: {
+    backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  puChipOn: { backgroundColor: C.teal, borderColor: C.teal },
+  puChipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   seg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   segOn: { backgroundColor: C.ink, borderColor: C.ink },
