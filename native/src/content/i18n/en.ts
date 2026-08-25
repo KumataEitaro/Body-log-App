@@ -894,4 +894,5 @@ export const EN: Record<string, string> = {
   "厳密さより続けやすさを優先": "Consistency over strictness",
   "筋肉をつける": "Build muscle",
   "増量期。たんぱく質と総量を確保": "Bulking: secure protein and total intake",
+  "食事として読み取れませんでした。品目と量（例: キャベツ1/4玉）で書くか、相談は相談タブへどうぞ。": "Could not read that as a meal. Try items with amounts (e.g. 1/4 cabbage), or take questions to the Coach tab.",
 };

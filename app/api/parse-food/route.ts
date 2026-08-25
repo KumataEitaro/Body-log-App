@@ -5,6 +5,7 @@ import { isPremiumActive } from '@/lib/premium';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
+import { buildParseFoodPrompt, buildParseHistoryBlock } from '@/lib/parseFoodPrompt';
 
 // 日本のユーザーが主のため東京リージョンで実行（画像アップロードとSupabase往復を短縮）
 export const preferredRegion = 'hnd1';
@@ -35,8 +36,10 @@ export async function POST(req: Request) {
   let text = '';
   let images: { data: string; mime: string }[] = [];
   let outLang = '';
+  let history: { role: string; text: string }[] = [];
   {
-    const body = bodyRaw as { text?: unknown; lang?: unknown; images?: unknown };
+    const body = bodyRaw as { text?: unknown; lang?: unknown; images?: unknown; history?: unknown };
+    if (Array.isArray(body.history)) history = (body.history as { role: string; text: string }[]).slice(-4);
     text = String(body.text || '').slice(0, 3000);
     const l = findLang(String(body.lang || ''));
     if (l && l.code !== 'ja') outLang = `${l.name}（${l.native}）`;
@@ -97,29 +100,7 @@ export async function POST(req: Request) {
       '- 分量の記載がなく、基準量が1個・1杯など単品の場合は基準量1つ分として計算する。\n';
   }
 
-  const prompt =
-    'あなたは日本の管理栄養士 兼 トレーニング記録係です。ユーザーの1日の記録メモ（と食事写真）を解析してください。\n' +
-    '\n【タスク1: 食事】メモと写真に写っている食事の各品目と合計の kcal・たんぱく質P(g)・脂質F(g)・炭水化物C(g) を推定する。\n' +
-    '- 分析用に各品目で次の栄養素も推定する（不明・微量は0。大まかな推定でよい）:\n' +
-    '  salt=食塩相当量(g,小数1) fib=食物繊維(g,小数1) sug=糖類(g) k=カリウム(mg) ca=カルシウム(mg) mg=マグネシウム(mg) fe=鉄(mg,小数1) zn=亜鉛(mg,小数1) vd=ビタミンD(μg,小数1) vc=ビタミンC(mg)\n' +
-    '- 数量不明の調味料は大さじ1として計算\n' +
-    '- 肉・魚・米などのグラム数は生の重量とみなす\n' +
-    '- 写真は写っている量から標準的な1人前を推定\n' +
-    '- 同じ食事がメモと写真の両方にある場合は二重計上しない\n' +
-    '\n【タスク2: その他の抽出】メモに書かれていれば抽出する（なければnull）:\n' +
-    '- weight: 体重(kg)の数値\n' +
-    '- waist: ウエスト・腹囲(cm)の数値\n' +
-    '- ex: 運動量。次の5択にマッピング → "オフ"(運動なし)/"軽い"(散歩・ストレッチ程度≒+30kcal)/"通常"(筋トレ・ジム1時間程度≒+150kcal)/"高"(ランニング・スイム・登山半日などしっかり有酸素≒+400kcal)/"特大"(終日登山・レースなど≒+800kcal)\n' +
-    '- adj: 補正kcal。基本は0。本人が消費kcalを明記している場合のみ、上記レベル値との差分を入れる\n' +
-    '- mood: 気分・メンタルに関する記述の要約(20字以内)\n' +
-    dictBlock +
-    (outLang ? `\n出力言語: items[].name・qty・mood・questionsの文字列は${outLang}で書くこと。\n` : '') +
-    '\n【禁止事項】疾病名の指摘・医療的な診断・治療の提案は行わないこと（本サービスは医療機器ではない）。\n' +
-    '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
-    '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,"salt":0,"fib":0,"sug":0,"k":0,"ca":0,"mg":0,"fe":0,"zn":0,"vd":0,"vc":0}],' +
-    '"total":{"kcal":0,"p":0,"f":0,"c":0},' +
-    '"weight":null,"waist":null,"ex":null,"adj":0,"mood":null,"questions":[]}\n' +
-    '\n記録メモ:\n' + (text.trim() || '(写真のみ)');
+  const prompt = buildParseFoodPrompt({ text, dictBlock, outLang, historyBlock: buildParseHistoryBlock(history) });
 
   const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [{ text: prompt }];
   for (const im of images) {

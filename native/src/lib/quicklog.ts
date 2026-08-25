@@ -8,6 +8,10 @@ import { todayJST, type ExLevel } from './calc';
 import { t, apiLang } from './i18n';
 
 export type QuickImage = { data: string; mime: string };
+
+/** AIの会話的な返し（表示のみ。DBには書かない） */
+export type ParsedExtras = { reply: string; questions: string[]; assumptions: string[] };
+export type ParseTurn = { role: 'user' | 'ai'; text: string };
 export type ParsedResult = {
   items: FoodItem[];
   weight: number | null;
@@ -18,9 +22,13 @@ export type ParsedResult = {
 };
 
 // テキスト/写真をAIで解析（保存はしない）
-export async function analyzeFood(text: string, images: QuickImage[]): Promise<{ ok: true; result: ParsedResult } | { ok: false; error: string }> {
-  const { ok, json, failure } = await apiPost<{ ok: boolean; error?: string; result?: { items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string } }>(
-    '/api/parse-food', { text, lang: apiLang(), images });
+export async function analyzeFood(
+  text: string, images: QuickImage[], history: ParseTurn[] = [],
+): Promise<{ ok: true; result: ParsedResult; extras: ParsedExtras } | { ok: false; error: string }> {
+  const { ok, json, failure } = await apiPost<{ ok: boolean; error?: string; result?: {
+    items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string;
+    reply?: string; questions?: string[]; assumptions?: string[];
+  } }>('/api/parse-food', { text, lang: apiLang(), images, history });
   if (!ok || !json?.ok || !json.result) {
     // 何が起きたかで文言を変える。原因が分かれば次の行動が決まる
     if (failure === 'timeout') {
@@ -32,6 +40,7 @@ export async function analyzeFood(text: string, images: QuickImage[]): Promise<{
     return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。') };
   }
   const r = json.result;
+  const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 4) : []);
   return {
     ok: true,
     result: {
@@ -41,6 +50,11 @@ export async function analyzeFood(text: string, images: QuickImage[]): Promise<{
       ex: (r.ex as ExLevel) ?? null,
       adj: Number(r.adj) || 0,
       mood: r.mood ?? null,
+    },
+    extras: {
+      reply: typeof r.reply === 'string' ? r.reply.slice(0, 300) : '',
+      questions: strs(r.questions),
+      assumptions: strs(r.assumptions),
     },
   };
 }

@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
@@ -94,6 +94,10 @@ export default function LogScreen() {
   // 解析中の行。連投できるため配列。idで管理し、完了した本人の分だけを消す
   // （以前は slice(1) で先頭を消していたため、2件目が先に終わると1件目の表示が残り続けた）
   const [pendingTexts, setPendingTexts] = useState<{ id: number; text: string }[]>([]);
+  // AIの会話的な返し（一言・仮定・聞き返し）。表示のみでDBには書かない
+  const [aiNote, setAiNote] = useState<{ reply: string; questions: string[]; assumptions: string[] } | null>(null);
+  // 聞き返しに「1/4玉」とだけ返しても文脈が繋がるように、直前のやりとりを覚えておく
+  const parseHistory = useRef<{ role: 'user' | 'ai'; text: string }[]>([]);
   const pendingSeq = useRef(0);
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
@@ -303,18 +307,36 @@ export default function LogScreen() {
     const pid = ++pendingSeq.current;
     setPendingTexts((p) => [...p, { id: pid, text: text || t('（写真）') }]);
     try {
-      const res = await analyzeFood(text, imgs);
+      const res = await analyzeFood(text, imgs, parseHistory.current);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
       const r = res.result;
-      setParsed((p) => ({
-        items: [...(p?.items ?? []), ...r.items],
-        weight: r.weight ?? p?.weight ?? null,
-        waist: r.waist ?? p?.waist ?? null,
-        ex: r.ex ?? p?.ex ?? null,
-        adj: r.adj || p?.adj || 0,
-        mood: r.mood ?? p?.mood ?? null,
-      }));
-      if (text) setStagedNote((n) => (n ? `${n}、${text}` : text));
+      const ex2 = res.extras;
+      // 会話の記憶は直近1往復だけ（古い文脈を引きずると誤解釈のもと）
+      const aiSaid = [ex2.reply, ...ex2.questions].filter(Boolean).join(' ');
+      parseHistory.current = [
+        { role: 'user' as const, text },
+        ...(aiSaid ? [{ role: 'ai' as const, text: aiSaid }] : []),
+      ];
+      // AIの一言。何も抽出できなかったときも、ここが必ず何か言う（無言の禁止）
+      setAiNote(ex2.reply || ex2.questions.length || ex2.assumptions.length ? ex2 : null);
+      const gotNothing = r.items.length === 0 && r.weight == null && r.waist == null && !r.ex && !r.mood;
+      if (gotNothing && !ex2.reply) {
+        setMsg({ ok: false, text: t('食事として読み取れませんでした。品目と量（例: キャベツ1/4玉）で書くか、相談は相談タブへどうぞ。') });
+      }
+      setParsed((p) => {
+        const next = {
+          items: [...(p?.items ?? []), ...r.items],
+          weight: r.weight ?? p?.weight ?? null,
+          waist: r.waist ?? p?.waist ?? null,
+          ex: r.ex ?? p?.ex ?? null,
+          adj: r.adj || p?.adj || 0,
+          mood: r.mood ?? p?.mood ?? null,
+        };
+        // 何も載らないのに空のトレイ骨格を作らない
+        if (p == null && next.items.length === 0 && next.weight == null && next.waist == null && !next.ex && !next.mood) return null;
+        return next;
+      });
+      if (text && r.items.length > 0) setStagedNote((n) => (n ? `${n}、${text}` : text));
     } catch {
       // analyzeFoodは例外を投げない作りだが、想定外の失敗でも必ずここで拾う
       setMsg({ ok: false, text: t('通信に失敗しました。電波状況を確認してください。') });
@@ -347,6 +369,7 @@ export default function LogScreen() {
   }
   function clearTray() {
     setParsed(null); setStagedNote(''); setFocusItem(null);
+    setAiNote(null); parseHistory.current = [];
   }
 
   // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除
@@ -1039,9 +1062,31 @@ export default function LogScreen() {
             </Pressable>
           </View>
         )}
-        {(parsed != null || pendingTexts.length > 0) && (
+        {(parsed != null || pendingTexts.length > 0 || aiNote != null) && (
           <View style={s.tray}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+            <View style={{ flex: 1 }}>
+            {aiNote && (
+              <View style={s.aiNoteRow}>
+                <Sparkles size={12} color={C.teal} />
+                <View style={{ flex: 1 }}>
+                  {!!aiNote.reply && <Text style={s.aiNoteT}>{aiNote.reply}</Text>}
+                  {aiNote.assumptions.map((a) => (
+                    <Text key={a} style={s.aiNoteSub} numberOfLines={2}>・{a}</Text>
+                  ))}
+                  {aiNote.questions.length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                      {aiNote.questions.map((q) => (
+                        <Pressable key={q} style={s.aiQChip} onPress={() => inputRef.current?.focus()}>
+                          <Text style={s.aiQChipT} numberOfLines={2}>{q}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <Pressable hitSlop={8} onPress={() => setAiNote(null)}><Text style={s.trayX}>×</Text></Pressable>
+              </View>
+            )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {parsed?.items.map((it, i) => {
                 const on = focusItem === i;
                 return (
@@ -1083,6 +1128,7 @@ export default function LogScreen() {
                 </View>
               ))}
             </ScrollView>
+            </View>
             {parsed != null && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                 <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
@@ -1249,6 +1295,17 @@ const s = StyleSheet.create({
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
   preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
+  aiNoteRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    paddingBottom: 6, marginBottom: 6, borderBottomWidth: 0.5, borderBottomColor: C.line,
+  },
+  aiNoteT: { fontSize: 12.5, color: C.ink, fontWeight: '600', lineHeight: 18 },
+  aiNoteSub: { fontSize: 11, color: C.sub, lineHeight: 16 },
+  aiQChip: {
+    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
+    maxWidth: '100%',
+  },
+  aiQChipT: { fontSize: 12, color: C.teal, fontWeight: '700' },
   tray: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,

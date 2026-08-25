@@ -779,4 +779,5 @@ export const ES: Record<string, string> = {
   "厳密さより続けやすさを優先": "Constancia antes que rigidez",
   "筋肉をつける": "Ganar musculo",
   "増量期。たんぱく質と総量を確保": "Volumen: asegurar proteina y total",
+  "食事として読み取れませんでした。品目と量（例: キャベツ1/4玉）で書くか、相談は相談タブへどうぞ。": "No se pudo leer como comida. Escribe alimentos con cantidades (p. ej., 1/4 de repollo) o usa la pestana de Consulta.",
 };
