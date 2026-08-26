@@ -19,9 +19,9 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: C.panel },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
         // タブ間はシフト遷移（無アニメの瞬間差し替えだと安っぽく見える）。
-        // freezeOnBlurで非表示タブの再レンダーを止め、遷移中のJS負荷を抑える
+        // 【重要】freezeOnBlurは付けない: shiftと併用すると凍結解除がアニメと競合し、
+        // フォーカス済みタブが空（背景色だけ＝白飛び）で表示されるバグが実際に起きた
         animation: 'shift',
-        freezeOnBlur: true,
       }}
       screenListeners={{
         // 切り替えの手応え（音のない小さなクリック感）
