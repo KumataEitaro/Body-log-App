@@ -123,15 +123,17 @@ workflows:
         script: |
           cd native
           npx expo prebuild --platform ios
-      - name: aps-environmentを除去（ローカル通知のみ運用）
+      - name: 未使用のentitlementを除去（署名プロファイルとの不一致を防ぐ）
         script: |
-          # expo-notificationsのpluginがリモートPush用のaps-environmentを自動付与するが、
-          # 現状の通知は全てローカル通知でありPush capabilityは不要。
-          # 署名プロファイルにPush capabilityが無くてもビルドが通るようentitlementから除去する。
-          # （将来リモートPushを使う時は、App IDにPush capabilityを追加してこのステップを削除すること）
+          # prebuildが付与するentitlementのうち、App ID側にcapabilityが無いものは
+          # 署名時に「Provisioning profile doesn't include ...」で必ず失敗するため除去する。
+          #  ・aps-environment: 通知は全てローカル通知でPush capabilityは不要
+          #  ・applesignin: SHOW_APPLE_SSO=false でAppleログインは未提供（usesAppleSignInはapp.jsonに残している）
+          # 将来有効化する時: Apple DeveloperのApp IDにcapabilityを追加→該当行を消す→SHOW_APPLE_SSO=true
           ENT="native/ios/BodyLog/BodyLog.entitlements"
           if [ -f "$ENT" ]; then
             plutil -remove aps-environment "$ENT" 2>/dev/null && echo "aps-environment removed" || echo "aps-environment not present (ok)"
+            plutil -remove com.apple.developer.applesignin "$ENT" 2>/dev/null && echo "applesignin removed" || echo "applesignin not present (ok)"
             plutil -p "$ENT"
           fi
       - name: Set build number
