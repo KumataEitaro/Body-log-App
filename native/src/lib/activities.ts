@@ -77,9 +77,9 @@ export const ACTIVITIES: Activity[] = [
   { id: 'swim', e: '🏊', canon: '水泳', mets: 6.0 },
   { id: 'swim_hard', e: '🌊', canon: '水泳（速め）', mets: 9.8 },
   { id: 'hiking', e: '⛰️', canon: '登山・ハイキング', mets: 6.0, perKgKm: 0.8 },
-  { id: 'elliptical', e: '🎚️', canon: 'クロストレーナー', mets: 5.0 },
+  { id: 'elliptical', e: '⛷️', canon: 'クロストレーナー', mets: 5.0 },
   { id: 'rowing', e: '🚣', canon: 'ローイング', mets: 7.0 },
-  { id: 'stepper', e: '🪫', canon: 'ステッパー', mets: 9.0 },
+  { id: 'stepper', e: '🦵', canon: 'ステッパー', mets: 9.0 },
   { id: 'jumprope', e: '🪢', canon: '縄跳び', mets: 11.8 },
   // スタジオ・自宅
   { id: 'yoga', e: '🧘', canon: 'ヨガ・ストレッチ', mets: 2.5 },
@@ -88,7 +88,7 @@ export const ACTIVITIES: Activity[] = [
   { id: 'aerobics', e: '🎶', canon: 'エアロビクス', mets: 7.3 },
   { id: 'hiit', e: '⚡', canon: 'HIIT', mets: 8.0 },
   { id: 'circuit', e: '🔁', canon: 'サーキットトレーニング', mets: 7.0 },
-  { id: 'calisthenics', e: '🤾', canon: '自体重トレーニング', mets: 3.8 },
+  { id: 'calisthenics', e: '💪', canon: '自体重トレーニング', mets: 3.8 },
   // 球技
   { id: 'soccer', e: '⚽', canon: 'サッカー', mets: 7.0 },
   { id: 'futsal', e: '🥅', canon: 'フットサル', mets: 7.0 },
@@ -110,10 +110,10 @@ export const ACTIVITIES: Activity[] = [
   { id: 'horse', e: '🐴', canon: '乗馬', mets: 5.5 },
   { id: 'kayak', e: '🛶', canon: 'カヤック', mets: 5.0 },
   // 格闘技
-  { id: 'martial', e: '🥋', canon: '格闘技・武道', mets: 10.3 },
+  { id: 'martial', e: '🤼', canon: '格闘技・武道', mets: 10.3 },
   { id: 'boxing', e: '🥊', canon: 'ボクシング', mets: 7.8 },
-  { id: 'kendo', e: '🎋', canon: '剣道', mets: 7.0 },
-  { id: 'judo', e: '🤼', canon: '柔道', mets: 10.3 },
+  { id: 'kendo', e: '⚔️', canon: '剣道', mets: 7.0 },
+  { id: 'judo', e: '🥋', canon: '柔道', mets: 10.3 },
   { id: 'karate', e: '👊', canon: '空手', mets: 10.3 },
   // その他
   { id: 'sports', e: '🏆', canon: 'スポーツ（その他）', mets: 7.0 },
