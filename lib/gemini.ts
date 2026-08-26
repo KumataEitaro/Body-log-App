@@ -145,6 +145,39 @@ async function tryModel(
   return { ok: false, err: lastErr || `${model}: 再試行しても失敗` };
 }
 
+// コールドスタート時、候補モデル全部に極小の生成を同時に打ち、最初に返ってきた
+// モデルを主役にする（1.5秒上限）。「ランク上位＝速い」が成り立たない時期
+// （2026-08: flash-latest/3.7が思考モードで20秒超）でも、実測で速い個体を掴める。
+async function probeFastest(key: string, candidates: string[]): Promise<string | null> {
+  const ctrls: AbortController[] = [];
+  const ping = async (model: string): Promise<string> => {
+    const ctrl = new AbortController();
+    ctrls.push(ctrl);
+    const genCfg: Record<string, unknown> = {
+      temperature: 0, maxOutputTokens: 16,
+      ...(/2\.5|latest|-3|3\./.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    };
+    const res = await fetch(`${BASE}/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: '1' }] }], generationConfig: genCfg }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    const j = await res.json();
+    const out = (j.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || '').join('');
+    if (!out) throw new Error('empty');
+    return model;
+  };
+  try {
+    return await Promise.race([
+      Promise.any(candidates.map(ping)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]).catch(() => null);
+  } finally {
+    for (const c of ctrls) c.abort();   // 勝者以外（と時間切れの全部）を中断
+  }
+}
+
 export async function callGemini(
   key: string, parts: Part[], temperature = 0
 ): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string; detail?: string }> {
@@ -159,6 +192,10 @@ export async function callGemini(
     if (found.length) cachedModels = found;
   }
   const discovered = cachedModels && cachedModels.length ? cachedModels.slice(0, 4) : [];
+  // コールド（成功実績なし）なら、実測ピンで速いモデルを先に掴む（+最大1.5秒）
+  if (!lastGood) {
+    lastGood = await probeFastest(key, [...new Set([...discovered, ...STATIC_FALLBACK])].slice(0, 5));
+  }
   let list = [...new Set([
     ...(lastGood ? [lastGood] : []),   // 前回成功したモデルを最優先
     ...discovered,
