@@ -7,9 +7,11 @@ workflows:
     name: BodyLog iOS → TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 45
-    # mainへのpushで自動ビルド（[skip ci]付きコミットはスキップされる）
     # 旧Capacitor版の自動ビルドは停止（2026-08-26）。本命は ios-release（RN版）。
     # 手動でStart new buildすれば今もビルド可能。
+    # 注意: integrationsはpublishing(ASC)が参照するため、トリガーを外しても残すこと
+    integrations:
+      app_store_connect: bodylog-asc
     environment:
       xcode: latest
       node: 22
