@@ -20,6 +20,7 @@ import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
+import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2 } from 'lucide-react-native';
 import { SegmentedControl } from '@/components/ui/Selectable';
 
@@ -53,10 +54,10 @@ const series = () => [
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'table', 'photos', 'binge', 'trends', 'health'];
+const BODY_ORDER_DEFAULT = ['digest', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal', 'tbal', 'tpart', 'ttable'];
 const CARD_LABELS = (): Record<string, string> => ({
-  kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
+  digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
 });
@@ -67,6 +68,12 @@ function mergeOrder(saved: string[], def: string[]): string[] {
 }
 
 
+function weekStartOf2(d: string): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 function addDays(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
   dt.setDate(dt.getDate() + n);
@@ -76,6 +83,8 @@ function addDays(d: string, n: number): string {
 export default function ChangesScreen() {
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
+  // 食べる時間帯カード用（id/at/items付きの生ログ）
+  const [logRows, setLogRows] = useState<{ id: string; date: string; at?: string | null; items?: FoodItem[] | null }[]>([]);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [serie, setSerie] = useState<ReturnType<typeof series>[number]['key']>('weight');
   const [range, setRange] = useState(30);
@@ -157,12 +166,13 @@ export default function ChangesScreen() {
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('entries').select('date,intake,weight,waist,bodyfat,ex,adj').order('date', { ascending: true }),
       supabase.from('goals').select('*').maybeSingle(),
-      supabase.from('logs').select('date,items').order('date', { ascending: true }).limit(2000),
+      supabase.from('logs').select('id,date,at,items').order('date', { ascending: true }).limit(2000),
     ]);
     // bodyfat列が無い旧DB（v16未適用）でも画面が壊れないようフォールバック
     const entRes = entResRaw.error
       ? await supabase.from('entries').select('date,intake,weight,waist,ex,adj').order('date', { ascending: true })
       : entResRaw;
+    setLogRows((itemRes.data as { id: string; date: string; at?: string | null; items?: FoodItem[] | null }[]) ?? []);
     const prof = profRes.data as Profile | null;
     if (goalRes.data) setGoal(goalRes.data as Goal);
     if (!prof || !entRes.data) return;
@@ -267,6 +277,96 @@ export default function ChangesScreen() {
   }
 
   // ===== カード定義（表示順はorderBody/orderTrainの配列で制御） =====
+  // ===== 週間ダイジェスト: 今週(月〜) vs 先週を数字で。AIを呼ばずローカル集計 =====
+  const digestCard = (() => {
+    const ws = weekStartOf2(today);
+    const lastWs = addDays(ws, -7);
+    const pick = (from: string, to: string) => rows.filter((r) => r.date >= from && r.date < to);
+    const thisW = pick(ws, addDays(today, 1));
+    const lastW = pick(lastWs, ws);
+    const avg2 = (xs: (number | null)[]) => {
+      const v = xs.filter((x): x is number => x != null);
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    };
+    const wOf = (list: typeof rows) => {
+      const w = list.filter((r) => r.weight != null);
+      return w.length ? Number(w[w.length - 1].weight) : null;
+    };
+    const tIn = avg2(thisW.map((r) => r.intake));
+    const lIn = avg2(lastW.map((r) => r.intake));
+    const tDf = avg2(thisW.map((r) => r.diff));
+    const rec = thisW.filter((r) => r.intake != null).length;
+    const wNow = wOf(thisW) ?? wOf(rows);
+    const wPrev = wOf(lastW);
+    const dW = wNow != null && wPrev != null ? Math.round((wNow - wPrev) * 10) / 10 : null;
+    const line = (label: string, v: string, sub?: string) => (
+      <View key={label} style={s.dgRow}>
+        <Text style={s.dgLabel}>{label}</Text>
+        <Text style={s.dgVal}>{v}</Text>
+        {sub ? <Text style={s.dgSub}>{sub}</Text> : null}
+      </View>
+    );
+    return (
+      <View style={s.card}>
+        <View style={s.h2Row}><CalendarDays size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('週間ダイジェスト')}<Text style={s.h2sub}>{t('— 今週と先週')}</Text></Text></View>
+        {line(t('記録した日'), t('{n}日', { n: rec }))}
+        {tIn != null && line(t('平均摂取'), `${tIn.toLocaleString()}kcal`, lIn != null ? t('先週 {n}', { n: lIn.toLocaleString() }) : undefined)}
+        {tDf != null && line(t('平均収支'), `${tDf > 0 ? '+' : ''}${tDf.toLocaleString()}kcal`)}
+        {dW != null && line(t('体重の変化'), `${dW > 0 ? '+' : ''}${dW}kg`)}
+        {rec === 0 && <Text style={s.note}>{t('今週の記録が貯まると、ここに先週との比較が出ます。')}</Text>}
+      </View>
+    );
+  })();
+
+  // ===== 食べる時間帯: 直近14日のkcalを朝/昼/夕/夜に配分 =====
+  const slotsCard = (() => {
+    const from14 = addDays(today, -14);
+    const entriesItems = toItemEntries(
+      (logRows as { id: string; date: string; at?: string | null; items?: FoodItem[] | null }[])
+        .filter((r) => r.date >= from14),
+    );
+    const share: Record<string, number> = { morning: 0, noon: 0, evening: 0, night: 0 };
+    for (const it of entriesItems) {
+      if (it.hour == null) continue;
+      share[slotOf(it.hour)] += it.kcal;
+    }
+    const total = share.morning + share.noon + share.evening + share.night;
+    if (total <= 0) return (
+      <View style={s.card}>
+        <View style={s.h2Row}><FlaskConical size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食べる時間帯')}</Text></View>
+        <Text style={s.note}>{t('食事の記録が貯まると、どの時間帯に食べているかの内訳が出ます。')}</Text>
+      </View>
+    );
+    const defs = [
+      { k: 'morning', label: t('朝(5-10時)'), color: C.teal },
+      { k: 'noon', label: t('昼(11-15時)'), color: '#4f9cf9' },
+      { k: 'evening', label: t('夕(16-20時)'), color: '#f59e0b' },
+      { k: 'night', label: t('夜(21-4時)'), color: '#8b5cf6' },
+    ] as const;
+    const nightPct = Math.round((share.night / total) * 100);
+    return (
+      <View style={s.card}>
+        <View style={s.h2Row}><FlaskConical size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食べる時間帯')}<Text style={s.h2sub}>{t('— 直近14日のkcal内訳')}</Text></Text></View>
+        <View style={s.slotBar}>
+          {defs.map((d) => share[d.k] > 0 && (
+            <View key={d.k} style={{ flex: share[d.k], backgroundColor: d.color }} />
+          ))}
+        </View>
+        <View style={s.slotLegend}>
+          {defs.map((d) => (
+            <View key={d.k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={[s.slotDot, { backgroundColor: d.color }]} />
+              <Text style={s.slotT}>{d.label} {Math.round((share[d.k] / total) * 100)}%</Text>
+            </View>
+          ))}
+        </View>
+        {nightPct >= 25 && (
+          <Text style={s.note}>{t('夜（21時以降）が{p}%。夜の配分を昼へ移すと、睡眠と翌朝の食欲が安定しやすくなります。', { p: nightPct })}</Text>
+        )}
+      </View>
+    );
+  })();
+
   const kpiCard = (
       <View style={s.kpiRow}>
         <View style={s.kpi}>
@@ -437,6 +537,8 @@ export default function ChangesScreen() {
 
   function cardBody(key: string): ReactNode {
     switch (key) {
+      case 'digest': return digestCard;
+      case 'slots': return slotsCard;
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
@@ -618,6 +720,7 @@ const s = StyleSheet.create({
   kpiD: { fontSize: 11, color: C.sub, marginTop: 2 },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  h2sub: { fontSize: 12, fontWeight: '700', color: C.faint },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
   dayHead: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
   dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
@@ -632,5 +735,13 @@ const s = StyleSheet.create({
   chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
+  dgRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
+  dgLabel: { width: 96, fontSize: 13, color: C.sub, fontWeight: '700' },
+  dgVal: { fontSize: 17, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  dgSub: { fontSize: 12, color: C.faint },
+  slotBar: { flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', backgroundColor: C.track, marginTop: 4 },
+  slotLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  slotDot: { width: 8, height: 8, borderRadius: 4 },
+  slotT: { fontSize: 11, color: C.sub, fontWeight: '700' },
   note: { fontSize: 13, color: C.faint, lineHeight: 18 },
 });

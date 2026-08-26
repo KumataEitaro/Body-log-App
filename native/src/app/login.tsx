@@ -1,8 +1,10 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
@@ -104,6 +106,46 @@ export default function LoginScreen() {
     } finally { setGBusy(false); }
   }
 
+  // Appleでサインイン（iOSのみ）。
+  // nonceを自前生成しSHA256をAppleへ、生の値をSupabaseへ渡す（トークン置換攻撃の防止）。
+  // Supabase側でAppleプロバイダの有効化が必要（未設定なら分かるメッセージを出す）。
+  const [aBusy, setABusy] = useState(false);
+  const [appleAvail, setAppleAvail] = useState(false);
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvail).catch(() => {});
+    }
+  }, []);
+  async function appleLogin() {
+    setABusy(true); setMsg(''); setInfo('');
+    try {
+      const rawNonce = Array.from(await Crypto.getRandomBytesAsync(16))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+      const hashed = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
+      const cred = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashed,
+      });
+      if (!cred.identityToken) { setMsg(t('Appleサインインを完了できませんでした。')); return; }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple', token: cred.identityToken, nonce: rawNonce,
+      });
+      if (error) {
+        setMsg(/provider is not enabled/i.test(error.message)
+          ? t('Appleサインインは準備中です（Supabase側のプロバイダ設定待ち）。')
+          : t('Appleサインインに失敗しました。もう一度お試しください。'));
+      }
+    } catch (e) {
+      // ユーザーがキャンセルした場合は黙る（エラー扱いにしない）
+      if (!(e instanceof Error && /canceled|cancelled|1001/i.test(e.message))) {
+        setMsg(t('Appleサインインに失敗しました。もう一度お試しください。'));
+      }
+    } finally { setABusy(false); }
+  }
+
   const isLogin = mode === 'login';
   const locale = useLocale();
   const [langOpen, setLangOpen] = useState(false);
@@ -140,7 +182,25 @@ export default function LoginScreen() {
         {info ? <Text style={s.info}>{info}</Text> : null}
         <OptionButton style={{ marginTop: 8 }} label={isLogin ? t('ログイン') : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
-        {/* SSO（v1.0では非表示。Googleを出すとApple Sign-Inの実装が必須になるため） */}
+        {/* Appleでサインイン（iOSのみ）。審査ガイドライン上、他のSSOを出すなら必須 */}
+        {appleAvail && (
+          <>
+            <View style={s.orRow}>
+              <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
+            </View>
+            <Pressable style={({ pressed }) => [s.ssoBtn, s.appleBtn, pressed && { opacity: 0.8 }]}
+                       onPress={appleLogin} disabled={aBusy}>
+              {aBusy ? <ActivityIndicator color="#fff" /> : (
+                <>
+                  <Text style={s.appleMark}></Text>
+                  <Text style={[s.ssoT, { color: '#fff' }]}>{t('Appleでサインイン')}</Text>
+                </>
+              )}
+            </Pressable>
+          </>
+        )}
+
+        {/* SSO（GoogleはOAuthクライアント設定後にSHOW_GOOGLE_SSOをtrueへ） */}
 {SHOW_GOOGLE_SSO && (
         <View style={s.orRow}>
           <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
@@ -185,6 +245,8 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
+  appleBtn: { backgroundColor: '#000', borderColor: '#000' },
+  appleMark: { color: '#fff', fontSize: 17, fontWeight: '700', marginRight: 6 },
   wrap: { flex: 1, backgroundColor: C.bg, justifyContent: 'center' },
   inner: { paddingHorizontal: 28 },
   langBtn: {

@@ -18,7 +18,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSHealthShareUsageDescription": "体重とワークアウトの記録をヘルスケアから読み取り、アプリのグラフや消費カロリー計算に反映するために使用します。",
         "NSHealthUpdateUsageDescription": "このアプリがヘルスケアへデータを書き込むことはありません。"
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -52,7 +53,8 @@
       ],
       "@react-native-community/datetimepicker",
       "@kingstinct/react-native-healthkit",
-      "expo-localization"
+      "expo-localization",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

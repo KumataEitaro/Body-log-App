@@ -34,6 +34,9 @@ import { C, rgba } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
+import { buildDailyBrief, type Brief } from '@/lib/dailyBrief';
+import DailyBrief from '@/components/DailyBrief';
+import { getColumns } from '@/content/columns';
 import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
@@ -545,6 +548,8 @@ export default function LogScreen() {
 
   // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
   const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
+  // 今日のひとこと帯（データ由来・採点なし・その日は×で閉じられる）
+  const [brief, setBrief] = useState<Brief | null>(null);
   useEffect(() => {
     if (!profile) return;
     (async () => {
@@ -569,6 +574,24 @@ export default function LogScreen() {
         });
         const risk = assessBingeRisk(days, new Date(t + 'T00:00:00').getDay());
         if (risk.level !== 'low') setBingeRisk(risk);
+
+        // 今日のひとこと帯（オフ設定・その日クローズ済みなら出さない）
+        if ((await AsyncStorage.getItem('bl-brief-off')) !== '1'
+          && (await AsyncStorage.getItem('bl-brief-closed')) !== t) {
+          const { data: wRows } = await supabase.from('entries')
+            .select('date,weight').not('weight', 'is', null)
+            .gte('date', shiftDate(t, -28)).order('date', { ascending: true });
+          const readRaw = await AsyncStorage.getItem('bl-columns-read');
+          const read = new Set<string>(readRaw ? JSON.parse(readRaw) as string[] : []);
+          const unread = getColumns().find((c) => !read.has(c.id)) ?? null;
+          setBrief(buildDailyBrief(
+            days,
+            new Date(t + 'T00:00:00').getDay(),
+            ((wRows ?? []) as { date: string; weight: number }[]),
+            unread ? { title: unread.title, minutes: unread.minutes, lead: unread.lead } : null,
+            Math.floor(Date.parse(t) / 86400000),
+          ));
+        }
       } catch { /* ベストエフォート */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -752,6 +775,14 @@ export default function LogScreen() {
             </Pressable>
           )}
         </Animated.View>
+
+        {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる） */}
+        {brief && (
+          <DailyBrief brief={brief} onClose={() => {
+            setBrief(null);
+            AsyncStorage.setItem('bl-brief-closed', todayJST()).catch(() => {});
+          }} />
+        )}
 
         {/* ヒーロー */}
         {vis('hero') && profile && (

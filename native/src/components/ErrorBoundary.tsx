@@ -11,6 +11,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { reportCrash } from '@/lib/crash';
 
 type Props = {
   children: ReactNode;
@@ -42,6 +43,8 @@ export default class ErrorBoundary extends Component<Props, State> {
       message: `${error.name}: ${error.message}`,
       stack,
     };
+    // 自前のクラッシュ計測へ（描画エラーは致命ではないがUXを壊すので集める）
+    void reportCrash(this.props.name ?? error.name, error.message, stack, false);
     // 開発中は普段どおりコンソールにも出す
     console.error(`[ErrorBoundary:${this.props.name ?? 'unknown'}]`, error, stack);
   }

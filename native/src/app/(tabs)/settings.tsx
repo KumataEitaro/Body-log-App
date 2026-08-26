@@ -11,6 +11,7 @@ import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
+import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
 import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
@@ -33,6 +34,52 @@ import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
 type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
+
+// 記録のCSVエクスポート（データは本人のもの、を形にする）
+function ExportRow() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  return (
+    <Pressable style={bt.row} disabled={busy} onPress={async () => {
+      setBusy(true); setErr('');
+      const r = await exportAllCsv();
+      if (!r.ok) setErr(r.error);
+      setBusy(false);
+    }}>
+      <Text style={bt.label}>{t('記録をエクスポート（CSV）')}</Text>
+      {busy ? <ActivityIndicator color={C.teal} /> : <Text style={{ color: C.teal, fontWeight: '800' }}>↗</Text>}
+      {err ? <Text style={{ position: 'absolute', bottom: -16, left: 14, fontSize: 11, color: C.coral }}>{err}</Text> : null}
+    </Pressable>
+  );
+}
+
+// 「今日のひとこと帯」のオン/オフ（設計上、消せることが安心につながる）
+function BriefToggle() {
+  const [off, setOff] = useState(false);
+  useEffect(() => { AsyncStorage.getItem('bl-brief-off').then((v) => setOff(v === '1')).catch(() => {}); }, []);
+  return (
+    <Pressable style={bt.row} onPress={() => {
+      const next = !off;
+      setOff(next);
+      AsyncStorage.setItem('bl-brief-off', next ? '1' : '0').catch(() => {});
+    }}>
+      <Text style={bt.label}>{t('今日のひとこと帯を表示')}</Text>
+      <View style={[bt.track, !off && bt.trackOn]}><View style={[bt.knob, !off && bt.knobOn]} /></View>
+    </Pressable>
+  );
+}
+const bt = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.panel, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+  },
+  label: { fontSize: 15, fontWeight: '600', color: C.ink },
+  track: { width: 44, height: 26, borderRadius: 13, backgroundColor: C.line, padding: 3 },
+  trackOn: { backgroundColor: C.teal },
+  knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
+  knobOn: { alignSelf: 'flex-end' },
+});
 
 export default function SettingsScreen() {
   const [email, setEmail] = useState('');
@@ -474,7 +521,11 @@ export default function SettingsScreen() {
     <Modal visible={sheet === 'columns'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
         <SheetHeader title={t('読みもの')} />
-        <ScrollView><ColumnReader /></ScrollView>
+        <ScrollView>
+        <BriefToggle />
+        <ExportRow />
+        <ColumnReader />
+        </ScrollView>
       </View>
     </Modal>
 

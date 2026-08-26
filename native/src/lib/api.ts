@@ -1,7 +1,7 @@
 // Vercel上のAI API（食事解析・コーチ）をBearerトークンで呼ぶ。
 import { supabase } from '@/lib/supabase';
 
-const API = process.env.EXPO_PUBLIC_API_BASE || 'https://bodylog-orcin.vercel.app';
+export const API = process.env.EXPO_PUBLIC_API_BASE || 'https://bodylog-orcin.vercel.app';
 
 // AI解析は数秒〜十数秒かかるが、それ以上待たせても成功しない。
 // タイムアウトが無いとfetchが永久に解決せず、ローディング表示が消えないまま操作不能になる。

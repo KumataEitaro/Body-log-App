@@ -14,6 +14,9 @@ import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
 import { reregisterAll } from '@/lib/notify';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { installCrashReporter } from '@/lib/crash';
+
+installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モジュール読込時に一度だけ）
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
