@@ -33,10 +33,11 @@ describe('recordItems と pickSuggestion', () => {
     expect((await pickSuggestion([], '2026-08-19'))?.days).toBe(3);
   });
 
-  it('2日だけでは提案しない', async () => {
-    await recordItems([item('納豆')], '2026-08-18');
+  it('1日だけでは提案しない・2日で提案する', async () => {
     await recordItems([item('納豆')], '2026-08-19');
     expect(await pickSuggestion([], '2026-08-19')).toBeNull();
+    await recordItems([item('納豆')], '2026-08-18');
+    expect((await pickSuggestion([], '2026-08-19'))?.name).toBe('納豆');
   });
 
   it('すでにマイ食品にある名前は提案しない', async () => {
@@ -117,8 +118,8 @@ describe('recordItems と pickSuggestion', () => {
 });
 
 describe('しきい値の定数', () => {
-  it('日単位の判定になっている（設計どおり3日・7日窓）', () => {
-    expect(_internal.NEED_DAYS).toBe(3);
+  it('日単位の判定になっている（設計どおり2日・7日窓）', () => {
+    expect(_internal.NEED_DAYS).toBe(2);
     expect(_internal.WINDOW_DAYS).toBe(7);
   });
 });

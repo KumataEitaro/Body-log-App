@@ -221,7 +221,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                 {/* 縦グリッド（全境界に引く・ラベル付きはやや濃く） */}
                 {xtks.map((t) => (
                   <Line key={`v${t.idx}`} x1={x(t.idx)} y1={PAD_T} x2={x(t.idx)} y2={PAD_T + plotH}
-                        stroke={t.label ? '#d5d9d3' : C.line} strokeWidth={0.5} strokeDasharray={t.label ? undefined : '2,3'} />
+                        stroke={C.sub} strokeOpacity={t.label ? 0.30 : 0.14} strokeWidth={0.5} strokeDasharray={t.label ? undefined : '2,3'} />
                 ))}
                 {xtks.filter((t) => t.label !== '').map((t) => (
                   <SvgText key={`vl${t.idx}`} x={x(t.idx)} y={height - 7} fontSize={9} fill={C.sub} textAnchor="middle">{t.label}</SvgText>
@@ -244,9 +244,9 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                   />
                 )}
                 {/* 生データレイヤー（薄グレー） */}
-                {rawPts.length >= 2 && <Path d={linePath(rawPts)} stroke="#c9cdc7" strokeWidth={1} fill="none" />}
+                {rawPts.length >= 2 && <Path d={linePath(rawPts)} stroke={C.faint} strokeOpacity={0.7} strokeWidth={1} fill="none" />}
                 {win.days <= 95 && rawPts.map((p, i) => (
-                  <Circle key={i} cx={p.x} cy={p.y} r={2} fill="#b3b8b1" />
+                  <Circle key={i} cx={p.x} cy={p.y} r={2} fill={C.faint} fillOpacity={0.8} />
                 ))}
                 {/* トレンド曲線（ベジェ） */}
                 {trendPts.length >= 2 && <Path d={smoothPath(trendPts)} stroke={color} strokeWidth={2.5} fill="none" strokeLinecap="round" />}

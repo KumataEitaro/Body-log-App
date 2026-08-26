@@ -64,3 +64,24 @@ describe('foodPortion（単位の初期値）', () => {
     expect(foodPortion('80g')).toBeNull();
   });
 });
+
+describe('foodBaseName（分数・漢数字・半分）', () => {
+  const { foodBaseName: b } = require('@/lib/foodName');
+  it('分数を落とす', () => {
+    expect(b('食パン1/2枚')).toBe('食パン');
+    expect(b('食パン 1枚')).toBe('食パン');
+  });
+  it('漢数字+単位を落とす', () => {
+    expect(b('ゆで卵 一個')).toBe('ゆで卵');
+    expect(b('豆腐 半丁')).toBe('豆腐');
+  });
+  it('食品名の中の漢数字は壊さない（単位が続く時だけ数量扱い）', () => {
+    expect(b('八宝菜')).toBe('八宝菜');
+    expect(b('十六穀米 150g')).toBe('十六穀米');
+    expect(b('一口カツ 2個')).toBe('一口カツ');
+  });
+  it('半分・約を落とす', () => {
+    expect(b('おにぎり 半分')).toBe('おにぎり');
+    expect(b('ごはん 約150g')).toBe('ごはん');
+  });
+});

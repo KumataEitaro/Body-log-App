@@ -18,7 +18,7 @@ import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/Notifi
 import { BellRing } from 'lucide-react-native';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
-import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, BG_TINTS, paletteFor } from '@/lib/theme';
+import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, BG_TINTS, paletteFor, darkPaletteFor } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -436,20 +436,40 @@ export default function SettingsScreen() {
       <View style={s.sheetBody}>
         <SheetHeader title={'🎨 ' + t('テーマカラー')} />
         <ScrollView>
-          <Text style={s.label}>{t('アクセントカラー')}</Text>
+          <Text style={s.label}>{t('外観')}</Text>
+          <Text style={s.note}>{t('「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。')}</Text>
+          <SegmentedControl
+            options={[
+              { key: 'light', label: t('ライト') },
+              { key: 'dark', label: t('ダーク') },
+              { key: 'system', label: t('自動') },
+            ]}
+            value={theme.mode}
+            onChange={(m) => setTheme({ mode: m as 'light' | 'dark' | 'system' })}
+          />
+
+          <Text style={[s.label, { marginTop: 22 }]}>{t('アクセントカラー')}</Text>
           <View style={s.swatchRow}>
-            {ACCENTS.map((a) => (
+            {ACCENTS.map((a) => {
+              // ダーク表示中はダーク版パレットでプレビュー（実際の見え方と一致させる）
+              const pal = theme.scheme === 'dark' ? darkPaletteFor(a.key) : PALETTES[a.key];
+              return (
               <Pressable key={a.key} style={s.swatchWrap} onPress={() => setTheme({ accent: a.key })}>
-                <View style={[s.swatch, { backgroundColor: PALETTES[a.key].bg, borderWidth: 1, borderColor: PALETTES[a.key].line }, theme.accent === a.key && s.swatchOn]}>
-                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 16, backgroundColor: PALETTES[a.key].accentBadge }} />
-                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: a.color }} />
+                <View style={[s.swatch, { backgroundColor: pal.bg, borderWidth: 1, borderColor: pal.line }, theme.accent === a.key && s.swatchOn]}>
+                  <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 16, backgroundColor: pal.accentBadge }} />
+                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: pal.teal }} />
                   {theme.accent === a.key && <Text style={s.swatchCheck}>✓</Text>}
                 </View>
                 <Text style={[s.swatchT, theme.accent === a.key && { color: C.ink, fontWeight: '800' }]}>{t(a.label)}</Text>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
 
+          {theme.scheme === 'dark' ? (
+            <Text style={[s.note, { marginTop: 22 }]}>{t('「背景」の淡色設定はライト表示のときに使えます。')}</Text>
+          ) : (
+          <>
           <Text style={[s.label, { marginTop: 22 }]}>{t('背景')}</Text>
           <Text style={s.note}>{t('カードの外側の下地だけを薄く色づけます。カード自体は白のままです。')}</Text>
           <View style={s.bgRow}>
@@ -467,6 +487,8 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          </>
+          )}
 
           <Text style={[s.label, { marginTop: 22 }]}>{t('P/F/Cバーの色')}</Text>
           <Text style={s.note}>{t('たんぱく質・脂質・炭水化物をそれぞれ好きな色にできます。目標を超えたバーは赤で表示されます。')}</Text>

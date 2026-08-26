@@ -1,5 +1,6 @@
-// テーマ設定（画面全体の配色 ＋ P/F/Cバーの配色。この2つは独立した設定）
+// テーマ設定（画面全体の配色 ＋ P/F/Cバーの配色 ＋ 明暗モード）
 import { useSyncExternalStore } from 'react';
+import { Appearance as RNAppearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { applyPalette, type Palette } from './ui';
 
@@ -164,15 +165,78 @@ export function paletteFor(accent: AccentKey, bg: BgTint): Palette {
   return { ...base, bg: mixW(base.teal, BG_MIX[bg]) };
 }
 
-export type ThemePrefs = { accent: AccentKey; pfc: PfcColors; bg: BgTint };
-export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: DEFAULT_PFC, bg: 'soft' };
+// ===== ダークパレット =====
+// 2つの色をt:1-tで混ぜる（tint系の導出に使う）
+function mixHex(a: string, b: string, t: number): string {
+  const ch = (i: number) => {
+    const va = parseInt(a.slice(i, i + 2), 16), vb = parseInt(b.slice(i, i + 2), 16);
+    return Math.round(va * t + vb * (1 - t)).toString(16).padStart(2, '0');
+  };
+  return '#' + ch(1) + ch(3) + ch(5);
+}
+
+/**
+ * アクセント1色からダークパレット一式を導出する。
+ * 方針: 中立色（背景・面・罫線）にアクセントをごく薄く混ぜて色相を揃え、
+ * アクセント自体は暗背景でのコントラスト確保のため少し明るく持ち上げる。
+ */
+export function darkPaletteFor(accent: AccentKey): Palette {
+  const a = (PALETTES[accent] ?? PALETTES.green).teal;
+  const al = (alpha: number) => {
+    const r = parseInt(a.slice(1, 3), 16), g = parseInt(a.slice(3, 5), 16), b = parseInt(a.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
+  const tint = (base: string, r: number) => mixHex(a, base, r);
+  return {
+    bg: tint('#0e1110', 0.05),
+    panel: tint('#191d1b', 0.05),
+    ink: '#e9edeb',
+    sub: '#98a29d',
+    faint: '#6b756f',
+    line: tint('#282d2a', 0.06),
+    teal: mixW(a, 0.12),                 // 暗所では少し明るいアクセント（上げすぎると白文字ボタンが薄くなる）
+    tealWeak: tint('#20302a', 0.30),
+    accentSoft: tint('#171e1b', 0.15),
+    accentBadge: tint('#1a2622', 0.24),
+    accentBorder: al(0.45),
+    track: tint('#252a27', 0.05),
+    chipBg: tint('#1f2422', 0.06),
+    segTrack: tint('#222724', 0.06),
+    pressed: tint('#282d2a', 0.06),
+    calorieBar: '#94a2b1',
+    coral: '#f2716a', coralWeak: '#3d211f', amber: '#dfae4a',
+  };
+}
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemePrefs = { accent: AccentKey; pfc: PfcColors; bg: BgTint; mode: ThemeMode };
+export const DEFAULT_THEME: ThemePrefs = { accent: 'green', pfc: DEFAULT_PFC, bg: 'soft', mode: 'system' };
 const KEY = 'bl-theme';
 
 let prefs: ThemePrefs = DEFAULT_THEME;
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+
+/** 実際に画面へ効いている明暗（mode=systemのときはOS設定に従う） */
+export function currentScheme(): 'light' | 'dark' {
+  if (prefs.mode !== 'system') return prefs.mode;
+  try { return RNAppearance.getColorScheme() === 'dark' ? 'dark' : 'light'; } catch { return 'light'; }
+}
+
+// useSyncExternalStore用スナップショット（scheme込み。emitのたびに作り直す）
+export type ThemeSnapshot = ThemePrefs & { scheme: 'light' | 'dark' };
+let snapshot: ThemeSnapshot = { ...prefs, scheme: 'light' };
+const emit = () => { snapshot = { ...prefs, scheme: currentScheme() }; listeners.forEach((l) => l()); };
 
 export function pfcColors(): PfcColors { return prefs.pfc; }
+
+function applyCurrent(): void {
+  const scheme = currentScheme();
+  applyPalette(scheme === 'dark' ? darkPaletteFor(prefs.accent) : paletteFor(prefs.accent, prefs.bg));
+  // ネイティブUI（タブバー・ヘッダー・シート）も同じ明暗に固定する。
+  // mode=systemのときはOS追従（null）。これを怠るとLiquid Glassのバーだけ暗い事故が再発する
+  // 型定義がnull（=OS追従に戻す）を受け付けない版があるためキャストする（ランタイムは対応済み）
+  try { RNAppearance.setColorScheme((prefs.mode === 'system' ? null : prefs.mode) as unknown as 'light' | 'dark'); } catch { /* 旧RNでは無視 */ }
+}
 
 export async function loadTheme(): Promise<void> {
   try {
@@ -184,23 +248,33 @@ export async function loadTheme(): Promise<void> {
         : { ...DEFAULT_PFC, ...(p.pfc as Partial<PfcColors>) }; // 新: 個別色
       const bg: BgTint = BG_TINTS.some((x) => x.key === p.bg)
         ? (p.bg as BgTint) : DEFAULT_THEME.bg;
-      prefs = { ...DEFAULT_THEME, ...p, pfc, bg };
+      const mode: ThemeMode = p.mode === 'light' || p.mode === 'dark' ? p.mode : 'system';
+      prefs = { ...DEFAULT_THEME, ...p, pfc, bg, mode };
     }
   } catch { /* 既定のまま */ }
-  applyPalette(paletteFor(prefs.accent, prefs.bg));
+  applyCurrent();
   emit();
 }
 
+// OSの外観切替（自動ダークモード等）に追従する（mode=systemの間だけ実質的に効く）
+try {
+  RNAppearance.addChangeListener(() => {
+    if (prefs.mode !== 'system') return;
+    applyCurrent();
+    emit();
+  });
+} catch { /* テスト環境等では無視 */ }
+
 export async function setTheme(patch: Partial<ThemePrefs>): Promise<void> {
   prefs = { ...prefs, ...patch };
-  applyPalette(paletteFor(prefs.accent, prefs.bg));
+  applyCurrent();
   emit();
   try { await AsyncStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* 表示は既に切り替わっている */ }
 }
 
-export function getTheme(): ThemePrefs { return prefs; }
+export function getTheme(): ThemeSnapshot { return snapshot; }
 
-export function useTheme(): ThemePrefs {
+export function useTheme(): ThemeSnapshot {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
     getTheme,

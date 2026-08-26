@@ -873,4 +873,10 @@ export const ID: Record<string, string> = {
   "{n}日間無料で始める": "Mulai uji coba gratis {n} hari",
   "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Setelah masa gratis berakhir, biayanya {p}. Tidak ada biaya jika Anda membatalkan selama masa uji coba.",
   "無料のまま始める": "Mulai dengan gratis",
+  "外観": "Tampilan",
+  "「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。": "'Otomatis' beralih mengikuti pengaturan mode gelap perangkatmu.",
+  "ライト": "Terang",
+  "ダーク": "Gelap",
+  "自動": "Otomatis",
+  "「背景」の淡色設定はライト表示のときに使えます。": "Pengaturan warna lembut 'Latar Belakang' dapat digunakan dalam mode Terang.",
 };

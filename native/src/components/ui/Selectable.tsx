@@ -105,7 +105,7 @@ const s = StyleSheet.create({
   // Segmented
   track: { position: 'relative', flexDirection: 'row', backgroundColor: C.segTrack, borderRadius: 999, padding: 3 },
   plate: {
-    position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: '#fff', borderRadius: 999,
+    position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: C.panel, borderRadius: 999,
     shadowColor: '#141815', shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
   segBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999 },

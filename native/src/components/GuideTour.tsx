@@ -363,7 +363,7 @@ const s = StyleSheet.create({
   },
   skipT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   bubble: {
-    position: 'absolute', left: 18, right: 18, backgroundColor: '#fff', borderRadius: 18, padding: 16,
+    position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: 18, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   bubbleTitle: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 5 },
@@ -373,7 +373,7 @@ const s = StyleSheet.create({
   demoTitle: { fontSize: 21, fontWeight: '900', color: '#fff', textAlign: 'center' },
   demoLead: { fontSize: 13, color: 'rgba(255,255,255,0.82)', textAlign: 'center', lineHeight: 19, marginTop: 6, marginBottom: 14 },
   demoPhone: {
-    backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
+    backgroundColor: C.panel, borderRadius: 20, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
   demoBar: { paddingVertical: 9, alignItems: 'center', backgroundColor: '#f7faf9', borderBottomWidth: 1, borderBottomColor: '#eef1f0' },
@@ -389,7 +389,7 @@ const s = StyleSheet.create({
   beakDown: { bottom: -10, borderTopWidth: 10, borderTopColor: '#fff' },
   cardWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
-    width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 22, padding: 22, alignItems: 'stretch',
+    width: '100%', maxWidth: 360, backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'stretch',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
   cardEmoji: { fontSize: 40, textAlign: 'center', marginBottom: 6 },

@@ -974,4 +974,10 @@ export const EN: Record<string, string> = {
   "{n}日間無料で始める": "Start {n} days free",
   "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "After your free trial, it's {p}. Cancel anytime during the trial and you won't be charged.",
   "無料のまま始める": "Continue for free",
+  "外観": "Appearance",
+  "「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。": "\"Auto\" switches automatically to match your device's dark mode settings.",
+  "ライト": "Light",
+  "ダーク": "Dark",
+  "自動": "Auto",
+  "「背景」の淡色設定はライト表示のときに使えます。": "The background tint setting is available in Light mode.",
 };

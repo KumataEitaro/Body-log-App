@@ -873,4 +873,10 @@ export const FR: Record<string, string> = {
   "{n}日間無料で始める": "Essayer gratuitement pendant {n} jours",
   "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Après la période gratuite, c'est {p}. Aucun frais si vous annulez pendant l'essai.",
   "無料のまま始める": "Continuer avec la version gratuite",
+  "外観": "Apparence",
+  "「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。": "« Auto » bascule entre le mode jour et nuit selon le mode sombre de votre appareil.",
+  "ライト": "Clair",
+  "ダーク": "Sombre",
+  "自動": "Auto",
+  "「背景」の淡色設定はライト表示のときに使えます。": "L'option de fond clair est disponible en mode clair.",
 };

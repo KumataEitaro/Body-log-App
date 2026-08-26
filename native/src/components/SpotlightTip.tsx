@@ -107,7 +107,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   bubble: {
-    position: 'absolute', left: 18, right: 18, backgroundColor: '#fff', borderRadius: 18, padding: 16,
+    position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: 18, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },

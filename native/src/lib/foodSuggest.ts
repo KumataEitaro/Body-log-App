@@ -12,7 +12,10 @@ const SHOWN_KEY = 'bl-food-suggest-shown';
 
 const KEEP_DAYS = 14;      // 出現履歴を保持する日数
 const WINDOW_DAYS = 7;     // 判定に使う直近の日数
-const NEED_DAYS = 3;       // 何日ぶん出たら提案するか（同じ日の複数回は1回）
+// 何日ぶん出たら提案するか（同じ日の複数回は1回）。
+// 3日だと体感が遅すぎた（βフィードバック: 出ない、と言われる）ので2日へ。
+// 誤検知しても「あとで」で二度と出ない＋登録済みは除外なので、緩めのコストは低い
+const NEED_DAYS = 2;
 
 /** 分量ごとの実績値。最頻の分量を代表値に選ぶために持つ */
 type PortionStat = { portion: string; n: number; kcal: number; p: number; f: number; c: number };

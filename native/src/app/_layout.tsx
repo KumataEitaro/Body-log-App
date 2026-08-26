@@ -53,10 +53,11 @@ export default function RootLayout() {
     // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿
     <ErrorBoundary name={t('アプリ')}>
       <LaunchProvider ready={ready}>
-        <StatusBar style="dark" />
+        {/* ダーク時は白文字のステータスバー */}
+        <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         {/* GuideProviderはルートに置く（設定画面がタブ外に出たため、タブ内限定だとuseGuideが届かない） */}
         <GuideProvider>
-          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.scheme}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         </GuideProvider>
       </LaunchProvider>
     </ErrorBoundary>

@@ -873,4 +873,10 @@ export const VI: Record<string, string> = {
   "{n}日間無料で始める": "Bắt đầu dùng thử miễn phí {n} ngày",
   "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Sau khi hết thời gian miễn phí là {p}. Sẽ không mất phí nếu bạn hủy trong thời gian dùng thử.",
   "無料のまま始める": "Bắt đầu miễn phí",
+  "外観": "Giao diện",
+  "「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。": "\"Tự động\" sẽ chuyển đổi theo cài đặt chế độ tối của thiết bị.",
+  "ライト": "Sáng",
+  "ダーク": "Tối",
+  "自動": "Tự động",
+  "「背景」の淡色設定はライト表示のときに使えます。": "Cài đặt màu nhạt cho \"Nền\" chỉ khả dụng ở chế độ Sáng.",
 };

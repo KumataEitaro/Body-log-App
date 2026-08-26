@@ -1344,7 +1344,7 @@ const s = StyleSheet.create({
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
-    backgroundColor: '#ffffff', borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
+    backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
     paddingHorizontal: 9, paddingVertical: 8,
     shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.12, elevation: 8,
   },
@@ -1380,7 +1380,7 @@ const s = StyleSheet.create({
   },
   trayChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
