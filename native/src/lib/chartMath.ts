@@ -129,6 +129,33 @@ export function xTicks(startIdx: number, endIdx: number, maxLabels = 8): XTick[]
   return out;
 }
 
+// ===== 滑らかなトレンド（1日刻みのゼロ位相EMA） =====
+// 記録のある日だけの点をベジェで繋ぐと、間隔がまばらな所で折れ・平坦→急坂が出る。
+// 対策: ①ビンを1日刻みに線形補間して密な系列にする → ②EMAを前向き→後ろ向きの
+// 2パスでかける（ゼロ位相＝遅れなし）。密な点列になるのでパスはどこでも滑らか。
+export function smoothTrend(bins: Bin[], unit: BinUnit): Bin[] {
+  if (bins.length < 2) return bins;
+  const start = Math.ceil(bins[0].idx), end = Math.floor(bins[bins.length - 1].idx);
+  if (end <= start) return bins;
+  // 1日刻みへ線形補間
+  const daily: number[] = [];
+  let j = 0;
+  for (let i = start; i <= end; i++) {
+    while (j < bins.length - 2 && bins[j + 1].idx < i) j++;
+    const a = bins[j], b = bins[Math.min(j + 1, bins.length - 1)];
+    const t = b.idx === a.idx ? 0 : (i - a.idx) / (b.idx - a.idx);
+    daily.push(a.value + (b.value - a.value) * Math.min(1, Math.max(0, t)));
+  }
+  // ゼロ位相EMA（半減期は表示単位に応じて）
+  const halflife = { day: 3.5, week: 14, month: 45 }[unit];
+  const alpha = 1 - Math.pow(0.5, 1 / halflife);
+  const fwd = [...daily];
+  for (let i = 1; i < fwd.length; i++) fwd[i] = fwd[i - 1] + (daily[i] - fwd[i - 1]) * alpha;
+  const out = [...fwd];
+  for (let i = out.length - 2; i >= 0; i--) out[i] = out[i + 1] + (fwd[i] - out[i + 1]) * alpha;
+  return out.map((v, k) => ({ idx: start + k, value: v }));
+}
+
 // ===== Catmull-Rom → 3次ベジェのSVGパス（滑らかなトレンド曲線） =====
 export function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return '';

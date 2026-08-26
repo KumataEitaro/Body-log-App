@@ -5,12 +5,12 @@
 // - ⤢で全画面モーダル展開
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
-import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { C } from '@/lib/ui';
 import {
-  type RawPoint, dateToIdx, idxToDate, unitForDays, MA_WINDOW,
-  binPoints, movingAvg, niceTicks, xTicks, smoothPath, linePath,
+  type RawPoint, dateToIdx, idxToDate, unitForDays,
+  binPoints, smoothTrend, niceTicks, xTicks, smoothPath, linePath,
 } from '@/lib/chartMath';
 import { t } from '@/lib/i18n';
 
@@ -68,9 +68,13 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
   }
   const binUnit = unitRef.current;
   const bins = useMemo(() => binPoints(sorted, binUnit), [sorted, binUnit]);
-  const trend = useMemo(() => movingAvg(bins, MA_WINDOW[binUnit]), [bins, binUnit]);
+  // 1日刻みのゼロ位相EMA（まばらな記録でも折れずに滑らか）
+  const trend = useMemo(() => smoothTrend(bins, binUnit), [bins, binUnit]);
 
-  const visTrend = trend.filter((b) => b.idx >= startF - 3 && b.idx <= win.end + 3);
+  const visTrendAll = trend.filter((b) => b.idx >= startF - 3 && b.idx <= win.end + 3);
+  // 密な日次系列なので、描画は最大240点に間引く（終端は必ず残す）
+  const thinStep = Math.max(1, Math.floor(visTrendAll.length / 240));
+  const visTrend = visTrendAll.filter((_, i) => i % thinStep === 0 || i === visTrendAll.length - 1);
   const showRaw = win.days <= 400;
   const visRaw = showRaw ? sorted.map((p) => ({ idx: dateToIdx(p.date), value: p.value }))
     .filter((b) => b.idx >= startF - 1 && b.idx <= win.end + 1) : [];
@@ -137,18 +141,24 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
       const damped = Math.pow(Math.max(0.2, e.scale), 0.9);
       const newDays = Math.min(Math.max(7, pinchStart.current.days / damped), span);
       const target = clampWin(focalIdx + (1 - fx) * newDays, newDays);
-      // 履歴に積む（400msより古いものは捨てる）
       const now = Date.now();
-      pinchHist.current.push({ t: now, end: target.end, days: target.days });
-      while (pinchHist.current.length > 0 && now - pinchHist.current[0].t > 400) pinchHist.current.shift();
-      // Withings風のローパス: 指に数フレーム遅れてぬるっと追従させる
-      setWin((prev) => ({
-        end: prev.end + (target.end - prev.end) * 0.5,
-        days: prev.days + (target.days - prev.days) * 0.5,
-      }));
+      // Withings風のローパス: 指に数フレーム遅れてぬるっと追従させる。
+      // 【指を離した瞬間に跳ぶバグの修正】履歴には「目標値」ではなく
+      // 「実際に表示した値（ローパス後）」を積む。目標値を積むと、確定時に
+      // 表示中の位置から乖離した場所へスナップして倍率が跳んで見える。
+      setWin((prev) => {
+        const next = {
+          end: prev.end + (target.end - prev.end) * 0.5,
+          days: prev.days + (target.days - prev.days) * 0.5,
+        };
+        pinchHist.current.push({ t: now, end: next.end, days: next.days });
+        while (pinchHist.current.length > 0 && now - pinchHist.current[0].t > 400) pinchHist.current.shift();
+        return next;
+      });
     })
     .onEnd(() => {
-      // 離れ際90msの暴れを無効化: それ以前の最後の状態へ確定する
+      // 離れ際90msの暴れを無効化: それ以前に「表示していた」状態へ確定する
+      // （表示値どうしの差はローパスで小さいため、確定時の視覚ジャンプは起きない）
       const cutoff = Date.now() - 90;
       const stable = [...pinchHist.current].reverse().find((h) => h.t <= cutoff);
       if (stable) {
@@ -220,16 +230,32 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                 {planValue != null && planValue >= lo && planValue <= hi && (
                   <Line x1={PAD_L} y1={y(planValue)} x2={PAD_L + plotW} y2={y(planValue)} stroke={C.sub} strokeWidth={1} strokeDasharray="5,4" />
                 )}
+                {/* トレンド下のグラデーション面（うっすら。曲線を主役に立てる） */}
+                <Defs>
+                  <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0" stopColor={color} stopOpacity={0.14} />
+                    <Stop offset="1" stopColor={color} stopOpacity={0} />
+                  </LinearGradient>
+                </Defs>
+                {trendPts.length >= 2 && (
+                  <Path
+                    d={`${smoothPath(trendPts)} L${trendPts[trendPts.length - 1].x.toFixed(1)},${(PAD_T + plotH).toFixed(1)} L${trendPts[0].x.toFixed(1)},${(PAD_T + plotH).toFixed(1)} Z`}
+                    fill="url(#trendFill)" stroke="none"
+                  />
+                )}
                 {/* 生データレイヤー（薄グレー） */}
                 {rawPts.length >= 2 && <Path d={linePath(rawPts)} stroke="#c9cdc7" strokeWidth={1} fill="none" />}
                 {win.days <= 95 && rawPts.map((p, i) => (
                   <Circle key={i} cx={p.x} cy={p.y} r={2} fill="#b3b8b1" />
                 ))}
                 {/* トレンド曲線（ベジェ） */}
-                {trendPts.length >= 2 && <Path d={smoothPath(trendPts)} stroke={color} strokeWidth={2.5} fill="none" />}
-                {/* 最新点の強調 */}
+                {trendPts.length >= 2 && <Path d={smoothPath(trendPts)} stroke={color} strokeWidth={2.5} fill="none" strokeLinecap="round" />}
+                {/* 最新点の強調（外側に淡いハロー） */}
                 {trendPts.length > 0 && (
-                  <Circle cx={trendPts[trendPts.length - 1].x} cy={trendPts[trendPts.length - 1].y} r={4} fill={color} />
+                  <>
+                    <Circle cx={trendPts[trendPts.length - 1].x} cy={trendPts[trendPts.length - 1].y} r={8} fill={color} opacity={0.18} />
+                    <Circle cx={trendPts[trendPts.length - 1].x} cy={trendPts[trendPts.length - 1].y} r={4} fill={color} />
+                  </>
                 )}
               </Svg>
             )}
