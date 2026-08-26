@@ -18,8 +18,10 @@ export type PlanLimits = {
 
 // DBのplan_limitsが読めない時の保険（値はmigration-18の初期値と揃えること）
 const FALLBACK: Record<Plan, PlanLimits> = {
-  free:     { plan: 'free',     text_day: 3,   photo_day: 0,  coach_day: 3,  photo_trial_total: 5, ads: true },
-  lite:     { plan: 'lite',     text_day: 3,   photo_day: 0,  coach_day: 3,  photo_trial_total: 5, ads: false },
+  // 写真は「累計5枚のお試し」ではなく日次リセットに変更（2026-08-26 1500人ペルソナ監査:
+  // 全6層共通のペイン1位。初日に尽きて看板機能を体験できないまま離脱していた）
+  free:     { plan: 'free',     text_day: 5,   photo_day: 2,  coach_day: 3,  photo_trial_total: 0, ads: true },
+  lite:     { plan: 'lite',     text_day: 5,   photo_day: 2,  coach_day: 3,  photo_trial_total: 0, ads: false },
   standard: { plan: 'standard', text_day: 50,  photo_day: 5,  coach_day: 10, photo_trial_total: 0, ads: false },
   premium:  { plan: 'premium',  text_day: 100, photo_day: 30, coach_day: 50, photo_trial_total: 0, ads: false },
 };
