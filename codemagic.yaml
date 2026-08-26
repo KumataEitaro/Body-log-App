@@ -133,7 +133,8 @@ workflows:
           ENT="native/ios/BodyLog/BodyLog.entitlements"
           if [ -f "$ENT" ]; then
             plutil -remove aps-environment "$ENT" 2>/dev/null && echo "aps-environment removed" || echo "aps-environment not present (ok)"
-            plutil -remove com.apple.developer.applesignin "$ENT" 2>/dev/null && echo "applesignin removed" || echo "applesignin not present (ok)"
+            # plutilはキー名の"."を階層区切りと解釈するため、ドット入りキーはPlistBuddyで消す
+            /usr/libexec/PlistBuddy -c "Delete :com.apple.developer.applesignin" "$ENT" 2>/dev/null && echo "applesignin removed" || echo "applesignin not present (ok)"
             plutil -p "$ENT"
           fi
       - name: Set build number
