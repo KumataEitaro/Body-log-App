@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing } from 'react-native';
 import { Stack } from 'expo-router';
-import { Share2 } from 'lucide-react-native';
+import { Share2, Flame, PartyPopper } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { evaluateAchievements, type AchievementReport, type BadgeState } from '@/lib/achievements';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
+import BadgeIcon from '@/components/BadgeIcon';
 
 // 新規獲得の祝祭オーバーレイ（スケールイン＋触覚。獲得の瞬間を「事件」にする）
 function CelebrateOverlay({ badges, onShare, onClose }: { badges: BadgeState[]; onShare: (b: BadgeState) => void; onClose: () => void }) {
@@ -21,11 +22,11 @@ function CelebrateOverlay({ badges, onShare, onClose }: { badges: BadgeState[]; 
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={s.celebBack}>
         <RNAnimated.View style={[s.celebCard, { transform: [{ scale }] }]}>
-          <Text style={{ fontSize: 44 }}>🎉</Text>
+          <View style={s.celebIcon}><PartyPopper size={30} color={C.teal} /></View>
           <Text style={s.celebT}>{t('新しいバッジを獲得！')}</Text>
           {badges.map((b) => (
             <View key={b.id} style={s.celebRow}>
-              <Text style={{ fontSize: 30 }}>{b.emoji}</Text>
+              <BadgeIcon id={b.id} size={40} />
               <View style={{ flex: 1 }}>
                 <Text style={s.celebName}>{b.name}</Text>
                 <Text style={s.celebDesc}>{b.desc}</Text>
@@ -82,7 +83,7 @@ export default function AchievementsScreen() {
           <>
             {/* ストリークのヒーロー */}
             <View style={s.hero}>
-              <Text style={{ fontSize: 40 }}>🔥</Text>
+              <View style={s.heroFlame}><Flame size={30} color={C.teal} fill={C.teal} /></View>
               <Text style={s.heroN}>{report.streak}<Text style={s.heroU}>{t('日連続')}</Text></Text>
               <Text style={s.heroSub}>
                 {report.usedFreeze
@@ -119,7 +120,7 @@ export default function AchievementsScreen() {
                     const on = b.earnedOn != null;
                     return (
                       <View key={b.id} style={[s.badge, !on && s.badgeOff]}>
-                        <Text style={[{ fontSize: 26 }, !on && { opacity: 0.35 }]}>{b.emoji}</Text>
+                        <BadgeIcon id={b.id} size={40} dim={!on} />
                         <Text style={[s.badgeN, !on && { color: C.faint }]} numberOfLines={1}>{b.name}</Text>
                         <Text style={s.badgeD} numberOfLines={2}>
                           {on ? t('{d} 獲得', { d: b.earnedOn!.slice(5).replace('-', '/') }) : b.desc}
@@ -136,7 +137,7 @@ export default function AchievementsScreen() {
       {celebrate.length > 0 && (
         <CelebrateOverlay
           badges={celebrate}
-          onShare={(b) => { setCelebrate([]); setSticker({ kind: 'badge', emoji: b.emoji, name: b.name }); }}
+          onShare={(b) => { setCelebrate([]); setSticker({ kind: 'badge', id: b.id, name: b.name }); }}
           onClose={() => setCelebrate([])}
         />
       )}
@@ -165,6 +166,8 @@ const s = StyleSheet.create({
   badgeOff: { backgroundColor: C.chipBg },
   badgeN: { fontSize: 12, fontWeight: '800', color: C.ink, marginTop: 4 },
   badgeD: { fontSize: 10, color: C.sub, textAlign: 'center', marginTop: 2, lineHeight: 13 },
+  heroFlame: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  celebIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
   celebBack: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 28 },
   celebCard: { backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'center' },
   celebT: { fontSize: 18, fontWeight: '900', color: C.ink, marginTop: 4, marginBottom: 10 },

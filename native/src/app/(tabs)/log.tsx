@@ -48,6 +48,7 @@ import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
+import MoodFace from '@/components/MoodFace';
 import { invalidateStreak } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
@@ -911,10 +912,10 @@ export default function LogScreen() {
               <Text style={[s.h2, { marginBottom: 0 }]}>{t('いまの気分は？')}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              {(['😫', '😕', '😐', '🙂', '😄'] as const).map((e, i) => (
-                <Pressable key={e} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}
-                           disabled={moodBusy} onPress={() => saveMood(i + 1)}>
-                  <Text style={{ fontSize: 26 }}>{e}</Text>
+              {([1, 2, 3, 4, 5] as const).map((lv) => (
+                <Pressable key={lv} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}
+                           disabled={moodBusy} onPress={() => saveMood(lv)}>
+                  <MoodFace level={lv} size={30} />
                 </Pressable>
               ))}
             </View>

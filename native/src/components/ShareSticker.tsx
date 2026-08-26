@@ -10,6 +10,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { Flame } from 'lucide-react-native';
+import { badgeIconOf } from '@/components/BadgeIcon';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
@@ -19,7 +21,7 @@ export type StickerData =
   | { kind: 'pr'; name: string; kg: number; date: string }
   | { kind: 'today'; kcal: number; left: number; p: number; f: number; c: number }
   | { kind: 'workout'; label: string; kcal: number; minutes: number; km?: number | null }
-  | { kind: 'badge'; emoji: string; name: string };
+  | { kind: 'badge'; id: string; name: string };
 
 type Tone = 'light' | 'dark'; // light=白文字（暗い写真用） dark=黒文字（明るい写真用）
 
@@ -53,7 +55,7 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
       <Text style={[st.dateLine, { color: toneSub(tone) }]}>{dateLine}</Text>
       {data.kind === 'streak' && (
         <>
-          <Text style={{ fontSize: 44 }}>🔥</Text>
+          <Flame size={44} color={col} fill={col} />
           <Stat label="" value={String(data.days)} unit="" tone={tone} big />
           <Text style={[st.label, { color: col, marginTop: -4 }]}>DAY STREAK</Text>
           <Rule tone={tone} />
@@ -70,7 +72,7 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
       )}
       {data.kind === 'badge' && (
         <>
-          <Text style={{ fontSize: 48 }}>{data.emoji}</Text>
+          {(() => { const Icon = badgeIconOf(data.id); return <Icon size={44} color={col} strokeWidth={2} />; })()}
           <Text style={[st.prName, { color: col, marginTop: 4 }]}>{data.name}</Text>
           <Rule tone={tone} />
           <Text style={[st.label, { color: toneSub(tone) }]}>ACHIEVEMENT UNLOCKED</Text>

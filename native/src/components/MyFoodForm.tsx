@@ -4,8 +4,13 @@
 //  ・設定 → マイ食品の管理 → ＋追加（空のフォーム）
 //  ・食事の保存後の案内 → 登録してみる（名前・単位・栄養値が埋まった状態）
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Sparkles, Camera } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { apiPost } from '@/lib/api';
+import { apiLang } from '@/lib/i18n';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
@@ -30,7 +35,72 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
   const [f, setF] = useState('');
   const [c, setC] = useState('');
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // AI解析の結果（items先頭 or 合計）でフォームを埋める共通処理
+  type ParseResult = { items?: { name?: string; qty?: string; kcal?: number; p?: number; f?: number; c?: number }[] };
+  function fillFrom(r: ParseResult | undefined) {
+    const it = r?.items?.[0];
+    if (!it || !(Number(it.kcal) > 0)) {
+      setMsg({ ok: false, text: t('栄養値を読み取れませんでした。名前や量をもう少し具体的にするか、手入力してください。') });
+      return;
+    }
+    // 複数品目が返ったら合計にする（お弁当の写真など）
+    const items = r!.items!;
+    const sum = (k: 'kcal' | 'p' | 'f' | 'c') => Math.round(items.reduce((a, x) => a + (Number(x[k]) || 0), 0));
+    setKcal(String(sum('kcal')));
+    setP(String(sum('p'))); setF(String(sum('f'))); setC(String(sum('c')));
+    if (!name.trim() && it.name) setName(String(it.name));
+    if (!unit.trim() && it.qty && items.length === 1) setUnit(String(it.qty));
+    setMsg({ ok: true, text: items.length > 1 ? t('{n}品目の合計を入れました。数値は自由に直せます。', { n: items.length }) : t('AIが数値を入れました。自由に直せます。') });
+  }
+
+  // 名前＋量のテキストからAI推定
+  async function aiFromText() {
+    const q = `${name.trim()} ${unit.trim()}`.trim();
+    if (!q) { setMsg({ ok: false, text: t('先に名前（と量）を入力してください。') }); return; }
+    setAiBusy(true); setMsg(null);
+    try {
+      const { ok, json } = await apiPost<{ ok: boolean; error?: string; code?: string; result?: ParseResult }>(
+        '/api/parse-food', { text: q, lang: apiLang() });
+      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。') }); return; }
+      fillFrom(json.result);
+    } finally { setAiBusy(false); }
+  }
+
+  // 写真からAI推定（成分表示ラベルを撮ると表記値がそのまま入る）
+  async function aiFromPhoto(fromCamera: boolean) {
+    setMsg(null);
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { setMsg({ ok: false, text: t('写真の許可が必要です（設定アプリ→BodyLog）。') }); return; }
+    const res = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 0.85 })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.85, selectionLimit: 1 });
+    if (res.canceled || !res.assets?.[0]?.uri) return;
+    setAiBusy(true);
+    try {
+      const small = await ImageManipulator.manipulateAsync(
+        res.assets[0].uri, [{ resize: { width: 1280 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true });
+      const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: ParseResult }>(
+        '/api/parse-food', { text: name.trim(), lang: apiLang(), images: [{ data: small.base64, mime: 'image/jpeg' }] });
+      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。') }); return; }
+      fillFrom(json.result);
+    } catch {
+      setMsg({ ok: false, text: t('写真を処理できませんでした。もう一度お試しください。') });
+    } finally { setAiBusy(false); }
+  }
+
+  function pickPhotoSource() {
+    Alert.alert(t('写真から読み取る'), t('パッケージ裏の栄養成分表示を撮ると、表記どおりの数値が入ります。'), [
+      { text: t('カメラで撮る'), onPress: () => aiFromPhoto(true) },
+      { text: t('ライブラリから選ぶ'), onPress: () => aiFromPhoto(false) },
+      { text: t('キャンセル'), style: 'cancel' },
+    ]);
+  }
 
   // 開くたびに初期値を入れ直す（前回の入力が残らないように）
   useEffect(() => {
@@ -119,6 +189,19 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
             <TextInput style={s.input} value={unit} onChangeText={setUnit}
                        placeholder={t('例: 80g')} placeholderTextColor={C.faint} />
 
+            {/* AI入力: 手入力の代わりに、名前+量のテキスト or 写真から栄養値を埋める */}
+            <View style={s.aiRow}>
+              <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={aiFromText} disabled={aiBusy}>
+                {aiBusy ? <ActivityIndicator size="small" color={C.teal} /> : <Sparkles size={15} color={C.teal} />}
+                <Text style={s.aiBtnT}>{t('AIにおまかせ')}</Text>
+              </Pressable>
+              <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={pickPhotoSource} disabled={aiBusy}>
+                <Camera size={15} color={C.teal} />
+                <Text style={s.aiBtnT}>{t('写真から読み取る')}</Text>
+              </Pressable>
+            </View>
+            <Text style={s.aiHint}>{t('成分表示のラベルを撮ると表記どおりの数値が入ります。下の欄はいつでも手で直せます。')}</Text>
+
             <Text style={s.label}>{t('カロリー（kcal）')}</Text>
             <TextInput style={s.input} value={kcal} onChangeText={setKcal}
                        keyboardType="number-pad" placeholder="0" placeholderTextColor={C.faint} />
@@ -165,4 +248,12 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
   col: { flex: 1 },
   msg: { fontSize: 13, fontWeight: '700', marginTop: 12 },
+  aiRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  aiBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+    borderRadius: 12, paddingVertical: 11,
+  },
+  aiBtnT: { fontSize: 13.5, fontWeight: '800', color: C.teal },
+  aiHint: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 16 },
 });

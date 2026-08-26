@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Award } from 'lucide-react-native';
+import { Award, Flame } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { quickStreak } from '@/lib/achievements';
@@ -23,7 +23,10 @@ export default function StreakChip() {
       <Pressable style={({ pressed }) => [s.chip, pressed && { opacity: 0.7 }]}
                  onPress={() => router.push('/achievements' as never)} hitSlop={6}>
         {days > 0 ? (
-          <Text style={s.t}>🔥 <Text style={s.n}>{days}</Text>{t('日連続')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Flame size={13} color={C.teal} fill={C.teal} />
+            <Text style={s.t}><Text style={s.n}>{days}</Text>{t('日連続')}</Text>
+          </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Award size={13} color={C.sub} />

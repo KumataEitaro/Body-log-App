@@ -655,11 +655,12 @@ export default function SettingsScreen() {
           ))}
           <View style={{ height: 24 }} />
         </ScrollView>
+        {/* 【重要】このフォームはpageSheetの内側に置く。外（兄弟）に置くと
+            iOSでは表示中のシートの上にモーダルを出せず、ボタンが無反応になる */}
+        <MyFoodForm visible={foodFormOpen} draft={null}
+                    onClose={() => setFoodFormOpen(false)} onSaved={load} />
       </View>
     </Modal>
-
-    <MyFoodForm visible={foodFormOpen} draft={null}
-                onClose={() => setFoodFormOpen(false)} onSaved={load} />
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
     <StatusBarMask />
     </View>
