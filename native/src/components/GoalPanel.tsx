@@ -268,6 +268,22 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             })}
           </View>
 
+          {/* 係数がピンと来ない人向けに、カロリー比%も併記する（MFP等の表現に慣れた人が多い） */}
+          {(() => {
+            const w = latestWeight ?? 70;
+            const pG = (Number(gProtein) || PROTEIN_PER_KG_DEFAULT) * w;
+            const fG = (Number(gFat) || FAT_PER_KG_DEFAULT) * w;
+            const kcal = 1800; // 表示用の概算基準（実際の目標kcalは日々変わるため比率の目安として出す）
+            const pPct = Math.round((pG * 4 / kcal) * 100);
+            const fPct = Math.round((fG * 9 / kcal) * 100);
+            const cPct = Math.max(0, 100 - pPct - fPct);
+            return (
+              <Text style={s.note}>
+                {t('kcal比の目安: P {p}% / F {f}% / C {c}%（1,800kcal換算）', { p: pPct, f: fPct, c: cPct })}
+              </Text>
+            );
+          })()}
+
           {/* PFC詳細（折りたたみ） */}
           <Pressable style={{ marginTop: 12 }} onPress={() => setPfcOpen((v) => !v)} hitSlop={6}>
             <Text style={s.pfcToggle}>{pfcOpen ? '▴' : '▾'} {t('PFC詳細設定（任意）')}</Text>

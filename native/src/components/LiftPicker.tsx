@@ -17,6 +17,8 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
 }) {
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
+  // 追加する種目が「体重が負荷になる（懸垂タイプ）」かどうか
+  const [bwNew, setBwNew] = useState(false);
   const custom = useCustomLifts();
   const query = q.trim();
 
@@ -34,10 +36,11 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
 
   // 一覧に無い名前はその場で追加して選ぶ（既にある名前ならそのまま選ぶだけ）
   async function addNew() {
-    await addCustomLift(query);
+    await addCustomLift(query, bwNew);
     onPick(query.trim());
     onClose();
     setQ('');
+    setBwNew(false);
   }
 
   return (
@@ -59,10 +62,17 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
           {query.length > 0
             && !LIFTS.some((l) => l.canon === query || liftName(l.id) === query)
             && !custom.includes(query) && (
+            <>
             <Pressable style={s.addRow} onPress={addNew}>
               <View style={s.addIcon}><Plus size={15} color="#fff" strokeWidth={3} /></View>
               <Text style={s.addT}>{t('「{name}」を追加して使う', { name: query })}</Text>
             </Pressable>
+            {/* 懸垂タイプ: kg欄が「加重」になり、実負荷=体重＋加重で計算される */}
+            <Pressable style={s.bwToggle} onPress={() => setBwNew((v) => !v)} hitSlop={6}>
+              <View style={[s.bwBox, bwNew && s.bwBoxOn]}>{bwNew && <Text style={s.bwCheck}>✓</Text>}</View>
+              <Text style={s.bwToggleT}>{t('体重が負荷になる種目（懸垂・ディップス系）')}</Text>
+            </Pressable>
+            </>
           )}
 
           {recent.length > 0 && query.length === 0 && (
@@ -135,6 +145,11 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   addT: { flex: 1, fontSize: 15, fontWeight: '700', color: C.teal },
+  bwToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 4, marginBottom: 4 },
+  bwBox: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  bwBoxOn: { backgroundColor: C.teal, borderColor: C.teal },
+  bwCheck: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  bwToggleT: { fontSize: 13, color: C.sub, fontWeight: '600' },
   groupT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 3 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

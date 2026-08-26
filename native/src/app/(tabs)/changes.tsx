@@ -53,8 +53,8 @@ const series = () => [
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'table', 'photos', 'binge', 'goal', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tbal', 'tpart', 'tchart', 'ttable', 'tgoal'];
+const BODY_ORDER_DEFAULT = ['kpi', 'calendar', 'chart', 'goal', 'table', 'photos', 'binge', 'trends', 'health'];
+const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal', 'tbal', 'tpart', 'ttable'];
 const CARD_LABELS = (): Record<string, string> => ({
   kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
@@ -518,7 +518,7 @@ export default function ChangesScreen() {
         <SegmentedControl
           options={[
             { key: 'body', label: t('身体の変化'), icon: <PersonStanding size={14} color={C.sub} /> },
-            { key: 'training', label: '運動の記録', icon: <Dumbbell size={14} color={C.sub} /> },
+            { key: 'training', label: t('筋トレの成長'), icon: <Dumbbell size={14} color={C.sub} /> },
           ]}
           value={topSeg} onChange={setTopSeg}
         />

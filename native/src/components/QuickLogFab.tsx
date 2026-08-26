@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
 import { sumItems } from '@/lib/items';
 import { C } from '@/lib/ui';
+import { useDayStatus } from '@/lib/dayStatus';
+import { LiveBar, usePulse } from '@/components/LivePreviewBar';
 import { t } from '@/lib/i18n';
 
 export default function QuickLogFab() {
@@ -26,20 +28,27 @@ export default function QuickLogFab() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
+  // 食事タブが計算した「今日の残り」。FAB単体では計画計算をしない（重複と食い違いを避ける）
+  const day = useDayStatus();
+  const stagedTotal = staged ? sumItems(staged.items) : { kcal: 0, p: 0, f: 0, c: 0 };
+  const pulse = usePulse(open && (staged?.items.length ?? 0) > 0);
 
   async function pickPhoto(fromCamera: boolean) {
     const perm = fromCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setMsg({ ok: false, text: fromCamera ? 'カメラの許可が必要です。' : t('写真の許可が必要です。') }); return; }
+    // quality:1は端末最大解像度のまま＝デコードで数百MB。あとで1280pxに縮小するので下げてよい。
+    // 同時デコード（Promise.all）は複数枚でメモリ不足の強制終了を招くため1枚ずつ処理する
     const res = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 1 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], selectionLimit: 4 - photos.length, allowsMultipleSelection: true, quality: 1 });
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], selectionLimit: 4 - photos.length, allowsMultipleSelection: true, quality: 0.8 });
     if (res.canceled || !res.assets?.length) return;
-    const list = (await Promise.all(res.assets.map(async (a) => {
+    const list: { uri: string; base64: string }[] = [];
+    for (const a of res.assets) {
       try {
         const out = await manipulateAsync(a.uri, [{ resize: { width: 1280 } }], { compress: 0.72, format: SaveFormat.JPEG, base64: true });
-        return out.base64 ? { uri: out.uri, base64: out.base64 } : null;
-      } catch { return null; }
-    }))).filter(Boolean) as { uri: string; base64: string }[];
+        if (out.base64) list.push({ uri: out.uri, base64: out.base64 });
+      } catch { /* 読めない1枚のために全体を止めない */ }
+    }
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
@@ -144,6 +153,24 @@ export default function QuickLogFab() {
                 </View>
               </View>
             )}
+            {day && (() => {
+              const left = day.goalKcal - day.eaten - Math.round(stagedTotal.kcal);
+              return (
+                <View style={s.preview}>
+                  <Text style={[s.previewMain, left < 0 && { color: C.coral }]}>
+                    {left >= 0 ? t('残り {n}kcal', { n: left.toLocaleString() }) : t('{n}kcal 超過', { n: (-left).toLocaleString() })}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1, marginLeft: 10, alignItems: 'center' }}>
+                    {([['P', day.p, stagedTotal.p], ['F', day.f, stagedTotal.f], ['C', day.c, stagedTotal.c]] as const).map(([ab, d2, stg]) => (
+                      <View key={ab} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Text style={s.previewAb}>{ab}</Text>
+                        <LiveBar eaten={d2.eaten} staged={Math.round(stg)} target={d2.target} color={C.teal} pulse={pulse} height={4} />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              );
+            })()}
             <View style={s.dock}>
               <DockIconButton Icon={Camera} onPress={() => pickPhoto(true)} />
               <DockIconButton Icon={Images} onPress={() => pickPhoto(false)} />
@@ -164,6 +191,9 @@ export default function QuickLogFab() {
 }
 
 const s = StyleSheet.create({
+  preview: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 7 },
+  previewMain: { fontSize: 12, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  previewAb: { fontSize: 10, fontWeight: '900', color: C.sub },
   fab: {
     position: 'absolute', right: 18, bottom: 24, width: 54, height: 54, borderRadius: 27,
     backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', zIndex: 20,

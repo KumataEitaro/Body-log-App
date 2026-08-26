@@ -124,7 +124,10 @@ export const LIFTS: Lift[] = [
  */
 export function bwRatioOf(canonName: string): number {
   const nm = canonName.trim();
-  return LIFTS.find((l) => l.canon === nm)?.bw ?? 0;
+  const base = LIFTS.find((l) => l.canon === nm)?.bw;
+  if (base != null) return base;
+  // ユーザー追加の懸垂タイプ（宣言は関数の巻き上げで後方の定義を参照できる）
+  return customBwOf(nm);
 }
 
 /** 加重して行う種目か（入力欄の見せ方を変えるため） */
@@ -147,40 +150,57 @@ export function liftPartLabel(key: string): string {
 }
 
 // ===== ユーザーが追加した種目（端末内に保存） =====
+// 保存形式は {n: 名前, bw?: 1}。以前は文字列の配列だったので、読み込み時に旧形式も受ける
 const CUSTOM_KEY = 'bl-custom-lifts';
 
-let customLifts: string[] = [];
+type CustomLift = { n: string; bw?: number };
+
+let customLifts: CustomLift[] = [];
+let customNames: string[] = [];   // useSyncExternalStore用（毎回新配列を作ると無限再描画になる）
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+const emit = () => { customNames = customLifts.map((c) => c.n); listeners.forEach((l) => l()); };
 
 export async function loadCustomLifts(): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(CUSTOM_KEY);
-    const v = raw ? (JSON.parse(raw) as string[]) : [];
-    if (Array.isArray(v)) customLifts = v.filter((x) => typeof x === 'string' && x.trim().length > 0);
+    const v = raw ? (JSON.parse(raw) as unknown[]) : [];
+    if (Array.isArray(v)) {
+      customLifts = v
+        .map((x) => (typeof x === 'string' ? { n: x } : (x as CustomLift)))
+        .filter((x) => x && typeof x.n === 'string' && x.n.trim().length > 0);
+    }
   } catch { /* 空のまま */ }
   emit();
 }
 
-/** 種目を追加する。基本種目と同じ名前は足さない */
-export async function addCustomLift(name: string): Promise<boolean> {
+async function persist(): Promise<void> {
+  try { await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(customLifts)); } catch { /* 表示は既に反映済み */ }
+}
+
+/** 種目を追加する。基本種目と同じ名前は足さない。bodyweight=懸垂タイプ（体重が負荷） */
+export async function addCustomLift(name: string, bodyweight = false): Promise<boolean> {
   const nm = name.trim();
   if (!nm) return false;
   if (LIFTS.some((l) => l.canon === nm)) return false;   // 基本種目に既にある
-  if (customLifts.includes(nm)) return false;            // 追加済み
-  customLifts = [...customLifts, nm];
+  if (customLifts.some((c) => c.n === nm)) return false; // 追加済み
+  customLifts = [...customLifts, bodyweight ? { n: nm, bw: 1 } : { n: nm }];
   emit();
-  try { await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(customLifts)); } catch { /* 表示は既に増えている */ }
+  await persist();
   return true;
 }
 
 export async function removeCustomLift(name: string): Promise<void> {
-  customLifts = customLifts.filter((x) => x !== name);
+  customLifts = customLifts.filter((x) => x.n !== name);
   emit();
-  try { await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(customLifts)); } catch { /* 無視 */ }
+  await persist();
 }
 
-export function getCustomLifts(): string[] { return customLifts; }
+export function getCustomLifts(): string[] { return customNames; }
+
+/** カスタム種目の自重係数（懸垂タイプなら1、通常は0） */
+export function customBwOf(name: string): number {
+  return customLifts.find((c) => c.n === name.trim())?.bw ?? 0;
+}
 
 export function useCustomLifts(): string[] {
   return useSyncExternalStore(

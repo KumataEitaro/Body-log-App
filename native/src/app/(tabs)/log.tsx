@@ -26,7 +26,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -46,9 +46,10 @@ import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
-import { useReduceMotion } from '@/lib/motion';
+import { useReduceMotion, useCountUp } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
+import { setDayStatus } from '@/lib/dayStatus';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -74,6 +75,7 @@ function shiftDate(d: string, n: number): string {
 
 export default function LogScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -102,7 +104,7 @@ export default function LogScreen() {
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
-  const [inputH, setInputH] = useState(54);   // 空でも2行分の余裕を見せる
+  const [inputH, setInputH] = useState(40);   // 1行から始めて最大5行まで自動で伸びる
 
   // マイ食品の並び順（保存済み順とサーバーの食品一覧をマージ・新規は末尾）
   useEffect(() => {
@@ -246,6 +248,7 @@ export default function LogScreen() {
   const goalKcal = planIntake ?? target;
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
+  const heroLeft = useCountUp(left);   // 保存の瞬間、残量が数え下がって見える
   // 係数が未設定の間は、選んだ目的の既定値を使う（未選択なら従来の既定 P2.0/F0.9）
   const purposePreset = purposeOf(usePurpose());
   const macros = profile ? macroTargets(
@@ -257,6 +260,16 @@ export default function LogScreen() {
   const eatenP = Math.round(summary.p ?? 0);
   const eatenF = Math.round(summary.f ?? 0);
   const eatenC = Math.round(summary.c ?? 0);
+  // FABのクイック記録でも同じ残量を見せるため、計算結果を共有ストアへ置く
+  useEffect(() => {
+    if (!profile || !macros) return;
+    setDayStatus({
+      goalKcal, eaten,
+      p: { eaten: eatenP, target: Math.round(macros.p) },
+      f: { eaten: eatenF, target: Math.round(macros.f) },
+      c: { eaten: eatenC, target: Math.round(macros.c) },
+    });
+  });
 
   // ===== 写真の取得（Web版と同じ最大辺1280px・JPEG品質0.72に圧縮してAPIへ） =====
   async function compressToPayload(uri: string): Promise<{ uri: string; base64: string } | null> {
@@ -344,6 +357,22 @@ export default function LogScreen() {
     } finally {
       setPendingTexts((p) => p.filter((x) => x.id !== pid));   // 自分の分だけ消す
     }
+  }
+
+  // マイ食品チップ: 長押しで「1回分をそのまま即記録」（トレイを経由しない最短経路）
+  async function quickSaveFood(fd: MyFood) {
+    if (!uid || saving) return;
+    setSaving(true);
+    try {
+      const items = addServing([], fd);
+      const r = await saveParsed(uid, {
+        items, weight: null, waist: null, ex: null, adj: 0, mood: null,
+      }, fd.name, viewDate);
+      if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setMsg({ ok: true, text: t('「{name}」を記録しました（長押しで即記録）', { name: fd.name }) });
+      await load();
+    } finally { setSaving(false); }
   }
 
   // マイ食品チップ: タップでトレイに積む（保存は✓保存で確定・−で減らせる）
@@ -730,7 +759,7 @@ export default function LogScreen() {
             <MinusBadge editing={editing} onPress={() => cards.hide('hero')} />
             <Text style={s.heroL}>{left < 0 ? t('オーバー') : t('あと食べられる')}{plan ? t('（計画）') : t('（維持）')}</Text>
             <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
-              {Math.abs(left).toLocaleString()}<Text style={s.heroU}> kcal</Text>
+              {Math.abs(heroLeft).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
             <View style={[s.hline, { flexDirection: 'row' }]}>
               <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: C.coral }]} />
@@ -757,7 +786,8 @@ export default function LogScreen() {
                   const total = segs.reduce((a, b) => a + b, 0);
                   const scale = total > 100 ? 100 / total : 1;  // 超過時は全体を100%に収める
                   return (
-                    <View key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Pressable key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                               onPress={() => router.push({ pathname: '/settings', params: { open: 'goalW', ts: String(Date.now()) } })}>
                       <Text style={s.pfcL} numberOfLines={1}>{t(ja)}<Text style={s.pfcAb}> {ab}</Text></Text>
                       <View style={[s.pfcBar, { flexDirection: 'row' }]}>
                         {segs.length > 0 && segs.length <= 5 ? segs.map((w, i) => (
@@ -773,7 +803,7 @@ export default function LogScreen() {
                                    target={tgt} color={col} pulse={pulse} />
                       </View>
                       <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
                 {/* 数字を「次の行動」に翻訳する一言（初心者がPFCの意味を調べなくても動ける） */}
@@ -1015,7 +1045,7 @@ export default function LogScreen() {
             const cnt = parsed ? servingCount(parsed.items, fd) : null;
             return (
               <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
-                <Pressable onPress={() => tapFood(fd)} style={s.chipMain}>
+                <Pressable onPress={() => tapFood(fd)} onLongPress={() => quickSaveFood(fd)} delayLongPress={450} style={s.chipMain}>
                   <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
                     {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
                   </Text>
@@ -1156,7 +1186,7 @@ export default function LogScreen() {
           )}
           <TextInput
             ref={inputRef} multiline
-            style={[s.dockInput, { height: Math.max(54, Math.min(112, inputH)) }]}
+            style={[s.dockInput, { height: Math.max(40, Math.min(132, inputH)) }]}
             placeholder={t('ここをタップして食事を入力…')} placeholderTextColor={C.sub}
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
