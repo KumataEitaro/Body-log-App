@@ -13,9 +13,9 @@ import { Languages, Check } from 'lucide-react-native';
 WebBrowser.maybeCompleteAuthSession();
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
 
-// v1.0はメール+パスワードのみで審査に出す。Googleを出すとApple Sign-Inの実装が必須になる
-// （App Store Review 4.8）ため、v1.1でApple/Google両対応してから true にする。
-const SHOW_GOOGLE_SSO = false;
+// Apple/Google両方のプロバイダ設定完了（2026-08-26）。両ボタン表示ON。
+// （GoogleのみONはApp Store Review 4.8違反になるため、必ずAppleとセットで運用する）
+const SHOW_GOOGLE_SSO = true;
 // SupabaseのAppleプロバイダ有効化済み（2026-08-26）。ボタン表示ON。
 const SHOW_APPLE_SSO = true;
 
