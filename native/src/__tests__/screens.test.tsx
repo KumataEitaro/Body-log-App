@@ -5,7 +5,7 @@ import LogScreen from '../app/(tabs)/log';
 import TrainingScreen from '../app/(tabs)/training';
 import ChangesScreen from '../app/(tabs)/changes';
 import CoachScreen from '../app/(tabs)/coach';
-import SettingsScreen from '../app/(tabs)/settings';
+import SettingsScreen from '../app/settings';
 import LoginScreen from '../app/login';
 import InteractiveChart from '../components/InteractiveChart';
 import GoalPanel from '../components/GoalPanel';

@@ -103,6 +103,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (cb) => { const React = require('react'); React.useEffect(() => cb(), []); },
   Redirect: () => null,
   Tabs: () => null,
+  Stack: Object.assign(() => null, { Screen: () => null }),
 }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }),

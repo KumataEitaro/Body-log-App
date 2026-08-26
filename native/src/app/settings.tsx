@@ -23,7 +23,7 @@ import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
@@ -252,6 +252,11 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+    {/* タブ外のスタック画面になったため、戻る導線はネイティブヘッダーで出す（タイトルは本文側のまま） */}
+    <Stack.Screen options={{
+      headerShown: true, title: '', headerBackTitle: t('戻る'),
+      headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
+    }} />
     <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
       <Text style={s.h}>{t('マイページ')}</Text>
 
@@ -635,7 +640,7 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 64, paddingBottom: 40 },
+  scroll: { padding: 16, paddingTop: 12, paddingBottom: 40 },  // ネイティブヘッダーが上を確保するため控えめに
   h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
   // サマリー
   summary: {

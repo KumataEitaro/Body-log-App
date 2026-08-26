@@ -14,6 +14,7 @@ import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
 import { reregisterAll } from '@/lib/notify';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { GuideProvider } from '@/components/GuideTour';
 import { installCrashReporter } from '@/lib/crash';
 
 installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モジュール読込時に一度だけ）
@@ -53,7 +54,10 @@ export default function RootLayout() {
     <ErrorBoundary name={t('アプリ')}>
       <LaunchProvider ready={ready}>
         <StatusBar style="dark" />
-        <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        {/* GuideProviderはルートに置く（設定画面がタブ外に出たため、タブ内限定だとuseGuideが届かない） */}
+        <GuideProvider>
+          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+        </GuideProvider>
       </LaunchProvider>
     </ErrorBoundary>
   );
