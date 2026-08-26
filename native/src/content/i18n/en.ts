@@ -967,5 +967,4 @@ export const EN: Record<string, string> = {
   "利用規約": "Terms of Service",
   "プライバシーポリシー": "Privacy Policy",
   "プランの確認・変更・購入の復元": "Manage Plan & Restore Purchases",
-  "「バナナと卵2個」のように書いて↑を押すと、AIが栄養を計算してトレイに載せます。写真でもOK。✓保存で確定です。": "Type something like \"a banana and 2 eggs\" and tap ↑ to let AI calculate the nutrition and put it on your tray. Photos work too. Tap ✓ Save to confirm.",
 };
