@@ -866,4 +866,11 @@ export const VI: Record<string, string> = {
   "利用規約": "Điều khoản dịch vụ",
   "プライバシーポリシー": "Chính sách bảo mật",
   "プランの確認・変更・購入の復元": "Kiểm tra/Thay đổi gói & Khôi phục giao dịch mua",
+  "目標「{n}kg」を最短で。": "Đạt mục tiêu \"{n}kg\" nhanh nhất.",
+  "準備ができました！": "Đã sẵn sàng!",
+  "AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。": "AI sẽ tính toán bữa ăn hàng ngày và suy nghĩ thay bạn. Hãy trải nghiệm miễn phí toàn bộ tính năng trước nhé.",
+  "月あたり{p}相当": "Tương đương {p}/tháng",
+  "{n}日間無料で始める": "Bắt đầu dùng thử miễn phí {n} ngày",
+  "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Sau khi hết thời gian miễn phí là {p}. Sẽ không mất phí nếu bạn hủy trong thời gian dùng thử.",
+  "無料のまま始める": "Bắt đầu miễn phí",
 };

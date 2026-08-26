@@ -967,4 +967,11 @@ export const EN: Record<string, string> = {
   "利用規約": "Terms of Service",
   "プライバシーポリシー": "Privacy Policy",
   "プランの確認・変更・購入の復元": "Manage Plan & Restore Purchases",
+  "目標「{n}kg」を最短で。": "Reach your {n}kg goal in the fastest way.",
+  "準備ができました！": "You're all set!",
+  "AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。": "AI tracks your daily meals and does the thinking for you. Try all features for free to start.",
+  "月あたり{p}相当": "Equivalent to {p}/month",
+  "{n}日間無料で始める": "Start {n} days free",
+  "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "After your free trial, it's {p}. Cancel anytime during the trial and you won't be charged.",
+  "無料のまま始める": "Continue for free",
 };

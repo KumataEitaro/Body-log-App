@@ -19,6 +19,7 @@ import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import GoalPanel from '@/components/GoalPanel';
 import { t } from '@/lib/i18n';
 import { PURPOSES, setPurpose, usePurpose, type PurposeKey } from '@/lib/purpose';
+import { purchasesAvailable } from '@/lib/purchases';
 
 const DONE_KEY = 'bl-onboard-done';
 
@@ -55,6 +56,12 @@ export default function Onboarding() {
   function done() {
     AsyncStorage.setItem(DONE_KEY, '1').catch(() => {});
     router.replace('/(tabs)/log' as never);
+    // 目標を決めた直後が課金の意思決定に最適なタイミング（2026年の実測でも
+    // オンボーディング直後ペイウォールが最良構成）。スキップ可のソフト型として重ねる。
+    // 課金基盤が未設定のビルドでは出さない（「準備中」を見せない）
+    if (purchasesAvailable()) {
+      setTimeout(() => router.push('/paywall?src=onboarding' as never), 400);
+    }
   }
 
   async function saveProfile() {

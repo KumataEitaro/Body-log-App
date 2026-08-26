@@ -51,8 +51,24 @@ export type Offer = {
   plan: Plan;
   period: 'monthly' | 'sixmonth' | 'annual';
   priceString: string;   // 例: ¥480
+  price: number;         // 数値（年額の月換算表示に使う）
+  currency: string;      // 例: JPY
+  trialDays: number;     // 無料トライアル日数（無ければ0）
   pkg: unknown;          // purchase()にそのまま渡す
 };
+
+// introPrice（お試しオファー）から無料トライアル日数を求める
+function trialDaysOf(intro: { price?: number; periodUnit?: string; periodNumberOfUnits?: number } | null | undefined): number {
+  if (!intro || Number(intro.price) !== 0) return 0;   // 有料イントロ価格はトライアル扱いしない
+  const n = Number(intro.periodNumberOfUnits) || 0;
+  switch (String(intro.periodUnit).toUpperCase()) {
+    case 'DAY': return n;
+    case 'WEEK': return n * 7;
+    case 'MONTH': return n * 30;
+    case 'YEAR': return n * 365;
+    default: return 0;
+  }
+}
 
 /** 買えるプラン一覧（RevenueCatのofferingsから取得。価格はASC側の設定が自動反映） */
 export async function fetchOffers(): Promise<Offer[]> {
@@ -69,7 +85,14 @@ export async function fetchOffers(): Promise<Offer[]> {
         const t = String(pkg.packageType || '').toUpperCase();
         const period = t === 'ANNUAL' ? 'annual' : t === 'SIX_MONTH' ? 'sixmonth' : t === 'MONTHLY' ? 'monthly' : null;
         if (!period) continue;
-        out.push({ plan, period, priceString: pkg.product.priceString, pkg });
+        out.push({
+          plan, period,
+          priceString: pkg.product.priceString,
+          price: Number(pkg.product.price) || 0,
+          currency: String(pkg.product.currencyCode || ''),
+          trialDays: trialDaysOf(pkg.product.introPrice),
+          pkg,
+        });
       }
     }
     return out;

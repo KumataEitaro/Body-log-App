@@ -2,11 +2,18 @@
 // 自動反映されるため、このファイルに金額は書かない（金額変更＝再ビルド不要）。
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Check, Sparkles } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
 import { purchasesAvailable, fetchOffers, purchase, restore, currentPlan, type Offer, type Plan } from '@/lib/purchases';
+
+// 金額の簡易フォーマット（月換算表示用）。主要通貨だけ整形し、他はそのまま
+function fmtMoney(v: number, currency: string): string {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: currency === 'JPY' ? 0 : 2 }).format(v); }
+  catch { return `${Math.round(v)} ${currency}`; }
+}
 
 const PERIODS = [
   { key: 'monthly', label: '1ヶ月' },
@@ -23,17 +30,35 @@ const PLAN_INFO: { plan: Plan; name: string; features: string[] }[] = [
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const { src } = useLocalSearchParams<{ src?: string }>();
+  const fromOnboarding = src === 'onboarding';
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const [plan, setPlan] = useState<Plan>('free');
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['key']>('monthly');
   const [busy, setBusy] = useState(false);
+  const [goalLine, setGoalLine] = useState('');
 
   useEffect(() => {
     (async () => {
       const [o, p] = await Promise.all([fetchOffers(), currentPlan()]);
       setOffers(o); setPlan(p);
+      // 年額プラン比率が最も高いカテゴリのため、年額をデフォルト選択にする
+      if (o.some((x) => x.period === 'annual')) setPeriod('annual');
     })();
   }, []);
+
+  // オンボーディング直後だけ、決めたばかりの目標を見出しに差し込む（パーソナライズ）
+  useEffect(() => {
+    if (!fromOnboarding) return;
+    (async () => {
+      const { data: g } = await supabase.from('goals').select('target_weight,start_weight').maybeSingle();
+      const delta = g?.target_weight != null && g?.start_weight != null
+        ? Number(g.target_weight) - Number(g.start_weight) : null;
+      if (delta != null && Math.abs(delta) >= 0.5) {
+        setGoalLine(t('目標「{n}kg」を最短で。', { n: (delta > 0 ? '+' : '') + delta.toFixed(1) }));
+      }
+    })();
+  }, [fromOnboarding]);
 
   const byPlan = useMemo(() => {
     const map = new Map<Plan, Offer>();
@@ -74,8 +99,13 @@ export default function PaywallScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
       <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.h}>{t('プラン')}</Text>
-        <Text style={s.lead}>{t('記録・グラフはずっと無料。AIをもっと使いたくなったら。')}</Text>
+        <Text style={s.h}>{fromOnboarding ? t('準備ができました！') : t('プラン')}</Text>
+        <Text style={s.lead}>
+          {goalLine}
+          {fromOnboarding
+            ? t('AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。')
+            : t('記録・グラフはずっと無料。AIをもっと使いたくなったら。')}
+        </Text>
 
         {!purchasesAvailable() || (offers !== null && offers.length === 0) ? (
           <View style={s.pending}>
@@ -106,7 +136,14 @@ export default function PaywallScreen() {
                   )}
                   <View style={s.cardHead}>
                     <Text style={s.planName}>{t(info.name)}</Text>
-                    {offer && <Text style={s.price}>{offer.priceString}<Text style={s.per}>{period === 'monthly' ? t('/月') : period === 'sixmonth' ? t('/6ヶ月') : t('/年')}</Text></Text>}
+                    {offer && (
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={s.price}>{offer.priceString}<Text style={s.per}>{period === 'monthly' ? t('/月') : period === 'sixmonth' ? t('/6ヶ月') : t('/年')}</Text></Text>
+                        {period === 'annual' && offer.price > 0 && (
+                          <Text style={s.perMonth}>{t('月あたり{p}相当', { p: fmtMoney(offer.price / 12, offer.currency) })}</Text>
+                        )}
+                      </View>
+                    )}
                   </View>
                   {info.features.map((f) => (
                     <View key={f} style={s.featRow}>
@@ -119,15 +156,30 @@ export default function PaywallScreen() {
                     onPress={() => offer && buy(offer)}
                     style={({ pressed }) => [s.cta, highlight && s.ctaHi, (isCurrent || !offer) && s.ctaOff, pressed && { opacity: 0.85 }]}>
                     <Text style={[s.ctaT, highlight && s.ctaTHi]}>
-                      {isCurrent ? t('現在のプラン') : !offer ? t('この期間の設定なし') : t('このプランにする')}
+                      {isCurrent ? t('現在のプラン')
+                        : !offer ? t('この期間の設定なし')
+                        : offer.trialDays > 0 ? t('{n}日間無料で始める', { n: offer.trialDays })
+                        : t('このプランにする')}
                     </Text>
                   </Pressable>
+                  {offer && offer.trialDays > 0 && !isCurrent && (
+                    <Text style={s.trialNote}>
+                      {t('無料期間の終了後は{p}。期間中の解約なら料金はかかりません。', {
+                        p: offer.priceString + (period === 'monthly' ? t('/月') : period === 'sixmonth' ? t('/6ヶ月') : t('/年')),
+                      })}
+                    </Text>
+                  )}
                 </View>
               );
             })}
             <Pressable onPress={doRestore} disabled={busy} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }}>
               <Text style={s.link}>{t('購入を復元する')}</Text>
             </Pressable>
+            {fromOnboarding && (
+              <Pressable onPress={() => router.back()} hitSlop={8} style={{ alignSelf: 'center', marginTop: 12 }}>
+                <Text style={[s.link, { color: C.sub }]}>{t('無料のまま始める')}</Text>
+              </Pressable>
+            )}
           </>
         )}
 
@@ -166,6 +218,8 @@ const s = StyleSheet.create({
   planName: { fontSize: 18, fontWeight: '800', color: C.ink },
   price: { fontSize: 20, fontWeight: '800', color: C.ink },
   per: { fontSize: 12, fontWeight: '500', color: C.sub },
+  perMonth: { fontSize: 11.5, color: C.teal, fontWeight: '700', marginTop: 1 },
+  trialNote: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 16 },
   featRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
   featT: { fontSize: 13.5, color: C.ink, flex: 1 },
   cta: { marginTop: 10, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: C.bg },

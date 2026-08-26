@@ -866,4 +866,11 @@ export const DE: Record<string, string> = {
   "利用規約": "Nutzungsbedingungen",
   "プライバシーポリシー": "Datenschutzrichtlinie",
   "プランの確認・変更・購入の復元": "Pläne verwalten & Käufe wiederherstellen",
+  "目標「{n}kg」を最短で。": "Ziel „{n}kg“ auf dem schnellsten Weg.",
+  "準備ができました！": "Bereit!",
+  "AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。": "Die KI trackt deine täglichen Mahlzeiten und denkt für dich mit. Teste jetzt alle Funktionen kostenlos.",
+  "月あたり{p}相当": "Entspricht {p} pro Monat",
+  "{n}日間無料で始める": "Mit {n} Gratis-Tagen starten",
+  "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Nach Ablauf der Testphase {p}. Bei Kündigung während der Testphase fallen keine Kosten an.",
+  "無料のまま始める": "Kostenlos starten",
 };

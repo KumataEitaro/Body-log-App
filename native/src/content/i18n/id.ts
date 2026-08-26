@@ -866,4 +866,11 @@ export const ID: Record<string, string> = {
   "利用規約": "Syarat & Ketentuan",
   "プライバシーポリシー": "Kebijakan Privasi",
   "プランの確認・変更・購入の復元": "Cek, ubah paket, atau pulihkan pembelian",
+  "目標「{n}kg」を最短で。": "Capai target \"{n}kg\" secepat mungkin.",
+  "準備ができました！": "Sudah siap!",
+  "AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。": "AI akan menghitung makanan harian Anda dan berpikir untuk Anda. Coba semua fitur gratis sekarang.",
+  "月あたり{p}相当": "Setara dengan {p} per bulan",
+  "{n}日間無料で始める": "Mulai uji coba gratis {n} hari",
+  "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Setelah masa gratis berakhir, biayanya {p}. Tidak ada biaya jika Anda membatalkan selama masa uji coba.",
+  "無料のまま始める": "Mulai dengan gratis",
 };

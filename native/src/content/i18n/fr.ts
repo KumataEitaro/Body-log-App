@@ -866,4 +866,11 @@ export const FR: Record<string, string> = {
   "利用規約": "Conditions d'utilisation",
   "プライバシーポリシー": "Politique de confidentialité",
   "プランの確認・変更・購入の復元": "Gérer l'abonnement et restaurer les achats",
+  "目標「{n}kg」を最短で。": "Atteignez votre objectif de {n}kg au plus vite.",
+  "準備ができました！": "Tout est prêt !",
+  "AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。": "L'IA compte vos repas quotidiens et réfléchit à votre place. Profitez gratuitement de toutes les fonctionnalités pour commencer.",
+  "月あたり{p}相当": "Soit l'équivalent de {p}/mois",
+  "{n}日間無料で始める": "Essayer gratuitement pendant {n} jours",
+  "無料期間の終了後は{p}。期間中の解約なら料金はかかりません。": "Après la période gratuite, c'est {p}. Aucun frais si vous annulez pendant l'essai.",
+  "無料のまま始める": "Continuer avec la version gratuite",
 };
