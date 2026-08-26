@@ -1,0 +1,120 @@
+// 実績ページ: 🔥ストリーク（お守りつき）＋バッジ一覧＋「いつでもストーリー共有」ハブ。
+// バッジは獲得済み=カラー、未獲得=グレー＋条件文（次に何をすればいいか常に見える）。
+import { useEffect, useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { Stack } from 'expo-router';
+import { Share2 } from 'lucide-react-native';
+import { C } from '@/lib/ui';
+import { t } from '@/lib/i18n';
+import { evaluateAchievements, type AchievementReport, type BadgeState } from '@/lib/achievements';
+import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
+
+const CAT_LABEL = (): Record<BadgeState['cat'], string> => ({
+  streak: t('継続'), action: t('行動'), result: t('成果'),
+});
+
+export default function AchievementsScreen() {
+  const [report, setReport] = useState<AchievementReport | null>(null);
+  const [sticker, setSticker] = useState<StickerData | null>(null);
+
+  useEffect(() => { evaluateAchievements().then(setReport).catch(() => setReport(null)); }, []);
+
+  const earned = report?.badges.filter((b) => b.earnedOn != null) ?? [];
+
+  // 「いつでも共有」の選択肢（データがあるものだけ出す）
+  const shareOptions: { key: string; label: string; data: StickerData | null }[] = report ? [
+    { key: 'streak', label: t('🔥 ストリーク'), data: report.streak > 0 ? { kind: 'streak', days: report.streak } : null },
+    { key: 'today', label: t('🍽 今日の食事'), data: report.share.today ? { kind: 'today', left: 0, ...report.share.today } : null },
+    { key: 'workout', label: t('🏃 最新の運動'), data: report.share.workout ? { kind: 'workout', ...report.share.workout } : null },
+    { key: 'pr', label: t('🏆 自己ベスト'), data: report.share.pr ? { kind: 'pr', ...report.share.pr } : null },
+  ] : [];
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Text style={s.h}>{t('実績')}</Text>
+
+        {report == null ? (
+          <ActivityIndicator color={C.teal} style={{ marginTop: 40 }} />
+        ) : (
+          <>
+            {/* ストリークのヒーロー */}
+            <View style={s.hero}>
+              <Text style={{ fontSize: 40 }}>🔥</Text>
+              <Text style={s.heroN}>{report.streak}<Text style={s.heroU}>{t('日連続')}</Text></Text>
+              <Text style={s.heroSub}>
+                {report.usedFreeze
+                  ? t('お守りが{d}の抜けをつなぎました（週1回まで自動）', { d: report.usedFreeze.slice(5).replace('-', '/') })
+                  : t('1日抜けても、週1回まで「お守り」が自動でつなぎます')}
+              </Text>
+            </View>
+
+            {/* いつでも共有ハブ */}
+            <View style={s.shareCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Share2 size={15} color={C.teal} />
+                <Text style={s.shareT}>{t('ストーリー用ステッカーを作る')}</Text>
+              </View>
+              <Text style={s.shareSub}>{t('文字だけの透過画像。自分の写真の上に重ねて、いつでも共有できます。')}</Text>
+              <View style={s.shareRow}>
+                {shareOptions.map((o) => (
+                  <Pressable key={o.key} disabled={o.data == null}
+                    style={[s.shareBtn, o.data == null && { opacity: 0.35 }]}
+                    onPress={() => o.data && setSticker(o.data)}>
+                    <Text style={s.shareBtnT}>{o.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* バッジ一覧（カテゴリごと） */}
+            <Text style={s.count}>{t('{n} / {m} 個 獲得', { n: earned.length, m: report.badges.length })}</Text>
+            {(['streak', 'action', 'result'] as const).map((cat) => (
+              <View key={cat}>
+                <Text style={s.catT}>{CAT_LABEL()[cat]}</Text>
+                <View style={s.grid}>
+                  {report.badges.filter((b) => b.cat === cat).map((b) => {
+                    const on = b.earnedOn != null;
+                    return (
+                      <View key={b.id} style={[s.badge, !on && s.badgeOff]}>
+                        <Text style={[{ fontSize: 26 }, !on && { opacity: 0.35 }]}>{b.emoji}</Text>
+                        <Text style={[s.badgeN, !on && { color: C.faint }]} numberOfLines={1}>{b.name}</Text>
+                        <Text style={s.badgeD} numberOfLines={2}>
+                          {on ? t('{d} 獲得', { d: b.earnedOn!.slice(5).replace('-', '/') }) : b.desc}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+      <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  scroll: { padding: 16, paddingTop: 8, paddingBottom: 48 },
+  h: { fontSize: 26, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  hero: { alignItems: 'center', backgroundColor: C.panel, borderRadius: 18, paddingVertical: 20, marginBottom: 12 },
+  heroN: { fontSize: 42, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
+  heroU: { fontSize: 15, fontWeight: '700', color: C.sub },
+  heroSub: { fontSize: 12, color: C.sub, marginTop: 4, paddingHorizontal: 20, textAlign: 'center' },
+  shareCard: { backgroundColor: C.panel, borderRadius: 16, padding: 14, marginBottom: 16 },
+  shareT: { fontSize: 14.5, fontWeight: '800', color: C.ink },
+  shareSub: { fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 17 },
+  shareRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  shareBtn: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
+  shareBtnT: { fontSize: 13, fontWeight: '700', color: C.teal },
+  count: { fontSize: 12.5, fontWeight: '700', color: C.sub, marginBottom: 4 },
+  catT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  badge: { width: '31%', backgroundColor: C.panel, borderRadius: 14, padding: 10, alignItems: 'center', minHeight: 108 },
+  badgeOff: { backgroundColor: C.chipBg },
+  badgeN: { fontSize: 12, fontWeight: '800', color: C.ink, marginTop: 4 },
+  badgeD: { fontSize: 10, color: C.sub, textAlign: 'center', marginTop: 2, lineHeight: 13 },
+});

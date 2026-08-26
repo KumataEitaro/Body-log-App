@@ -7,7 +7,8 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { TrendingUp, CalendarDays, Trophy } from 'lucide-react-native';
+import { TrendingUp, CalendarDays, Trophy, Share2 } from 'lucide-react-native';
+import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
@@ -384,6 +385,7 @@ export function LiftChartCard() {
 // ===== ⑥ 自己ベスト（種目ごとの最高記録。直近14日の更新は NEW! で祝う） =====
 export function PersonalBestCard() {
   const { series, goalKg } = useLifting();
+  const [sticker, setSticker] = useState<StickerData | null>(null);
   const today = todayJST();
   const rows = [...series.entries()].map(([name, pts]) => {
     let best = { kg: 0, date: '' };
@@ -413,10 +415,14 @@ export function PersonalBestCard() {
               </Text>
               <Text style={s.prDate}>{r.date.slice(5).replace('-', '/')}{goal ? ` ・ ${t('目標')}${goal}kg` : ''}</Text>
             </View>
+            <Pressable hitSlop={8} onPress={() => setSticker({ kind: 'pr', name: r.name, kg: Math.round(r.kg), date: r.date })}>
+              <Share2 size={15} color={C.faint} />
+            </Pressable>
           </View>
         );
       })}
-      <Text style={[s.muted, { marginTop: 8 }]}>{t('実重量ベースの最高記録（自重種目は体重込み）')}</Text>
+      <Text style={[s.muted, { marginTop: 8 }]}>{t('実重量ベースの最高記録（自重種目は体重込み）。共有アイコンでストーリー用の透過ステッカーを作れます。')}</Text>
+      <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
     </View>
   );
 }

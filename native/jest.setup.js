@@ -140,6 +140,7 @@ jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
   EncodingType: { UTF8: 'utf8' },
   writeAsStringAsync: async () => {},
+  readAsStringAsync: async () => 'base64data',
 }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: async () => false, shareAsync: async () => {} }));
 
@@ -152,3 +153,9 @@ jest.mock('expo-linear-gradient', () => {
   const RN = require('react-native');
   return { LinearGradient: RN.View };
 });
+jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn(async () => 'file:///tmp/sticker.png') }));
+jest.mock('expo-clipboard', () => ({ setImageAsync: jest.fn(async () => {}) }));
+jest.mock('expo-media-library', () => ({
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  saveToLibraryAsync: jest.fn(async () => {}),
+}));

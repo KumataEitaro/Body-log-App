@@ -9,7 +9,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
@@ -297,6 +297,8 @@ export default function SettingsScreen() {
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
         <Row icon={<Crown color={C.teal} size={19} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
+        <View style={s.sep} />
+        <Row icon={<Award color={C.teal} size={19} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} onPress={() => router2.push('/achievements' as never)} />
         <View style={s.sep} />
         <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />

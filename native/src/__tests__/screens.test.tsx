@@ -7,6 +7,7 @@ import ChangesScreen from '../app/(tabs)/changes';
 import CoachScreen from '../app/(tabs)/coach';
 import SettingsScreen from '../app/settings';
 import PaywallScreen from '../app/paywall';
+import AchievementsScreen from '../app/achievements';
 import LoginScreen from '../app/login';
 import InteractiveChart from '../components/InteractiveChart';
 import GoalPanel from '../components/GoalPanel';
@@ -29,6 +30,7 @@ describe('screens smoke（マウント時クラッシュ検出）', () => {
   const cases: [string, React.ReactElement][] = [
     ['ログイン画面', <LoginScreen key="login" />],
     ['プラン(ペイウォール)', <PaywallScreen key="paywall" />],
+    ['実績', <AchievementsScreen key="ach" />],
     ['食事タブ', <LogScreen key="log" />],
     ['トレタブ', <TrainingScreen key="tr" />],
     ['概要タブ', <ChangesScreen key="ch" />],

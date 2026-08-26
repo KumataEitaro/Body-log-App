@@ -47,6 +47,8 @@ import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTo
 import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
+import StreakChip from '@/components/StreakChip';
+import { invalidateStreak } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
 import { useReduceMotion, useCountUp } from '@/lib/motion';
@@ -516,6 +518,7 @@ export default function LogScreen() {
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
         : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
 
+      invalidateStreak();   // 🔥チップを最新化
       // よく食べる食品の検出（保存が成功したときだけ学習する）
       try {
         await recordItems(items, viewDate);
@@ -775,6 +778,9 @@ export default function LogScreen() {
             </Pressable>
           )}
         </Animated.View>
+
+        {/* 🔥ストリーク常設チップ（タップで実績ページへ） */}
+        <StreakChip />
 
         {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる） */}
         {brief && (

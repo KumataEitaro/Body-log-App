@@ -2,7 +2,7 @@
   "expo": {
     "name": "BodyLog",
     "slug": "bodylog-native",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "splash": {
@@ -36,6 +36,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "作成した共有画像（透過ステッカー）を写真に保存するために使用します。",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       [
         "expo-image-picker",
         {

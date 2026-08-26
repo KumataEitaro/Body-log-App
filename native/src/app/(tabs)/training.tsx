@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell, Target } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
+import { bumpRestCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
@@ -462,7 +463,7 @@ export default function TrainingScreen() {
       const lastRow = wasEdit ? null : tRows.filter(rowReady).slice(-1)[0] ?? null;
       setTRows([lastRow ? { name: lastRow.name, kg: lastRow.kg, reps: '', sets: '' } : { name: '', kg: '', reps: '', sets: '' }]);
       await load();
-      if (!wasEdit) setRestLeft(restSec); // 保存でレストタイマー自動開始（長さは設定した値）
+      if (!wasEdit) { setRestLeft(restSec); bumpRestCount(); } // 保存でレストタイマー自動開始（長さは設定した値）
       setMsg({ ok: true, text: wasEdit ? t('書き換えました。') : fb });
     } finally {
       setSaving(false);
@@ -613,7 +614,7 @@ export default function TrainingScreen() {
             </View>
           </Pressable>
         ) : (
-          <Pressable style={s.restIdle} onPress={() => setRestLeft(restSec)}>
+          <Pressable style={s.restIdle} onPress={() => { setRestLeft(restSec); bumpRestCount(); }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Timer size={15} color={C.sub} />
               <Text style={s.restIdleT}>{t('レストタイマー')}</Text>
