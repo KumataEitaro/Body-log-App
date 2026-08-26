@@ -12,9 +12,11 @@ const STATIC_FALLBACK = [
 
 let cachedModels: string[] | null = null;
 
-// テスト用: モデル発見をスキップさせる（本番では使わない）
+// テスト用: モデル発見・実測ピンをスキップさせる（本番では使わない）
 export function _setModelsForTest(models: string[] | null): void {
   cachedModels = models;
+  lastGood = models?.[0] ?? null;   // ピン(probeFastest)を走らせない＝fetchモックの回数を予測可能に
+  badUntil.clear();
 }
 
 // モデル名のスコアリング（flash優先・新しいバージョン優先・埋め込み等は除外）
@@ -236,7 +238,10 @@ export async function callGemini(
       const ctrl = new AbortController();
       ctrls.add(ctrl);
       inflight++;
-      tryModel(key, model, parts, temperature, ctrl).then((r) => {
+      // tryModel内の想定外の例外（応答形式の異常等）もモデル失敗として扱い、全体を止めない
+      tryModel(key, model, parts, temperature, ctrl)
+        .catch((e): ModelTry => ({ ok: false, err: `${model}: ${String((e as Error)?.message ?? e)}` }))
+        .then((r) => {
         inflight--;
         ctrls.delete(ctrl);
         if (settled) return;

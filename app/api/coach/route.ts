@@ -1,8 +1,8 @@
 import { NextResponse, after } from 'next/server';
 import { findLang } from '@/lib/langs';
 import { getApiAuth } from '@/lib/supabase/apiAuth';
-import { AI_DAILY_LIMIT, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel } from '@/lib/calc';
-import { isPremiumActive } from '@/lib/premium';
+import { AI_LIMITS_ENABLED, isUnlimited, todayJST, mifflinBMR, EX_ADD, type ExLevel } from '@/lib/calc';
+import { resolvePlan, getLimits, checkKindLimit } from '@/lib/plan';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
@@ -49,17 +49,24 @@ export async function POST(req: Request) {
     ? bodyRaw.sleep.filter((s: { date?: unknown; min?: unknown }) => typeof s?.date === 'string' && typeof s?.min === 'number' && s.min > 0).slice(0, 7)
     : [];
 
-  // 使用回数（食事AI解析と同じ日次上限を共有）
+  // 使用回数（プラン別のcoach日次上限）
   const today = todayJST();
-  const [usageRes, capReached, premRes] = await Promise.all([
-    supabase.from('ai_usage').select('count').eq('user_id', user.id).eq('date', today).maybeSingle(),
+  const [usageRes, capReached, profPlanRes] = await Promise.all([
+    supabase.from('ai_usage').select('count,text_count,photo_count,coach_count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
-    supabase.from('profiles').select('premium_until').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('plan,plan_until,premium_until').eq('id', user.id).maybeSingle(),
   ]);
-  const unlimited = isUnlimited(user.email) || isPremiumActive(premRes.data?.premium_until as string | null | undefined);
   const used = usageRes.data?.count ?? 0;
-  if (!unlimited && used >= AI_DAILY_LIMIT) {
-    return NextResponse.json({ ok: false, error: `本日のAI利用回数（${AI_DAILY_LIMIT}回）を使い切りました。明日また使えます。` }, { status: 429 });
+  const userPlan = resolvePlan(profPlanRes.data);
+  if (AI_LIMITS_ENABLED && !isUnlimited(user.email)) {
+    const limits = await getLimits(supabase, userPlan);
+    const chk = checkKindLimit(limits, 'coach', usageRes.data, 0);
+    if (!chk.ok) {
+      return NextResponse.json({
+        ok: false, code: 'plan_limit', plan: userPlan, kind: 'coach', reason: chk.reason,
+        error: `本日のAI相談回数（${chk.limit}回）を使い切りました。明日また使えます。`,
+      }, { status: 429 });
+    }
   }
   if (capReached) {
     return NextResponse.json({ ok: false, error: '本日はサービス全体のAI利用上限に達しました。明日また使えます。' }, { status: 429 });
@@ -199,9 +206,16 @@ export async function POST(req: Request) {
   if (!answer) answer = r.text.trim();
 
   const bumpUsage = async () => {
-    try { await supabase.from('ai_usage').upsert({ user_id: user.id, date: today, count: used + 1 }); } catch { /* 無視 */ }
+    try {
+      await supabase.from('ai_usage').upsert({
+        user_id: user.id, date: today, count: used + 1,
+        text_count: usageRes.data?.text_count ?? 0,
+        photo_count: usageRes.data?.photo_count ?? 0,
+        coach_count: (usageRes.data?.coach_count ?? 0) + 1,
+      });
+    } catch { /* 無視 */ }
   };
   try { after(bumpUsage); } catch { void bumpUsage(); }
 
-  return NextResponse.json({ ok: true, answer, action, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1 });
+  return NextResponse.json({ ok: true, answer, action, plan: userPlan });
 }

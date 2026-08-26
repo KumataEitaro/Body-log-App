@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { getApiAuth } from '@/lib/supabase/apiAuth';
-import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
-import { isPremiumActive } from '@/lib/premium';
+import { AI_LIMITS_ENABLED, isUnlimited, todayJST } from '@/lib/calc';
+import { resolvePlan, getLimits, checkKindLimit } from '@/lib/plan';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
@@ -55,27 +55,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'テキストか写真のどちらかを入れてください。' }, { status: 400 });
   }
 
-  // ===== 使用回数チェック・全体上限・マイ食品辞書を並列取得（直列3往復→1往復分の時間に） =====
+  // ===== 使用回数チェック・全体上限・マイ食品辞書を並列取得（直列往復→1往復分の時間に） =====
   const today = todayJST();
-  const [usageRes, capReached, myFoodsRes, premRes] = await Promise.all([
-    supabase.from('ai_usage').select('count').eq('user_id', user.id).eq('date', today).maybeSingle(),
+  const kind = images.length > 0 ? 'photo' as const : 'text' as const;
+  const [usageRes, capReached, myFoodsRes, profRes] = await Promise.all([
+    supabase.from('ai_usage').select('count,text_count,photo_count,coach_count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
     supabase.from('my_foods').select('name,kind,unit,kcal,p,f,c,note,serving_label,serving_ratio').limit(60),
-    supabase.from('profiles').select('premium_until').eq('id', user.id).maybeSingle(), // 列未作成でもerror→無料扱いで安全
+    supabase.from('profiles').select('plan,plan_until,premium_until,photo_trial_used').eq('id', user.id).maybeSingle(), // 列未作成でもerror→無料扱いで安全
   ]);
-  // プレミアム会員はAI無制限（管理者メールも従来どおり無制限）
-  const unlimited = isUnlimited(user.email) || isPremiumActive(premRes.data?.premium_until as string | null | undefined);
   const used = usageRes.data?.count ?? 0;
-  if (!unlimited && used >= AI_DAILY_LIMIT) {
-    return NextResponse.json({
-      ok: false, remaining: 0,
-      error: `本日のAI解析回数（${AI_DAILY_LIMIT}回）を使い切りました。明日また使えます。`,
-    }, { status: 429 });
+  const photoTrialUsed = Number((profRes.data as { photo_trial_used?: number } | null)?.photo_trial_used ?? 0);
+  // ===== プラン別の回数制限（AI_LIMITS_ENABLED=false の間は判定を眠らせる。管理者も無制限） =====
+  const plan = resolvePlan(profRes.data);
+  if (AI_LIMITS_ENABLED && !isUnlimited(user.email)) {
+    const limits = await getLimits(supabase, plan);
+    const chk = checkKindLimit(limits, kind, usageRes.data, photoTrialUsed);
+    if (!chk.ok) {
+      // code:'plan_limit' はアプリ側でアップグレード導線を出す合図
+      const msg = chk.reason === 'trial'
+        ? `写真解析のお試し枠（累計${chk.limit}枚）を使い切りました。写真解析はスタンダードプランで使えます。`
+        : `本日の${kind === 'photo' ? '写真解析' : 'AI解析'}回数（${chk.limit}回）を使い切りました。明日また使えます。`;
+      return NextResponse.json({ ok: false, code: 'plan_limit', plan, kind, reason: chk.reason, error: msg }, { status: 429 });
+    }
   }
   // 全体上限（課金の安全弁）。管理者もコスト保護のため対象
   if (capReached) {
     return NextResponse.json({
-      ok: false, remaining: unlimited ? null : AI_DAILY_LIMIT - used,
+      ok: false,
       error: '本日はサービス全体のAI利用上限に達しました。明日また使えます。',
     }, { status: 429 });
   }
@@ -118,15 +125,26 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ ok: false, error: 'AIの応答を解釈できませんでした。もう一度お試しください。' }, { status: 502 });
     }
-    // 使用回数のカウントアップは応答を返した後に実行（ユーザーを待たせない）
+    // 使用回数のカウントアップは応答を返した後に実行（ユーザーを待たせない）。種類別にも数える
     const bumpUsage = async () => {
-      try { await supabase.from('ai_usage').upsert({ user_id: user.id, date: today, count: used + 1 }); } catch { /* 計上失敗は無視 */ }
+      try {
+        await supabase.from('ai_usage').upsert({
+          user_id: user.id, date: today, count: used + 1,
+          text_count: (usageRes.data?.text_count ?? 0) + (kind === 'text' ? 1 : 0),
+          photo_count: (usageRes.data?.photo_count ?? 0) + (kind === 'photo' ? 1 : 0),
+          coach_count: usageRes.data?.coach_count ?? 0,
+        });
+        // 無料・ライトの写真はお試し累計を消費（standard以上は日次枠なので数えない）
+        if (kind === 'photo' && (plan === 'free' || plan === 'lite')) {
+          await supabase.from('profiles').update({ photo_trial_used: photoTrialUsed + 1 }).eq('id', user.id);
+        }
+      } catch { /* 計上失敗は無視 */ }
     };
     try { after(bumpUsage); } catch { void bumpUsage(); } // after非対応環境（テスト等）は即時実行
     const totalMs = Date.now() - t0;
     console.log(`[parse-food] setup=${tSetup}ms ai=${tAi}ms total=${totalMs}ms imgs=${images.length} textLen=${text.length}`);
     return NextResponse.json({
-      ok: true, result: parsed, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1,
+      ok: true, result: parsed, plan,
       timings: { setupMs: tSetup, aiMs: tAi, totalMs },
     });
   } catch (e) {

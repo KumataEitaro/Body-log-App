@@ -95,10 +95,10 @@ describe('POST /api/parse-food', () => {
     const res = await POST(req({ text: 'ごはん' }));
     expect(res.status).toBe(200);
     const j = await res.json();
-    expect(j.remaining).toBeNull();   // 無制限を表す
+    expect(j.plan).toBe('free');   // プラン判定つきで成功する
   });
 
-  it('正常系: 解析結果を返し、使用回数を+1、remainingを返す', async () => {
+  it('正常系: 解析結果を返し、使用回数を+1、planを返す', async () => {
     const payload = {
       items: [{ name: 'ごはん', qty: '180g', kcal: 302, p: 6, f: 1, c: 67 }],
       total: { kcal: 302, p: 6, f: 1, c: 67 },
@@ -110,7 +110,7 @@ describe('POST /api/parse-food', () => {
     const j = await res.json();
     expect(j.ok).toBe(true);
     expect(j.result.total.kcal).toBe(302);
-    expect(j.remaining).toBeNull();   // 上限撤廃中は無制限
+    expect(j.plan).toBe('free');
     expect(state.upserted[0]).toMatchObject({ user_id: 'user-1', count: 1 });
   });
 
@@ -161,7 +161,7 @@ describe('POST /api/parse-food', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(GEMINI_OK({ items: [], total: { kcal: 1, p: 0, f: 0, c: 0 } }));
     const res = await POST(req({ text: 'みかん' }));
     const j = await res.json();
-    expect(j.remaining).toBeNull();
+    expect(j.ok).toBe(true);
     expect(state.upserted[0]).toMatchObject({ count: 2 });   // ai_usageへの記録は継続
   });
 
@@ -204,7 +204,7 @@ describe('POST /api/parse-food', () => {
     const res = await POST(req({ text: 'ごはん' }));
     expect(res.status).toBe(200);
     const j = await res.json();
-    expect(j.remaining).toBeNull(); // 残数表示なし
+    expect(j.ok).toBe(true);
     expect(state.upserted.length).toBe(1); // 使用回数の記録は一般ユーザーと同じく行われる
   });
 
