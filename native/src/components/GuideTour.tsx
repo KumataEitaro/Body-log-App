@@ -9,7 +9,7 @@ import {
 } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Dimensions, Animated,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, Modal,
 } from 'react-native';
 import Svg, { Rect, Mask } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -71,7 +71,13 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     <GuideCtx.Provider value={{ active, start, register, registerScroller }}>
       <View style={{ flex: 1 }}>
         {children}
-        {active && <GuideOverlay targets={targets} scrollers={scrollers} close={() => setActive(false)} />}
+        {/* ModalはネイティブのタブバーやFABの上にも被さる（JSのabsolute Viewでは覆えない） */}
+        {active && (
+          <Modal visible transparent animationType="fade" statusBarTranslucent
+                 onRequestClose={() => setActive(false)}>
+            <GuideOverlay targets={targets} scrollers={scrollers} close={() => setActive(false)} />
+          </Modal>
+        )}
       </View>
     </GuideCtx.Provider>
   );

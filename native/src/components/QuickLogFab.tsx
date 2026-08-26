@@ -15,6 +15,7 @@ import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
 import { sumItems } from '@/lib/items';
 import { C } from '@/lib/ui';
 import { useDayStatus } from '@/lib/dayStatus';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveBar, usePulse } from '@/components/LivePreviewBar';
 import { t } from '@/lib/i18n';
 
@@ -30,6 +31,7 @@ export default function QuickLogFab() {
   const inputRef = useRef<TextInput>(null);
   // 食事タブが計算した「今日の残り」。FAB単体では計画計算をしない（重複と食い違いを避ける）
   const day = useDayStatus();
+  const insets = useSafeAreaInsets();
   const stagedTotal = staged ? sumItems(staged.items) : { kcal: 0, p: 0, f: 0, c: 0 };
   const pulse = usePulse(open && (staged?.items.length ?? 0) > 0);
 
@@ -96,7 +98,7 @@ export default function QuickLogFab() {
 
   return (
     <>
-      <Pressable style={s.fab} onPress={() => { setMsg(null); setOpen(true); }} hitSlop={6}>
+      <Pressable style={[s.fab, { bottom: insets.bottom + 12 }]} onPress={() => { setMsg(null); setOpen(true); }} hitSlop={6}>
         <Text style={s.fabT}>＋</Text>
       </Pressable>
 
@@ -195,7 +197,7 @@ const s = StyleSheet.create({
   previewMain: { fontSize: 12, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   previewAb: { fontSize: 10, fontWeight: '900', color: C.sub },
   fab: {
-    position: 'absolute', right: 18, bottom: 24, width: 54, height: 54, borderRadius: 27,
+    position: 'absolute', right: 18, width: 54, height: 54, borderRadius: 27,
     backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', zIndex: 20,
     shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6,
   },

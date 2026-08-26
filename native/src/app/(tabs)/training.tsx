@@ -466,7 +466,7 @@ export default function TrainingScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     <ScrollView
       ref={trScrollRef}
-      style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+      style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
@@ -854,7 +854,7 @@ export default function TrainingScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
   h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },

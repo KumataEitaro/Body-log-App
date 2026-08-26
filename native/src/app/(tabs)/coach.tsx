@@ -219,7 +219,7 @@ export default function CoachScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={s.wrap}>
+      <View style={[s.wrap, { paddingBottom: insets.bottom + 6 }]}>
         <Text style={[s.pageTitle, { marginTop: insets.top + 8 }]}>{t('相談')}</Text>
         {empty ? (
           /* ===== Empty State: 中央寄せのウェルカムUI（キーボード表示中はスクロールしてロゴまで見える） ===== */

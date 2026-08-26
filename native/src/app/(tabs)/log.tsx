@@ -1024,7 +1024,7 @@ export default function LogScreen() {
       </ScrollView>
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
-      <Animated.View style={[s.dockWrap, enter[3]]} ref={dockTarget} collapsable={false}>
+      <Animated.View style={[s.dockWrap, { paddingBottom: insets.bottom + 8 }, enter[3]]} ref={dockTarget} collapsable={false}>
         {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
         {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;

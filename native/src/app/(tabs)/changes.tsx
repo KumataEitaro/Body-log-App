@@ -646,7 +646,7 @@ export default function ChangesScreen() {
         header={headerJSX}
         onEnterEdit={() => setEditing(true)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
         onScroller={(fn) => guide.registerScroller('/changes', fn)}
       />
       </Animated.View>
@@ -664,7 +664,7 @@ export default function ChangesScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
   h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
   pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
