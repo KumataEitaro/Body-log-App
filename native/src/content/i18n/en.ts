@@ -937,4 +937,12 @@ export const EN: Record<string, string> = {
   "脂肪1kgは約7,200kcal。数字はゆっくりでも、確実に進んでいます。": "1 kg of fat is about 7,200 kcal. The scale may move slowly, but you're definitely making progress.",
   "{title}（{n}分で読めます）": "{title} ({n} min read)",
   "　→ 相談タブの「読みもの」からどうぞ。": "→ Check it out under \"Articles\" in the Advice tab.",
+  "記録をエクスポート（CSV）": "Export Logs (CSV)",
+  "Appleサインインを完了できませんでした。": "Couldn't complete Apple Sign-In.",
+  "Appleサインインは準備中です（Supabase側のプロバイダ設定待ち）。": "Apple Sign-In is coming soon (waiting on Supabase provider setup).",
+  "Appleサインインに失敗しました。もう一度お試しください。": "Apple Sign-In failed. Please try again.",
+  "Appleでサインイン": "Sign in with Apple",
+  "データの取得に失敗しました。通信環境を確認してください。": "Failed to load data. Please check your internet connection.",
+  "この端末では共有シートを開けませんでした。": "Couldn't open the share sheet on this device.",
+  "エクスポートに失敗しました（{msg}）。": "Export failed ({msg}).",
 };

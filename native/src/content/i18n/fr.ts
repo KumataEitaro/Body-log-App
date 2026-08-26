@@ -836,4 +836,12 @@ export const FR: Record<string, string> = {
   "時間内に解析できませんでした。文章を短くするか、もう一度お試しください。": "L'analyse a pris trop de temps. Raccourcissez votre texte ou réessayez.",
   "通信できませんでした。電波状況を確認してもう一度お試しください。": "Connexion impossible. Vérifiez votre réseau et réessayez.",
   "解析に失敗しました。もう一度お試しください。": "L'analyse a échoué. Veuillez réessayer.",
+  "記録をエクスポート（CSV）": "Exporter les données (CSV)",
+  "Appleサインインを完了できませんでした。": "Impossible de finaliser la connexion avec Apple.",
+  "Appleサインインは準備中です（Supabase側のプロバイダ設定待ち）。": "La connexion avec Apple arrive bientôt (en attente de configuration).",
+  "Appleサインインに失敗しました。もう一度お試しください。": "Échec de la connexion avec Apple. Veuillez réessayer.",
+  "Appleでサインイン": "Se connecter avec Apple",
+  "データの取得に失敗しました。通信環境を確認してください。": "Impossible de récupérer les données. Vérifiez votre connexion.",
+  "この端末では共有シートを開けませんでした。": "Impossible d'ouvrir le menu de partage sur cet appareil.",
+  "エクスポートに失敗しました（{msg}）。": "Échec de l'exportation ({msg}).",
 };

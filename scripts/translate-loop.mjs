@@ -10,6 +10,20 @@ const SECRET = fs.readFileSync(process.argv[2], 'utf8').trim();
 const TARGETS = process.argv.slice(3);
 const URL_QA = 'https://bodylog-orcin.vercel.app/api/translate-qa';
 const I18N_DIR = 'native/src/content/i18n';
+// 一時的な通信断・AI側の混雑で全体を止めない（3回まで待って再試行）
+async function fetchRetry(url, init, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, init);
+      if (r.status >= 500 && i < tries - 1) { await new Promise((x) => setTimeout(x, 4000)); continue; }
+      return r;
+    } catch (e) {
+      if (i === tries - 1) throw e;
+      await new Promise((x) => setTimeout(x, 4000));
+    }
+  }
+}
+
 const LANG_NAME = { en: 'English', ko: 'Korean', zh: 'Simplified Chinese', es: 'Spanish', fr: 'French', de: 'German', pt: 'Brazilian Portuguese', id: 'Indonesian', th: 'Thai', vi: 'Vietnamese' };
 
 // ---- t('...')で使用中のキーを集める（native/scripts/i18n-keys.jsと同じ考え方） ----
@@ -61,13 +75,17 @@ for (const code of TARGETS) {
   let ok = 0, bad = 0;
   for (let i = 0; i < missing.length; i += 40) {
     const batch = missing.slice(i, i + 40);
-    const res = await fetch(URL_QA, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${SECRET}` },
-      body: JSON.stringify({ target: LANG_NAME[code] ?? code, entries: batch.map((ja) => ({ ja, en: EN.get(ja) })) }),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!j.ok) { console.log(`  batch ${i / 40 + 1}: 失敗 ${j.error ?? res.status}（このバッチは飛ばす）`); bad += batch.length; continue; }
+    // 1バッチの失敗（3回リトライ後）でジョブ全体を落とさない。飛ばして次へ
+    let j = {};
+    try {
+      const res = await fetchRetry(URL_QA, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${SECRET}` },
+        body: JSON.stringify({ target: LANG_NAME[code] ?? code, entries: batch.map((ja) => ({ ja, en: EN.get(ja) })) }),
+      });
+      j = await res.json().catch(() => ({}));
+    } catch (e) { j = { ok: false, error: String(e?.message ?? e) }; }
+    if (!j.ok) { console.log(`  batch ${i / 40 + 1}: 失敗 ${j.error ?? '?'}（このバッチは飛ばす）`); bad += batch.length; continue; }
     const pairs = [];
     batch.forEach((ja, idx) => {
       const v = String(j.t[idx] ?? '').trim();
