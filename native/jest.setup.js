@@ -119,6 +119,29 @@ jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: jest.fn(async () => ({ uri: 'x', base64: 'x' })),
   SaveFormat: { JPEG: 'jpeg' },
 }));
+jest.mock('expo-apple-authentication', () => ({
+  isAvailableAsync: async () => true,
+  signInAsync: async () => ({ identityToken: 'test-token' }),
+  AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+}));
+jest.mock('expo-crypto', () => ({
+  getRandomBytesAsync: async (n) => new Uint8Array(n),
+  digestStringAsync: async () => 'hashed',
+  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+}));
+jest.mock('expo-web-browser', () => ({
+  openAuthSessionAsync: async () => ({ type: 'cancel' }),
+  maybeCompleteAuthSession: () => {},
+  openBrowserAsync: async () => {},
+}));
+jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0-test' }));
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { UTF8: 'utf8' },
+  writeAsStringAsync: async () => {},
+}));
+jest.mock('expo-sharing', () => ({ isAvailableAsync: async () => false, shareAsync: async () => {} }));
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(async () => {}),
   selectionAsync: jest.fn(async () => {}),

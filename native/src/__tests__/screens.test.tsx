@@ -6,6 +6,7 @@ import TrainingScreen from '../app/(tabs)/training';
 import ChangesScreen from '../app/(tabs)/changes';
 import CoachScreen from '../app/(tabs)/coach';
 import SettingsScreen from '../app/(tabs)/settings';
+import LoginScreen from '../app/login';
 import InteractiveChart from '../components/InteractiveChart';
 import GoalPanel from '../components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '../components/LiftingProgress';
@@ -25,6 +26,7 @@ async function mount(el: React.ReactElement): Promise<ReactTestRenderer> {
 
 describe('screens smoke（マウント時クラッシュ検出）', () => {
   const cases: [string, React.ReactElement][] = [
+    ['ログイン画面', <LoginScreen key="login" />],
     ['食事タブ', <LogScreen key="log" />],
     ['トレタブ', <TrainingScreen key="tr" />],
     ['概要タブ', <ChangesScreen key="ch" />],

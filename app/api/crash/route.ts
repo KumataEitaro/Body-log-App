@@ -19,7 +19,8 @@ export async function POST(req: Request) {
   if (!body?.message) return NextResponse.json({ ok: false }, { status: 400 });
 
   const svc = createClient(url, svcKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  await svc.from('crash_reports').insert({
+  // insert失敗（テーブル未作成等）を握りつぶすと「計測できているつもり」になる。失敗は失敗と返す
+  const { error } = await svc.from('crash_reports').insert({
     platform: String(body.platform ?? '').slice(0, 16),
     app_version: String(body.app_version ?? '').slice(0, 32),
     fatal: body.fatal === true,
@@ -28,5 +29,6 @@ export async function POST(req: Request) {
     stack: String(body.stack ?? '').slice(0, 4000),
     user_id: /^[0-9a-f-]{36}$/.test(String(body.user_id)) ? body.user_id : null,
   });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

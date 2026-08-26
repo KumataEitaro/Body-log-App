@@ -16,6 +16,9 @@ const OAUTH_REDIRECT = 'bodylog://auth-callback';
 // v1.0はメール+パスワードのみで審査に出す。Googleを出すとApple Sign-Inの実装が必須になる
 // （App Store Review 4.8）ため、v1.1でApple/Google両対応してから true にする。
 const SHOW_GOOGLE_SSO = false;
+// AppleサインインはコードとcapabilityまでOK。SupabaseのAppleプロバイダを有効化したらtrueへ。
+// （未設定のままボタンを出すと「押しても準備中エラー」になり、審査で確実に落ちる）
+const SHOW_APPLE_SSO = false;
 
 export default function LoginScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -183,7 +186,7 @@ export default function LoginScreen() {
         <OptionButton style={{ marginTop: 8 }} label={isLogin ? t('ログイン') : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
         {/* Appleでサインイン（iOSのみ）。審査ガイドライン上、他のSSOを出すなら必須 */}
-        {appleAvail && (
+        {SHOW_APPLE_SSO && appleAvail && (
           <>
             <View style={s.orRow}>
               <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
