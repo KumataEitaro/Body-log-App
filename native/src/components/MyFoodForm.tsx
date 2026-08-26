@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Sparkles, Camera } from 'lucide-react-native';
+import { Sparkles, Camera, Salad } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { apiLang } from '@/lib/i18n';
@@ -177,7 +177,10 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={s.wrap}>
-          <Text style={s.title}>{'🍱 ' + t('マイ食品を追加')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Salad size={18} color={C.teal} />
+            <Text style={s.title}>{t('マイ食品を追加')}</Text>
+          </View>
           <Text style={s.note}>{t('よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。')}</Text>
 
           <ScrollView keyboardShouldPersistTaps="handled">

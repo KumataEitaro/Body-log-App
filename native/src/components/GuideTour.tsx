@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { todayJST } from '@/lib/calc';
+import { Hand, PartyPopper } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
@@ -241,7 +242,7 @@ function GuideOverlay({ targets, scrollers, close }: {
 function WelcomeCard({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
   return (
     <View style={s.card}>
-      <Text style={s.cardEmoji}>👋</Text>
+      <View style={s.cardIcon}><Hand size={26} color={C.teal} /></View>
       <Text style={s.cardTitle}>{t('ようこそ BodyLog へ')}</Text>
       <Text style={s.cardText}>{t('1分で使い方をご案内します。')}{'\n'}{t('ツアーのあとに、あなたの現在地点と目標を一緒に設定しましょう。')}</Text>
       <OptionButton style={{ alignSelf: 'stretch', marginTop: 14, marginBottom: 8 }} label={t('ガイドを始める')} onPress={onStart} />
@@ -348,7 +349,7 @@ function CoachDemoPanel({ title, text, onNext, last, H }: {
 function DoneCard({ onFinish }: { onFinish: () => void }) {
   return (
     <View style={s.card}>
-      <Text style={s.cardEmoji}>🎉</Text>
+      <View style={s.cardIcon}><PartyPopper size={26} color={C.teal} /></View>
       <Text style={s.cardTitle}>{t('準備完了！')}</Text>
       <Text style={s.cardText}>{t('まずは今日食べたものを1つ、下の入力欄に書いてみましょう。')}{'\n'}{t('続けるほどAIのアドバイスが賢くなります。')}</Text>
       <OptionButton style={{ alignSelf: 'stretch', marginTop: 14 }} label={t('食事を記録してみる')} onPress={onFinish} />
@@ -357,6 +358,7 @@ function DoneCard({ onFinish }: { onFinish: () => void }) {
 }
 
 const s = StyleSheet.create({
+  cardIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 6 },
   skip: {
     position: 'absolute', top: 62, right: 16, backgroundColor: 'rgba(255,255,255,0.14)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,

@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { AddCardSheet } from '@/components/CardLayout';
-import { Plus } from 'lucide-react-native';
+import { Plus, Moon } from 'lucide-react-native';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
@@ -516,8 +516,8 @@ export default function ChangesScreen() {
             activity.map((a) => (
               <View key={a.date} style={s.actRow}>
                 <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
-                <Text style={s.actVal}>👟 {a.steps.toLocaleString()}歩</Text>
-                <Text style={s.actVal}>😴 {a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Footprints size={13} color={C.sub} /><Text style={s.actVal}>{a.steps.toLocaleString()}歩</Text></View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Moon size={13} color={C.sub} /><Text style={s.actVal}>{a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text></View>
               </View>
             ))
           )}

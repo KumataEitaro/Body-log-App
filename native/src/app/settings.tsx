@@ -9,7 +9,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
@@ -242,10 +242,13 @@ export default function SettingsScreen() {
   }
 
   // モーダル共通ヘッダー
-  function SheetHeader({ title }: { title: string }) {
+  function SheetHeader({ title, icon }: { title: string; icon?: React.ReactNode }) {
     return (
       <View style={s.sheetHead}>
-        <Text style={s.sheetTitle}>{title}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+          {icon}
+          <Text style={s.sheetTitle}>{title}</Text>
+        </View>
         <Pressable onPress={() => setSheet(null)} hitSlop={8}><Text style={s.sheetClose}>{t('閉じる')}</Text></Pressable>
       </View>
     );
@@ -406,7 +409,7 @@ export default function SettingsScreen() {
     {/* ===== プロフィール編集モーダル ===== */}
     <Modal visible={sheet === 'profile'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title={"👤 " + t("プロフィール編集")} />
+        <SheetHeader icon={<UserRound size={18} color={C.teal} />} title={t("プロフィール編集")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={s.label}>{t('表示名')}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder={t('表示名')} placeholderTextColor={C.faint} />
@@ -436,7 +439,7 @@ export default function SettingsScreen() {
     {/* ===== テーマ選択モーダル ===== */}
     <Modal visible={sheet === 'theme'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={'🎨 ' + t('テーマカラー')} />
+        <SheetHeader icon={<Palette size={18} color={C.teal} />} title={t('テーマカラー')} />
         <ScrollView>
           <Text style={s.label}>{t('外観')}</Text>
           <Text style={s.note}>{t('「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。')}</Text>
@@ -536,7 +539,7 @@ export default function SettingsScreen() {
     {/* ===== 言語選択モーダル ===== */}
     <Modal visible={sheet === 'lang'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={"🌐 " + t("言語")} />
+        <SheetHeader icon={<Languages size={18} color={C.teal} />} title={t("言語")} />
         <ScrollView>
           {LOCALES.map((l) => (
             <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}>
@@ -564,7 +567,7 @@ export default function SettingsScreen() {
     {/* ===== マイ食品管理モーダル ===== */}
     <Modal visible={sheet === 'foods'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={"🍱 " + t("マイ食品の管理")} />
+        <SheetHeader icon={<Salad size={18} color={C.teal} />} title={t("マイ食品の管理")} />
         <ScrollView>
           {foods.length === 0 && <Text style={s.note}>{t('まだ登録がありません。食事タブでAI解析した品目が候補になります。')}</Text>}
           <OptionButton style={{ marginBottom: 12 }} label={t('＋ 食品を追加')} onPress={() => setFoodFormOpen(true)} />
@@ -602,7 +605,7 @@ export default function SettingsScreen() {
     {/* ===== 体重目標モーダル ===== */}
     <Modal visible={sheet === 'goalW'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title={"🎯 " + t("体重の目標")} />
+        <SheetHeader icon={<Target size={18} color={C.teal} />} title={t("体重の目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="weight" weightSections="goal" />
           <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
@@ -613,7 +616,7 @@ export default function SettingsScreen() {
     {/* ===== 筋トレ目標モーダル ===== */}
     <Modal visible={sheet === 'goalT'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader title={"🏋️ " + t("筋トレの目標")} />
+        <SheetHeader icon={<Dumbbell size={18} color={C.teal} />} title={t("筋トレの目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="training" />
         </ScrollView>
@@ -623,7 +626,7 @@ export default function SettingsScreen() {
     {/* ===== アカウント削除モーダル ===== */}
     <Modal visible={sheet === 'delete'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={"⚠️ " + t("アカウント削除")} />
+        <SheetHeader icon={<Trash2 size={18} color={C.coral} />} title={t("アカウント削除")} />
         <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
         <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder={t('削除')} placeholderTextColor={C.faint} />
@@ -638,7 +641,7 @@ export default function SettingsScreen() {
     <QuickLogFab />
     <Modal visible={avatarOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAvatarOpen(false)}>
       <View style={s.sheetBody}>
-        <SheetHeader title={"🙂 " + t("アイコンを選ぶ")} />
+        <SheetHeader icon={<Smile size={18} color={C.teal} />} title={t("アイコンを選ぶ")} />
         <ScrollView>
           {AVATAR_GROUPS.map((g) => (
             <View key={g.key}>

@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { TrendingUp, CalendarDays, Trophy, Share2 } from 'lucide-react-native';
+import { TrendingUp, CalendarDays, Trophy, Share2, Flame } from 'lucide-react-native';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
@@ -124,7 +124,12 @@ export function LiftKpiCard() {
     <View style={s.card}>
       <View style={[s.h2Row, { justifyContent: 'space-between' }]}>
         <Text style={[s.h2, { marginBottom: 0 }]}>{t('今週の運動')}<Text style={s.weekNote}>{t('— 月曜はじまり')}</Text></Text>
-        {streak > 0 && <Text style={s.streak}>🔥 {t('{n}週連続', { n: streak })}</Text>}
+        {streak > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Flame size={13} color={C.teal} fill={C.teal} />
+            <Text style={s.streak}>{t('{n}週連続', { n: streak })}</Text>
+          </View>
+        )}
       </View>
       <View style={s.kpiRow}>
         <View style={s.kpi}>
