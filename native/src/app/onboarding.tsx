@@ -1,13 +1,18 @@
-// 初回オンボーディング: 使い方ガイド（紙芝居）のあとに開く4ステップウィザード
+// 初回オンボーディング: 価値カルーセル（intro）→ 4ステップウィザード
+// intro: バリュープロポジションを先に体感させる（2026年知見: 深いオンボの方が転換・継続が高い）
 // ① あなたの現在地点（プロフィール＋活動量カード選択＋現在の体重）
-// ② ダイエット目的（PFC係数の既定とAI相談の前提を決める）
-// ③ 目標（体重・期日・体脂肪率は任意）
+// ② 目的（減量3種＋増量。PFC係数の既定とAI相談の前提を決める）
+// ③ 目標（体重・期日・体脂肪率は任意。減らす人も増やす人も同じ逆算）
 // ④ 筋トレ目標（任意・スキップ可）
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
+import Animated, {
+  FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,12 +25,14 @@ import GoalPanel from '@/components/GoalPanel';
 import { t } from '@/lib/i18n';
 import { PURPOSES, setPurpose, usePurpose, type PurposeKey } from '@/lib/purpose';
 import { purchasesAvailable } from '@/lib/purchases';
+import OnboardingIntro from '@/components/OnboardingIntro';
 
 const DONE_KEY = 'bl-onboard-done';
 
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [stage, setStage] = useState<'intro' | 'wizard'>('intro');
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [sex, setSex] = useState<'male' | 'female'>('male');
@@ -36,6 +43,19 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
   const purpose = usePurpose();
   const [msg, setMsg] = useState('');
+
+  // 進捗はドットではなくスプリングで満ちていくバー（前進の実感＝マイクロコミットメント）
+  const prog = useSharedValue(0.25);
+  useEffect(() => {
+    prog.value = withSpring((step + 1) / 4, { damping: 15, stiffness: 140 });
+  }, [step, prog]);
+  const progSt = useAnimatedStyle(() => ({ width: `${prog.value * 100}%` }));
+
+  // ステップ前進は必ずここを通す（触覚＋遷移アニメの起点をそろえる）
+  function go(n: number) {
+    Haptics.selectionAsync().catch(() => {});
+    setStep(n);
+  }
 
   // 既存値があればプリフィル（ガイド再実行などで再訪しても壊れない）
   useEffect(() => {
@@ -54,6 +74,7 @@ export default function Onboarding() {
   }, []);
 
   function done() {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     AsyncStorage.setItem(DONE_KEY, '1').catch(() => {});
     router.replace('/(tabs)/log' as never);
     // 目標を決めた直後が課金の意思決定に最適なタイミング（2026年の実測でも
@@ -81,22 +102,31 @@ export default function Onboarding() {
       if (error) { setMsg(t('保存に失敗しました。もう一度お試しください。')); return; }
       await supabase.from('entries').upsert(
         { user_id: uid, date: todayJST(), weight: Number(weight) }, { onConflict: 'user_id,date' });
-      setStep(1);
+      go(1);
     } finally { setBusy(false); }
+  }
+
+  // まず価値カルーセル。設定を求める前に「何が返ってくるアプリか」を体感してもらう
+  if (stage === 'intro') {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top + 8 }}>
+        <OnboardingIntro onDone={() => setStage('wizard')} />
+      </View>
+    );
   }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1, paddingTop: insets.top + 14, paddingHorizontal: 20 }}>
-        {/* 進捗ドット＋スキップ */}
+        {/* スプリング進捗バー＋スキップ */}
         <View style={s.topRow}>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[0, 1, 2, 3].map((i) => <View key={i} style={[s.dot, step === i && s.dotOn]} />)}
-          </View>
+          <View style={s.track}><Animated.View style={[s.fill, progSt]} /></View>
           <Pressable onPress={done} hitSlop={10}><Text style={s.skipT}>{t('あとで設定')}</Text></Pressable>
         </View>
 
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
+          {/* keyでツリーを差し替え、ステップ全体がふわっと入場する */}
+          <Animated.View key={step} entering={FadeInDown.duration(320)}>
           {step === 0 && (
             <>
               <Text style={s.h1}>{t('あなたの現在地点')}</Text>
@@ -125,19 +155,20 @@ export default function Onboarding() {
               <Text style={s.label}>{t('日常の活動量')}</Text>
               <ActivityLevelPicker value={life} onChange={setLife} />
               {msg ? <Text style={s.err}>{msg}</Text> : null}
-              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 目標を決める')} onPress={saveProfile} busy={busy} />
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 目的を選ぶ')} onPress={saveProfile} busy={busy} />
             </>
           )}
 
           {step === 1 && (
             <>
               <Text style={s.h1}>{t('なんのために使う？')}</Text>
-              <Text style={s.sub}>{t('目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「設定→体重の目標」からいつでも変えられます。')}</Text>
+              <Text style={s.sub}>{t('減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「設定→体重の目標」からいつでも変えられます。')}</Text>
               {PURPOSES.map((pu) => {
                 const on = purpose === pu.key;
                 return (
-                  <Pressable key={pu.key} style={[s.purposeCard, on && s.purposeCardOn]}
-                             onPress={() => setPurpose(pu.key as PurposeKey)}>
+                  <Pressable key={pu.key}
+                             style={({ pressed }) => [s.purposeCard, on && s.purposeCardOn, pressed && { transform: [{ scale: 0.98 }] }]}
+                             onPress={() => { Haptics.selectionAsync().catch(() => {}); setPurpose(pu.key as PurposeKey); }}>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.purposeT, on && { color: C.teal }]}>{t(pu.label)}</Text>
                       <Text style={s.purposeD}>{t(pu.desc)}</Text>
@@ -147,8 +178,8 @@ export default function Onboarding() {
                 );
               })}
               <OptionButton style={{ marginTop: 18 }} label={t('次へ — 目標を決める')}
-                            onPress={() => setStep(2)} disabled={purpose == null} />
-              <Pressable onPress={() => setStep(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
+                            onPress={() => go(2)} disabled={purpose == null} />
+              <Pressable onPress={() => go(2)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
                 <Text style={s.linkT}>{t('目的はあとで決める')}</Text>
               </Pressable>
             </>
@@ -157,10 +188,10 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <Text style={s.h1}>{t('目標を決める')}</Text>
-              <Text style={s.sub}>{t('目標から逆算して、毎日の「あと食べられる量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
+              <Text style={s.sub}>{t('減らす人も、増やす人も。目標から逆算して、毎日の「ちょうどいい量」を自動計算します。「目標を保存する」を押してから次へ進んでください。')}</Text>
               <GoalPanel mode="weight" weightSections="goal" />
-              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 筋トレ目標（任意）')} onPress={() => setStep(3)} />
-              <Pressable onPress={() => setStep(3)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
+              <OptionButton style={{ marginTop: 18 }} label={t('次へ — 筋トレ目標（任意）')} onPress={() => go(3)} />
+              <Pressable onPress={() => go(3)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
                 <Text style={s.linkT}>{t('目標はあとで決める')}</Text>
               </Pressable>
             </>
@@ -174,6 +205,7 @@ export default function Onboarding() {
               <OptionButton style={{ marginTop: 18 }} label={t('はじめる 🎉')} onPress={done} />
             </>
           )}
+          </Animated.View>
           <View style={{ height: 40 }} />
         </ScrollView>
       </View>
@@ -191,9 +223,9 @@ const s = StyleSheet.create({
   purposeT: { fontSize: 15, fontWeight: '800', color: C.ink },
   purposeD: { fontSize: 13, color: C.sub, marginTop: 2 },
   purposeCoef: { fontSize: 11, color: C.faint, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.line },
-  dotOn: { backgroundColor: C.teal, width: 22 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16 },
+  track: { flex: 1, height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' },
+  fill: { height: 6, borderRadius: 3, backgroundColor: C.teal },
   skipT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   h1: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 6 },
   sub: { fontSize: 13, color: C.sub, lineHeight: 19, marginBottom: 14 },
