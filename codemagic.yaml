@@ -109,6 +109,11 @@ workflows:
     environment:
       xcode: latest
       node: 22
+      # Codemagic UIの環境変数グループ「rc」: EXPO_PUBLIC_RC_IOS_KEY（RevenueCatのApple公開キー）を入れる。
+      # グループ未作成のままだとビルドが検証エラーになるため、作成完了までコメントアウト。
+      # （キー未設定のビルドでも、アプリは課金機能を「準備中」として安全に隠す）
+      # groups:
+      #   - rc
       vars:
         BUNDLE_ID: com.gotcha.bodylog.rn
       ios_signing:
