@@ -90,7 +90,7 @@ export default function LogScreen() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; upgrade?: boolean } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wWeight, setWWeight] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
@@ -324,7 +324,7 @@ export default function LogScreen() {
     setPendingTexts((p) => [...p, { id: pid, text: text || t('（写真）') }]);
     try {
       const res = await analyzeFood(text, imgs, parseHistory.current);
-      if (!res.ok) { setMsg({ ok: false, text: res.error }); setChat(text); return; }
+      if (!res.ok) { setMsg({ ok: false, text: res.error, upgrade: res.upgrade }); setChat(text); return; }
       const r = res.result;
       const ex2 = res.extras;
       // 会話の記憶は直近1往復だけ（古い文脈を引きずると誤解釈のもと）
@@ -1005,6 +1005,12 @@ export default function LogScreen() {
         )}
 
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+        {msg?.upgrade && (
+          <Pressable onPress={() => router.push('/paywall' as never)} hitSlop={8}
+            style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 6 }, pressed && { opacity: 0.7 }]}>
+            <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+          </Pressable>
+        )}
 
         {/* 体重クイック入力 */}
         {vis('weight') && (

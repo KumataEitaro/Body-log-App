@@ -9,7 +9,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
@@ -23,7 +23,7 @@ import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
@@ -82,6 +82,7 @@ const bt = StyleSheet.create({
 });
 
 export default function SettingsScreen() {
+  const router2 = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [sex, setSex] = useState<'male' | 'female'>('male');
@@ -295,6 +296,8 @@ export default function SettingsScreen() {
       {/* アカウント設定 */}
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
+        <Row icon={<Crown color={C.teal} size={19} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
+        <View style={s.sep} />
         <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
         <Row icon={<Salad color={C.teal} size={19} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
