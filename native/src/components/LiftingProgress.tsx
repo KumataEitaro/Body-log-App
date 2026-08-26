@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { TrendingUp, CalendarDays } from 'lucide-react-native';
+import { TrendingUp, CalendarDays, Trophy } from 'lucide-react-native';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
@@ -331,7 +331,7 @@ export function LiftChartCard() {
 
   return (
     <View style={s.card}>
-      <View style={s.h2Row}><TrendingUp size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレの成長')}</Text></View>
+      <View style={s.h2Row}><TrendingUp size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('挙上重量の推移')}</Text></View>
       <View style={s.chips}>
         {([['1rm', t('推定1RM')], ['kg', t('実重量')], ['volume', t('ボリューム')]] as const).map(([m, l]) => (
           <Chip key={m} label={l} tone="ink" selected={chartMode === m} onPress={() => setChartMode(m)} />
@@ -381,7 +381,55 @@ export function LiftChartCard() {
   );
 }
 
+// ===== ⑥ 自己ベスト（種目ごとの最高記録。直近14日の更新は NEW! で祝う） =====
+export function PersonalBestCard() {
+  const { series, goalKg } = useLifting();
+  const today = todayJST();
+  const rows = [...series.entries()].map(([name, pts]) => {
+    let best = { kg: 0, date: '' };
+    for (const p of pts) if (p.maxKg > best.kg) best = { kg: p.maxKg, date: p.date };
+    return { name, kg: best.kg, date: best.date };
+  }).filter((r) => r.kg > 0)
+    .sort((a, b) => b.kg - a.kg)
+    .slice(0, 8);
+  if (rows.length === 0) return null;
+  const isNew = (d: string) => shiftDate(d, 14) >= today;   // 直近14日以内の更新
+  const topKg = rows[0].kg;
+  return (
+    <View style={s.card}>
+      <View style={s.h2Row}><Trophy size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('自己ベスト')}</Text></View>
+      {rows.map((r) => {
+        const goal = goalKg.get(r.name);
+        return (
+          <View key={r.name} style={s.prRow}>
+            <Text style={s.prName} numberOfLines={1}>{r.name}</Text>
+            <View style={s.prBarTrack}>
+              <View style={[s.prBarFill, { width: `${Math.max(6, (r.kg / topKg) * 100)}%` }]} />
+            </View>
+            <View style={{ alignItems: 'flex-end', minWidth: 84 }}>
+              <Text style={s.prKg}>
+                {r.kg}<Text style={s.prUnit}>kg</Text>
+                {isNew(r.date) && <Text style={s.prNew}> NEW!</Text>}
+              </Text>
+              <Text style={s.prDate}>{r.date.slice(5).replace('-', '/')}{goal ? ` ・ ${t('目標')}${goal}kg` : ''}</Text>
+            </View>
+          </View>
+        );
+      })}
+      <Text style={[s.muted, { marginTop: 8 }]}>{t('実重量ベースの最高記録（自重種目は体重込み）')}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  prRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  prName: { width: 96, fontSize: 13, fontWeight: '700', color: C.ink },
+  prBarTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.track, overflow: 'hidden' },
+  prBarFill: { height: 8, borderRadius: 4, backgroundColor: C.teal },
+  prKg: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  prUnit: { fontSize: 11, fontWeight: '600', color: C.sub },
+  prNew: { fontSize: 11, fontWeight: '900', color: C.coral },
+  prDate: { fontSize: 10.5, color: C.faint },
   pvChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   pvChip: { paddingHorizontal: 11, paddingVertical: 6 },
   pvChipOn: { backgroundColor: C.ink, borderColor: C.ink },

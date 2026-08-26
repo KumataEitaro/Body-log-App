@@ -1,14 +1,15 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration } from 'react-native';
 import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, type HKWorkout } from '@/lib/health';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
-import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell } from 'lucide-react-native';
+import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell, Target } from 'lucide-react-native';
+import GoalPanel from '@/components/GoalPanel';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
@@ -54,7 +55,7 @@ const fmtRest = (n: number) => (n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 6
 // 表示/非表示できるカード（かんたん記録側と筋トレ側）
 const EX_CARDS = ['quick', 'liftInput', 'liftHistory'];
 const EX_LABELS = (): Record<string, string> => ({
-  quick: t('今日の運動をゆるく記録'),
+  quick: t('今日の消費カロリーを記録'),
   liftInput: t('今日のトレーニングを記録'),
   liftHistory: t('筋トレ履歴'),
 });
@@ -86,10 +87,14 @@ export default function TrainingScreen() {
     trScrollRef.current?.scrollTo({ y: Math.max(0, trY.current + delta), animated: true });
   }, []));
 
-  // レストタイマーのカウントダウン
+  // レストタイマーのカウントダウン（0になった瞬間にバイブで知らせる）
   useEffect(() => {
     if (restLeft == null || restLeft <= 0) return;
-    const t = setInterval(() => setRestLeft((v) => (v == null || v <= 1 ? 0 : v - 1)), 1000);
+    const t = setInterval(() => setRestLeft((v) => {
+      if (v == null) return v;
+      if (v <= 1) { try { Vibration.vibrate(500); } catch { /* 端末設定次第 */ } return 0; }
+      return v - 1;
+    }), 1000);
     return () => clearInterval(t);
   }, [restLeft]);
 
@@ -111,6 +116,8 @@ export default function TrainingScreen() {
 
   // 記録先の日付（既定=今日。過去日にも記録できる）
   const [viewDate, setViewDate] = useState(todayJST());
+  // 運動目標の編集モーダル
+  const [goalOpen, setGoalOpen] = useState(false);
   const cards = useCardLayout('bl-cards-exercise', EX_CARDS);
 
   const vis = (k: string) => !cards.layout.hidden.includes(k);
@@ -503,8 +510,8 @@ export default function TrainingScreen() {
       {seg === 'easy' && vis('quick') && (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
           <MinusBadge editing={editing} onPress={() => cards.hide('quick')} />
-          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の運動をゆるく記録')}</Text></View>
-          <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると今日の目標カロリーに自動反映されます。')}</Text>
+          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の消費カロリーを記録')}</Text></View>
+          <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると消費カロリーを計算して、今日の「あと食べられる量」に自動で上乗せします。')}</Text>
           <View style={s.actGrid}>
             {shownActs.map((a) => (
               <Pressable key={a.id} style={[s.actChip, actId === a.id && s.actChipOn]}
@@ -581,20 +588,39 @@ export default function TrainingScreen() {
         </View>
       </Modal>
 
-      {/* レストタイマー（保存で自動開始・タップで設定した長さにリスタート） */}
-      {seg === 'lift' && restLeft != null && (
-        <Pressable style={s.rest} onPress={() => setRestLeft(restSec)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Timer size={15} color={C.teal} />
-            <Text style={s.restL}>{t('レスト')}</Text>
-          </View>
-          <Text style={s.restN}>
-            {restLeft > 0
-              ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
-              : t('終了💪')}
-          </Text>
-          <Text style={s.restHint}>{restLeft > 0 ? t('タップで{d}に戻す', { d: fmtRest(restSec) }) : t('次のセットへ！')}</Text>
-        </Pressable>
+      {/* レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー） */}
+      {seg === 'lift' && (
+        restLeft != null ? (
+          <Pressable style={s.rest} onPress={() => setRestLeft(restSec)}>
+            {/* 残り時間の進捗バー（面の下端。減っていくのが視覚で分かる） */}
+            <View style={s.restBarTrack}>
+              <View style={[s.restBarFill, { width: `${Math.max(0, Math.min(100, (restLeft / restSec) * 100))}%` }]} />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Timer size={15} color={C.teal} />
+              <Text style={s.restL}>{t('レスト')}</Text>
+            </View>
+            <Text style={s.restN}>
+              {restLeft > 0
+                ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
+                : t('終了💪')}
+            </Text>
+            <View style={{ alignItems: 'flex-end', gap: 2 }}>
+              <Text style={s.restHint}>{restLeft > 0 ? t('タップで{d}に戻す', { d: fmtRest(restSec) }) : t('次のセットへ！')}</Text>
+              <Pressable onPress={() => setRestLeft(null)} hitSlop={10}>
+                <Text style={s.restStop}>{t('とじる')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable style={s.restIdle} onPress={() => setRestLeft(restSec)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Timer size={15} color={C.sub} />
+              <Text style={s.restIdleT}>{t('レストタイマー')}</Text>
+            </View>
+            <Text style={s.restIdleStart}>▶ {fmtRest(restSec)} {t('で開始')}</Text>
+          </Pressable>
+        )
       )}
 
       {/* 入力 */}
@@ -701,6 +727,31 @@ export default function TrainingScreen() {
       )}
 
       {/* 履歴 */}
+      {/* 運動目標への導線（目標を置くとグラフに目標線が出る） */}
+      {seg === 'lift' && (
+        <Pressable style={s.goalRow} onPress={() => setGoalOpen(true)}>
+          <View style={s.goalIcon}><Target size={16} color={C.teal} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.goalRowT}>{t('目標を記録しましょう')}</Text>
+            <Text style={s.goalRowSub}>{t('ベンチプレス100kgなど。成長グラフに目標線が引かれます。')}</Text>
+          </View>
+          <Text style={s.goalRowGo}>›</Text>
+        </Pressable>
+      )}
+
+      {/* 運動目標の編集モーダル */}
+      <Modal visible={goalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGoalOpen(false)}>
+        <View style={s.hkWrap}>
+          <View style={s.hkHead}>
+            <Text style={s.hkTitle}>{t('運動の目標')}</Text>
+            <Pressable onPress={() => setGoalOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            <GoalPanel mode="training" />
+          </ScrollView>
+        </View>
+      </Modal>
+
       <View style={[s.card, (seg !== 'lift' || !vis('liftHistory')) && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
         <View style={s.h2Row}><BookOpen size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
@@ -928,7 +979,27 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
+    overflow: 'hidden',
   },
+  restBarTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: 'transparent' },
+  restBarFill: { height: 3, backgroundColor: C.teal, borderRadius: 2 },
+  restStop: { fontSize: 11, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
+  restIdle: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
+  },
+  restIdleT: { fontSize: 13, fontWeight: '700', color: C.sub },
+  restIdleStart: { fontSize: 13, fontWeight: '800', color: C.teal },
+  goalRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12,
+  },
+  goalIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  goalRowT: { fontSize: 13.5, fontWeight: '800', color: C.ink },
+  goalRowSub: { fontSize: 11.5, color: C.sub, marginTop: 1 },
+  goalRowGo: { fontSize: 22, color: C.faint, fontWeight: '300' },
   restL: { fontSize: 13, fontWeight: '800', color: C.ink },
   restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
   restHint: { fontSize: 11, color: C.sub },

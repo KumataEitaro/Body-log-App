@@ -30,7 +30,7 @@ import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
-import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard } from '@/components/LiftingProgress';
+import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
@@ -55,11 +55,11 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['digest', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tgoal', 'tbal', 'tpart', 'ttable'];
+const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
 const CARD_LABELS = (): Record<string, string> => ({
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
-  tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('筋トレの成長'), tgoal: t('運動目標'),
+  tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -554,6 +554,7 @@ export default function ChangesScreen() {
       case 'tbal': return <BalanceCard />;
       case 'tpart': return <PartVolumeCard />;
       case 'tchart': return <LiftChartCard />;
+      case 'tpr': return <PersonalBestCard />;
       case 'tgoal': return <GoalSummaryCard mode="training" />;
       default: return null;
     }
@@ -620,7 +621,7 @@ export default function ChangesScreen() {
         <SegmentedControl
           options={[
             { key: 'body', label: t('身体の変化'), icon: <PersonStanding size={14} color={C.sub} /> },
-            { key: 'training', label: t('筋トレの成長'), icon: <Dumbbell size={14} color={C.sub} /> },
+            { key: 'training', label: t('運動の成果'), icon: <Dumbbell size={14} color={C.sub} /> },
           ]}
           value={topSeg} onChange={setTopSeg}
         />
