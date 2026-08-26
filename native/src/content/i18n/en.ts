@@ -1081,4 +1081,6 @@ export const EN: Record<string, string> = {
   "運動の消費が週に5,000kcal": "Burned 5,000kcal from workouts in a week",
   "記録更新×5": "New Record ×5",
   "自己ベストを5回更新する": "Beat your personal best 5 times",
+  "新しいバッジを獲得！": "New badge unlocked!",
+  "ストーリーに自慢する": "Flex on your story",
 };

@@ -1,13 +1,48 @@
 // 実績ページ: 🔥ストリーク（お守りつき）＋バッジ一覧＋「いつでもストーリー共有」ハブ。
 // バッジは獲得済み=カラー、未獲得=グレー＋条件文（次に何をすればいいか常に見える）。
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing } from 'react-native';
 import { Stack } from 'expo-router';
 import { Share2 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { evaluateAchievements, type AchievementReport, type BadgeState } from '@/lib/achievements';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
+
+// 新規獲得の祝祭オーバーレイ（スケールイン＋触覚。獲得の瞬間を「事件」にする）
+function CelebrateOverlay({ badges, onShare, onClose }: { badges: BadgeState[]; onShare: (b: BadgeState) => void; onClose: () => void }) {
+  const scale = useRef(new RNAnimated.Value(0.6)).current;
+  useEffect(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 120 }).start();
+  }, [scale]);
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.celebBack}>
+        <RNAnimated.View style={[s.celebCard, { transform: [{ scale }] }]}>
+          <Text style={{ fontSize: 44 }}>🎉</Text>
+          <Text style={s.celebT}>{t('新しいバッジを獲得！')}</Text>
+          {badges.map((b) => (
+            <View key={b.id} style={s.celebRow}>
+              <Text style={{ fontSize: 30 }}>{b.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.celebName}>{b.name}</Text>
+                <Text style={s.celebDesc}>{b.desc}</Text>
+              </View>
+            </View>
+          ))}
+          <Pressable style={s.celebCta} onPress={() => onShare(badges[0])}>
+            <Text style={s.celebCtaT}>{t('ストーリーに自慢する')}</Text>
+          </Pressable>
+          <Pressable onPress={onClose} hitSlop={8} style={{ marginTop: 10 }}>
+            <Text style={s.celebClose}>{t('とじる')}</Text>
+          </Pressable>
+        </RNAnimated.View>
+      </View>
+    </Modal>
+  );
+}
 
 const CAT_LABEL = (): Record<BadgeState['cat'], string> => ({
   streak: t('継続'), action: t('行動'), result: t('成果'),
@@ -16,8 +51,14 @@ const CAT_LABEL = (): Record<BadgeState['cat'], string> => ({
 export default function AchievementsScreen() {
   const [report, setReport] = useState<AchievementReport | null>(null);
   const [sticker, setSticker] = useState<StickerData | null>(null);
+  const [celebrate, setCelebrate] = useState<BadgeState[]>([]);
 
-  useEffect(() => { evaluateAchievements().then(setReport).catch(() => setReport(null)); }, []);
+  useEffect(() => {
+    evaluateAchievements().then((r) => {
+      setReport(r);
+      if (r.newIds.length > 0) setCelebrate(r.badges.filter((b) => r.newIds.includes(b.id)));
+    }).catch(() => setReport(null));
+  }, []);
 
   const earned = report?.badges.filter((b) => b.earnedOn != null) ?? [];
 
@@ -92,6 +133,13 @@ export default function AchievementsScreen() {
           </>
         )}
       </ScrollView>
+      {celebrate.length > 0 && (
+        <CelebrateOverlay
+          badges={celebrate}
+          onShare={(b) => { setCelebrate([]); setSticker({ kind: 'badge', emoji: b.emoji, name: b.name }); }}
+          onClose={() => setCelebrate([])}
+        />
+      )}
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
     </View>
   );
@@ -117,4 +165,13 @@ const s = StyleSheet.create({
   badgeOff: { backgroundColor: C.chipBg },
   badgeN: { fontSize: 12, fontWeight: '800', color: C.ink, marginTop: 4 },
   badgeD: { fontSize: 10, color: C.sub, textAlign: 'center', marginTop: 2, lineHeight: 13 },
+  celebBack: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 28 },
+  celebCard: { backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'center' },
+  celebT: { fontSize: 18, fontWeight: '900', color: C.ink, marginTop: 4, marginBottom: 10 },
+  celebRow: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch', backgroundColor: C.accentSoft, borderRadius: 14, padding: 12, marginTop: 6 },
+  celebName: { fontSize: 15, fontWeight: '800', color: C.ink },
+  celebDesc: { fontSize: 11.5, color: C.sub, marginTop: 1 },
+  celebCta: { backgroundColor: C.teal, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
+  celebCtaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  celebClose: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
 });

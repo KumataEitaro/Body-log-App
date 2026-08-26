@@ -980,4 +980,6 @@ export const ID: Record<string, string> = {
   "運動の消費が週に5,000kcal": "Kalori terbakar dari olahraga mencapai 5.000kcal seminggu",
   "記録更新×5": "Pecah rekor ×5",
   "自己ベストを5回更新する": "Pecahkan rekor pribadi sebanyak 5 kali",
+  "新しいバッジを獲得！": "Dapatkan lencana baru!",
+  "ストーリーに自慢する": "Pamerkan ke Story",
 };

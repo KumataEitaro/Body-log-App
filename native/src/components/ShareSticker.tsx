@@ -18,7 +18,8 @@ export type StickerData =
   | { kind: 'streak'; days: number }
   | { kind: 'pr'; name: string; kg: number; date: string }
   | { kind: 'today'; kcal: number; left: number; p: number; f: number; c: number }
-  | { kind: 'workout'; label: string; kcal: number; minutes: number; km?: number | null };
+  | { kind: 'workout'; label: string; kcal: number; minutes: number; km?: number | null }
+  | { kind: 'badge'; emoji: string; name: string };
 
 type Tone = 'light' | 'dark'; // light=白文字（暗い写真用） dark=黒文字（明るい写真用）
 
@@ -38,15 +39,25 @@ function Stat({ label, value, unit, tone, big }: { label: string; value: string;
   );
 }
 
+// 細い罫線（エディトリアルの句読点。写真の上でも情報の区切りが立つ）
+function Rule({ tone }: { tone: Tone }) {
+  return <View style={{ width: 42, height: 1.5, backgroundColor: toneSub(tone), marginVertical: 8, borderRadius: 1 }} />;
+}
+
 function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
   const col = toneColor(tone);
+  const today = new Date();
+  const dateLine = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
   return (
     <View style={{ alignItems: 'center', paddingVertical: 12, paddingHorizontal: 18 }}>
+      <Text style={[st.dateLine, { color: toneSub(tone) }]}>{dateLine}</Text>
       {data.kind === 'streak' && (
         <>
-          <Text style={{ fontSize: 40 }}>🔥</Text>
-          <Stat label="STREAK" value={String(data.days)} unit="DAYS" tone={tone} big />
-          <Text style={[st.label, { color: toneSub(tone) }]}>{t('毎日の記録、続いてます')}</Text>
+          <Text style={{ fontSize: 44 }}>🔥</Text>
+          <Stat label="" value={String(data.days)} unit="" tone={tone} big />
+          <Text style={[st.label, { color: col, marginTop: -4 }]}>DAY STREAK</Text>
+          <Rule tone={tone} />
+          <Text style={[st.tagline, { color: toneSub(tone) }]}>{t('毎日の記録、続いてます')}</Text>
         </>
       )}
       {data.kind === 'pr' && (
@@ -54,7 +65,15 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
           <Text style={[st.label, { color: toneSub(tone) }]}>PERSONAL BEST</Text>
           <Text style={[st.prName, { color: col }]}>{data.name}</Text>
           <Stat label="" value={String(data.kg)} unit="kg" tone={tone} big />
-          <Text style={[st.newBadge]}>NEW RECORD</Text>
+          <View style={st.newPill}><Text style={st.newPillT}>NEW RECORD</Text></View>
+        </>
+      )}
+      {data.kind === 'badge' && (
+        <>
+          <Text style={{ fontSize: 48 }}>{data.emoji}</Text>
+          <Text style={[st.prName, { color: col, marginTop: 4 }]}>{data.name}</Text>
+          <Rule tone={tone} />
+          <Text style={[st.label, { color: toneSub(tone) }]}>ACHIEVEMENT UNLOCKED</Text>
         </>
       )}
       {data.kind === 'today' && (
@@ -180,11 +199,14 @@ const st = StyleSheet.create({
   ctaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   close: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   // ステッカー内（写真の上に載る側）
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' },
-  big: { fontSize: 44, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -1 },
+  label: { fontSize: 11, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase' },
+  dateLine: { fontSize: 10, fontWeight: '700', letterSpacing: 2.5, marginBottom: 2, fontVariant: ['tabular-nums'] },
+  big: { fontSize: 54, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -1.5, lineHeight: 58 },
   mid: { fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
   unit: { fontSize: 14, fontWeight: '700' },
-  prName: { fontSize: 18, fontWeight: '800', marginTop: 2 },
-  newBadge: { fontSize: 11, fontWeight: '900', color: '#ff5a4e', letterSpacing: 2, marginTop: 2 },
+  tagline: { fontSize: 11.5, fontWeight: '600' },
+  prName: { fontSize: 19, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
+  newPill: { backgroundColor: '#ff4d42', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
+  newPillT: { fontSize: 10.5, fontWeight: '900', color: '#fff', letterSpacing: 2.5 },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 });

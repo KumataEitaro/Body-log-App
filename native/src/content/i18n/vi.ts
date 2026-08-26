@@ -980,4 +980,6 @@ export const VI: Record<string, string> = {
   "運動の消費が週に5,000kcal": "Lượng calo tiêu hao khi tập luyện đạt 5.000kcal/tuần",
   "記録更新×5": "Kỷ lục mới ×5",
   "自己ベストを5回更新する": "Phá kỷ lục cá nhân 5 lần",
+  "新しいバッジを獲得！": "Nhận huy hiệu mới!",
+  "ストーリーに自慢する": "Khoe lên tin",
 };
