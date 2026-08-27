@@ -2,13 +2,15 @@
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration } from 'react-native';
-import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, type HKWorkout } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
-import { ClipboardList, BookOpen, Timer, Footprints, Dumbbell, Target } from 'lucide-react-native';
+import { ClipboardList, BookOpen, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
@@ -30,7 +32,7 @@ import {
 import { bumpFoodFreq, readFoodFreq, foodScores } from '@/lib/foods';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
-import { SegmentedControl, Chip, OptionButton } from '@/components/ui/Selectable';
+import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 import { t } from '@/lib/i18n';
 
@@ -53,9 +55,10 @@ const REST_OPTIONS = [30, 60, 90, 120, 180, 300, 600];
 // レスト秒数の表示（60の倍数は「分」、90秒などはそのまま「秒」）
 const fmtRest = (n: number) => (n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n }));
 
-// 表示/非表示できるカード（かんたん記録側と筋トレ側）
-const EX_CARDS = ['quick', 'liftInput', 'liftHistory'];
+// 表示/非表示できるカード（上から: きょうの動き→ゆる記録→筋トレ入力→履歴）
+const EX_CARDS = ['move', 'quick', 'liftInput', 'liftHistory'];
 const EX_LABELS = (): Record<string, string> => ({
+  move: t('きょうの動き'),
   quick: t('今日の消費カロリーを記録'),
   liftInput: t('今日のトレーニングを記録'),
   liftHistory: t('筋トレ履歴'),
@@ -125,8 +128,39 @@ export default function TrainingScreen() {
   const [editing, setEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
+  // ===== きょうの動き（消費kcal・歩数・目標への逆算）=====
+  // コンセプト: 食事タブの「あと食べられる量」と同じ文法で「動き」を見せる。
+  // 消費が見えるから、目標に対してあと何歩かを逆算できる。
+  const purpose = usePurpose();
+  const [burnToday, setBurnToday] = useState(0);
+  const [entryToday, setEntryToday] = useState<{ intake: number | null; target: number | null }>({ intake: null, target: null });
+  const [healthDays, setHealthDays] = useState<HealthDaySummary[] | null>(null);
+  const loadMove = useCallback(async (date: string) => {
+    const [ls, en] = await Promise.all([
+      supabase.from('logs').select('adj').eq('date', date),
+      supabase.from('entries').select('intake,target').eq('date', date).maybeSingle(),
+    ]);
+    setBurnToday(((ls.data as { adj: number | null }[]) || []).reduce((sum, l) => sum + Math.max(0, Number(l.adj) || 0), 0));
+    const e = en.data as { intake: number | null; target: number | null } | null;
+    setEntryToday({
+      intake: e?.intake != null ? Number(e.intake) : null,
+      target: e?.target != null ? Number(e.target) : null,
+    });
+  }, []);
+  useEffect(() => { loadMove(viewDate); }, [viewDate, loadMove]);
+  const loadHealth = useCallback(async () => {
+    if (!healthAvailable()) return;
+    const r = await readActivitySummary(7);
+    if (!('error' in r)) setHealthDays(r);
+  }, []);
+  useEffect(() => { loadHealth(); }, [loadHealth]);
+  async function connectHealth() {
+    if (!healthAvailable()) { setMsg({ ok: false, text: t('歩数の自動表示はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
+    if (await requestHealthAuth()) await loadHealth();
+  }
+  const stepsOfView = healthDays?.find((d) => d.date === viewDate)?.steps ?? null;
+
   // かんたん記録の状態
-  const [seg, setSeg] = useState<'easy' | 'lift'>('easy');
   const [actId, setActId] = useState<string | null>(null);
   // 表示する種目（54種すべて出すと毎日使うものが埋もれるため既定は8種）
   const [visibleIds, setVisibleIds] = useState<string[]>(DEFAULT_VISIBLE);
@@ -227,6 +261,7 @@ export default function TrainingScreen() {
       const r = await importWorkouts(uid, items);
       if ('error' in r) { setHkMsg(r.error); return; }
       setHkOpen(false);
+      loadMove(viewDate);
       setMsg({ ok: true, text: t('⌚ {n}件を取り込みました{skip}。消費kcalが目標カロリーに反映されます。', { n: r.imported, skip: r.skipped > 0 ? t('（{n}件は取込済みでスキップ）', { n: r.skipped }) : '' }) });
     } finally { setHkBusy(false); }
   }
@@ -263,6 +298,7 @@ export default function TrainingScreen() {
       }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
+      loadMove(today); // 「きょうの動き」の消費kcalと逆算を即時更新
       bumpFoodFreq('act:' + a.id);            // よく使う種目を前に出すため
       setActFreq(foodScores(readFoodFreq()));
       setActId(null); setActKm('');
@@ -476,7 +512,7 @@ export default function TrainingScreen() {
       ref={trScrollRef}
       style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadMove(viewDate), loadHealth()]); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
         <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
@@ -496,19 +532,75 @@ export default function TrainingScreen() {
         )}
       </View>
 
-      {/* かんたん記録 ⇄ 筋トレ のセグメント */}
-      <View style={{ marginBottom: 14 }}>
-        <SegmentedControl
-          options={[
-            { key: 'easy', label: t('かんたん記録'), icon: <Footprints size={14} color={C.sub} /> },
-            { key: 'lift', label: t('筋トレ'), icon: <Dumbbell size={14} color={C.sub} /> },
-          ]}
-          value={seg} onChange={setSeg}
-        />
-      </View>
+      {/* 操作結果のメッセージ（どのカードの操作もここに出す） */}
+      {msg && <Text style={[s.msg, { marginTop: 0, marginBottom: 10, color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+
+      {/* ===== きょうの動き: 消費kcal・歩数・目標への逆算（食事の残量と同じ文法） ===== */}
+      {vis('move') && (() => {
+        const kcalPerStep = Math.max(0.02, myWeight * 0.0005); // 87kgで約0.044kcal/歩
+        const walkKcalMin = 0.0613 * myWeight;                 // はや歩き3.5METs相当
+        const target = entryToday.target;
+        const over = target != null ? Math.round((entryToday.intake ?? 0) - target) : null;
+        let line: { text: string; color: string } | null = null;
+        if (over == null) {
+          line = { text: t('目標を設定すると「あと何歩で帳尻が合うか」がここに出ます'), color: C.sub };
+        } else if (purpose === 'bulk') {
+          // 増量目的では収支の意味が逆になる（不足が課題・超過が達成）
+          line = over < 0
+            ? { text: t('増量ノルマまで あと{n}kcal 食べる', { n: (-over).toLocaleString() }), color: C.amber }
+            : { text: t('今日の増量ノルマ達成💪'), color: C.teal };
+        } else if (over > 0) {
+          const steps = Math.ceil(over / kcalPerStep / 100) * 100;
+          const min = Math.max(5, Math.round(over / walkKcalMin / 5) * 5);
+          line = { text: t('食べすぎぶんは あと約{s}歩（はや歩き{m}分）で帳尻が合います', { s: steps.toLocaleString(), m: min }), color: C.amber };
+        } else {
+          line = { text: t('収支は目標内。あと{n}kcal食べられます', { n: (-over).toLocaleString() }), color: C.teal };
+        }
+        const last7 = (healthDays ?? []).slice(-7);
+        const maxSteps = Math.max(1, ...last7.map((d) => d.steps));
+        const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
+        return (
+          <Animated.View entering={FadeInDown.duration(320)} style={s.card}>
+            <MinusBadge editing={editing} onPress={() => cards.hide('move')} />
+            <View style={s.h2Row}><Activity size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('きょうの動き')}</Text></View>
+            <View style={s.mvRow}>
+              <View style={s.mvStat}>
+                <View style={s.mvLblRow}><Flame size={13} color={C.sub} /><Text style={s.mvLbl}>{t('消費（運動）')}</Text></View>
+                <Text style={s.mvVal}>{Math.round(burnToday).toLocaleString()}<Text style={s.mvUnit}> kcal</Text></Text>
+              </View>
+              <View style={s.mvStat}>
+                <View style={s.mvLblRow}><Footprints size={13} color={C.sub} /><Text style={s.mvLbl}>{t('歩数')}</Text></View>
+                {stepsOfView != null ? (
+                  <Text style={s.mvVal}>{stepsOfView.toLocaleString()}<Text style={s.mvUnit}> {t('歩')}</Text></Text>
+                ) : (
+                  <Pressable onPress={connectHealth} hitSlop={6}>
+                    <Text style={s.mvLink}>{t('ヘルスケアと連携する')}</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+            {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
+            {last7.length > 1 && (
+              <View style={s.mvBars}>
+                {last7.map((d) => {
+                  const [y, m, dd] = d.date.split('-').map(Number);
+                  const dow = new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
+                  const on = d.date === viewDate;
+                  return (
+                    <View key={d.date} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                      <View style={[s.mvBar, { height: 6 + Math.round(34 * (d.steps / maxSteps)) }, on && { backgroundColor: C.teal }]} />
+                      <Text style={[s.mvBarL, on && { color: C.teal, fontWeight: '800' }]}>{wd[dow]}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </Animated.View>
+        );
+      })()}
 
       {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
-      {seg === 'easy' && vis('quick') && (
+      {vis('quick') && (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
           <MinusBadge editing={editing} onPress={() => cards.hide('quick')} />
           <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の消費カロリーを記録')}</Text></View>
@@ -554,7 +646,6 @@ export default function TrainingScreen() {
             onPress={saveActivity} busy={actSaving} disabled={actId == null}
           />
           <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
-          {msg && seg === 'easy' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </View>
       )}
 
@@ -590,7 +681,7 @@ export default function TrainingScreen() {
       </Modal>
 
       {/* レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー） */}
-      {seg === 'lift' && (
+      {(
         restLeft != null ? (
           <Pressable style={s.rest} onPress={() => setRestLeft(restSec)}>
             {/* 残り時間の進捗バー（面の下端。減っていくのが視覚で分かる） */}
@@ -625,7 +716,7 @@ export default function TrainingScreen() {
       )}
 
       {/* 入力 */}
-      <View style={[s.card, (seg !== 'lift' || !vis('liftInput')) && { display: 'none' }]}>
+      <View style={[s.card, !vis('liftInput') && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
         <View style={s.h2Row}><ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
         {rewriting && (
@@ -719,17 +810,16 @@ export default function TrainingScreen() {
             </Pressable>
           ))}
         </View>
-        {msg && seg === 'lift' && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
 
-      {/* 挙上重量グラフは「変化」タブ→筋トレの成長へ移設（入力と振り返りの役割分離） */}
-      {seg === 'lift' && history.length > 0 && (
-        <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます')}</Text>
+      {/* 挙上重量グラフは概要タブへ移設（入力と振り返りの役割分離） */}
+      {history.length > 0 && (
+        <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「挙上重量の推移」で見られます')}</Text>
       )}
 
       {/* 履歴 */}
       {/* 運動目標への導線（目標を置くとグラフに目標線が出る） */}
-      {seg === 'lift' && (
+      {(
         <Pressable style={s.goalRow} onPress={() => setGoalOpen(true)}>
           <View style={s.goalIcon}><Target size={16} color={C.teal} /></View>
           <View style={{ flex: 1 }}>
@@ -753,7 +843,7 @@ export default function TrainingScreen() {
         </View>
       </Modal>
 
-      <View style={[s.card, (seg !== 'lift' || !vis('liftHistory')) && { display: 'none' }]}>
+      <View style={[s.card, !vis('liftHistory') && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
         <View style={s.h2Row}><BookOpen size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
         {days.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
@@ -912,6 +1002,18 @@ const s = StyleSheet.create({
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
   doneBtn2T: { color: '#fff', fontSize: 13, fontWeight: '800' },
   pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 12 },
+  // きょうの動きカード
+  mvRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  mvStat: { flex: 1, backgroundColor: C.bg, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14 },
+  mvLblRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  mvLbl: { fontSize: 12, fontWeight: '700', color: C.sub },
+  mvVal: { fontSize: 25, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
+  mvUnit: { fontSize: 13, fontWeight: '700', color: C.sub },
+  mvLink: { fontSize: 14, fontWeight: '800', color: C.teal, textDecorationLine: 'underline', paddingVertical: 6 },
+  mvLine: { fontSize: 13.5, fontWeight: '700', lineHeight: 20, marginTop: 12 },
+  mvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 14 },
+  mvBar: { width: '62%', borderRadius: 4, backgroundColor: C.line },
+  mvBarL: { fontSize: 10.5, color: C.faint, fontWeight: '700' },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   segBtn: {
     flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,

@@ -3,12 +3,17 @@
 // - 長押し(250ms)→指に追従してドラッグ。掴むと scale1.04+深い影 で浮き上がる
 // - 他カードはスプリングで滑らかに退避し、離すと目標スロットへスナップ着地
 // - 編集中は全カードが微振動(Jiggle)・カード内操作は停止・画面端で自動スクロール
-// - gesture-handler + reanimated 4 のみ（外部D&Dライブラリ不使用＝白画面事故の構造を排除）
+//
+// 【ぬるぬるの根拠＝全計算をUIスレッドで行う】
+// 旧実装は runOnJS(true) で追従がJSスレッド依存だった（チャートで重い画面ほど遅れる）。
+// v2は追従・スロット判定・退避・着地・自動スクロールすべてworklet。
+// JSへ渡るのは「並び確定」「ハプティクス」「スクロール停止」の離散イベントだけ。
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { View, Text, Pressable, StyleSheet, Dimensions, type RefreshControlProps } from 'react-native';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, useAnimatedScrollHandler,
+  useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedRef,
+  useFrameCallback, scrollTo, runOnJS,
   withSpring, withRepeat, withSequence, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +26,8 @@ const EDGE = 130;       // 自動スクロール発火ゾーン(px)
 const EDGE_SPEED = 9;   // 自動スクロール速度(px/frame)
 
 type Frame = { y: number; h: number };
+type Pack = { top: number; j: number; y: number };
+type ActiveSnap = { y: number; h: number; gap: number };
 
 type Props = {
   editing: boolean;
@@ -39,25 +46,28 @@ type Props = {
 export default function ReorderableCards({
   editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide,
 }: Props) {
-  const scrollRef = useRef<Animated.ScrollView>(null);
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useSharedValue(0);
   const scrollNow = useRef(0);
   const onScroll = useAnimatedScrollHandler({ onScroll: (e) => { scrollY.value = e.contentOffset.y; } });
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [shifts, setShifts] = useState<Record<string, number>>({});
-  const [drop, setDrop] = useState<{ key: string; offset: number } | null>(null);
   const [resetNonce, setResetNonce] = useState(0);
 
-  // ドラッグ中の計算用スナップショット
-  const frames = useRef(new Map<string, Frame>());
-  const snap = useRef<{ others: { key: string; top: number; h: number }[]; slots: number[]; active: Frame; k: number; gap: number; scroll0: number } | null>(null);
-  const kRef = useRef(0);
-  const autoScroll = useRef<ReturnType<typeof setInterval> | null>(null);
-  const winH = Dimensions.get('window').height;
+  // ドラッグ状態（すべてworkletから読み書きする共有値）
+  const dragKey = useSharedValue<string | null>(null);
+  const dropKey = useSharedValue<string | null>(null);   // 着地アニメ中もzIndexを保つ
+  const kSV = useSharedValue(0);                          // 現在の挿入スロット
+  const slotsSV = useSharedValue<number[]>([]);           // 各スロットの上端y
+  const packSV = useSharedValue<Record<string, Pack>>({});// 非アクティブカードのパック位置
+  const activeSV = useSharedValue<ActiveSnap | null>(null);
+  const scroll0 = useSharedValue(0);
+  const autoDir = useSharedValue(0);                      // -1/0/1 画面端の自動スクロール
 
-  useEffect(() => () => { if (autoScroll.current) clearInterval(autoScroll.current); }, []);
+  // レイアウト実測（onLayoutはJSなので、JS側refとworklet用共有値の両方に書く）
+  const framesJS = useRef(new Map<string, Frame>());
+  const framesSV = useSharedValue<Record<string, Frame>>({});
+  const winH = Dimensions.get('window').height;
 
   // ガイドツアー用: 相対スクロール（ネイティブease付き）
   useEffect(() => {
@@ -68,94 +78,39 @@ export default function ReorderableCards({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function stopAutoScroll() {
-    if (autoScroll.current) { clearInterval(autoScroll.current); autoScroll.current = null; }
-  }
+  // 画面端の自動スクロール（UIスレッドのフレームコールバック。JSのsetIntervalを廃止）
+  useFrameCallback(() => {
+    'worklet';
+    if (autoDir.value === 0 || dragKey.value == null) return;
+    scrollTo(scrollRef, 0, Math.max(0, scrollY.value + autoDir.value * EDGE_SPEED), false);
+  });
 
-  function onDragStart(key: string) {
-    const active = frames.current.get(key);
-    if (!active) return;
-    setScrollEnabled(false);
-    setActiveKey(key);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    const k0 = order.indexOf(key);
-    kRef.current = k0;
-    // 隣接カードとの実測ギャップ（marginBottom等を吸収）
-    const sorted = order.map((o) => ({ key: o, f: frames.current.get(o)! })).filter((x) => x.f);
-    let gap = 12;
-    if (sorted.length >= 2) gap = Math.max(0, sorted[1].f.y - (sorted[0].f.y + sorted[0].f.h));
-    const A = active.h + gap; // アクティブを抜いた時に詰まる量
-    // アクティブを除いたパック配置（ドラッグ中は不変＝判定が安定する）
-    const others = order.filter((o) => o !== key).map((o, j) => {
-      const f = frames.current.get(o)!;
-      const orig = order.indexOf(o);
-      return { key: o, top: orig < k0 ? f.y : f.y - A, h: f.h, j };
-    });
-    // 挿入スロットkの上端位置 S_k（k=others.length は末尾）
-    const slots: number[] = [];
-    for (let k = 0; k <= others.length; k++) {
-      slots.push(k < others.length ? others[k].top : (others.length ? others[others.length - 1].top + others[others.length - 1].h + gap : active.y));
-    }
-    snap.current = { others, slots, active, k: k0, gap, scroll0: scrollNow.current };
-    setShifts({});
-  }
+  const haptic = (kind: 'start' | 'slot') => {
+    if (kind === 'start') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    else Haptics.selectionAsync().catch(() => {});
+  };
 
-  function onDragMove(key: string, translationY: number, absoluteY: number) {
-    const sn = snap.current;
-    if (!sn) return;
-    const scrollDelta = scrollNow.current - sn.scroll0;
-    const activeCenter = sn.active.y + sn.active.h / 2 + translationY + scrollDelta;
-    // 各スロット中心 C_k = S_k + activeH/2 に最も近いkを選ぶ（S固定なので判定が暴れない）
-    let best = 0, bestDist = Infinity;
-    for (let k = 0; k < sn.slots.length; k++) {
-      const c = sn.slots[k] + sn.active.h / 2;
-      const d = Math.abs(activeCenter - c);
-      if (d < bestDist) { bestDist = d; best = k; }
-    }
-    if (best !== kRef.current) {
-      kRef.current = best;
-      Haptics.selectionAsync().catch(() => {});
-      // 退避: 挿入先k以降のotherは下へ(activeH+gap)、それ以外は0（パック位置基準の絶対シフト）
-      const A = sn.active.h + sn.gap;
-      const next: Record<string, number> = {};
-      sn.others.forEach((o, j) => {
-        const target = o.top + (j >= best ? A : 0);
-        const f = frames.current.get(o.key)!;
-        next[o.key] = target - f.y;
-      });
-      setShifts(next);
-    }
-    // 画面端の自動スクロール
-    const dir = absoluteY < EDGE ? -1 : absoluteY > winH - EDGE ? 1 : 0;
-    if (dir !== 0 && !autoScroll.current) {
-      autoScroll.current = setInterval(() => {
-        scrollNow.current = Math.max(0, scrollNow.current + dir * EDGE_SPEED);
-        scrollRef.current?.scrollTo({ y: scrollNow.current, animated: false });
-      }, 16);
-    } else if (dir === 0) {
-      stopAutoScroll();
-    }
-  }
-
-  function onDragEnd(key: string) {
-    stopAutoScroll();
-    const sn = snap.current;
-    if (!sn) { setActiveKey(null); setScrollEnabled(true); return; }
-    const k = kRef.current;
-    const targetTop = sn.slots[k];
-    setDrop({ key, offset: targetTop - sn.active.y }); // 子がスプリングで着地
+  // 並び確定（スプリング着地の完了コールバックから呼ばれる唯一のJS往復）
+  const commit = (key: string, k: number, scrollYNow: number) => {
+    scrollNow.current = scrollYNow; // 自動スクロールで動いたぶんをJS側にも反映
     const others = order.filter((o) => o !== key);
     const nextOrder = [...others.slice(0, k), key, ...others.slice(k)];
-    setTimeout(() => {
-      onOrderChange(nextOrder);
-      setShifts({});
-      setDrop(null);
-      setActiveKey(null);
-      setScrollEnabled(true);
-      setResetNonce((n) => n + 1); // 全translateを無アニメで0へ（レイアウト確定と同時）
-      snap.current = null;
-    }, 230);
-  }
+    onOrderChange(nextOrder);
+    // レイアウトが新順序になるのと同じコミットでtransformを無アニメで0へ
+    setResetNonce((n) => n + 1);
+    setScrollEnabled(true);
+  };
+  const cancelDrag = () => setScrollEnabled(true);
+
+  // resetNonceの変化でworklet状態も初期化（並び確定と同時にゼロへ）
+  useEffect(() => {
+    dragKey.value = null;
+    dropKey.value = null;
+    packSV.value = {};
+    activeSV.value = null;
+    autoDir.value = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetNonce]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -175,17 +130,19 @@ export default function ReorderableCards({
           <DraggableCard
             key={k}
             id={k}
+            order={order}
             editing={editing}
-            active={activeKey === k}
-            dimmed={activeKey != null && activeKey !== k}
-            shift={shifts[k] ?? 0}
-            drop={drop?.key === k ? drop.offset : null}
             resetNonce={resetNonce}
-            scrollY={scrollY}
-            onFrame={(f) => frames.current.set(k, f)}
-            onStart={() => onDragStart(k)}
-            onMove={(ty, ay) => onDragMove(k, ty, ay)}
-            onEnd={() => onDragEnd(k)}
+            winH={winH}
+            sv={{ dragKey, dropKey, kSV, slotsSV, packSV, activeSV, scroll0, autoDir, scrollY, framesSV }}
+            onFrame={(f) => {
+              framesJS.current.set(k, f);
+              framesSV.value = { ...framesSV.value, [k]: f };
+            }}
+            onDragStartJS={() => { setScrollEnabled(false); haptic('start'); }}
+            onSlotHaptic={() => haptic('slot')}
+            onCommit={commit}
+            onCancel={cancelDrag}
             onEnterEdit={onEnterEdit}
             onHide={onHide ? () => onHide(k) : undefined}
           >
@@ -199,87 +156,171 @@ export default function ReorderableCards({
   );
 }
 
+type SVBundle = {
+  dragKey: SharedValue<string | null>;
+  dropKey: SharedValue<string | null>;
+  kSV: SharedValue<number>;
+  slotsSV: SharedValue<number[]>;
+  packSV: SharedValue<Record<string, Pack>>;
+  activeSV: SharedValue<ActiveSnap | null>;
+  scroll0: SharedValue<number>;
+  autoDir: SharedValue<number>;
+  scrollY: SharedValue<number>;
+  framesSV: SharedValue<Record<string, Frame>>;
+};
+
 function DraggableCard({
-  id, editing, active, dimmed, shift, drop, resetNonce, scrollY, onFrame, onStart, onMove, onEnd, onEnterEdit, onHide, children,
+  id, order, editing, resetNonce, winH, sv, onFrame, onDragStartJS, onSlotHaptic, onCommit, onCancel, onEnterEdit, onHide, children,
 }: {
   id: string;
+  order: string[];
   editing: boolean;
-  active: boolean;
-  dimmed: boolean;
-  shift: number;
-  drop: number | null;
   resetNonce: number;
-  scrollY: SharedValue<number>;
+  winH: number;
+  sv: SVBundle;
   onFrame: (f: Frame) => void;
-  onStart: () => void;
-  onMove: (translationY: number, absoluteY: number) => void;
-  onEnd: () => void;
+  onDragStartJS: () => void;
+  onSlotHaptic: () => void;
+  onCommit: (key: string, k: number, scrollYNow: number) => void;
+  onCancel: () => void;
   onEnterEdit: () => void;
   onHide?: () => void;
   children: ReactNode;
 }) {
   const dragY = useSharedValue(0);
-  const shiftY = useSharedValue(0);
   const scale = useSharedValue(1);
   const rot = useSharedValue(0);
-  const scroll0 = useSharedValue(0);
-  const isActive = useSharedValue(false);
+  const { dragKey, dropKey, kSV, slotsSV, packSV, activeSV, scroll0, autoDir, scrollY, framesSV } = sv;
 
-  // Jiggle（編集中・非アクティブ時）
+  // Jiggle（編集中のみ。ドラッグ中の自分はstyle側で回転を止める）
   useEffect(() => {
-    rot.value = editing && !active
+    rot.value = editing
       ? withRepeat(withSequence(withTiming(-0.35, { duration: 140 }), withTiming(0.35, { duration: 140 })), -1, true)
       : withTiming(0, { duration: 100 });
-  }, [editing, active, rot]);
-
-  // 退避シフト（スプリング）
-  useEffect(() => { shiftY.value = withSpring(shift, SPRING); }, [shift, shiftY]);
-
-  // ドロップ: 目標スロットへスナップ着地
-  useEffect(() => {
-    if (drop != null) {
-      dragY.value = withSpring(drop, { ...SPRING, damping: 22 });
-      scale.value = withSpring(1, SPRING);
-    }
-  }, [drop, dragY, scale]);
+  }, [editing, rot]);
 
   // 並び確定後の無アニメリセット（レイアウトが新順序になった瞬間にtransformを消す）
   useEffect(() => {
-    dragY.value = 0; shiftY.value = 0; scale.value = 1; isActive.value = false;
+    dragY.value = 0; scale.value = 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetNonce]);
 
   const pan = Gesture.Pan()
     .enabled(editing)
-    .runOnJS(true)
     .activateAfterLongPress(250)
     .onStart(() => {
-      isActive.value = true;
+      'worklet';
+      const frames = framesSV.value;
+      const active = frames[id];
+      if (!active) return;
+      // スナップショット: アクティブを抜いたパック配置と挿入スロット（判定が暴れない固定基準）
+      const k0 = order.indexOf(id);
+      let gap = 12;
+      if (order.length >= 2) {
+        const f0 = frames[order[0]]; const f1 = frames[order[1]];
+        if (f0 && f1) gap = Math.max(0, f1.y - (f0.y + f0.h));
+      }
+      const A = active.h + gap;
+      const pack: Record<string, Pack> = {};
+      const slots: number[] = [];
+      let j = 0;
+      let lastTop = active.y; let lastH = 0;
+      for (const o of order) {
+        if (o === id) continue;
+        const f = frames[o];
+        if (!f) continue;
+        const top = order.indexOf(o) < k0 ? f.y : f.y - A;
+        pack[o] = { top, j, y: f.y };
+        slots.push(top);
+        lastTop = top; lastH = f.h;
+        j++;
+      }
+      slots.push(j > 0 ? lastTop + lastH + gap : active.y); // 末尾スロット
+      packSV.value = pack;
+      slotsSV.value = slots;
+      activeSV.value = { y: active.y, h: active.h, gap };
+      kSV.value = k0;
       scroll0.value = scrollY.value;
+      dragKey.value = id;
+      dropKey.value = null;
       scale.value = withSpring(1.045, SPRING);
-      onStart();
+      runOnJS(onDragStartJS)();
     })
     .onUpdate((e) => {
-      dragY.value = e.translationY + (scrollY.value - scroll0.value);
-      onMove(e.translationY, e.absoluteY);
+      'worklet';
+      const a = activeSV.value;
+      if (!a || dragKey.value !== id) return;
+      const scrollDelta = scrollY.value - scroll0.value;
+      dragY.value = e.translationY + scrollDelta;
+      // スロット判定: 各スロット中心にいちばん近いk（すべてUIスレッド）
+      const slots = slotsSV.value;
+      const center = a.y + a.h / 2 + e.translationY + scrollDelta;
+      let best = 0; let bestDist = 1e15;
+      for (let k = 0; k < slots.length; k++) {
+        const d = Math.abs(center - (slots[k] + a.h / 2));
+        if (d < bestDist) { bestDist = d; best = k; }
+      }
+      if (best !== kSV.value) { kSV.value = best; runOnJS(onSlotHaptic)(); }
+      // 画面端の自動スクロール（フレームコールバック側が読む）
+      autoDir.value = e.absoluteY < EDGE ? -1 : e.absoluteY > winH - EDGE ? 1 : 0;
     })
-    .onEnd(() => onEnd())
-    .onFinalize(() => { if (drop == null) scale.value = withSpring(1, SPRING); });
+    .onEnd(() => {
+      'worklet';
+      const a = activeSV.value;
+      if (!a || dragKey.value !== id) return;
+      autoDir.value = 0;
+      const k = kSV.value;
+      const target = slotsSV.value[k] - a.y;
+      dropKey.value = id;      // 着地中もzIndexと影を保つ
+      dragKey.value = null;    // 追従は終了（退避スプリングは最終形のまま）
+      scale.value = withSpring(1, SPRING);
+      dragY.value = withSpring(target, { ...SPRING, damping: 22 }, (finished) => {
+        if (finished) runOnJS(onCommit)(id, k, scrollY.value);
+      });
+    })
+    .onFinalize(() => {
+      'worklet';
+      // キャンセル（onEndに到達しない中断）時の後始末
+      if (dragKey.value === id) {
+        dragKey.value = null;
+        autoDir.value = 0;
+        dragY.value = withSpring(0, SPRING);
+        scale.value = withSpring(1, SPRING);
+        packSV.value = {};
+        activeSV.value = null;
+        runOnJS(onCancel)();
+      }
+    });
 
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: isActive.value || drop != null ? dragY.value : shiftY.value },
-      { scale: scale.value },
-      { rotate: `${rot.value}deg` },
-    ],
-    zIndex: isActive.value || drop != null ? 20 : 0,
-    shadowColor: '#000',
-    shadowOpacity: isActive.value ? 0.3 : 0,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: isActive.value ? 14 : 0,
-    opacity: dimmed ? 0.75 : 1,
-  }));
+  const style = useAnimatedStyle(() => {
+    const isActive = dragKey.value === id || dropKey.value === id;
+    // 退避: 挿入スロットkに応じたパック位置へスプリング（再レンダーなしで全カードが動く）
+    let ty = 0;
+    if (isActive) {
+      ty = dragY.value;
+    } else if (dragKey.value != null || dropKey.value != null) {
+      const p = packSV.value[id];
+      const a = activeSV.value;
+      if (p && a) {
+        const target = p.top + (p.j >= kSV.value ? a.h + a.gap : 0) - p.y;
+        ty = withSpring(target, SPRING) as unknown as number;
+      }
+    }
+    return {
+      transform: [
+        { translateY: ty },
+        { scale: scale.value },
+        { rotate: `${dragKey.value === id ? 0 : rot.value}deg` },
+      ],
+      zIndex: isActive ? 20 : 0,
+      shadowColor: '#000',
+      shadowOpacity: dragKey.value === id ? 0.3 : 0,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: dragKey.value === id ? 14 : 0,
+      opacity: dragKey.value != null && dragKey.value !== id ? 0.75 : 1,
+    };
+  });
 
   const inner = (
     <View>

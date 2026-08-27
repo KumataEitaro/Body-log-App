@@ -15,7 +15,8 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'plan', label: '計画' },
 ];
 
-const fmtK = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(Math.abs(v) % 1000 === 0 ? 0 : 1)}k` : String(v));
+// 日本語UIでは「k」より「万」が生活感覚（4桁区切り文化圏）。1万未満はそのまま桁区切り
+const fmtK = (v: number) => (Math.abs(v) >= 10000 ? `${(v / 10000).toFixed(Math.abs(v) % 10000 === 0 ? 0 : 1)}万` : v.toLocaleString());
 
 /**
  * 進捗と計画を1枚に統合したチャート。

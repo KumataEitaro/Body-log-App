@@ -12,7 +12,8 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'all', label: '全期間' },
 ];
 
-const fmtK = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(Math.abs(v) % 1000 === 0 ? 0 : 1)}k` : String(v));
+// 日本語UIでは「k」より「万」が生活感覚（4桁区切り文化圏）。1万未満はそのまま桁区切り
+const fmtK = (v: number) => (Math.abs(v) >= 10000 ? `${(v / 10000).toFixed(Math.abs(v) % 10000 === 0 ? 0 : 1)}万` : v.toLocaleString());
 
 // カロリー収支: 棒＝その日の収支（左軸）／ 面＝累計（右軸・背景）
 export default function CumChart({ points, today }: { points: DiffPoint[]; today: string }) {

@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { AddCardSheet } from '@/components/CardLayout';
-import { Plus, Moon } from 'lucide-react-native';
+import { Plus, Moon, Sparkles, TrendingUp, Target, Utensils, Camera, Tornado, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import Svg, { Polyline } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
@@ -22,7 +24,6 @@ import BingeTriggerCard from '@/components/BingeTriggerCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2 } from 'lucide-react-native';
-import { SegmentedControl } from '@/components/ui/Selectable';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
@@ -36,7 +37,9 @@ import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDay
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
-import { logIcon, logTitle } from '@/lib/feed';
+import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
+import { bigKcalParts } from '@/lib/format';
+import { MoodInline } from '@/components/MoodFace';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
@@ -56,6 +59,8 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 const BODY_ORDER_DEFAULT = ['digest', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
+// マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
+const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
 const CARD_LABELS = (): Record<string, string> => ({
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
@@ -67,6 +72,23 @@ function mergeOrder(saved: string[], def: string[]): string[] {
   return [...kept, ...def.filter((k) => !kept.includes(k))];
 }
 
+
+// メニュー行に添えるミニスパークライン（体重の直近30日）
+function MiniSpark({ vals, color }: { vals: number[]; color: string }) {
+  if (vals.length < 2) return null;
+  const w = 54; const h = 22;
+  const min = Math.min(...vals); const max = Math.max(...vals);
+  const pts = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = max === min ? h / 2 : h - (((v - min) / (max - min)) * (h - 4) + 2);
+    return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`;
+  }).join(' ');
+  return (
+    <Svg width={w} height={h}>
+      <Polyline points={pts} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 function weekStartOf2(d: string): string {
   const dt = new Date(d + 'T00:00:00');
@@ -98,12 +120,11 @@ export default function ChangesScreen() {
   const router = useRouter();
   const guide = useGuide();
   const chartTarget = useGuideTarget('chart');
-  const [topSeg, setTopSeg] = useState<'body' | 'training'>('body');
+  // 開いている詳細ページ（nullならマスタメニュー）。ヘルスケア式のメニュー→詳細
+  const [detailKey, setDetailKey] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [orderBody, setOrderBody] = useState<string[]>(BODY_ORDER_DEFAULT);
-  const [orderTrain, setOrderTrain] = useState<string[]>(TRAIN_ORDER_DEFAULT);
-  const [hiddenBody, setHiddenBody] = useState<string[]>([]);
-  const [hiddenTrain, setHiddenTrain] = useState<string[]>([]);
+  const [orderAll, setOrderAll] = useState<string[]>(ALL_ORDER_DEFAULT);
+  const [hiddenAll, setHiddenAll] = useState<string[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [bodyTableOpen, setBodyTableOpen] = useState(false);
   const [liftTableOpen, setLiftTableOpen] = useState(false);
@@ -115,31 +136,40 @@ export default function ChangesScreen() {
     setBodyTableOpen(true);
   }
 
-  // 並び順の復元
+  // 並び順の復元（統合キーが無ければ旧・身体/筋トレ別キーから移行する）
   useEffect(() => {
     (async () => {
       try {
-        const b = JSON.parse((await AsyncStorage.getItem('bl-order-body')) || 'null');
-        if (Array.isArray(b)) setOrderBody(mergeOrder(b, BODY_ORDER_DEFAULT));
-        const t = JSON.parse((await AsyncStorage.getItem('bl-order-train')) || 'null');
-        if (Array.isArray(t)) setOrderTrain(mergeOrder(t, TRAIN_ORDER_DEFAULT));
-        const hb = JSON.parse((await AsyncStorage.getItem('bl-hidden-body')) || 'null');
-        if (Array.isArray(hb)) setHiddenBody(hb.filter((k: string) => BODY_ORDER_DEFAULT.includes(k)));
-        const ht = JSON.parse((await AsyncStorage.getItem('bl-hidden-train')) || 'null');
-        if (Array.isArray(ht)) setHiddenTrain(ht.filter((k: string) => TRAIN_ORDER_DEFAULT.includes(k)));
+        const all = JSON.parse((await AsyncStorage.getItem('bl-order-all')) || 'null');
+        if (Array.isArray(all)) {
+          setOrderAll(mergeOrder(all, ALL_ORDER_DEFAULT));
+        } else {
+          const b = JSON.parse((await AsyncStorage.getItem('bl-order-body')) || 'null');
+          const t = JSON.parse((await AsyncStorage.getItem('bl-order-train')) || 'null');
+          const legacy = [...(Array.isArray(b) ? b : BODY_ORDER_DEFAULT), ...(Array.isArray(t) ? t : TRAIN_ORDER_DEFAULT)];
+          setOrderAll(mergeOrder(legacy, ALL_ORDER_DEFAULT));
+        }
+        const hAll = JSON.parse((await AsyncStorage.getItem('bl-hidden-all')) || 'null');
+        if (Array.isArray(hAll)) {
+          setHiddenAll(hAll.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
+        } else {
+          const hb = JSON.parse((await AsyncStorage.getItem('bl-hidden-body')) || 'null');
+          const ht = JSON.parse((await AsyncStorage.getItem('bl-hidden-train')) || 'null');
+          const legacy = [...(Array.isArray(hb) ? hb : []), ...(Array.isArray(ht) ? ht : [])];
+          if (legacy.length) setHiddenAll(legacy.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
+        }
       } catch { /* 初回など */ }
     })();
   }, []);
 
   // 離脱時確定用に最新値をrefへ同期（AppState/blurリスナーの古いクロージャ対策）
-  const editStateRef = useRef({ editing: false, body: BODY_ORDER_DEFAULT, train: TRAIN_ORDER_DEFAULT });
-  editStateRef.current = { editing, body: orderBody, train: orderTrain };
+  const editStateRef = useRef({ editing: false, all: ALL_ORDER_DEFAULT });
+  editStateRef.current = { editing, all: orderAll };
 
   const finishEditing = useCallback(async () => {
     setEditing(false);
     try {
-      await AsyncStorage.setItem('bl-order-body', JSON.stringify(editStateRef.current.body));
-      await AsyncStorage.setItem('bl-order-train', JSON.stringify(editStateRef.current.train));
+      await AsyncStorage.setItem('bl-order-all', JSON.stringify(editStateRef.current.all));
     } catch { /* 保存失敗はレイアウトが戻るだけ */ }
   }, []);
 
@@ -380,7 +410,7 @@ export default function ChangesScreen() {
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('累計収支')}</Text>
-          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]}>{sumAll > 0 ? '+' : ''}{(sumAll / 1000).toFixed(1)}<Text style={s.kpiU}>k</Text></Text>
+          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
           <Text style={s.kpiD}>{t('脂肪 約')}{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
@@ -402,8 +432,12 @@ export default function ChangesScreen() {
             {dayDetail !== null && dayDetail.length === 0 && <Text style={s.note}>{t('この日の記録はありません。')}</Text>}
             {dayDetail?.map((l) => (
               <View key={l.id} style={s.dayRow}>
+                {moodLevelOf(l) != null ? (
+                  <View style={{ flex: 1 }}><MoodInline level={moodLevelOf(l)!} /></View>
+                ) : (<>
                 <Text style={{ fontSize: 15 }}>{logIcon(l)}</Text>
                 <Text style={s.dayText} numberOfLines={2}>{logTitle(l)}</Text>
+                </>)}
                 {l.kcal != null && (
                   <View style={s.kcalBadge}><Text style={s.kcalBadgeT}>{Math.round(Number(l.kcal)).toLocaleString()} kcal</Text></View>
                 )}
@@ -560,42 +594,134 @@ export default function ChangesScreen() {
     }
   }
 
-  const order = topSeg === 'body' ? orderBody : orderTrain;
-  const setOrderRaw = topSeg === 'body' ? setOrderBody : setOrderTrain;
-  const hidden = topSeg === 'body' ? hiddenBody : hiddenTrain;
-  const setHidden = topSeg === 'body' ? setHiddenBody : setHiddenTrain;
-  const hiddenKey = topSeg === 'body' ? 'bl-hidden-body' : 'bl-hidden-train';
-  const visibleOrder = order.filter((k) => !hidden.includes(k));
+  const hidden = hiddenAll;
+  const visibleOrder = orderAll.filter((k) => !hidden.includes(k));
 
   // 表示中カードの並べ替え結果を、非表示カードの位置を保ったまま全体の順序へ戻す
   const setOrder = (nextVisible: string[]) => {
     let i = 0;
-    setOrderRaw(order.map((k) => (hidden.includes(k) ? k : nextVisible[i++])));
+    setOrderAll(orderAll.map((k) => (hidden.includes(k) ? k : nextVisible[i++])));
   };
 
   function hideCard(key: string) {
     const next = [...hidden, key];
-    setHidden(next);
-    AsyncStorage.setItem(hiddenKey, JSON.stringify(next)).catch(() => {});
+    setHiddenAll(next);
+    AsyncStorage.setItem('bl-hidden-all', JSON.stringify(next)).catch(() => {});
   }
   function showCard(key: string) {
     const next = hidden.filter((k) => k !== key);
-    setHidden(next);
-    AsyncStorage.setItem(hiddenKey, JSON.stringify(next)).catch(() => {});
+    setHiddenAll(next);
+    AsyncStorage.setItem('bl-hidden-all', JSON.stringify(next)).catch(() => {});
   }
 
   // 最初の並びに戻す
   async function resetOrder() {
-    setOrderBody(BODY_ORDER_DEFAULT);
-    setOrderTrain(TRAIN_ORDER_DEFAULT);
-    setHiddenBody([]);
-    setHiddenTrain([]);
+    setOrderAll(ALL_ORDER_DEFAULT);
+    setHiddenAll([]);
     try {
+      await AsyncStorage.removeItem('bl-order-all');
+      await AsyncStorage.removeItem('bl-hidden-all');
       await AsyncStorage.removeItem('bl-order-body');
       await AsyncStorage.removeItem('bl-order-train');
       await AsyncStorage.removeItem('bl-hidden-body');
       await AsyncStorage.removeItem('bl-hidden-train');
     } catch { /* 無視 */ }
+  }
+
+  // ===== マスタメニューの要約行（ヘルスケア式: 名前＋変化の言語化＋ミニチャート） =====
+  function weekDeltaOf(sel: (r: Row) => number | null): number | null {
+    const xs = rows.filter((r) => sel(r) != null);
+    if (xs.length < 2) return null;
+    const last = xs[xs.length - 1];
+    const cutoff = addDays(last.date, -7);
+    let base = xs[0];
+    for (const r of xs) { if (r.date <= cutoff) base = r; else break; }
+    const d = Number(sel(last)) - Number(sel(base));
+    return Math.round(d * 10) / 10;
+  }
+  const wRows = rows.filter((r) => r.weight != null);
+  const latestW2 = wRows.length ? Number(wRows[wRows.length - 1].weight) : null;
+  const weekW = weekDeltaOf((r) => r.weight);
+
+  function summaryOf(key: string): string {
+    switch (key) {
+      case 'digest': return t('今週のふりかえり');
+      case 'kpi': {
+        if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
+        const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
+        return `${latestW2.toFixed(1)}kg${d}`;
+      }
+      case 'calendar': {
+        const mon = today.slice(0, 7);
+        const n = rows.filter((r) => r.date.startsWith(mon) && (r.intake != null || r.weight != null)).length;
+        return t('今月{n}日記録', { n });
+      }
+      case 'chart': return t('体重・摂取・消費の推移');
+      case 'goal': return goal?.target_weight != null
+        ? `${latestW2 != null ? `${latestW2.toFixed(1)} → ` : ''}${Number(goal.target_weight).toFixed(1)}kg`
+        : t('目標を決めると逆算が始まります');
+      case 'slots': return t('直近14日のkcal内訳');
+      case 'table': return t('体重・ウエスト・体脂肪率の一覧');
+      case 'photos': return t('見た目の変化を並べて見る');
+      case 'binge': return t('食べすぎの引き金を分析');
+      case 'trends': return foodFx.length > 0 ? t('{n}件の食材傾向が見つかっています', { n: foodFx.length }) : t('食材×翌日体重の傾向');
+      case 'health': {
+        const st = activity?.find((d) => d.date === today)?.steps;
+        return st != null ? t('きょう{n}歩', { n: st.toLocaleString() }) : t('歩数・睡眠をヘルスケアから');
+      }
+      case 'tkpi': return t('今週のセット数・ボリューム');
+      case 'tcal': return t('トレーニングした日をひと目で');
+      case 'tchart': return t('種目ごとの重量の伸び');
+      case 'tpr': return t('自己ベストと共有ステッカー');
+      case 'tgoal': return t('目標線をグラフに引く');
+      case 'tbal': return t('週ごとの部位バランス');
+      case 'tpart': return t('部位別ボリューム');
+      case 'ttable': return t('挙上重量の一覧');
+      default: return '';
+    }
+  }
+  function menuIconOf(key: string) {
+    const p = { size: 17, color: C.teal } as const;
+    switch (key) {
+      case 'digest': return <Sparkles {...p} />;
+      case 'kpi': return <PersonStanding {...p} />;
+      case 'calendar': case 'tcal': return <CalendarDays {...p} />;
+      case 'chart': case 'tchart': return <TrendingUp {...p} />;
+      case 'goal': case 'tgoal': return <Target {...p} />;
+      case 'slots': return <Utensils {...p} />;
+      case 'table': case 'ttable': return <Table2 {...p} />;
+      case 'photos': return <Camera {...p} />;
+      case 'binge': return <Tornado {...p} />;
+      case 'trends': return <Salad {...p} />;
+      case 'health': return <Footprints {...p} />;
+      case 'tkpi': case 'tbal': case 'tpart': return <Dumbbell {...p} />;
+      case 'tpr': return <Trophy {...p} />;
+      default: return <FlaskConical {...p} />;
+    }
+  }
+  // 体重のミニスパークライン（kpi/chart行に添える。直近30日）
+  const sparkVals = wRows.slice(-30).map((r) => Number(r.weight));
+  function openDetail(key: string) {
+    Haptics.selectionAsync().catch(() => {});
+    setDetailKey(key);
+  }
+  function menuRow(key: string) {
+    const withSpark = (key === 'kpi' || key === 'chart') && sparkVals.length >= 2;
+    return (
+      <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+                 // ガイドツアーの「グラフ」ハイライトはメニュー行に当てる（詳細はタップ先）
+                 ref={key === 'chart' ? chartTarget : undefined} collapsable={false}
+                 onPress={() => openDetail(key)}
+                 onLongPress={() => setEditing(true)} delayLongPress={400}>
+        <View style={s.menuIcon}>{menuIconOf(key)}</View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.menuT}>{CARD_LABELS()[key] ?? key}</Text>
+          <Text style={s.menuSub} numberOfLines={1}>{summaryOf(key)}</Text>
+        </View>
+        {withSpark && <MiniSpark vals={sparkVals} color={C.teal} />}
+        <Text style={s.menuGo}>›</Text>
+      </Pressable>
+    );
   }
 
   const headerJSX = (
@@ -617,40 +743,44 @@ export default function ChangesScreen() {
           )}
         </View>
       </View>
-      <View style={{ marginBottom: 4 }}>
-        <SegmentedControl
-          options={[
-            { key: 'body', label: t('身体の変化'), icon: <PersonStanding size={14} color={C.sub} /> },
-            { key: 'training', label: t('運動の成果'), icon: <Dumbbell size={14} color={C.sub} /> },
-          ]}
-          value={topSeg} onChange={setTopSeg}
-        />
-      </View>
-      {editing && <Text style={s.editHint}>{t('カードを長押し→そのままドラッグで移動。「完了」で保存します')}</Text>}
+      {editing && <Text style={s.editHint}>{t('行を長押し→そのままドラッグで並び替え。「完了」で保存します')}</Text>}
     </>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {/* インプレイスのドラッグ並び替え（通常時は普通のスクロール・カード長押しで編集モードへ） */}
-      {/* セグメント切替はクロスフェード。ヘッダーは両側で同一なので静止して見え、
-          中身だけが入れ替わる。key再マウントは意図的（編集状態や開閉を持ち越さない） */}
-      <Animated.View key={topSeg} style={{ flex: 1 }}
-                     entering={FadeIn.duration(180)}>
-      <ReorderableCards
-        editing={editing}
-        order={visibleOrder}
-        onOrderChange={setOrder}
-        renderCard={card}
-        onHide={hideCard}
-        ghostLabel={(k) => CARD_LABELS()[k] ?? k}
-        header={headerJSX}
-        onEnterEdit={() => setEditing(true)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
-        onScroller={(fn) => guide.registerScroller('/changes', fn)}
-      />
-      </Animated.View>
+      {detailKey == null ? (
+        // ===== マスタメニュー（ヘルスケア式: 要約行のリスト。行の長押しで並び替え） =====
+        <ReorderableCards
+          editing={editing}
+          order={visibleOrder}
+          onOrderChange={setOrder}
+          renderCard={menuRow}
+          onHide={hideCard}
+          ghostLabel={(k) => CARD_LABELS()[k] ?? k}
+          header={headerJSX}
+          onEnterEdit={() => setEditing(true)}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+          contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+          onScroller={(fn) => guide.registerScroller('/changes', fn)}
+        />
+      ) : (
+        // ===== 詳細ページ（メニュー行タップで展開。既存カードをそのまま全画面で見せる） =====
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+        >
+          <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
+            <Pressable style={s.backRow} onPress={() => { Haptics.selectionAsync().catch(() => {}); setDetailKey(null); }} hitSlop={8}>
+              <ChevronLeft size={20} color={C.teal} />
+              <Text style={s.backT}>{t('概要')}</Text>
+            </Pressable>
+            <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
+            <ErrorBoundary>{card(detailKey)}</ErrorBoundary>
+          </Animated.View>
+        </ScrollView>
+      )}
       {!editing && <QuickLogFab />}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
@@ -745,4 +875,21 @@ const s = StyleSheet.create({
   slotDot: { width: 8, height: 8, borderRadius: 4 },
   slotT: { fontSize: 11, color: C.sub, fontWeight: '700' },
   note: { fontSize: 13, color: C.faint, lineHeight: 18 },
+  // マスタメニュー（ヘルスケア式）
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 9,
+    shadowColor: '#0e1116', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
+  },
+  menuIcon: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  menuT: { fontSize: 15.5, fontWeight: '800', color: C.ink },
+  menuSub: { fontSize: 12.5, color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
+  menuGo: { fontSize: 21, color: C.faint, fontWeight: '600', marginLeft: 2 },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 2 },
+  backT: { fontSize: 15, fontWeight: '800', color: C.teal },
+  detailTitle: { fontSize: 24, fontWeight: '900', color: C.ink, marginBottom: 12 },
 });

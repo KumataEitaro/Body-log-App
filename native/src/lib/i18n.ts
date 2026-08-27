@@ -8,18 +8,21 @@ import { DICTS } from '@/content/i18n';
 
 export type LocaleCode = 'ja' | 'en' | 'zh' | 'ko' | 'es' | 'fr' | 'de' | 'pt' | 'id' | 'th' | 'vi';
 
+// 並びはISO 639-1コードのアルファベット順＋自称（endonym）表記。
+// W3Cのセレクタと同じ方式で、どの言語も特別扱いしない（英語名ソートは文化バイアス、
+// UI言語での照合ソートはスクリプト混在で破綻するため避ける）
 export const LOCALES: { code: LocaleCode; label: string }[] = [
-  { code: 'ja', label: '日本語' },
+  { code: 'de', label: 'Deutsch' },
   { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文' },
-  { code: 'ko', label: '한국어' },
   { code: 'es', label: 'Español' },
   { code: 'fr', label: 'Français' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'pt', label: 'Português' },
   { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'pt', label: 'Português' },
   { code: 'th', label: 'ไทย' },
   { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'zh', label: '中文' },
 ];
 
 

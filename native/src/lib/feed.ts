@@ -23,6 +23,17 @@ export function logIcon(l: FeedLog): string {
   return '📝';
 }
 
+// この行が「気分だけの記録」なら1〜5を返す（食事や体重を伴う行はnull）。
+// 表示側はこの値があるとき分数テキストではなく顔＋ドットで描く。
+export function moodLevelOf(l: FeedLog): 1 | 2 | 3 | 4 | 5 | null {
+  if (logIcon(l) !== '💭' || !l.mood) return null;
+  const m = String(l.mood).match(/([1-5])\s*\/\s*5/);
+  if (m) return Number(m[1]) as 1 | 2 | 3 | 4 | 5;
+  const faces = ['😫', '😕', '😐', '🙂', '😄']; // 旧データ（絵文字時代）の互換
+  for (let i = 0; i < faces.length; i++) if (String(l.mood).includes(faces[i])) return (i + 1) as 1 | 2 | 3 | 4 | 5;
+  return null;
+}
+
 export function logTitle(l: FeedLog): string {
   const items = (l.items as FoodItem[]) || [];
   if (l.text?.startsWith('🏋️')) return l.text.replace(/^🏋️ /, '');
@@ -34,5 +45,8 @@ export function logTitle(l: FeedLog): string {
   if (l.kcal != null) return String(l.text || t('食事（概算）')).replace(/^（|）$/g, '').slice(0, 60);
   if (l.weight != null) return t('体重 {n}kg', { n: Number(l.weight).toFixed(1) });
   if (l.ex && l.ex !== 'オフ') return `運動 ${l.ex}`;
+  // 気分は「4/5」の分数を見せない（テキスト消費箇所＝削除確認Alert等でもドットにする）
+  const lv = moodLevelOf(l);
+  if (lv != null) return `${t('気分')} ${'●'.repeat(lv)}${'○'.repeat(5 - lv)}`;
   return String(l.text || l.mood || t('記録')).slice(0, 60);
 }

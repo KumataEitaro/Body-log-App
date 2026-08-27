@@ -41,14 +41,14 @@ import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
-import { logIcon, logTitle } from '@/lib/feed';
+import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
-import MoodFace from '@/components/MoodFace';
+import MoodFace, { MoodInline } from '@/components/MoodFace';
 import { invalidateStreak } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
@@ -942,9 +942,11 @@ export default function LogScreen() {
                        }}
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
-              <Text style={{ fontSize: 15, marginRight: 2 }}>{logIcon(l)}</Text>
+              {moodLevelOf(l) == null && <Text style={{ fontSize: 15, marginRight: 2 }}>{logIcon(l)}</Text>}
               <View style={{ flex: 1 }}>
-                <Text style={[s.feedTitle, { flex: 0 }]} numberOfLines={2}>{logTitle(l)}</Text>
+                {moodLevelOf(l) != null
+                  ? <MoodInline level={moodLevelOf(l)!} />
+                  : <Text style={[s.feedTitle, { flex: 0 }]} numberOfLines={2}>{logTitle(l)}</Text>}
                 {l.kcal != null && l.p != null && (
                   <Text style={s.feedPfc}>
                     <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(Number(l.p))}

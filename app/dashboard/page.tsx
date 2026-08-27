@@ -443,7 +443,7 @@ export default function DashboardPage() {
               </div>
               <div className="s-stat">
                 <div className="s-lbl">累計収支</div>
-                <div className="s-val num" style={{ color: kpi.sumAll <= 0 ? 'var(--green)' : 'var(--coral)' }}>{kpi.sumAll > 0 ? '+' : ''}{(kpi.sumAll / 1000).toFixed(1)}<small>k kcal</small></div>
+                <div className="s-val num" style={{ color: kpi.sumAll <= 0 ? 'var(--green)' : 'var(--coral)' }}>{kpi.sumAll > 0 ? '+' : ''}{Math.abs(kpi.sumAll) >= 10000 ? (kpi.sumAll / 10000).toFixed(1) : Math.round(kpi.sumAll).toLocaleString()}<small>{Math.abs(kpi.sumAll) >= 10000 ? '万' : ''} kcal</small></div>
                 <div className="s-delta muted" style={{ fontWeight: 400 }}>
                   脂肪 約{kpi.fatKg}kg{(kpi.unrecorded ?? 0) > 0 && <>・<span style={{ color: 'var(--amber)' }}>未記録{kpi.unrecorded}日=±0扱い</span></>}
                 </div>
