@@ -42,7 +42,9 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
-import { skipTodayReminder } from '@/lib/notify';
+import { skipTodayReminder, scheduleFirstLawNotification } from '@/lib/notify';
+import { checkFirstLawUnlock, consumeFirstLawBanner } from '@/lib/laws';
+import { BookOpen } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
@@ -608,6 +610,22 @@ export default function LogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
+  // ===== B-7: Day12「最初の法則」の帯 =====
+  // 記録12日到達＋法則1件以上を初検出したら、21:05の通知予約＋この帯を一度きり出す。
+  // 判定・永続化はlib/laws側（'bl-day12-done'）。帯はタップ/×で消化され、以後は出ない
+  const [firstLaw, setFirstLaw] = useState(false);
+  useEffect(() => {
+    checkFirstLawUnlock(scheduleFirstLawNotification).then(setFirstLaw).catch(() => {});
+  }, []);
+  function dismissFirstLaw(goSee: boolean) {
+    consumeFirstLawBanner().catch(() => {});
+    setFirstLaw(false);
+    if (goSee) {
+      Haptics.selectionAsync().catch(() => {});
+      router.push('/laws' as never);
+    }
+  }
+
   async function snoozeRisk() {
     try { await AsyncStorage.setItem('bl-risk-snooze', todayJST()); } catch { /* 無視 */ }
     setBingeRisk(null);
@@ -791,6 +809,18 @@ export default function LogScreen() {
 
         {/* 🔥ストリーク常設チップ（タップで実績ページへ） */}
         <StreakChip />
+
+        {/* B-7: 最初の法則の帯（一度きり。タップで法則図鑑へ・×は見ずに消化） */}
+        {firstLaw && (
+          <Pressable style={s.lawBand} onPress={() => dismissFirstLaw(true)}>
+            <BookOpen size={16} color={C.teal} />
+            <Text style={s.lawBandT}>{t('あなたの最初の法則が見つかりました')}</Text>
+            <Text style={s.lawBandGo}>{t('見にいく')} →</Text>
+            <Pressable hitSlop={10} onPress={() => dismissFirstLaw(false)}>
+              <Text style={s.lawBandX}>×</Text>
+            </Pressable>
+          </Pressable>
+        )}
 
         {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる） */}
         {brief && (
@@ -1308,6 +1338,15 @@ export default function LogScreen() {
 const s = StyleSheet.create({
   scroll: { padding: 16 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  // B-7: 最初の法則の帯（今日のひとこと帯と同じ「帯」の文法・アクセント面で一段目立たせる）
+  lawBand: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
+    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
+  },
+  lawBandT: { flex: 1, fontSize: 13, fontWeight: '800', color: C.ink, lineHeight: 18 },
+  lawBandGo: { fontSize: 13, fontWeight: '800', color: C.teal },
+  lawBandX: { fontSize: 17, color: C.faint, fontWeight: '700', paddingHorizontal: 2 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
