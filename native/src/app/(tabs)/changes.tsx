@@ -42,6 +42,8 @@ import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDay
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
+import { latestLawSummary } from '@/lib/laws';
+import { BookOpen } from 'lucide-react-native';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { bigKcalParts } from '@/lib/format';
 import { MoodInline } from '@/components/MoodFace';
@@ -63,12 +65,13 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 // bulkguardは増量目的（purpose==='bulk'）のときだけメニューに現れる（下のvisibleOrderで絞る）
-const BODY_ORDER_DEFAULT = ['digest', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
+// lawsは詳細ページではなく /laws（法則図鑑）への外部遷移行（menuRowで分岐する）
+const BODY_ORDER_DEFAULT = ['digest', 'laws', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
 // マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
 const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
 const CARD_LABELS = (): Record<string, string> => ({
-  digest: t('週間ダイジェスト'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
+  digest: t('週間ダイジェスト'), laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
@@ -121,6 +124,8 @@ export default function ChangesScreen() {
   const [chartNonce, setChartNonce] = useState(0); // 同じプリセット再タップでも窓をリセットするため
   const [refreshing, setRefreshing] = useState(false);
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
+  // 法則図鑑のサマリー行（最新の法則の一文。端末内のAsyncStorageから読むだけで軽い）
+  const [lawLine, setLawLine] = useState<string | null>(null);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
@@ -236,6 +241,8 @@ export default function ChangesScreen() {
         .filter((e) => e.weight != null).map((e) => ({ date: e.date, weight: Number(e.weight) }));
       setFoodFx(foodWeightEffects(buildItemDays((itemRes.data as { date: string; items?: { name?: string }[] }[]) || []), weightPts));
     } catch { /* 分析はベストエフォート */ }
+    // 法則図鑑のサマリー（未発見ならnullのまま＝誘い文に落ちる）
+    try { setLawLine(await latestLawSummary()); } catch { /* サマリーは飾り */ }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -661,6 +668,7 @@ export default function ChangesScreen() {
   function summaryOf(key: string): string {
     switch (key) {
       case 'digest': return t('今週のふりかえり');
+      case 'laws': return lawLine ?? t('記録が貯まると、あなたの法則が見つかります');
       case 'bulkguard': return t('週あたりの増量ペースを見張る');
       case 'kpi': {
         if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
@@ -701,6 +709,7 @@ export default function ChangesScreen() {
     const p = { size: 17, color: C.teal } as const;
     switch (key) {
       case 'digest': return <Sparkles {...p} />;
+      case 'laws': return <BookOpen {...p} />;
       case 'bulkguard': return <Gauge {...p} />;
       case 'kpi': return <PersonStanding {...p} />;
       case 'calendar': case 'tcal': return <CalendarDays {...p} />;
@@ -738,6 +747,13 @@ export default function ChangesScreen() {
                      Haptics.selectionAsync().catch(() => {});
                      // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
                      router.push('/paywall?src=digest' as never);
+                     return;
+                   }
+                   // lawsはカード詳細ではなく法則図鑑（スタック画面）への外部遷移
+                   // （実績と同じ「別ページに住む機能」なのでdetailKeyには入れない）
+                   if (key === 'laws') {
+                     Haptics.selectionAsync().catch(() => {});
+                     router.push('/laws' as never);
                      return;
                    }
                    openDetail(key);

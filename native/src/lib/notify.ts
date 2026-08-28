@@ -243,6 +243,29 @@ export async function rescheduleMealGapReminder(lastMealAt: Date): Promise<void>
   } catch { /* Expo Go等では黙って諦める */ }
 }
 
+// ===== Day12「最初の法則」（B-7） =====
+
+/** 最初の法則の通知を21:05に1回だけ予約する（当日を過ぎていれば翌日）。
+ *  即時に鳴らさないのは、発見の瞬間はアプリ内の帯が担い、通知は「夜の再訪のきっかけ」
+ *  に徹するため。許可が無ければ静かにスキップ（帯だけで伝わる） */
+export async function scheduleFirstLawNotification(): Promise<void> {
+  try {
+    const cur = await Notifications.getPermissionsAsync();
+    if (!cur.granted) return;
+    const d = new Date();
+    d.setHours(21, 5, 0, 0);
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: t('あなたの最初の法則が見つかりました🔍'),
+        body: t('記録から、あなただけの傾向が見えてきました。図鑑で確かめてみましょう。'),
+        data: { url: 'bodylog://laws' },   // タップで法則図鑑へ（既存ルーティングが処理）
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
+    });
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
 // ===== 記録リマインダーのアクションボタン（B-10） =====
 
 /** 記録リマインダー用の通知カテゴリを登録する。

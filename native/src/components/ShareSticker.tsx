@@ -21,7 +21,8 @@ export type StickerData =
   | { kind: 'pr'; name: string; kg: number; date: string }
   | { kind: 'today'; kcal: number; left: number; p: number; f: number; c: number }
   | { kind: 'workout'; label: string; kcal: number; minutes: number; km?: number | null }
-  | { kind: 'badge'; id: string; name: string };
+  | { kind: 'badge'; id: string; name: string }
+  | { kind: 'law'; title: string; sub: string };
 
 type Tone = 'light' | 'dark'; // light=白文字（暗い写真用） dark=黒文字（明るい写真用）
 
@@ -99,6 +100,15 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
             <Stat label={t('消費')} value={data.kcal.toLocaleString()} unit="kcal" tone={tone} big={data.km == null || data.km <= 0} />
           </View>
           <Stat label={t('時間')} value={`${data.minutes}`} unit={t('分')} tone={tone} />
+        </>
+      )}
+      {data.kind === 'law' && (
+        <>
+          {/* 法則図鑑（B-6）: 発見文そのものが主役。数字の大写しではなく文章を中央に置く */}
+          <Text style={[st.label, { color: toneSub(tone) }]}>DISCOVERY</Text>
+          <Text style={[st.lawTitle, { color: col }]}>{data.title}</Text>
+          <Rule tone={tone} />
+          <Text style={[st.tagline, { color: toneSub(tone) }]}>{data.sub}</Text>
         </>
       )}
       {/* 小さなワードマーク＝ダウンロード導線（Strava式のブランド刷り込み） */}
@@ -208,6 +218,8 @@ const st = StyleSheet.create({
   unit: { fontSize: 14, fontWeight: '700' },
   tagline: { fontSize: 11.5, fontWeight: '600' },
   prName: { fontSize: 19, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
+  // 法則ステッカー: 文章が主役なので折り返し前提の中央寄せ（幅は写真に載せて邪魔にならない程度）
+  lawTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', lineHeight: 24, maxWidth: 240, marginTop: 6 },
   newPill: { backgroundColor: '#ff4d42', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
   newPillT: { fontSize: 10.5, fontWeight: '900', color: '#fff', letterSpacing: 2.5 },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
