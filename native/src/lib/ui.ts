@@ -1,6 +1,14 @@
 // デザイントークン。テーマ変更で「アクセントだけ」でなく、背景・枠線・文字・面の色まで
 // まとめて差し替わるよう、全色をこのオブジェクトに集約している。
-import { StyleSheet } from 'react-native';
+import { Platform, StatusBar, StyleSheet } from 'react-native';
+
+/** シート（pageSheetモーダル）の上端パディング。
+ *  iOS: pageSheetはOSが上を空けるので素の値をそのまま返す＝iOSの見た目は完全に不変。
+ *  Android: presentationStyleは無視されて全画面になり、さらにSDK 57はエッジツーエッジ既定で
+ *  コンテンツがステータスバーの下に潜るため、時計とヘッダーが重ならないよう高さを足す。 */
+export function sheetTopPad(base: number): number {
+  return Platform.OS === 'android' ? base + (StatusBar.currentHeight ?? 24) : base;
+}
 
 export type Palette = {
   bg: string;           // 画面の背景

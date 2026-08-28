@@ -14,7 +14,7 @@ import { OptionButton } from '@/components/ui/Selectable';
 import { apiPost } from '@/lib/api';
 import { t, apiLang } from '@/lib/i18n';
 import { getPurpose } from '@/lib/purpose';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 
 type Pick = { name: string; estKcal: number; reason: string };
 type AdviceResult = { picks: Pick[]; note: string };
@@ -151,7 +151,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: 18 },
+  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   note: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
   loadingBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },

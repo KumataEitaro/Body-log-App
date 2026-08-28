@@ -14,7 +14,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
@@ -426,7 +426,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
     alignItems: 'center', justifyContent: 'center',
   },
-  histWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
+  histWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   histHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   histTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   histSearch: {

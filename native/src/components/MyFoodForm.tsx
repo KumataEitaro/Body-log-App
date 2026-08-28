@@ -11,7 +11,7 @@ import { Sparkles, Camera, Salad } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { apiLang } from '@/lib/i18n';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
 
@@ -240,7 +240,7 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: 18 },
+  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   note: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 10, lineHeight: 18 },
   label: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 5 },

@@ -8,6 +8,7 @@
 //    14日ひらかないと自動で静かになる＝離れた人を追いかけて責めない（L4思想）
 //  - always: 毎日決まった時刻に必ず（習慣のアンカーとして使う人向け）
 //  - off
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { t } from './i18n';
@@ -280,6 +281,20 @@ export async function registerReminderCategory(): Promise<void> {
   } catch { /* Expo Goではカテゴリ未対応でも全体を落とさない */ }
 }
 
+/** Android: 通知チャンネルを登録する（チャンネルが無いとAndroidでは通知が一切表示されない）。
+ *  名前は端末の通知設定画面に出るため翻訳キーを使い、言語変更時はreregisterAll経由で
+ *  名前だけ更新される（既存チャンネルへのsetNotificationChannelAsyncは名前の更新になる）。
+ *  iOSではチャンネルの概念が無いので何もしない＝iOS挙動は不変 */
+async function ensureAndroidChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: t('通知'),
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
 /** 「あとで」→ 同じ内容の単発を2時間後に1回だけ。
  *  カテゴリを付けない＝スヌーズの連鎖はさせない（先送りが無限に続くのを防ぐ） */
 async function snoozeReminder2h(content: { title?: string | null; body?: string | null; data?: Record<string, unknown> }): Promise<void> {
@@ -307,6 +322,8 @@ async function skipTodayFromAction(): Promise<void> {
  *  （smartは単発14日ぶんの先積みなので、起動ごとの補充を兼ねる） */
 export async function reregisterAll(): Promise<void> {
   try {
+    // Androidのみ: チャンネルを先に用意する（無いと以降の通知が全て表示されない）
+    await ensureAndroidChannel();
     // カテゴリはここで毎回登録し直す（ボタン文言が登録時の言語で固定されるため）
     await registerReminderCategory();
     const { mode } = await getDailyReminderPrefs();

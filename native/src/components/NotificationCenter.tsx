@@ -4,7 +4,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { X, BellRing, Check } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { buildTodos, badgeCount, type Todo } from '@/lib/todos';
 
@@ -103,7 +103,7 @@ export function TodoBadge({ count, style }: { count: number; style?: object }) {
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 16 },
+  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: sheetTopPad(16) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   sub: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 12, lineHeight: 18 },

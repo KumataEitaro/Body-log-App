@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Table2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { kgToDisplay, useUnits } from '@/lib/units';
 import { Chip } from '@/components/ui/Selectable';
@@ -214,7 +214,7 @@ export function TableEntryCard({ onOpenBody, onOpenLift }: { onOpenBody: () => v
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 16 },
+  wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: sheetTopPad(16) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   chips: { flexDirection: 'row', gap: 6, marginBottom: 12, flexWrap: 'wrap' },

@@ -22,6 +22,8 @@
       "usesAppleSignIn": true
     },
     "android": {
+      "package": "com.gotcha.bodylog.rn",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -56,6 +58,13 @@
           "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#059669"
         }
       ],
       "@react-native-community/datetimepicker",

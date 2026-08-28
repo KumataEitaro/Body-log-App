@@ -167,3 +167,62 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  # ===== React Native版（native/）→ Google Play（.aab） =====
+  # 手動実行のみ（Start new build でこのworkflowを選択）。
+  # 事前準備（Codemagic側のUIで1回だけ）:
+  #  1. Teams > Code signing identities > Android keystores にキーストアをアップロードし、
+  #     Reference name を「bodylog_keystore」にする（下のandroid_signingが参照する）。
+  #     キーストアが無ければ手元で生成する（docs/ANDROID.md にkeytoolコマンド例あり）。
+  #  2. キーストア未アップロードの間は下の android_signing の2行をコメントアウトすれば
+  #     無署名でもビルド自体は通る（Playへは提出できないが動作確認用にはなる）。
+  # 公開: 今はGoogle Play Consoleへ .aab を手動アップロードする運用
+  # （サービスアカウント未作成のため）。作成後に publishing > google_play を足して自動化する。
+  rn-android:
+    name: BodyLog RN (native/) → Google Play (aab)
+    # Androidビルドにmacは不要。linuxインスタンスでコストを抑える
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      # iOS側（rn-testflight）とNodeメジャーを揃える。JavaはAGP要件の17
+      node: 22
+      java: 17
+      # Codemagic UIの環境変数グループ「rc」（iOS側と共用）。
+      # RevenueCatのGoogle Play公開キーを発行したら EXPO_PUBLIC_RC_ANDROID_KEY をこのグループに
+      # 追加する。未設定の間はアプリ側が安全に「未課金」扱いになる（課金UIが出ないだけ）
+      groups:
+        - rc
+      android_signing:
+        - bodylog_keystore
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd native
+          npm ci
+      - name: Set versionCode（iOSのagvtoolに相当）
+        script: |
+          # Google Playは同じversionCodeを二度受け付けないため、ビルドごとに必ず増える
+          # Codemagicの $PROJECT_BUILD_NUMBER を app.json の android.versionCode に注入する。
+          # version文字列（マーケティングバージョン）はリポジトリの値のまま＝docs/RELEASE.mdの運用
+          cd native
+          node -e "
+            const fs = require('fs');
+            const p = './app.json';
+            const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+            j.expo.android.versionCode = Number(process.env.PROJECT_BUILD_NUMBER);
+            fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+            console.log('android.versionCode =', j.expo.android.versionCode);
+          "
+      - name: Expo prebuild（androidプロジェクト生成）
+        script: |
+          cd native
+          npx expo prebuild --platform android
+      - name: Build aab
+        script: |
+          # Codemagicのandroid_signing（上のbodylog_keystore）が有効なら、署名設定は
+          # gradleに自動注入される（リポジトリにキーストアを置かない）
+          cd native/android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+    artifacts:
+      - native/android/app/build/outputs/**/*.aab

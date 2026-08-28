@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Minus, Plus, X, Search } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 export type CardLayout = { order: string[]; hidden: string[] };
@@ -121,7 +121,7 @@ export function AddCardSheet({ visible: open, onClose, hidden, labels, onShow, s
 
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.sheet, { paddingTop: 16 }]}>
+      <View style={[s.sheet, { paddingTop: sheetTopPad(16) }]}>
         <View style={s.sheetHead}>
           <Text style={s.sheetTitle}>{t('表示する項目を編集')}</Text>
           <Pressable onPress={onClose} hitSlop={10} style={s.doneBtn}>
