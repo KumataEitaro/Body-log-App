@@ -1296,4 +1296,13 @@ export const ES: Record<string, string> = {
   "プレートなし（バーのみで{bar}kg）": "Sin discos (solo la barra, {bar}kg)",
   "あと片側{n}kgぶんは端数です（1.25kg未満）": "Quedan {n}kg por lado que no se pueden ajustar (menos de 1.25kg)",
   "片側 {side}kg × 2 ＋ バー {bar}kg": "{side}kg por lado × 2 ＋ barra {bar}kg",
+  "スタートチェックリスト": "Lista de inicio",
+  "プロフィールと目標を設定する": "Configura tu perfil y objetivos",
+  "最初の食事を、つぶやきで記録する": "Registra tu primera comida con un comentario",
+  "写真で1回記録してみる": "Prueba a registrar con una foto",
+  "体重を1回記録する": "Registra tu peso una vez",
+  "AIに1回相談してみる": "Prueba a consultar con la IA",
+  "通知を設定する（記録がない日だけ）": "Activa las notificaciones (solo días sin registro)",
+  "ぜんぶ完了！あなたの記録生活、いいスタートです 🎉": "¡Todo listo! Tu vida de registro tiene un gran comienzo 🎉",
+  "最初の1週間で、ぜんぶ試してみましょう。やれば自動で✓が付きます。": "Prueba todo durante la primera semana. Se marcará con ✓ automáticamente al hacerlo.",
 };

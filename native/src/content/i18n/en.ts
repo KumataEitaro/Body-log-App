@@ -1312,4 +1312,13 @@ export const EN: Record<string, string> = {
   "プレートなし（バーのみで{bar}kg）": "No plates (bar only: {bar}kg)",
   "あと片側{n}kgぶんは端数です（1.25kg未満）": "Remaining {n}kg on each side is a remainder (under 1.25kg)",
   "片側 {side}kg × 2 ＋ バー {bar}kg": "{side}kg each side × 2 + Bar {bar}kg",
+  "スタートチェックリスト": "Getting started checklist",
+  "プロフィールと目標を設定する": "Set up your profile and goals",
+  "最初の食事を、つぶやきで記録する": "Log your first meal with a quick text",
+  "写真で1回記録してみる": "Try logging once with a photo",
+  "体重を1回記録する": "Log your weight once",
+  "AIに1回相談してみる": "Try asking AI once",
+  "通知を設定する（記録がない日だけ）": "Set up notifications (only on days you don't log)",
+  "ぜんぶ完了！あなたの記録生活、いいスタートです 🎉": "All done! You're off to a great start 🎉",
+  "最初の1週間で、ぜんぶ試してみましょう。やれば自動で✓が付きます。": "Try everything in your first week. They'll automatically get checked off ✓ as you do them.",
 };

@@ -1212,4 +1212,13 @@ export const FR: Record<string, string> = {
   "プレートなし（バーのみで{bar}kg）": "Aucun disque (barre seule : {bar}kg)",
   "あと片側{n}kgぶんは端数です（1.25kg未満）": "Reste {n}kg par côté (moins de 1,25kg)",
   "片側 {side}kg × 2 ＋ バー {bar}kg": "{side}kg par côté × 2 + barre {bar}kg",
+  "スタートチェックリスト": "Liste de départ",
+  "プロフィールと目標を設定する": "Définir le profil et les objectifs",
+  "最初の食事を、つぶやきで記録する": "Enregistrer le premier repas par note rapide",
+  "写真で1回記録してみる": "Essayer d'enregistrer une fois avec une photo",
+  "体重を1回記録する": "Enregistrer le poids une fois",
+  "AIに1回相談してみる": "Consulter l'IA une fois",
+  "通知を設定する（記録がない日だけ）": "Activer les notifications (uniquement les jours sans enregistrement)",
+  "ぜんぶ完了！あなたの記録生活、いいスタートです 🎉": "Tout est fait ! Votre parcours commence sur les chapeaux de roues 🎉",
+  "最初の1週間で、ぜんぶ試してみましょう。やれば自動で✓が付きます。": "Essayez tout au cours de la première semaine. Les ✓ s'ajouteront automatiquement au fur et à mesure.",
 };

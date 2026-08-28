@@ -1212,4 +1212,13 @@ export const ID: Record<string, string> = {
   "プレートなし（バーのみで{bar}kg）": "Tanpa plat (hanya barbel {bar}kg)",
   "あと片側{n}kgぶんは端数です（1.25kg未満）": "Sisa {n}kg per sisi adalah pecahan (di bawah 1.25kg)",
   "片側 {side}kg × 2 ＋ バー {bar}kg": "{side}kg per sisi × 2 ＋ barbel {bar}kg",
+  "スタートチェックリスト": "Daftar Periksa Mulai",
+  "プロフィールと目標を設定する": "Atur profil dan target",
+  "最初の食事を、つぶやきで記録する": "Catat makanan pertama lewat obrolan",
+  "写真で1回記録してみる": "Coba catat 1 kali dengan foto",
+  "体重を1回記録する": "Catat berat badan 1 kali",
+  "AIに1回相談してみる": "Coba konsultasi dengan AI 1 kali",
+  "通知を設定する（記録がない日だけ）": "Atur notifikasi (hanya di hari tanpa catatan)",
+  "ぜんぶ完了！あなたの記録生活、いいスタートです 🎉": "Semua selesai! Awal yang bagus untuk kebiasaan mencatatmu 🎉",
+  "最初の1週間で、ぜんぶ試してみましょう。やれば自動で✓が付きます。": "Coba semuanya di minggu pertama. Centang ✓ akan terisi otomatis setelah kamu melakukannya.",
 };
