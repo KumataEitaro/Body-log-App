@@ -13,8 +13,16 @@ export function buildCoachPrompt(input: {
   purposeKey?: string | null;
   /** 妊娠・授乳フラグ（profiles.maternity）。trueなら減量提案を禁止し維持と栄養を最優先する */
   maternity?: boolean;
+  /** 恒常的な制約（profiles.constraints_note）。アレルギー・宗教/ベジ・苦手・予算等を本人の言葉で */
+  constraintsNote?: string | null;
 }): string {
   const { dataBlock, historyBlock, question, answerLang, purposeKey, maternity } = input;
+  // 制約プロフィール: 毎回のプロンプトに必ず載せる「私の前提」。
+  // 改行はルール箇条書きを壊すので1行に潰し、長すぎる入力は切り詰める
+  const note = String(input.constraintsNote ?? '').replace(/\s*[\r\n]+\s*/g, ' / ').trim().slice(0, 500);
+  const constraintsRules = note
+    ? `- 【最優先】ユーザーの恒常的な制約（毎回必ず尊重する。提案がこれに反してはならない）: ${note}\n`
+    : '';
   // 増量目的では失敗の向きが逆（食べすぎではなく食べ忘れ）。減量前提のルールのまま
   // 答えると「控えめに」と真逆の助言をしてしまうため、方針をここで上書きする
   const bulkRules = purposeKey === 'bulk'
@@ -41,6 +49,9 @@ export function buildCoachPrompt(input: {
     '- 「栄養素: データなし」の項目を根拠にしない。データに無いことは「記録からは分かりませんが」と断ってから一般論を短く\n' +
     '- メモに酒・睡眠不足などの手がかりがあれば言及する\n' +
     '- 責めない・寄り添うトーン\n' +
+    // 感情への応答（1500人監査）: 過食・自己嫌悪の報告に正論から入ると相談が途切れる
+    '- 過食・自己嫌悪の報告（「食べすぎた」「自分が嫌になる」等）には、まず1文の共感から始める（正論・数値の指摘から入らない）\n' +
+    constraintsRules +
     '- 【本人の目的】が示されている場合はそれに沿った提案をする。「筋肉を守りながらしっかり減量」ならたんぱく質優先・トレ前提、「ゆるく健康的に」なら厳密なPFC管理を求めず続けやすさ優先。目的と矛盾する一般論を言わない\n' +
     maternityRules +
     bulkRules +

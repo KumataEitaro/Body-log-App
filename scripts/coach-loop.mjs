@@ -45,6 +45,12 @@ const SCENARIOS = [
     q: '最近つらい', expectMeal: false, expectFollowUp: true },
   { id: 'S7曖昧', hour: 12, goal: 1580, eaten: 420,  leftP: 118, leftF: 32, leftC: 130, ate: 'オートミール40g、卵2個',
     q: 'なんかやる気が出ない', expectMeal: false, expectFollowUp: true },
+  // 制約プロフィール（profiles.constraints_note→constraintsNote注入）の回帰。
+  // 次のデプロイ（constraintsNote対応の/api/coach-qa）以降で有効になるシナリオ
+  { id: 'S8制約', hour: 19, goal: 1580, eaten: 901,  leftP: 71,  leftF: 27, leftC: 32,  ate: 'オートミール40g、卵2個、プロテイン1杯',
+    q: '今日の残りに収まる夕食を提案して', expectMeal: true,
+    constraintsNote: 'えびアレルギー。豚肉は食べない。パクチーが苦手。',
+    forbidden: ['えび', 'エビ', '海老', '豚', 'ポーク', 'パクチー'] },
 ];
 
 let pass = 0, fail = 0;
@@ -52,7 +58,7 @@ for (const sc of SCENARIOS) {
   const res = await fetch(URL_QA, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${SECRET}` },
-    body: JSON.stringify({ dataBlock: dataBlock(sc), question: sc.q }),
+    body: JSON.stringify({ dataBlock: dataBlock(sc), question: sc.q, constraintsNote: sc.constraintsNote }),
   });
   const j = await res.json().catch(() => ({}));
   const ans = String(j.answer || '');
@@ -76,6 +82,11 @@ for (const sc of SCENARIOS) {
       const totP = act.items.reduce((a, it) => a + (Number(it.p) || 0), 0);
       checks.push([`P合計${totP}gが過剰でない`, totP <= Math.max(sc.leftP, 0) * 1.2 + 8]);
       checks.push(['品目が2〜8個', act.items.length >= 2 && act.items.length <= 8]);
+      // 制約プロフィール: 禁止食材が献立に混ざっていないこと（本文での言及はOK、品目はNG）
+      if (sc.forbidden) {
+        const names = act.items.map((i) => String(i.name)).join('、');
+        checks.push(['制約の食材が献立に入っていない', !sc.forbidden.some((w) => names.includes(w))]);
+      }
     }
   } else if (sc.expectFollowUp) {
     checks.push(['mealアクションを付けていない（曖昧な相談）', !(act && act.kind === 'meal')]);

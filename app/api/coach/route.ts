@@ -49,16 +49,29 @@ export async function POST(req: Request) {
     ? bodyRaw.sleep.filter((s: { date?: unknown; min?: unknown }) => typeof s?.date === 'string' && typeof s?.min === 'number' && s.min > 0).slice(0, 7)
     : [];
 
+  // セッションID（native生成のUUID）。同じIDの間は「ひと続きの相談」＝往復しても消費しない
+  const sessionIdRaw = String((bodyRaw as { sessionId?: unknown }).sessionId ?? '').trim().toLowerCase();
+  const sessionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(sessionIdRaw) ? sessionIdRaw : null;
+
   // 使用回数（プラン別のcoach日次上限）
   const today = todayJST();
-  const [usageRes, capReached, profPlanRes] = await Promise.all([
+  const [usageRes, capReached, profPlanRes, seenRes] = await Promise.all([
     supabase.from('ai_usage').select('count,text_count,photo_count,coach_count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
     supabase.from('profiles').select('plan,plan_until,premium_until').eq('id', user.id).maybeSingle(),
+    // セッション制: そのsessionIdを今日すでに見ていれば「継続往復」（上限も消費もかからない）。
+    // coach_sessionsテーブル未作成（migration-22未適用）や旧クライアント（sessionIdなし）は
+    // seenRes=null扱い → 従来どおり毎往復1消費にフォールバックする
+    sessionId
+      ? supabase.from('coach_sessions').select('session_id').eq('user_id', user.id).eq('session_id', sessionId).eq('date', today).maybeSingle()
+      : Promise.resolve(null),
   ]);
+  const isNewSession = !(seenRes && !seenRes.error && seenRes.data);
   const used = usageRes.data?.count ?? 0;
   const userPlan = resolvePlan(profPlanRes.data);
-  if (AI_LIMITS_ENABLED && !isUnlimited(user.email)) {
+  // 上限は「新しい相談を始める」ときだけ見る。セッション内の継続往復は無制限
+  // （globalCapは別途すべての往復にかかる安全弁のまま）
+  if (AI_LIMITS_ENABLED && isNewSession && !isUnlimited(user.email)) {
     const limits = await getLimits(supabase, userPlan);
     const chk = checkKindLimit(limits, 'coach', usageRes.data, 0);
     if (!chk.ok) {
@@ -193,7 +206,10 @@ export async function POST(req: Request) {
   // 増量（bulk）のときはプロンプトの方針も切り替わる（食べ忘れ対策・液体カロリー提案）。
   // maternity（妊娠・授乳）は減量提案の全面禁止（G3）。列が無いDBではundefined → false扱い
   const maternity = (prof as { maternity?: boolean | null }).maternity === true;
-  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang, purposeKey, maternity });
+  // 制約プロフィール（migration-22）: アレルギー・宗教・苦手・予算等の恒常的な前提。
+  // maternityと同じ流儀で、列が無いDBではundefined → 空扱いで壊れない
+  const constraintsNote = String((prof as { constraints_note?: string | null }).constraints_note ?? '');
+  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang, purposeKey, maternity, constraintsNote });
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
@@ -209,7 +225,10 @@ export async function POST(req: Request) {
   } catch { /* JSON崩れ時は生テキストを使う */ }
   if (!answer) answer = r.text.trim();
 
+  // セッション制の計数: 消費するのは「そのsessionIdを今日はじめて見たとき」だけ。
+  // 継続往復（isNewSession=false）は何も書かない。
   const bumpUsage = async () => {
+    if (!isNewSession) return;
     try {
       await supabase.from('ai_usage').upsert({
         user_id: user.id, date: today, count: used + 1,
@@ -217,6 +236,12 @@ export async function POST(req: Request) {
         photo_count: usageRes.data?.photo_count ?? 0,
         coach_count: (usageRes.data?.coach_count ?? 0) + 1,
       });
+      // セッション台帳に記録（次の往復から「継続」と判定される）。
+      // テーブルが無い（migration-22未適用）と失敗するが、その場合は毎往復1消費のままでよい
+      if (sessionId) {
+        await supabase.from('coach_sessions')
+          .upsert({ user_id: user.id, session_id: sessionId, date: today }, { onConflict: 'user_id,session_id,date', ignoreDuplicates: true });
+      }
     } catch { /* 無視 */ }
   };
   try { after(bumpUsage); } catch { void bumpUsage(); }

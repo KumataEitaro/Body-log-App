@@ -21,13 +21,18 @@ export async function POST(req: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return NextResponse.json({ ok: false, error: 'no key' }, { status: 500 });
 
-  const body = await req.json().catch(() => null) as { dataBlock?: string; question?: string; purposeKey?: string; maternity?: boolean } | null;
+  const body = await req.json().catch(() => null) as { dataBlock?: string; question?: string; purposeKey?: string; maternity?: boolean; constraintsNote?: string } | null;
   const dataBlock = String(body?.dataBlock ?? '').slice(0, 8000);
   const question = String(body?.question ?? '').slice(0, 500);
   if (!dataBlock || !question) return NextResponse.json({ ok: false, error: 'dataBlock/question required' }, { status: 400 });
 
-  // 本番と同じく目的キー・妊娠授乳フラグで方針が変わる（合成シナリオでQAできるように受け取る）
-  const prompt = buildCoachPrompt({ dataBlock, historyBlock: '', question, answerLang: '', purposeKey: body?.purposeKey ?? null, maternity: body?.maternity === true });
+  // 本番と同じく目的キー・妊娠授乳フラグ・制約プロフィールで方針が変わる（合成シナリオでQAできるように受け取る）。
+  // セッション制（sessionId）はDB計数の話でプロンプトには影響しないため、QAルートでは扱わない
+  const prompt = buildCoachPrompt({
+    dataBlock, historyBlock: '', question, answerLang: '',
+    purposeKey: body?.purposeKey ?? null, maternity: body?.maternity === true,
+    constraintsNote: body?.constraintsNote ?? null,
+  });
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
 
