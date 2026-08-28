@@ -5,7 +5,7 @@
 // - ⤢で全画面モーダル展開
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
-import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { C } from '@/lib/ui';
 import {
@@ -26,11 +26,12 @@ type Props = {
   color?: string;
   fullscreenEnabled?: boolean; // 全画面内での再帰を防ぐ
   onDaysChange?: (days: number, isFull: boolean) => void; // ピンチ/パン後に実際の表示日数を親へ通知（期間チップの追従用）
+  markers?: { date: string; label: string }[]; // サイクル境界（B-5）等の薄い縦線＋小ラベル。省略時は描画コストゼロ
 };
 
 const PAD_L = 8, PAD_R = 44, PAD_T = 10, PAD_B = 22;
 
-function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange }: Props) {
+function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange, markers }: Props) {
   const [width, setWidth] = useState(0);
   const [fs, setFs] = useState(false);
 
@@ -97,6 +98,13 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
 
   // 期間ヘッダーと傾向（表示中トレンドの端点差）
   const delta = visTrend.length >= 2 ? visTrend[visTrend.length - 1].value - visTrend[0].value : null;
+
+  // サイクル境界などの注釈（markers未指定なら早期にnull＝計算・描画コストゼロ）
+  const visMarkers = markers && markers.length > 0
+    ? markers
+        .map((m) => ({ idx: dateToIdx(m.date), label: m.label }))
+        .filter((m) => m.idx >= startF && m.idx <= win.end)
+    : null;
 
   // ===== ジェスチャー =====
   const clampWin = (end: number, days: number) => {
@@ -230,6 +238,14 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                 {planValue != null && planValue >= lo && planValue <= hi && (
                   <Line x1={PAD_L} y1={y(planValue)} x2={PAD_L + plotW} y2={y(planValue)} stroke={C.sub} strokeWidth={1} strokeDasharray="5,4" />
                 )}
+                {/* サイクル境界の注釈（B-5）: 薄い縦線＋小ラベル。データ・目盛りには一切触れない */}
+                {visMarkers?.map((m, i) => (
+                  <G key={`mk${m.idx}-${i}`}>
+                    <Line x1={x(m.idx)} y1={PAD_T} x2={x(m.idx)} y2={PAD_T + plotH}
+                          stroke={C.sub} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="3,3" />
+                    <SvgText x={x(m.idx) + 3} y={PAD_T + 8} fontSize={9} fill={C.sub} fillOpacity={0.85}>{m.label}</SvgText>
+                  </G>
+                ))}
                 {/* トレンド下のグラデーション面（うっすら。曲線を主役に立てる） */}
                 <Defs>
                   <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
@@ -278,7 +294,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
             </View>
             <Inner
               points={points} unit={unit} decimals={decimals} planValue={planValue}
-              presetDays={presetDays} color={color} fullscreenEnabled={false}
+              presetDays={presetDays} color={color} fullscreenEnabled={false} markers={markers}
               height={Math.round(Dimensions.get('window').height * 0.66)}
             />
           </View>

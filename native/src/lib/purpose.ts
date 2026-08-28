@@ -10,6 +10,7 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { t } from './i18n';
+import { todayJST } from './calc';
 
 export type PurposeKey = 'cut_lean' | 'cut_std' | 'easy' | 'bulk';
 
@@ -65,9 +66,50 @@ export function setPurpose(key: PurposeKey): void {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
-      if (uid) await supabase.from('profiles').update({ purpose: key }).eq('id', uid);
+      if (!uid) return;
+      await supabase.from('profiles').update({ purpose: key }).eq('id', uid);
+      // サイクル履歴（B-5）もベストエフォート。失敗しても端末保存は成功のまま
+      await recordPurposePeriod(uid, key);
     } catch { /* 端末保存が主なので無視 */ }
   })();
+}
+
+// ===== サイクル履歴（B-5・purpose_periods） =====
+// バルク⇄カットの往復を期間として残し、サイクル単位の自己比較を可能にする。
+// migration-20未適用（テーブルが無い）環境でも全機能が動くよう、
+// ここは常にベストエフォート＝エラーは握りつぶしてサイクル機能だけ静かに諦める。
+export type PurposePeriod = { purpose: string; started_at: string; ended_at: string | null };
+
+async function recordPurposePeriod(uid: string, key: PurposeKey): Promise<void> {
+  try {
+    const today = todayJST();
+    // 現在行（ended_at=null）を見る。無ければ初回＝現在の目的で1行作る
+    const { data, error } = await supabase.from('purpose_periods')
+      .select('id,purpose').is('ended_at', null)
+      .order('started_at', { ascending: false }).limit(1);
+    if (error) return; // テーブル未作成など。切替自体は端末＋profilesで完結している
+    const open = (data as { id: string; purpose: string }[] | null)?.[0];
+    if (open?.purpose === key) return; // 同じ目的の再選択は履歴にしない
+    if (open) await supabase.from('purpose_periods').update({ ended_at: today }).eq('id', open.id);
+    await supabase.from('purpose_periods').insert({ user_id: uid, purpose: key, started_at: today });
+  } catch { /* ベストエフォート */ }
+}
+
+/** 全サイクル履歴を古い順で取得。テーブル未作成・オフラインはnull（＝機能を静かに非表示にする合図） */
+export async function fetchPurposePeriods(): Promise<PurposePeriod[] | null> {
+  try {
+    const { data, error } = await supabase.from('purpose_periods')
+      .select('purpose,started_at,ended_at').order('started_at', { ascending: true });
+    if (error) return null;
+    return (data as PurposePeriod[]) ?? [];
+  } catch { return null; }
+}
+
+/** サイクルの呼び名（表示用・t()済み）。目的4種を増量/減量/ゆる維持の3系に畳む */
+export function cycleLabel(key: string): string {
+  if (key === 'bulk') return t('増量');
+  if (key === 'easy') return t('ゆる維持');
+  return t('減量');
 }
 
 export function getPurpose(): PurposeKey | null { return current; }
