@@ -48,6 +48,7 @@ import { latestLawSummary } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { bigKcalParts } from '@/lib/format';
+import { trendPhrase } from '@/lib/trend';
 import { MoodInline } from '@/components/MoodFace';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
@@ -684,7 +685,22 @@ export default function ChangesScreen() {
 
   function summaryOf(key: string): string {
     switch (key) {
-      case 'digest': return t('今週のふりかえり');
+      case 'digest': {
+        // 今週の記録日数＋先週比の体重変化（digestCardと同じ集計を要約1行に）
+        const ws = weekStartOf2(today);
+        const rec = rows.filter((r) => r.date >= ws && r.date <= today && r.intake != null).length;
+        if (rec === 0) return t('今週のふりかえり');
+        const wOf = (from: string, to: string) => {
+          const l = wRows.filter((r) => r.date >= from && r.date < to);
+          return l.length ? Number(l[l.length - 1].weight) : null;
+        };
+        const wNow = wOf(ws, addDays(today, 1)) ?? latestW2;
+        const wPrev = wOf(addDays(ws, -7), ws);
+        const dW = wNow != null && wPrev != null ? Math.round((wNow - wPrev) * 10) / 10 : null;
+        return dW != null
+          ? t('今週{n}日記録・体重{d}kg', { n: rec, d: `${dW > 0 ? '+' : ''}${dW.toFixed(1)}` })
+          : t('今週{n}日記録', { n: rec });
+      }
       case 'laws': return lawLine ?? t('記録が貯まると、あなたの法則が見つかります');
       case 'bulkguard': return t('週あたりの増量ペースを見張る');
       case 'cycles': {
@@ -707,11 +723,39 @@ export default function ChangesScreen() {
         const n = rows.filter((r) => r.date.startsWith(mon) && (r.intake != null || r.weight != null)).length;
         return t('今月{n}日記録', { n });
       }
-      case 'chart': return t('体重・摂取・消費の推移');
-      case 'goal': return goal?.target_weight != null
-        ? `${latestW2 != null ? `${latestW2.toFixed(1)} → ` : ''}${Number(goal.target_weight).toFixed(1)}kg`
-        : t('目標を決めると逆算が始まります');
-      case 'slots': return t('直近14日のkcal内訳');
+      case 'chart': {
+        // 体重の直近30日の変化を言語化（kpi行の1週間と対で「30日の流れ」を見せる）
+        if (latestW != null && firstW != null) {
+          const d = Math.round((latestW - firstW) * 10) / 10;
+          return `${t('体重')} ${t('30日で')}${d <= 0 ? '▼' : '▲'}${Math.abs(d).toFixed(1)}kg`;
+        }
+        return t('体重・摂取・消費の推移');
+      }
+      case 'goal': {
+        if (goal?.target_weight == null) return t('目標を決めると逆算が始まります');
+        if (latestW2 == null) return `→ ${Number(goal.target_weight).toFixed(1)}kg`;
+        // 「あと{n}kg・{date}まで」（減量も増量も残り幅の絶対値。目標日が過去なら日付は出さない）
+        const n = Math.abs(Math.round((latestW2 - Number(goal.target_weight)) * 10) / 10).toFixed(1);
+        if (goal.target_date && goal.target_date >= today) {
+          const [, m, d] = goal.target_date.split('-').map(Number);
+          return t('あと{n}kg・{date}まで', { n, date: t('{m}/{d}', { m, d }) });
+        }
+        return t('あと{n}kg', { n });
+      }
+      case 'slots': {
+        // 直近14日のkcalの最多時間帯（slotsCardと同じ集計の要約）
+        const from14 = addDays(today, -14);
+        const share: Record<string, number> = { morning: 0, noon: 0, evening: 0, night: 0 };
+        for (const it of toItemEntries(logRows.filter((r) => r.date >= from14))) {
+          if (it.hour == null) continue;
+          share[slotOf(it.hour)] += it.kcal;
+        }
+        const total = share.morning + share.noon + share.evening + share.night;
+        if (total <= 0) return t('直近14日のkcal内訳');
+        const names: Record<string, string> = { morning: t('朝'), noon: t('昼'), evening: t('夕'), night: t('夜') };
+        const top = Object.keys(share).reduce((a, b) => (share[a] >= share[b] ? a : b));
+        return t('{slot}が最多（{p}%）', { slot: names[top], p: Math.round((share[top] / total) * 100) });
+      }
       case 'table': return t('体重・ウエスト・体脂肪率の一覧');
       case 'photos': return t('見た目の変化を並べて見る');
       case 'binge': return t('食べすぎの引き金を分析');
@@ -760,6 +804,43 @@ export default function ChangesScreen() {
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
     setDetailKey(key);
+  }
+
+  // ===== 詳細ページのヘルスケア式ヘッダー（A-8残） =====
+  // 数値系の主要カード（kpi=体重・chart=選択中の系列・health=歩数）だけ、
+  // タイトル直下に「大きな現在値＋トレンド文章（{n}週間で下向き等）」を1段足す。
+  // 中身のカードは不変。トレンドはlib/trend.tsのtrendPhrase（週平均の平滑変化）
+  function detailHeader(key: string): ReactNode {
+    let val: string | null = null;
+    let unit = '';
+    let src: { date: string; value: number }[] = [];
+    if (key === 'kpi') {
+      if (latestW2 == null) return null;
+      val = latestW2.toFixed(1); unit = 'kg';
+      src = wRows.map((r) => ({ date: r.date, value: Number(r.weight) }));
+    } else if (key === 'chart') {
+      // 選択中の系列に追従（カード内のチップを切り替えるとヘッダーも変わる）
+      if (points.length === 0) return null;
+      val = points[points.length - 1].value.toFixed(conf.decimals);
+      unit = conf.unit || 'kcal';
+      src = points;
+    } else if (key === 'health') {
+      const st = activity?.find((d) => d.date === today)?.steps;
+      if (st == null) return null; // 未読込・未連携ならヘッダーなし（カードの読込ボタンに任せる）
+      val = st.toLocaleString(); unit = t('歩');
+      src = (activity ?? []).map((a) => ({ date: a.date, value: a.steps }));
+    } else {
+      return null;
+    }
+    return (
+      <View style={s.detailHead}>
+        <Text style={s.detailVal}>
+          {val}
+          <Text style={s.detailUnit}> {unit}</Text>
+        </Text>
+        <Text style={s.detailTrend}>{trendPhrase(src)}</Text>
+      </View>
+    );
   }
   function menuRow(key: string) {
     const withSpark = (key === 'kpi' || key === 'chart') && sparkVals.length >= 2;
@@ -852,6 +933,7 @@ export default function ChangesScreen() {
               <Text style={s.backT}>{t('概要')}</Text>
             </Pressable>
             <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
+            {detailHeader(detailKey)}
             <ErrorBoundary>{card(detailKey)}</ErrorBoundary>
           </Animated.View>
         </ScrollView>
@@ -967,4 +1049,9 @@ const s = StyleSheet.create({
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 2 },
   backT: { fontSize: 15, fontWeight: '800', color: C.teal },
   detailTitle: { fontSize: 24, fontWeight: '900', color: C.ink, marginBottom: 12 },
+  // 詳細ページのヘルスケア式ヘッダー（大きな現在値＋トレンド文章）
+  detailHead: { marginTop: -6, marginBottom: 14 },
+  detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  detailUnit: { fontSize: 16, fontWeight: '700', color: C.sub },
+  detailTrend: { fontSize: 13.5, fontWeight: '700', color: C.sub, marginTop: 2 },
 });

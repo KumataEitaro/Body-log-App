@@ -2,7 +2,7 @@
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration, AppState } from 'react-native';
-import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
@@ -162,9 +162,16 @@ export default function TrainingScreen() {
     if (!('error' in r)) setHealthDays(r);
   }, []);
   useEffect(() => { loadHealth(); }, [loadHealth]);
+  // 時間帯別の歩数（0-23時・ヘルスケア式バー）。HealthKitが無い環境ではnullのまま＝出さない
+  const [hourlySteps, setHourlySteps] = useState<number[] | null>(null);
+  const loadHourly = useCallback(async (date: string) => {
+    if (!healthAvailable()) return;
+    setHourlySteps(await readHourlySteps(date));
+  }, []);
+  useEffect(() => { loadHourly(viewDate); }, [viewDate, loadHourly]);
   async function connectHealth() {
     if (!healthAvailable()) { setMsg({ ok: false, text: t('歩数の自動表示はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
-    if (await requestHealthAuth()) await loadHealth();
+    if (await requestHealthAuth()) { await loadHealth(); loadHourly(viewDate); }
   }
   const stepsOfView = healthDays?.find((d) => d.date === viewDate)?.steps ?? null;
 
@@ -592,7 +599,7 @@ export default function TrainingScreen() {
       ref={trScrollRef}
       style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadMove(viewDate), loadHealth()]); setRefreshing(false); }} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
         <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
@@ -683,6 +690,39 @@ export default function TrainingScreen() {
                 })}
               </View>
             )}
+            {/* ===== 時間帯別の歩数（A-7残・ヘルスケア式の0-23時バー） =====
+                HealthKitが無い環境（Expo Go / Android）はhourlyStepsがnullのまま＝出さない。
+                今日を見ているときは現在時刻より未来の時間帯を空にする（静的表示・タップ不要） */}
+            {hourlySteps != null && hourlySteps.some((v) => v > 0) && (() => {
+              const nowH = jstHourNow();
+              const isToday = viewDate === todayJST();
+              const maxHr = Math.max(1, ...hourlySteps);
+              return (
+                <View style={s.hrWrap}>
+                  <Text style={s.hrTitle}>{t('時間帯別の歩数')}</Text>
+                  <View style={s.hrBars}>
+                    {hourlySteps.map((v, h) => {
+                      const future = isToday && h > nowH;
+                      return (
+                        <View key={h} style={s.hrCol}>
+                          {future ? (
+                            <View style={s.hrEmpty} />
+                          ) : (
+                            <View style={[s.hrBar, { height: v > 0 ? 3 + Math.round(41 * (v / maxHr)) : 2 }, v === 0 && { backgroundColor: C.line }]} />
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                  {/* 目盛りは6時間おき（0・6・12・18時）。バー24本の下に等間隔で置く */}
+                  <View style={s.hrAxis}>
+                    {[0, 6, 12, 18].map((h) => (
+                      <Text key={h} style={s.hrAxisT}>{t('{n}時', { n: h })}</Text>
+                    ))}
+                  </View>
+                </View>
+              );
+            })()}
           </Animated.View>
         );
       })()}
@@ -1116,6 +1156,15 @@ const s = StyleSheet.create({
   mvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 14 },
   mvBar: { width: '62%', borderRadius: 4, backgroundColor: C.line },
   mvBarL: { fontSize: 10.5, color: C.faint, fontWeight: '700' },
+  // 時間帯別の歩数（0-23時・ヘルスケア式）。バーは静的表示・未来の時間帯は空
+  hrWrap: { marginTop: 14, borderTopWidth: 0.5, borderTopColor: C.line, paddingTop: 12 },
+  hrTitle: { fontSize: 12, fontWeight: '700', color: C.sub, marginBottom: 8 },
+  hrBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 44 },
+  hrCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  hrBar: { alignSelf: 'stretch', borderRadius: 2, backgroundColor: C.teal },
+  hrEmpty: { alignSelf: 'stretch', height: 2, borderRadius: 2, backgroundColor: C.track },
+  hrAxis: { flexDirection: 'row', marginTop: 4 },
+  hrAxisT: { flex: 1, fontSize: 11, color: C.faint, fontWeight: '700', textAlign: 'left' },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   segBtn: {
     flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
