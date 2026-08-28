@@ -42,6 +42,7 @@ import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
+import { skipTodayReminder } from '@/lib/notify';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
@@ -691,6 +692,8 @@ export default function LogScreen() {
   function moodSnooze() {
     AsyncStorage.setItem('bl-mood-snooze', todayJST()).catch(() => {});
     setMoodSnoozed(true);
+    // 「今日は聞かないで」の意思は通知にも波及させる（今夜のリマインダーも黙る）
+    skipTodayReminder().catch(() => {});
   }
 
   async function backfillSnooze() {
