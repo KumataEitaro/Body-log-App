@@ -4,6 +4,25 @@
 横断変更は全機能スイープ（grep全数→全件判定→対象外の正しさ監査）を行うこと。
 更新日: 2026-08-27（夜: 全消し込み実施）
 
+## ✅ 実装済み（2026-08-29 v1.0.19・featureブランチ残置）— 残件ゼロ化バッチ
+- 安全ガード8件（BMI18.5下限＋週1kgペース上限／過食2,500kcal超の非審判文言／
+  妊娠・授乳フラグ=migration-21／復帰トーン確認／AI相談の安全チェック層／
+  アレルゲン免責／ステッカー実数マスク確認／体重±15%外れ値確認） … feat/safety-guards
+- AI相談のセッション制（sessionId台帳=migration-22・継続往復は枠を消費しない）＋
+  制約プロフィール（アレルギー/宗教/苦手/予算をprofiles.constraints_noteで恒常注入）＋
+  過食報告への共感ファースト … feat/coach-sessions
+- バーコードスキャン＋Open Food Facts公式DB（expo-camera・AI枠消費ゼロ・
+  7日キャッシュ・未ヒットは成分表示写真へ誘導。入口=食事ドック＋マイ食品） … feat/barcode-db
+- 筋トレのオフライン化（送信失敗→ローカルキュー→復帰時自動同期・未同期チップ）＋
+  プレート計算機 … feat/offline-lifts
+- スタートチェックリスト（6項目自動判定・14日以内表示・全完了で祝祭→翌日消滅） … feat/start-checklist
+- A-7/A-8残の解消（詳細ページのヘルスケア式ヘッダー=現在値＋トレンド文章、
+  行要約の拡充、時間帯別歩数チャート） … feat/overview-polish
+- B-9 ホームウィジェット（残量＋炎。ENABLE_WIDGET=trueのCIビルドのみ組込・
+  既定ビルド完全不変・**有効化はユーザー手順=docs/WIDGET.md**） … feat/widget
+- Android版リリース準備（package/versionCode/通知チャンネル/edge-to-edge対応13箇所/
+  RC受け口/rn-androidワークフロー/docs/ANDROID.md） … feat/android
+
 ## ✅ 実装済み（2026-08-27 v1.0.18・featureブランチ残置）
 - 記録リマインダー3モード化（smart=記録がない日だけ/毎日/オフ・時刻選択・
   文言ローテ・タップでクイック入力・「今日は聞かないで」連動）… feat/smart-reminders
@@ -187,28 +206,51 @@
 - B-8. 曜日ヒートマップ（過去8週の超過を曜日×週で可視化→曜日別+200kcalの傘に接続・小工数）
 
 ### L1/L2 摩擦ゼロ・事前判断
-- B-9. ホーム画面ウィジェット（残量＋ストリーク）【唯一の残件】
-  - 見送り理由: WidgetKit拡張ターゲット＋App Group＋拡張用プロビジョニングの追加が必要で、
-    ビルド→実機確認のループなしに盲目実装するとCodemagic署名を壊すリスクが高い。
-    ビルドを回せるタイミングで専用セッションとして着手する（scripts/add-widget-target.rb が下地）
+- ~~B-9~~ → 実装済み（ENABLE_WIDGETゲート方式・有効化はdocs/WIDGET.mdの手順で）
 - ~~B-10/B-11~~ → 実装済み（上記）
 
 ### L4 感情設計
 - ~~B-12/B-13~~ → 実装済み（上記）
 
-## C. 中期バックログ（既出）
-- AI相談のセッション制＋制約プロフィール
-- 安全ガード8件
-- バーコード読み取り／公式食品DB連携
-- 筋トレ記録のオフライン化
-- スタートチェックリスト
-- IGストーリー直接連携（Meta App ID取得）
-- RC_WEBHOOK_SECRETのローテーション（**公開前必須**）
+## C. 中期バックログ
+- ~~セッション制・安全ガード・バーコードDB・オフライン化・チェックリスト~~ → 実装済み（上記v1.0.19）
+- IGストーリー直接連携（**Meta App ID取得＝熊田さんのタスクが先**。現状の透過ステッカー
+  コピー＆ペースト方式で機能は成立している）
+- 監査Later群（未着手・優先度低）: 非同期解析／音声入力／バイタル記録＋医師向けPDF／
+  生理周期表示／MFPインポート／レシピビルダー／繁体字／地域別価格戦略／Apple Watch
 
-## D. ユーザー操作待ち（開発ではなく熊田さんのタスク）
-- Supabaseで migration-19.sql 実行（free/liteの写真枠 日次化）
-- Codemagicで rn-testflight ビルド（次ビルド=1.0.15）
-- サンドボックス購入テスト
-- ASCで国=日本のSandboxテスターを作成→ペイウォールが¥表示になるか確認（A-5）
-- Supabaseで migration-20.sql 実行（増量サイクル切替のperiodsテーブル。未実行でもアプリは正常・サイクル機能だけ非表示）
-- Codemagicで rn-testflight ビルド（次ビルド=**1.0.18**・今回の全機能入り）
+## D. 熊田さんのTODO（2026-08-29版・開発側は残件ゼロ）
+
+### すぐ（アプリを動かすため）
+1. **Supabase SQLを4本実行**（順不同・どれも未実行でもアプリは壊れない）
+   https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
+   - migration-19.sql（free/lite写真枠の日次化）
+   - migration-20.sql（増量サイクル履歴）
+   - migration-21.sql（妊娠・授乳フラグ）
+   - migration-22.sql（AI相談セッション台帳＋制約プロフィール列）
+2. **Codemagicで rn-testflight ビルド**（次=**1.0.19**・1.0.15以降の全機能入り。
+   expo-camera追加のためネイティブ再ビルド必須）
+3. **実機で体感チェック**（体感が合格ラインのもの）: 概要の並べ替えぬるぬる／
+   オンボv2のカルーセル／バーコード実スキャン／機内モード→筋トレ保存→復帰同期／
+   メニューおすすめの実写真／気分の顔＋ドット表示
+
+### 課金まわり（公開判断の前に）
+4. ASCで**国=日本のSandboxテスター**を作成→ペイウォールが¥表示になるか確認（A-5）
+5. サンドボックス購入テスト（lite/standard/premium）
+6. **RC_WEBHOOK_SECRETのローテーション（公開前必須・スクショ漏洩済みのため）**
+
+### Android（届けるため・リードタイム約3週間）
+7. Google Play Console登録（$25）→ アプリ作成（package: com.gotcha.bodylog.rn）
+8. keytoolでキーストア生成→Codemagicへ `bodylog_keystore` 名でアップロード
+   （手順: docs/ANDROID.md）→ rn-android ビルド→内部テストで実機確認
+9. **テスター12人を確保してクローズドテスト開始**（14日連続・実使用が必要。
+   早く始めるほど公開が早い。詳細: docs/ANDROID.mdの配信戦略）
+
+### 任意（後回し可）
+10. ウィジェット試験: Apple Developer portalでApp Group
+    `group.com.gotcha.bodylog.rn` を作成→App ID2つに紐付け→
+    Codemagicで ENABLE_WIDGET=true を指定してビルド（手順: docs/WIDGET.md。
+    失敗しても変数を外せば従来ビルドに即復帰）
+11. RevenueCatにGoogle Playアプリ追加→ EXPO_PUBLIC_RC_ANDROID_KEY 設定
+12. IG直接連携をやるならMeta App ID取得
+13. **次のApp Store審査提出はバージョンを1.1.0へ切り上げ**（docs/RELEASE.mdの基準）
