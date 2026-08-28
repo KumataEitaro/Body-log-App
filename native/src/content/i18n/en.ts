@@ -1210,4 +1210,8 @@ export const EN: Record<string, string> = {
   "週3日": "3 days a week",
   "週の約束": "Weekly promise",
   "自分で決めた週目標を4週連続で守った": "Kept your weekly goal for 4 consecutive weeks",
+  "あなたの法則を、ぜんぶ手に入れる": "Unlock all your personal patterns.",
+  "無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。": "The Free plan shows up to your 3 most recent cards. Upgrade to Standard or higher to unlock the full collection.",
+  "食べ方のクセまで見える、週間ダイジェスト": "Weekly Digest — spot all your eating habits",
+  "1週間の食べ方をAIがまとめて言語化。プレミアムの詳細分析で、毎週のふりかえりが開きます。": "AI summarizes your week of eating into clear insights. Detailed Premium analysis unlocks your weekly review.",
 };

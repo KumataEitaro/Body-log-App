@@ -19,6 +19,8 @@ import { AppState } from 'react-native';
 import { CalendarDays, CalendarRange, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
 import LeanBulkCard from '@/components/LeanBulkCard';
 import { usePurpose } from '@/lib/purpose';
+import { useGate } from '@/lib/gate';
+import CrownBadge from '@/components/CrownBadge';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
@@ -123,6 +125,8 @@ export default function ChangesScreen() {
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
   const guide = useGuide();
+  // 王冠ゲーティング（MFP式）。課金基盤が無効なビルドでは active=false で何も変わらない
+  const gate = useGate();
   // リーンバルク・ガードは増量目的のときだけ意味を持つ（減量中は判定が全部ノイズになる）
   const purpose = usePurpose();
   const chartTarget = useGuideTarget('chart');
@@ -722,17 +726,29 @@ export default function ChangesScreen() {
   }
   function menuRow(key: string) {
     const withSpark = (key === 'kpi' || key === 'chart') && sparkVals.length >= 2;
+    // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
+    // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり
+    const crowned = key === 'digest' && gate.gated('digest');
     return (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
                  // ガイドツアーの「グラフ」ハイライトはメニュー行に当てる（詳細はタップ先）
                  ref={key === 'chart' ? chartTarget : undefined} collapsable={false}
-                 onPress={() => openDetail(key)}
+                 onPress={() => {
+                   if (crowned) {
+                     Haptics.selectionAsync().catch(() => {});
+                     // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
+                     router.push('/paywall?src=digest' as never);
+                     return;
+                   }
+                   openDetail(key);
+                 }}
                  onLongPress={() => setEditing(true)} delayLongPress={400}>
         <View style={s.menuIcon}>{menuIconOf(key)}</View>
         <View style={{ flex: 1 }}>
           <Text style={s.menuT}>{CARD_LABELS()[key] ?? key}</Text>
           <Text style={s.menuSub} numberOfLines={1}>{summaryOf(key)}</Text>
         </View>
+        {crowned && <CrownBadge size={14} />}
         {withSpark && <MiniSpark vals={sparkVals} color={C.teal} />}
         <Text style={s.menuGo}>›</Text>
       </Pressable>
