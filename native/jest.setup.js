@@ -127,6 +127,10 @@ jest.mock('expo-image-picker', () => ({
   launchCameraAsync: jest.fn(async () => ({ canceled: true })),
   launchImageLibraryAsync: jest.fn(async () => ({ canceled: true })),
 }));
+jest.mock('expo-camera', () => ({
+  CameraView: () => null,
+  useCameraPermissions: () => [{ granted: false, canAskAgain: true }, jest.fn(async () => ({ granted: false }))],
+}));
 jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: jest.fn(async () => ({ uri: 'x', base64: 'x' })),
   SaveFormat: { JPEG: 'jpeg' },
@@ -158,7 +162,9 @@ jest.mock('expo-sharing', () => ({ isAvailableAsync: async () => false, shareAsy
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(async () => {}),
   selectionAsync: jest.fn(async () => {}),
+  notificationAsync: jest.fn(async () => {}),
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
+  NotificationFeedbackType: { Success: 's', Warning: 'w', Error: 'e' },
 }));
 jest.mock('expo-linear-gradient', () => {
   const RN = require('react-native');
