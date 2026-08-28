@@ -13,6 +13,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
 import { sumItems } from '@/lib/items';
+import { confirmOutlierWeight } from '@/lib/guard';
 import { C } from '@/lib/ui';
 import { useDayStatus } from '@/lib/dayStatus';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,6 +88,13 @@ export default function QuickLogFab() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
+      // G8: AI解析の体重が前回から±15%以上ずれていたら保存前に確かめる（FABは前回値を持たないので都度取得）
+      if (staged.weight != null) {
+        const { data: prevRows } = await supabase.from('entries')
+          .select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1);
+        const prevW = prevRows?.length ? Number(prevRows[0].weight) : null;
+        if (!(await confirmOutlierWeight(prevW, Number(staged.weight)))) return;   // トレイは残す（破棄で消せる）
+      }
       const res = await saveParsed(uid, staged, stagedNote);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       setStaged(null); setStagedNote('');

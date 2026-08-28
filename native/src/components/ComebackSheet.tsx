@@ -23,6 +23,7 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { invalidateStreak } from '@/lib/achievements';
 import { todayJST } from '@/lib/calc';
 import { useUnits, displayToKg } from '@/lib/units';
+import { confirmOutlierWeight } from '@/lib/guard';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import MoodFace from '@/components/MoodFace';
@@ -88,6 +89,12 @@ export default function ComebackSheet({ onSaved }: {
     if (!uid || !(w > 20 && w < 300)) { setErr(t('体重の値を確認してください。')); return; }
     setBusy(true);
     try {
+      // G8: 空白明けは特に打ち間違いが起きやすい（久しぶりで単位や桁の感覚がズレる）。
+      // 前回の記録体重を取り、±15%以上ずれていたら保存前に一度だけ確かめる
+      const { data: prevRows } = await supabase.from('entries')
+        .select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1);
+      const prevW = prevRows?.length ? Number(prevRows[0].weight) : null;
+      if (!(await confirmOutlierWeight(prevW, w))) return;
       const today = todayJST();
       // 食事タブの体重クイック入力と同じ経路: logsへ1行→entriesへ日次サマリー同期（upsert）
       await supabase.from('logs').insert({

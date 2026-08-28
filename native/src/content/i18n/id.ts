@@ -1170,4 +1170,13 @@ export const ID: Record<string, string> = {
   "増量": "Bulking",
   "ゆる維持": "Maintenance Santai",
   "減量": "Cutting",
+  "記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。": "Mencatat saja sudah merupakan langkah besar. Besok tidak perlu mengurangi makan secara ekstrem. Cukup jalani seperti biasa.",
+  "妊娠中・授乳中": "Hamil & Menyusui",
+  "ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。": "Selama mode ini aktif, target penurunan berat badan tidak bisa diatur, dan konsultasi AI akan memprioritaskan pemeliharaan serta nutrisi.",
+  "その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。": "Target tersebut terlalu berat bagi tubuh Anda. Target di bawah BMI 18.5 ({kg}kg) tidak dapat diatur.",
+  "妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。": "Target penurunan berat badan tidak bisa diatur selama masa kehamilan & menyusui. Saat ini, pemeliharaan dan nutrisi adalah prioritas utama.",
+  "そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。": "Laju tersebut terlalu cepat. Harap sesuaikan tanggal atau target agar tidak lebih dari 1kg per minggu.",
+  "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Lajunya agak cepat (sekitar {n}kg per minggu). Tetap perhatikan kondisi tubuh Anda saat menjalaninya.",
+  "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Ada perubahan besar dari sebelumnya ({prev}kg → {next}kg). Apakah nilai ini sudah benar?",
+  "入力し直す": "Masukkan ulang",
 };

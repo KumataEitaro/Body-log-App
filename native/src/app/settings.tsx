@@ -91,6 +91,8 @@ export default function SettingsScreen() {
   const [height, setHeight] = useState('170');
   const [age, setAge] = useState('30');
   const [life, setLife] = useState('1.3');
+  // G3: 妊娠・授乳フラグ。ONの間は減量目標の設定不可＋AI相談が維持・栄養最優先で答える
+  const [maternity, setMaternity] = useState(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [foods, setFoods] = useState<MyFoodLite[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -128,6 +130,7 @@ export default function SettingsScreen() {
       if (prof.height_cm != null) setHeight(String(prof.height_cm));
       if (prof.age != null) setAge(String(prof.age));
       if (prof.life_factor != null) setLife(String(prof.life_factor));
+      setMaternity(prof.maternity === true);   // 列が無い旧DBではundefined → false扱い
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -200,11 +203,16 @@ export default function SettingsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const { error } = await supabase.from('profiles').update({
+      const base = {
         display_name: name.trim(), sex,
         height_cm: Number(height) || 170, age: Number(age) || 30,
         life_factor: Number(life) || 1.3,
-      }).eq('id', uid);
+      };
+      // maternity列が無い旧DBでは列なしで再実行し、プロフィール保存自体は成立させる
+      let { error } = await supabase.from('profiles').update({ ...base, maternity }).eq('id', uid);
+      if (error && /maternity|column|schema/i.test(error.message)) {
+        ({ error } = await supabase.from('profiles').update(base).eq('id', uid));
+      }
       setMsg(error ? { ok: false, text: t('保存に失敗しました。もう一度お試しください。') } : { ok: true, text: t('保存しました。') });
     } finally { setBusy(false); }
   }
@@ -511,6 +519,14 @@ export default function SettingsScreen() {
           </View>
           <Text style={s.label}>{t('日常の活動量')}<Text style={{ fontWeight: '400' }}>{t('— 消費カロリーの計算に使います')}</Text></Text>
           <ActivityLevelPicker value={Number(life) || 1.375} onChange={(v) => setLife(String(v))} />
+          {/* G3: 妊娠・授乳フラグ。減量を促さないための安全ガード（収益より本人の安全を優先） */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.label, { marginTop: 0, marginBottom: 2 }]}>{t('妊娠中・授乳中')}</Text>
+              <Text style={s.note}>{t('ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。')}</Text>
+            </View>
+            <Switch value={maternity} onValueChange={setMaternity} trackColor={{ true: C.teal }} />
+          </View>
           <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>

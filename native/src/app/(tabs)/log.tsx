@@ -61,6 +61,7 @@ import { useReduceMotion, useCountUp } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
 import { setDayStatus } from '@/lib/dayStatus';
+import { confirmOutlierWeight } from '@/lib/guard';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -512,6 +513,10 @@ export default function LogScreen() {
     setSaving(true); setMsg(null);
     try {
       const items = parsed.items;   // setParsed(null)より前に控える（後段の学習で使う）
+      // G8: AI解析で体重が載っているときも外れ値を確かめる（「52.8」を「528」と読む事故を保存前に止める）
+      if (parsed.weight != null && !(await confirmOutlierWeight(latestWeight, Number(parsed.weight)))) {
+        return;   // トレイは残る。体重チップの×で外すか、値を直して再保存できる
+      }
       const res = await saveParsed(uid, parsed, stagedNote, viewDate);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
@@ -522,12 +527,17 @@ export default function LogScreen() {
         else await syncEntriesForDate(uid, viewDate);
       }
       const wasEdit = editingId != null;
+      // G2: 1回の食事が2,500kcal超のとき、保存後の一言だけを非審判の文言に差し替える
+      // （赤の超過表示や計算はいじらない。過食直後の罪悪感で記録をやめさせないための一点）
+      const savedKcal = items.length > 0 ? Math.round(sumItems(items).kcal) : 0;
       setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
       editingDateRef.current = null;
       await load();
       setMsg(delFailed
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
-        : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
+        : savedKcal > 2500
+          ? { ok: true, text: t('記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。') }
+          : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
 
       invalidateStreak();   // 🔥チップを最新化
       // よく食べる食品の検出（保存が成功したときだけ学習する）
@@ -545,6 +555,8 @@ export default function LogScreen() {
     // 入力は表示単位（kg/lb）。DBは常にkgで保存する
     const w = displayToKg(Number(wWeight), units.weight);
     if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: t('体重の値を確認してください。') }); return; }
+    // G8: 前回から±15%以上ずれた値は誤入力の可能性が高い。保存前に一度だけ確かめる
+    if (!(await confirmOutlierWeight(latestWeight, w))) return;
     setSaving(true);
     try {
       await supabase.from('logs').insert({

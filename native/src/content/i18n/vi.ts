@@ -1170,4 +1170,13 @@ export const VI: Record<string, string> = {
   "増量": "Tăng cơ",
   "ゆる維持": "Duy trì nhẹ nhàng",
   "減量": "Giảm cân",
+  "記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。": "Việc bạn ghi chép lại đã là một bước tiến lớn rồi. Ngày mai không cần phải cắt giảm quá mức đâu. Cứ bình thường là được nhé.",
+  "妊娠中・授乳中": "Đang mang thai / cho con bú",
+  "ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。": "Khi BẬT, bạn sẽ không thể đặt mục tiêu giảm cân, và tư vấn AI cũng sẽ ưu tiên hàng đầu cho việc duy trì và dinh dưỡng.",
+  "その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。": "Mục tiêu đó gây quá nhiều áp lực cho cơ thể. Không thể đặt mục tiêu dưới BMI 18.5 ({kg}kg).",
+  "妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。": "Không thể đặt mục tiêu giảm cân khi đang mang thai hoặc cho con bú. Hiện tại, việc duy trì và dinh dưỡng là ưu tiên hàng đầu.",
+  "そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。": "Tốc độ đó quá nhanh. Vui lòng điều chỉnh ngày hoặc mục tiêu để trong khoảng 1kg mỗi tuần.",
+  "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Tốc độ hơi nhanh một chút (khoảng {n}kg mỗi tuần). Hãy chú ý theo dõi thay đổi của cơ thể nhé.",
+  "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Có sự thay đổi lớn so với lần trước ({prev}kg → {next}kg). Giá trị này đã đúng chưa bạn?",
+  "入力し直す": "Nhập lại",
 };

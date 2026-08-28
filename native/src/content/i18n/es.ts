@@ -1254,4 +1254,13 @@ export const ES: Record<string, string> = {
   "増量": "Volumen",
   "ゆる維持": "Mantenimiento suave",
   "減量": "Definición",
+  "記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。": "El simple hecho de registrarlo ya es un gran paso. Mañana no hace falta que recortes de forma extrema. Todo estará bien si sigues como siempre.",
+  "妊娠中・授乳中": "Embarazo / Lactancia",
+  "ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。": "Mientras esté activado, no podrás establecer objetivos de pérdida de peso y las consultas de IA priorizarán el mantenimiento y la nutrición.",
+  "その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。": "Ese objetivo es demasiado exigente para tu cuerpo. No se puede establecer un objetivo por debajo de un IMC de 18.5 ({kg}kg).",
+  "妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。": "No se pueden establecer objetivos de pérdida de peso durante el embarazo o la lactancia. Ahora mismo, el mantenimiento y la nutrición son la máxima prioridad.",
+  "そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。": "Ese ritmo es demasiado rápido. Ajusta la fecha o el objetivo para que no supere 1kg por semana.",
+  "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Es un ritmo algo rápido (aprox. {n}kg por semana). Avanza con cuidado y presta atención a cómo te sientes.",
+  "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Ha cambiado mucho desde la última vez ({prev}kg → {next}kg). ¿Es correcto este valor?",
+  "入力し直す": "Volver a ingresar",
 };

@@ -1270,4 +1270,13 @@ export const EN: Record<string, string> = {
   "増量": "Bulk",
   "ゆる維持": "Easy Maintain",
   "減量": "Cut",
+  "記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。": "Logging this is already a big step. You don't need to cut back drastically tomorrow—staying on your usual track is just fine.",
+  "妊娠中・授乳中": "Pregnant / Breastfeeding",
+  "ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。": "While turned ON, weight loss goals will be disabled, and AI advice will prioritize maintenance and nutrition.",
+  "その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。": "That goal is too hard on your body. Targets below BMI 18.5 ({kg}kg) cannot be set.",
+  "妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。": "Weight loss goals cannot be set during pregnancy or breastfeeding. Right now, maintenance and nutrition are the top priority.",
+  "そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。": "That pace is too fast. Please adjust your date or goal so it stays under 1kg per week.",
+  "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "That's a slightly fast pace (about {n}kg per week). Pay attention to how you feel as you go.",
+  "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "That's a big change from last time ({prev}kg → {next}kg). Is this value correct?",
+  "入力し直す": "Re-enter",
 };
