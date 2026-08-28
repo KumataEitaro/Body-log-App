@@ -1110,4 +1110,8 @@ export const VI: Record<string, string> = {
   "週3日": "3 ngày/tuần",
   "週の約束": "Mục tiêu tuần",
   "自分で決めた週目標を4週連続で守った": "Hoàn thành mục tiêu tuần tự đặt ra trong 4 tuần liên tiếp",
+  "あなたの法則を、ぜんぶ手に入れる": "Sở hữu toàn bộ quy luật của riêng bạn",
+  "無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。": "Gói miễn phí chỉ xem được 3 ảnh mới nhất. Đăng ký gói Standard trở lên để mở khóa toàn bộ bộ sưu tập.",
+  "食べ方のクセまで見える、週間ダイジェスト": "Báo cáo tuần: Nhìn thấu thói quen ăn uống của bạn",
+  "1週間の食べ方をAIがまとめて言語化。プレミアムの詳細分析で、毎週のふりかえりが開きます。": "AI sẽ tổng hợp và phân tích thói quen ăn uống trong tuần của bạn bằng ngôn từ dễ hiểu. Đăng ký gói Premium để mở khóa phân tích chi tiết và xem lại mỗi tuần.",
 };

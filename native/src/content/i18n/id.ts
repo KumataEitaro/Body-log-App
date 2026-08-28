@@ -1110,4 +1110,8 @@ export const ID: Record<string, string> = {
   "週3日": "3 hari seminggu",
   "週の約束": "Komitmen Mingguan",
   "自分で決めた週目標を4週連続で守った": "Berhasil menepati target mingguan pilihanmu selama 4 minggu berturut-turut",
+  "あなたの法則を、ぜんぶ手に入れる": "Dapatkan semua formula yang cocok untukmu",
+  "無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。": "Paket gratis hanya menampilkan 3 foto terbaru. Buka semua koleksi dengan paket Standar atau lebih tinggi.",
+  "食べ方のクセまで見える、週間ダイジェスト": "Rangkuman Mingguan, pahami kebiasaan makanmu",
+  "1週間の食べ方をAIがまとめて言語化。プレミアムの詳細分析で、毎週のふりかえりが開きます。": "AI merangkum dan menjelaskan pola makanmu selama seminggu. Buka evaluasi mingguan dengan analisis detail Premium.",
 };

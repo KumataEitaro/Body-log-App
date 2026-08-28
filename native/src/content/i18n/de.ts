@@ -1110,4 +1110,8 @@ export const DE: Record<string, string> = {
   "週3日": "3 Tage pro Woche",
   "週の約束": "Wochenziel",
   "自分で決めた週目標を4週連続で守った": "Wochenziel 4 Wochen in Folge erreicht",
+  "あなたの法則を、ぜんぶ手に入れる": "Hol dir alle deine Regeln",
+  "無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。": "Der kostenlose Tarif zeigt nur die letzten 3 Bilder. Ab Standard wird das gesamte Lexikon freigeschaltet.",
+  "食べ方のクセまで見える、週間ダイジェスト": "Wochen-Digest: Erkenne sogar deine Essgewohnheiten",
+  "1週間の食べ方をAIがまとめて言語化。プレミアムの詳細分析で、毎週のふりかえりが開きます。": "Die KI fasst deine Essgewohnheiten der Woche in Worte. Mit der Premium-Detailanalyse wird dein wöchentlicher Rückblick freigeschaltet.",
 };

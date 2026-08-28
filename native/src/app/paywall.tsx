@@ -21,6 +21,24 @@ const PERIODS = [
   { key: 'annual', label: '1年' },
 ] as const;
 
+// src（どの機能から来たか）→ 文脈見出し。MFP式: 使おうとした瞬間（moment of intent）に
+// その機能の言葉で誘うほうが汎用の売り文句より効くため、王冠からの遷移はsrcを付けて来る。
+// 未知のsrcでも壊れないよう、マップに無ければ既定（汎用）文言に落ちる
+const SRC_COPY = (): Record<string, { h: string; lead: string }> => ({
+  onboarding: {
+    h: t('準備ができました！'),
+    lead: t('AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。'),
+  },
+  laws: {
+    h: t('あなたの法則を、ぜんぶ手に入れる'),
+    lead: t('無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。'),
+  },
+  digest: {
+    h: t('食べ方のクセまで見える、週間ダイジェスト'),
+    lead: t('1週間の食べ方をAIがまとめて言語化。プレミアムの詳細分析で、毎週のふりかえりが開きます。'),
+  },
+});
+
 // 各プランの訴求（機能差はサーバーのplan_limitsが正本。ここは表示のみ）
 const PLAN_INFO: { plan: Plan; name: string; features: string[] }[] = [
   { plan: 'lite', name: 'ライト', features: ['広告なし'] },
@@ -99,13 +117,22 @@ export default function PaywallScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
       <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.h}>{fromOnboarding ? t('準備ができました！') : t('プラン')}</Text>
-        <Text style={s.lead}>
-          {goalLine}
-          {fromOnboarding
-            ? t('AIが毎日の食事を数えて、あなたの代わりに考えます。まずは無料で全機能をどうぞ。')
-            : t('記録・グラフはずっと無料。AIをもっと使いたくなったら。')}
-        </Text>
+        {(() => {
+          // 文脈見出し（srcが未知・未指定なら従来の汎用文言）
+          const copy = SRC_COPY()[String(src ?? '')] ?? {
+            h: t('プラン'),
+            lead: t('記録・グラフはずっと無料。AIをもっと使いたくなったら。'),
+          };
+          return (
+            <>
+              <Text style={s.h}>{copy.h}</Text>
+              <Text style={s.lead}>
+                {goalLine}
+                {copy.lead}
+              </Text>
+            </>
+          );
+        })()}
 
         {!purchasesAvailable() || (offers !== null && offers.length === 0) ? (
           <View style={s.pending}>
