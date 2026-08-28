@@ -8,7 +8,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, Sparkles, SquarePen, type LucideIcon } from 'lucide-react-native';
+import * as Crypto from 'expo-crypto';
 import { Keyboard } from 'react-native';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
@@ -28,6 +29,16 @@ import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
+
+// 相談セッションのID（UUID v4）。expo-cryptoが使えない環境（jest等）ではMath.random版に
+// フォールバックする（秘匿用途ではなく「今日はじめて見たIDか」の識別にしか使わないため十分）
+function newSessionId(): string {
+  try { return Crypto.randomUUID(); } catch { /* フォールバックへ */ }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 // 過去の相談は端末に保存して日付で振り返れるようにする
 type HistEntry = { d: string; role: 'user' | 'ai'; text: string };
@@ -78,6 +89,31 @@ export default function CoachScreen() {
   const [histQ, setHistQ] = useState('');
   const [hist, setHist] = useState<HistEntry[]>([]);
 
+  // セッション制: 「新しい相談を始める」から次に始めるまでが1セッション（使用回数はセッション開始時のみ1消費）。
+  // IDは端末生成のUUID。永続化しない＝アプリ再起動で自然に新セッションになる
+  const sessionIdRef = useRef<string>(newSessionId());
+  function newSession() {
+    sessionIdRef.current = newSessionId();
+    setMsgs([]);
+    setInput('');
+  }
+
+  // 制約プロフィール（profiles.constraints_note）が未設定の人にだけ「前提を設定」導線を見せる。
+  // 列が無い旧DB（migration-22未適用）ではエラー → 保存できない導線を出さないためリンクも出さない
+  const [hasConstraints, setHasConstraints] = useState(true);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const { data, error } = await supabase.from('profiles').select('constraints_note').eq('id', uid).maybeSingle();
+      if (!alive || error) return;
+      setHasConstraints(!!String((data as { constraints_note?: string | null } | null)?.constraints_note ?? '').trim());
+    })();
+    return () => { alive = false; };
+  }, []));
+
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }, [msgs, busy]);
@@ -127,7 +163,7 @@ export default function CoachScreen() {
     setBusy(true);
     try {
       const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string }>(
-        '/api/coach', { question, history, lang: apiLang() });
+        '/api/coach', { question, history, lang: apiLang(), sessionId: sessionIdRef.current });
       if (!ok || !json?.ok || !json.answer) {
         setMsgs((m) => [...m, { role: 'ai', text: json?.error || t('うまく答えられませんでした。もう一度お試しください。') }]);
         return;
@@ -323,7 +359,16 @@ export default function CoachScreen() {
             <ArrowUp color="#fff" size={16} strokeWidth={3} />
           </Pressable>
         </View>
-        <Text style={s.disclaimer}>{t('医療的な診断はできません。深刻な不調が続く場合は医療機関へ。')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Text style={[s.disclaimer, { flex: 1 }]}>{t('医療的な診断はできません。深刻な不調が続く場合は医療機関へ。')}</Text>
+          {/* 制約プロフィール未設定のときだけの導線（プロフィール編集シートへディープリンク） */}
+          {!hasConstraints && (
+            <Pressable hitSlop={8}
+                       onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}>
+              <Text style={s.presetLink}>{t('前提を設定（アレルギー・苦手など）')}</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
       <StatusBarMask />
       <HeaderGear />
@@ -331,6 +376,13 @@ export default function CoachScreen() {
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
         <History size={16} color={C.sub} />
       </Pressable>
+      {/* ＋新しい相談: sessionId再生成＋画面クリア（会話中だけ表示。履歴ボタンと同じ流儀） */}
+      {!empty && (
+        <Pressable style={[s.histBtn, { top: insets.top + 8, right: 92 }]} accessibilityLabel={t('＋新しい相談')}
+                   onPress={() => { Keyboard.dismiss(); newSession(); }} hitSlop={10}>
+          <SquarePen size={16} color={C.sub} />
+        </Pressable>
+      )}
 
       {/* ===== 相談履歴モーダル: 日付グループ＋日付/キーワード検索 ===== */}
       <Modal visible={histOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHistOpen(false)}>
@@ -419,6 +471,7 @@ const s = StyleSheet.create({
   sendInline: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 11, color: C.faint, marginTop: 5 },
+  presetLink: { fontSize: 11, color: C.teal, fontWeight: '800', marginTop: 5 },
   pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 10, marginLeft: 2 },
   histBtn: {
     position: 'absolute', right: 54, zIndex: 30,

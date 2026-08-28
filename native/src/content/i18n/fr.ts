@@ -1179,4 +1179,9 @@ export const FR: Record<string, string> = {
   "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Le rythme est un peu rapide (environ {n}kg par semaine). Restez à l'écoute de votre corps.",
   "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Grand changement depuis la dernière fois ({prev}kg → {next}kg). Cette valeur est-elle correcte ?",
   "入力し直す": "Corriger",
+  "前提を設定（アレルギー・苦手など）": "Définir les préférences (allergies, aversions, etc.)",
+  "＋新しい相談": "+ Nouvelle consultation",
+  "AIに伝えておく前提（アレルギー・苦手・宗教・予算など）": "Préférences pour l'IA (allergies, aversions, religion, budget, etc.)",
+  "AI相談と献立提案は、ここに書いた前提を毎回守ります。": "Les conseils de l'IA et les propositions de menus respecteront toujours les règles définies ici.",
+  "例: えびアレルギー。豚肉は食べない。パクチー苦手。食費は1日1,000円まで。": "Ex. : Allergique aux crevettes. Pas de porc. N'aime pas la coriandre. Budget repas : max 1 000円 par jour.",
 };

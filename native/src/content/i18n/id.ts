@@ -1179,4 +1179,9 @@ export const ID: Record<string, string> = {
   "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Lajunya agak cepat (sekitar {n}kg per minggu). Tetap perhatikan kondisi tubuh Anda saat menjalaninya.",
   "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Ada perubahan besar dari sebelumnya ({prev}kg → {next}kg). Apakah nilai ini sudah benar?",
   "入力し直す": "Masukkan ulang",
+  "前提を設定（アレルギー・苦手など）": "Atur preferensi (Alergi, pantangan, dll.)",
+  "＋新しい相談": "＋ Konsultasi Baru",
+  "AIに伝えておく前提（アレルギー・苦手・宗教・予算など）": "Preferensi untuk AI (Alergi, pantangan, agama, anggaran, dll.)",
+  "AI相談と献立提案は、ここに書いた前提を毎回守ります。": "Konsultasi AI dan rekomendasi menu akan selalu mengikuti preferensi yang ditulis di sini.",
+  "例: えびアレルギー。豚肉は食べない。パクチー苦手。食費は1日1,000円まで。": "Cth: Alergi udang. Tidak makan babi. Tidak suka daun ketumbar. Anggaran makan maks 1.000 yen/hari.",
 };

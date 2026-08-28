@@ -93,6 +93,9 @@ export default function SettingsScreen() {
   const [life, setLife] = useState('1.3');
   // G3: 妊娠・授乳フラグ。ONの間は減量目標の設定不可＋AI相談が維持・栄養最優先で答える
   const [maternity, setMaternity] = useState(false);
+  // 制約プロフィール: AIに毎回伝える恒常的な前提（アレルギー・宗教・苦手・予算など）。
+  // 自由記述1カラム（profiles.constraints_note・migration-22）＝構造化しないことで入力障壁を下げる
+  const [constraintsNote, setConstraintsNote] = useState('');
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [foods, setFoods] = useState<MyFoodLite[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -131,6 +134,7 @@ export default function SettingsScreen() {
       if (prof.age != null) setAge(String(prof.age));
       if (prof.life_factor != null) setLife(String(prof.life_factor));
       setMaternity(prof.maternity === true);   // 列が無い旧DBではundefined → false扱い
+      setConstraintsNote(prof.constraints_note ?? '');  // 列が無い旧DBではundefined → 空欄
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -208,9 +212,15 @@ export default function SettingsScreen() {
         height_cm: Number(height) || 170, age: Number(age) || 30,
         life_factor: Number(life) || 1.3,
       };
-      // maternity列が無い旧DBでは列なしで再実行し、プロフィール保存自体は成立させる
-      let { error } = await supabase.from('profiles').update({ ...base, maternity }).eq('id', uid);
+      // maternity/constraints_note列が無い旧DBでは列を減らして再実行し、プロフィール保存自体は成立させる
+      let { error } = await supabase.from('profiles')
+        .update({ ...base, maternity, constraints_note: constraintsNote.trim() || null }).eq('id', uid);
+      if (error && /constraints_note|maternity|column|schema/i.test(error.message)) {
+        // migration-22未適用: constraints_noteを外して再実行
+        ({ error } = await supabase.from('profiles').update({ ...base, maternity }).eq('id', uid));
+      }
       if (error && /maternity|column|schema/i.test(error.message)) {
+        // migration-21も未適用: 基本項目だけで再実行
         ({ error } = await supabase.from('profiles').update(base).eq('id', uid));
       }
       setMsg(error ? { ok: false, text: t('保存に失敗しました。もう一度お試しください。') } : { ok: true, text: t('保存しました。') });
@@ -527,6 +537,15 @@ export default function SettingsScreen() {
             </View>
             <Switch value={maternity} onValueChange={setMaternity} trackColor={{ true: C.teal }} />
           </View>
+          {/* 制約プロフィール: AI相談・献立提案が毎回尊重する「私の前提」。自分の言葉で書けばよい */}
+          <Text style={[s.label, { marginTop: 16 }]}>{t('AIに伝えておく前提（アレルギー・苦手・宗教・予算など）')}</Text>
+          <Text style={[s.note, { marginBottom: 4 }]}>{t('AI相談と献立提案は、ここに書いた前提を毎回守ります。')}</Text>
+          <TextInput
+            style={[s.input, { minHeight: 88, textAlignVertical: 'top' }]} multiline
+            value={constraintsNote} onChangeText={setConstraintsNote}
+            placeholder={t('例: えびアレルギー。豚肉は食べない。パクチー苦手。食費は1日1,000円まで。')}
+            placeholderTextColor={C.faint}
+          />
           <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>

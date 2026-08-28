@@ -1179,4 +1179,9 @@ export const VI: Record<string, string> = {
   "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Tốc độ hơi nhanh một chút (khoảng {n}kg mỗi tuần). Hãy chú ý theo dõi thay đổi của cơ thể nhé.",
   "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Có sự thay đổi lớn so với lần trước ({prev}kg → {next}kg). Giá trị này đã đúng chưa bạn?",
   "入力し直す": "Nhập lại",
+  "前提を設定（アレルギー・苦手など）": "Cài đặt lưu ý (dị ứng, món không thích...)",
+  "＋新しい相談": "＋Tư vấn mới",
+  "AIに伝えておく前提（アレルギー・苦手・宗教・予算など）": "Lưu ý cho AI (dị ứng, món không thích, tôn giáo, ngân sách...)",
+  "AI相談と献立提案は、ここに書いた前提を毎回守ります。": "AI sẽ luôn tuân thủ các lưu ý này khi tư vấn và gợi ý thực đơn.",
+  "例: えびアレルギー。豚肉は食べない。パクチー苦手。食費は1日1,000円まで。": "Ví dụ: Dị ứng tôm. Không ăn thịt heo. Không thích rau mùi. Tiền ăn tối đa 1,000 yên/ngày.",
 };
