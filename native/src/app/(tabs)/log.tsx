@@ -257,7 +257,12 @@ export default function LogScreen() {
   const left = goalKcal - eaten;
   const heroLeft = useCountUp(left);   // 保存の瞬間、残量が数え下がって見える
   // 係数が未設定の間は、選んだ目的の既定値を使う（未選択なら従来の既定 P2.0/F0.9）
-  const purposePreset = purposeOf(usePurpose());
+  const purposeKey = usePurpose();
+  const purposePreset = purposeOf(purposeKey);
+  // 増量目的では残量の意味が反転する: 失敗は「食べすぎ」ではなく「食べ忘れ」。
+  // 残っていても責め色（coral）にせず「まだやることがある」アンバー、
+  // 食べきったら減量の超過赤とは逆の達成表現（teal）にする
+  const isBulk = purposeKey === 'bulk';
   const macros = profile ? macroTargets(
     weightForBmr, goalKcal,
     goal?.protein_per_kg ?? purposePreset?.p,
@@ -798,12 +803,18 @@ export default function LogScreen() {
         {vis('hero') && profile && (
           <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
             <MinusBadge editing={editing} onPress={() => cards.hide('hero')} />
-            <Text style={s.heroL}>{left < 0 ? t('オーバー') : t('あと食べられる')}{plan ? t('（計画）') : t('（維持）')}</Text>
-            <Text style={[s.heroN, left < 0 && { color: C.coral }]}>
+            <Text style={s.heroL}>
+              {isBulk
+                // 増量: 残量はタスク（あと食べる）、使い切りは達成。減量の「オーバー赤」を出さない
+                ? (left > 0 ? t('増量ノルマ・あと食べる') : t('今日のぶんは食べきった 🎉'))
+                : (left < 0 ? t('オーバー') : t('あと食べられる'))}
+              {plan ? t('（計画）') : t('（維持）')}
+            </Text>
+            <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : left < 0 && { color: C.coral }]}>
               {Math.abs(heroLeft).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
             <View style={[s.hline, { flexDirection: 'row' }]}>
-              <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: C.coral }]} />
+              <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: isBulk ? C.teal : C.coral }]} />
               <GhostPair eaten={eaten} others={split('kcal').others} focus={split('kcal').focus}
                          target={goalKcal} color={C.calorieBar} pulse={pulse} />
             </View>
@@ -820,6 +831,8 @@ export default function LogScreen() {
                   [PFC_LABEL.c, 'C', eatenC, macros.c, pfcColors().c, 'c'],
                 ] as const).map(([ja, ab, eat, tgt, col, key]) => {
                   const over = eat > tgt;
+                  // 増量ではPが主役: 埋まるのは良いこと（超過を赤にしない）＋達成率を小さく強調
+                  const bulkP = isBulk && key === 'p';
                   // 食事ごとの寄与（バーに区切り線を引き、どの食事でどれだけ摂ったか見えるように）
                   const segs = dayLogs
                     .filter((l) => l.kcal != null && Number(l[key] ?? 0) > 0)
@@ -834,16 +847,22 @@ export default function LogScreen() {
                         {segs.length > 0 && segs.length <= 5 ? segs.map((w, i) => (
                           <View key={i} style={{
                             width: `${w * scale}%`, height: '100%',
-                            backgroundColor: over ? C.coral : col,
+                            backgroundColor: over ? (bulkP ? col : C.coral) : col,
                             borderRightWidth: i < segs.length - 1 ? 1.5 : 0, borderRightColor: '#ffffff',
                           }} />
                         )) : (
-                          <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? C.coral : col }]} />
+                          <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? (bulkP ? col : C.coral) : col }]} />
                         )}
                         <GhostPair eaten={eat} others={split(key).others} focus={split(key).focus}
                                    target={tgt} color={col} pulse={pulse} />
                       </View>
-                      <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
+                      {bulkP ? (
+                        <Text style={[s.pfcT, { fontWeight: '800', color: eat >= tgt ? C.teal : C.ink }]}>
+                          {t('{n}%達成', { n: Math.min(999, Math.round((eat / Math.max(1, tgt)) * 100)) })}
+                        </Text>
+                      ) : (
+                        <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
+                      )}
                     </Pressable>
                   );
                 })}
