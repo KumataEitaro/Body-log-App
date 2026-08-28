@@ -5,8 +5,10 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, ScanBarcode } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
@@ -323,6 +325,46 @@ export default function LogScreen() {
       if (list.length >= 4 - photos.length) break;
     }
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
+  }
+
+  // ===== バーコード→公式DB（Open Food Facts）: ヒットで品目をトレイに直接積む =====
+  // 端末→OFF直の照会なのでAI枠は消費しない。未ヒットは成分表示写真（AI読み取り）へ案内する
+  const [scanOpen, setScanOpen] = useState(false);
+
+  async function scannedBarcode(jan: string) {
+    const pid = ++pendingSeq.current;
+    setPendingTexts((p) => [...p, { id: pid, text: t('バーコードを照会中…') }]);
+    try {
+      const fd = await lookupBarcode(jan);
+      if (!fd) {
+        // 未ヒット: 既存のカメラ撮影（成分表示→AI解析）へ1タップで進める
+        Alert.alert(
+          t('データベースに見つかりませんでした。成分表示の写真を撮ると正確に読み取れます。'), '',
+          [
+            { text: t('成分表示を撮る'), onPress: () => takePhoto() },
+            { text: t('キャンセル'), style: 'cancel' },
+          ],
+        );
+        return;
+      }
+      // 1品として投入。qtyは「1個」既定・内容量が取れたら1個ぶんのkcalを計算、
+      // 取れなければ100gあたり（qty=100g。分量編集のg再計算がそのまま効く）
+      const name = fd.brand ? `${fd.brand} ${fd.name}` : fd.name;
+      const pkg = packageNutrition(fd);
+      const item: FoodItem = pkg
+        ? { name, qty: t('1個（{g}g）', { g: pkg.g }), kcal: pkg.kcal, p: pkg.p, f: pkg.f, c: pkg.c }
+        : fd.serving && fd.serving.p != null && fd.serving.f != null && fd.serving.c != null
+          ? { name, qty: fd.serving.size ? t('1個（{size}）', { size: fd.serving.size }) : t('1個'), kcal: fd.serving.kcal, p: fd.serving.p, f: fd.serving.f, c: fd.serving.c }
+          : { name, qty: '100g', kcal: fd.per100g.kcal, p: fd.per100g.p, f: fd.per100g.f, c: fd.per100g.c };
+      setParsed((p2) => ({
+        items: [...(p2?.items ?? []), item],
+        weight: p2?.weight ?? null, waist: p2?.waist ?? null,
+        ex: p2?.ex ?? null, adj: p2?.adj ?? 0, mood: p2?.mood ?? null,
+      }));
+      setMsg({ ok: true, text: t('公式データベースの値でトレイに入れました。量を調整して✓保存してください。') });
+    } finally {
+      setPendingTexts((p) => p.filter((x) => x.id !== pid));
+    }
   }
 
   // ===== ボトムドックからの送信: AI解析→トレイに積む（保存は✓保存で確定・連投可） =====
@@ -1305,6 +1347,8 @@ export default function LogScreen() {
           />
           <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
+          {/* バーコード→公式DB（ヒットすればAI枠を使わずトレイへ直行） */}
+          <DockIconButton Icon={ScanBarcode} onPress={() => setScanOpen(true)} />
           {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
               「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
           {profile != null && (
@@ -1349,6 +1393,8 @@ export default function LogScreen() {
         onClose={() => setFoodDraft(null)}
         onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に追加しました。下のチップから1タップで足せます。') }); }}
       />
+      {/* バーコードスキャナ（読み取り成功で即クローズ→公式DB照会→トレイ投入） */}
+      <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={scannedBarcode} />
       {/* おかえりフロー: 発火判定はコンポーネント内で完結（マウント直後のみ→既存Modalと競合しない） */}
       <ComebackSheet onSaved={load} />
       <StatusBarMask />

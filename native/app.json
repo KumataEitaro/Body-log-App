@@ -53,6 +53,13 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "食事の撮影と、パッケージのバーコードを読み取って公式データベースから栄養成分を取得するために使用します。",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",

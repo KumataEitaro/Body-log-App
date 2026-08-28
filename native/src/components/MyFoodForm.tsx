@@ -7,13 +7,15 @@ import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Sparkles, Camera, Salad } from 'lucide-react-native';
+import { Sparkles, Camera, Salad, ScanBarcode } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { apiLang } from '@/lib/i18n';
 import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 
 export type MyFoodDraft = {
   name: string;
@@ -37,6 +39,8 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);   // バーコードスキャナの表示
+  const [dbMiss, setDbMiss] = useState(false);       // DB未ヒット時に写真経路への案内ボタンを出す
 
   // AI解析の結果（items先頭 or 合計）でフォームを埋める共通処理
   type ParseResult = { items?: { name?: string; qty?: string; kcal?: number; p?: number; f?: number; c?: number }[] };
@@ -102,6 +106,33 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
     ]);
   }
 
+  // バーコード（第4の方式）: 公式DB（Open Food Facts）ヒットで名前/kcal/PFCを自動充填。
+  // 端末→OFF直の照会なのでAI枠は消費しない。未ヒットは既存の成分表示写真経路へ案内する。
+  async function fromBarcode(jan: string) {
+    setAiBusy(true); setMsg(null); setDbMiss(false);
+    try {
+      const fd = await lookupBarcode(jan);
+      if (!fd) {
+        setDbMiss(true);
+        setMsg({ ok: false, text: t('データベースに見つかりませんでした。成分表示の写真を撮ると正確に読み取れます。') });
+        return;
+      }
+      // 100gあたりを基準として充填（単位も100gにして量の意味を揃える）
+      setName(fd.brand ? `${fd.brand} ${fd.name}` : fd.name);
+      setUnit('100g');
+      setKcal(String(Math.round(fd.per100g.kcal)));
+      setP(String(fd.per100g.p)); setF(String(fd.per100g.f)); setC(String(fd.per100g.c));
+      // 内容量が取れたら1個ぶんの換算候補も添える（数値は自由に直せる）
+      const pkg = packageNutrition(fd);
+      setMsg({
+        ok: true,
+        text: pkg
+          ? t('公式データベースの値（100gあたり）を入れました。1個（{g}g）なら約{kcal}kcalです。量の単位はいつでも直せます。', { g: pkg.g, kcal: Math.round(pkg.kcal) })
+          : t('公式データベースの値（100gあたり）を入れました。量の単位はいつでも直せます。'),
+      });
+    } finally { setAiBusy(false); }
+  }
+
   // 開くたびに初期値を入れ直す（前回の入力が残らないように）
   useEffect(() => {
     if (!visible) return;
@@ -112,6 +143,7 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
     setF(draft?.f != null ? String(Math.round(draft.f)) : '');
     setC(draft?.c != null ? String(Math.round(draft.c)) : '');
     setMsg(null);
+    setDbMiss(false);
   }, [visible, draft]);
 
   async function submit() {
@@ -203,6 +235,13 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
                 <Text style={s.aiBtnT}>{t('写真から読み取る')}</Text>
               </Pressable>
             </View>
+            {/* 第4の方式: バーコード→公式DB。ヒットすればAI枠を使わない */}
+            <View style={s.aiRow}>
+              <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={() => { setMsg(null); setScanOpen(true); }} disabled={aiBusy}>
+                <ScanBarcode size={15} color={C.teal} />
+                <Text style={s.aiBtnT}>{t('バーコードで探す')}</Text>
+              </Pressable>
+            </View>
             <Text style={s.aiHint}>{t('成分表示のラベルを撮ると表記どおりの数値が入ります。下の欄はいつでも手で直せます。')}</Text>
 
             <Text style={s.label}>{t('カロリー（kcal）')}</Text>
@@ -228,6 +267,13 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
             </View>
 
             {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+            {/* DB未ヒット時: 既存の成分表示写真経路（AI読み取り）へワンタップで進める */}
+            {dbMiss && (
+              <Pressable style={[s.aiBtn, { marginTop: 8 }]} onPress={() => { setDbMiss(false); pickPhotoSource(); }}>
+                <Camera size={15} color={C.teal} />
+                <Text style={s.aiBtnT}>{t('成分表示を写真で読み取る')}</Text>
+              </Pressable>
+            )}
 
             <OptionButton style={{ marginTop: 18 }} label={t('登録する')} onPress={submit} busy={busy} />
             <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('キャンセル')} onPress={onClose} />
@@ -235,6 +281,8 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+      {/* バーコードスキャナ（読み取り成功で即クローズ→公式DB照会） */}
+      <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={fromBarcode} />
     </Modal>
   );
 }
