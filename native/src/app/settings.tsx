@@ -29,6 +29,7 @@ import { apiPost } from '@/lib/api';
 import { C } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
+import { WEEK_GOAL_KEY } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
@@ -141,6 +142,19 @@ export default function SettingsScreen() {
   const [avatarOpen, setAvatarOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
+
+  // 記録の週目標（ソフト週目標）。既定は「毎日」=現行と同じ意味なので、
+  // 何もしない人の体験は一切変わらない。値は実績ページのバッジ判定と共有する
+  const [weekGoal, setWeekGoal] = useState<'7' | '5' | '4' | '3'>('7');
+  useEffect(() => {
+    AsyncStorage.getItem(WEEK_GOAL_KEY).then((v) => {
+      if (v === '7' || v === '5' || v === '4' || v === '3') setWeekGoal(v);
+    }).catch(() => {});
+  }, []);
+  function changeWeekGoal(v: '7' | '5' | '4' | '3') {
+    setWeekGoal(v);
+    AsyncStorage.setItem(WEEK_GOAL_KEY, v).catch(() => {});
+  }
 
   // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
   const [remMode, setRemMode] = useState<DailyReminderMode>('off');
@@ -331,6 +345,21 @@ export default function SettingsScreen() {
         <Row icon={<Target color={C.teal} size={19} />} label={t('体重の目標')} sub={t('目標日・目標体重・PFC詳細')} onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
         <Row icon={<Dumbbell color={C.teal} size={19} />} label={t('運動の目標')} sub={t('週の運動習慣・種目ごとの目標重量（RM換算）')} onPress={() => openSheet('goalT')} />
+        <View style={s.sep} />
+        {/* ソフト週目標: 「毎日」を強いない自己契約。達成の表示は実績ページの「今週」ブロック */}
+        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={s.notifLabel}>{t('記録の週目標')}</Text>
+          <Text style={[s.notifSub, { marginBottom: 10 }]}>{t('毎日じゃなくていい。自分で決めたペースを守れたら、それは成功です。')}</Text>
+          <SegmentedControl
+            options={[
+              { key: '7', label: t('毎日') },
+              { key: '5', label: t('週5日') },
+              { key: '4', label: t('週4日') },
+              { key: '3', label: t('週3日') },
+            ]}
+            value={weekGoal} onChange={changeWeekGoal}
+          />
+        </View>
       </View>
 
       {/* 見た目（テーマカラー・PFCの色） */}
