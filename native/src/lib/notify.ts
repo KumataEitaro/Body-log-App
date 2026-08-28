@@ -1,4 +1,5 @@
-// ローカル通知（リマインダー）: 記録リマインダー・週1体写真(日曜19:00)・チートデイ前日(20:00)
+// ローカル通知（リマインダー）: 記録リマインダー・週1体写真(日曜19:00)・チートデイ前日(20:00)・
+// 食間リマインド(増量向け・最後の食事から5時間後)
 // Expo Goでは動作が制限されるため全て安全に失敗する（TestFlight/dev clientで完全動作）
 //
 // 記録リマインダーは3モード:
@@ -12,12 +13,22 @@ import * as Notifications from 'expo-notifications';
 import { t } from './i18n';
 import { todayJST } from './calc';
 import { supabase } from './supabase';
+// purpose→notifyの依存は一方向（purposeはnotifyをimportしない）なので循環しない。
+// sync.ts→notify.tsの既存依存もそのまま（notifyからsyncはimportしない）
+import { getPurpose } from './purpose';
 
 const IDS_KEY = 'bl-notif-ids';         // { daily?: string; weekly?: string }
 const SMART_KEY = 'bl-notif-smart-ids'; // { 'YYYY-MM-DD': notificationId }
 const MODE_KEY = 'bl-notif-daily-mode'; // 'off' | 'smart' | 'always'
 const TIME_KEY = 'bl-notif-daily-time'; // 'HH:00'
 const SMART_HORIZON = 14;               // smartで先積みする日数
+const GAP_PREF_KEY = 'bl-notif-gap';    // 食間リマインド設定 '1' | '0'
+const GAP_ID_KEY = 'bl-notif-gap-id';   // 予約中の食間通知ID（予約し直す前にキャンセルする）
+
+// 記録リマインダーのアクションボタン（iOSの長押し/引き下げで出る）
+const DAILY_CATEGORY = 'bl-daily';
+const ACTION_LATER_2H = 'bl-later-2h';     // あとで（2時間後）
+const ACTION_SKIP_TODAY = 'bl-skip-today'; // 今日は聞かないで
 
 export type DailyReminderMode = 'off' | 'smart' | 'always';
 
@@ -106,7 +117,7 @@ export async function applyDailyReminder(): Promise<boolean> {
   try {
     if (mode === 'always') {
       const id = await Notifications.scheduleNotificationAsync({
-        content: { ...REMINDER_COPY()[0], data: { url: 'bodylog://log?quick=1' } },
+        content: { ...REMINDER_COPY()[0], data: { url: 'bodylog://log?quick=1' }, categoryIdentifier: DAILY_CATEGORY },
         // v57からトリガーはtype必須（旧形式{hour,minute,repeats}は例外を投げる）
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute: 0 },
       });
@@ -125,7 +136,7 @@ export async function applyDailyReminder(): Promise<boolean> {
       if (i === 0 && skipToday) continue;                   // 今日はもう記録済み
       const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const id = await Notifications.scheduleNotificationAsync({
-        content: { ...copies[i % copies.length], data: { url: 'bodylog://log?quick=1' } },
+        content: { ...copies[i % copies.length], data: { url: 'bodylog://log?quick=1' }, categoryIdentifier: DAILY_CATEGORY },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
       });
       map[dateKey] = id;
@@ -184,10 +195,97 @@ export async function scheduleCheatDayEve(dateStr: string): Promise<void> {
   } catch { /* Expo Go等では黙って諦める */ }
 }
 
+// ===== 食間リマインド（増量向け・B-3） =====
+// 増量の失敗は「食べ過ぎ」ではなく「食べ忘れ」。食事保存のたびに5時間後の単発を
+// 予約し直す（＝食べている限り鳴らない・空いたときだけ鳴る）。呼び出し元はlib/sync
+
+/** 食間リマインドの設定を読む（既定はOFF） */
+export async function getMealGapEnabled(): Promise<boolean> {
+  try { return (await AsyncStorage.getItem(GAP_PREF_KEY)) === '1'; } catch { return false; }
+}
+
+/** 予約中の食間通知を取り消す（設定OFF時・予約し直しの前に呼ぶ） */
+export async function cancelMealGapReminder(): Promise<void> {
+  try {
+    const id = await AsyncStorage.getItem(GAP_ID_KEY);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      await AsyncStorage.removeItem(GAP_ID_KEY).catch(() => {});
+    }
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
+/** 最後の食事から5時間後に食間リマインドを予約し直す。
+ *  lastMealAt=その日の最後の食事時刻（sync側が渡す）。同じ食事なら同じ着地時刻に
+ *  なるので、体重だけ保存した再同期などで呼ばれてもタイマーは延びない */
+export async function rescheduleMealGapReminder(lastMealAt: Date): Promise<void> {
+  try {
+    // 前回分を必ず消してから判定する（OFFや目的変更で「消すだけ」になるケースも正しく動く）
+    await cancelMealGapReminder();
+    if (!(await getMealGapEnabled())) return;
+    if (getPurpose() !== 'bulk') return;            // 増量目的の人だけ（減量中に「食べろ」は逆効果）
+    const cur = await Notifications.getPermissionsAsync();
+    if (!cur.granted) return;
+    const d = new Date(lastMealAt.getTime() + 5 * 3600000);
+    if (d.getTime() <= Date.now()) return;          // 着地がもう過去（古い食事での再同期）
+    // 静音時間: 21:30以降〜翌7:00前に着地するなら鳴らさない（就寝を邪魔しない）
+    const mins = d.getHours() * 60 + d.getMinutes();
+    if (mins >= 21 * 60 + 30 || mins < 7 * 60) return;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: t('そろそろ補給の時間です'),
+        body: t('食間が5時間あきました。シェイク1杯でも立派な1食です。'),
+        data: { url: 'bodylog://log?quick=1' },     // タップでクイック入力へ（既存ルーティングが処理）
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
+    });
+    await AsyncStorage.setItem(GAP_ID_KEY, id).catch(() => {});
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
+// ===== 記録リマインダーのアクションボタン（B-10） =====
+
+/** 記録リマインダー用の通知カテゴリを登録する。
+ *  ボタン文言は登録時の言語で固定されるため、言語変更時にも再登録が必要
+ *  （reregisterAllから呼ばれることで両方カバーする） */
+export async function registerReminderCategory(): Promise<void> {
+  try {
+    await Notifications.setNotificationCategoryAsync(DAILY_CATEGORY, [
+      { identifier: ACTION_LATER_2H, buttonTitle: t('あとで（2時間後）') },
+      { identifier: ACTION_SKIP_TODAY, buttonTitle: t('今日は聞かないで') },
+    ]);
+  } catch { /* Expo Goではカテゴリ未対応でも全体を落とさない */ }
+}
+
+/** 「あとで」→ 同じ内容の単発を2時間後に1回だけ。
+ *  カテゴリを付けない＝スヌーズの連鎖はさせない（先送りが無限に続くのを防ぐ） */
+async function snoozeReminder2h(content: { title?: string | null; body?: string | null; data?: Record<string, unknown> }): Promise<void> {
+  try {
+    const now = new Date();
+    const d = new Date(now.getTime() + 2 * 3600000);
+    // 着地が翌1:00を超えるなら予約しない（深夜に起こしてまで催促しない）
+    const isNextDay = d.getDate() !== now.getDate();
+    if (isNextDay && d.getHours() * 60 + d.getMinutes() > 60) return;
+    await Notifications.scheduleNotificationAsync({
+      content: { title: content.title ?? undefined, body: content.body ?? undefined, data: content.data },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
+    });
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
+/** 「今日は聞かないで」→ 今夜のリマインダー取消＋気分カードのスヌーズと同じキーに書く
+ *  （アプリ内の「今日は聞かないで」と意味を揃える: 通知からの意思表示も気分カードに波及） */
+async function skipTodayFromAction(): Promise<void> {
+  await skipTodayReminder();
+  await AsyncStorage.setItem('bl-mood-snooze', todayJST()).catch(() => {});
+}
+
 /** 言語変更・アプリ起動時に、いまの設定どおり登録し直す
  *  （smartは単発14日ぶんの先積みなので、起動ごとの補充を兼ねる） */
 export async function reregisterAll(): Promise<void> {
   try {
+    // カテゴリはここで毎回登録し直す（ボタン文言が登録時の言語で固定されるため）
+    await registerReminderCategory();
     const { mode } = await getDailyReminderPrefs();
     if (mode !== 'off') await applyDailyReminder();
     const kv = await AsyncStorage.multiGet(['bl-notif-weekly']);
@@ -195,10 +293,21 @@ export async function reregisterAll(): Promise<void> {
   } catch { /* 失敗しても既存の通知が残るだけ */ }
 }
 
-/** 通知タップ→クイック入力へ。ルートレイアウトで一度だけ呼ぶ。戻り値は解除関数 */
+/** 通知タップ→クイック入力へ。ルートレイアウトで一度だけ呼ぶ。戻り値は解除関数
+ *  アクションボタン（あとで/今日は聞かないで）もここで分岐する */
 export function attachNotificationTapRouting(open: (url: string) => void): () => void {
   try {
     const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+      const action = res.actionIdentifier;
+      if (action === ACTION_LATER_2H) {
+        void snoozeReminder2h(res.notification.request.content);
+        return;
+      }
+      if (action === ACTION_SKIP_TODAY) {
+        void skipTodayFromAction().catch(() => {});
+        return;
+      }
+      // 本体タップ（DEFAULT_ACTION_IDENTIFIER）は従来どおりURLを開く
       const url = res.notification.request.content.data?.url;
       if (typeof url === 'string' && url.startsWith('bodylog://')) open(url);
     });

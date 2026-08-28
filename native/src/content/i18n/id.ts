@@ -1078,4 +1078,9 @@ export const ID: Record<string, string> = {
   "直近7日平均と、その前7日平均の差": "Selisih antara rata-rata 7 hari terakhir dan 7 hari sebelumnya",
   "挙上も継続中 → 筋肉の乗る増量です": "Latihan beban berlanjut → bulking pembentukan otot",
   "目標を見直す": "Tinjau kembali target",
+  "食間リマインド（増量向け）": "Pengingat Antara Waktu Makan (Bulking)",
+  "最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）": "Notifikasi jika sudah 5 jam sejak makan terakhir (tidak ada notifikasi pukul 21:30 - 07:00)",
+  "そろそろ補給の時間です": "Waktunya mengisi energi",
+  "食間が5時間あきました。シェイク1杯でも立派な1食です。": "Sudah 5 jam sejak makan terakhir. Satu gelas shake pun sudah termasuk makanan yang baik.",
+  "あとで（2時間後）": "Nanti saja (2 jam lagi)",
 };
