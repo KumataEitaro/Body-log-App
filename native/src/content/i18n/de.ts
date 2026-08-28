@@ -1093,4 +1093,11 @@ export const DE: Record<string, string> = {
   "目標内": "Im Ziel",
   "{d}曜日に崩れやすい傾向（平均+{n}kcal）": "Neigt am {d} zu Abweichungen (Schnitt +{n}kcal)",
   "先回りのコツ: {d}曜は昼を少し厚めにすると夜の反動が減ります": "Tipp zum Vorbeugen: Wenn du am {d} mittags etwas mehr isst, hast du abends weniger Heißhunger",
+  "おかえりなさい": "Willkommen zurück",
+  "空白は失敗じゃなくて、休憩です。今日からまた、1行だけ。": "Lücken sind kein Scheitern, sondern eine Pause. Lass uns heute einfach mit einer Zeile weitermachen.",
+  "前回までの記録はぜんぶ残っています。AIもあなたの法則を覚えています。": "Deine bisherigen Einträge sind alle noch da. Auch die KI erinnert sich an deine Gewohnheiten.",
+  "おかえりなさい。今日から再開です 🎉": "Willkommen zurück. Heute geht es wieder los 🎉",
+  "もしよければ、いまの体重だけ（空欄のままでも大丈夫）": "Wenn du möchtest, trage dein aktuelles Gewicht ein (du kannst es auch leer lassen)",
+  "保存して再開": "Speichern und fortfahren",
+  "そっと閉じる（開いてくれただけで十分です）": "Leise schließen (schön, dass du kurz vorbeigeschaut hast)",
 };

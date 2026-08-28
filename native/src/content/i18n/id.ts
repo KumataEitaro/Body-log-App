@@ -1093,4 +1093,11 @@ export const ID: Record<string, string> = {
   "目標内": "Sesuai Target",
   "{d}曜日に崩れやすい傾向（平均+{n}kcal）": "Cenderung tidak stabil di hari {d} (rata-rata +{n}kcal)",
   "先回りのコツ: {d}曜は昼を少し厚めにすると夜の反動が減ります": "Tips antisipasi: Makan siang sedikit lebih banyak di hari {d} untuk mengurangi keinginan makan berlebih di malam hari",
+  "おかえりなさい": "Selamat datang kembali",
+  "空白は失敗じゃなくて、休憩です。今日からまた、1行だけ。": "Kolom kosong bukanlah kegagalan, melainkan istirahat. Mulai hari ini, cukup satu baris saja.",
+  "前回までの記録はぜんぶ残っています。AIもあなたの法則を覚えています。": "Semua catatan sebelumnya tetap tersimpan. AI juga masih mengingat pola Anda.",
+  "おかえりなさい。今日から再開です 🎉": "Selamat datang kembali. Mari kita mulai lagi hari ini 🎉",
+  "もしよければ、いまの体重だけ（空欄のままでも大丈夫）": "Jika berkenan, cukup masukkan berat badan Anda saat ini (boleh dikosongkan)",
+  "保存して再開": "Simpan & Lanjutkan",
+  "そっと閉じる（開いてくれただけで十分です）": "Tutup perlahan (terima kasih sudah mau membuka aplikasi ini)",
 };

@@ -50,6 +50,7 @@ import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
 import MoodFace, { MoodInline } from '@/components/MoodFace';
+import ComebackSheet from '@/components/ComebackSheet';
 import { invalidateStreak } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
@@ -1296,6 +1297,8 @@ export default function LogScreen() {
         onClose={() => setFoodDraft(null)}
         onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に追加しました。下のチップから1タップで足せます。') }); }}
       />
+      {/* おかえりフロー: 発火判定はコンポーネント内で完結（マウント直後のみ→既存Modalと競合しない） */}
+      <ComebackSheet onSaved={load} />
       <StatusBarMask />
       <HeaderGear />
     </KeyboardAvoidingView>
