@@ -13,6 +13,9 @@ import { t } from './i18n';
 
 const EARNED_KEY = 'bl-badges-earned';   // { [id]: 'YYYY-MM-DD' }
 const REST_COUNT_KEY = 'bl-rest-count';  // レストタイマー起動回数（端末ローカル）
+// ソフト週目標（'7'|'5'|'4'|'3'・未設定=毎日）。「1日欠け→全崩壊」の完璧主義を
+// 週◯日でOKの自己契約に緩めるためのキー。設定画面と実績ページが共有する
+export const WEEK_GOAL_KEY = 'bl-week-goal';
 
 export type Badge = {
   id: string;
@@ -68,6 +71,32 @@ export function calcStreak(recorded: Set<string>, today: string): { days: number
   return { days, usedFreeze };
 }
 
+/**
+ * 今週（月曜起点）の記録状況。days=月〜日の記録有無、count=記録日数。
+ * 週の起点はcalcStreakのお守りや週別バランスと同じweekKey（月曜）に統一する。
+ */
+export function calcWeekProgress(recorded: Set<string>, today: string): { count: number; days: boolean[]; todayIdx: number } {
+  const mon = weekKey(today);
+  const days = Array.from({ length: 7 }, (_, i) => recorded.has(shiftDate(mon, i)));
+  const todayIdx = Math.round((Date.parse(today) - Date.parse(mon)) / 86400000);
+  return { count: days.filter(Boolean).length, days, todayIdx };
+}
+
+/**
+ * 週の約束バッジの判定: 直近4週すべてで記録日数>=goal。
+ * 今週は進行中で「まだ守れていない」と誤判定しうるため、完了した先週から遡る
+ * （weekend4と同じ考え方）。
+ */
+export function weekPromiseOk(recorded: Set<string>, today: string, goal: number): boolean {
+  for (let w = 1; w <= 4; w++) {
+    const mon = shiftDate(weekKey(today), -7 * w);
+    let n = 0;
+    for (let i = 0; i < 7; i++) if (recorded.has(shiftDate(mon, i))) n++;
+    if (n < goal) return false;
+  }
+  return true;
+}
+
 /** 過去に一度でも折れて、その後30日以上つないだか（不死鳥） */
 export function hadComeback(recordedSorted: string[], today: string): boolean {
   // 記録日を古い順に走査し、「2日以上の穴」の後に30日連続があればtrue
@@ -100,6 +129,7 @@ export function badgeDefs(): Badge[] {
     { id: 'streak100', emoji: '🌋', name: t('百日行'), desc: t('100日連続で記録する'), cat: 'streak' },
     { id: 'phoenix', emoji: '🐦‍🔥', name: t('不死鳥'), desc: t('途切れたあと、もう一度30日つなぐ'), cat: 'streak' },
     { id: 'weekend4', emoji: '📅', name: t('週末も欠かさず'), desc: t('土日を含む週を4週連続で記録する'), cat: 'streak' },
+    { id: 'week_promise', emoji: '🤝', name: t('週の約束'), desc: t('自分で決めた週目標を4週連続で守った'), cat: 'streak' },
     { id: 'morning14', emoji: '🌅', name: t('朝型'), desc: t('朝（10時まで）の記録を累計14日'), cat: 'streak' },
     // 行動
     { id: 'photo1', emoji: '📸', name: t('はじめての写真解析'), desc: t('写真から食事を解析する'), cat: 'action' },
@@ -136,6 +166,9 @@ export async function bumpRestCount(): Promise<void> {
 export type AchievementReport = {
   streak: number;
   usedFreeze: string | null;
+  // ソフト週目標の進捗（実績ページの「今週」ブロック用）。
+  // goal=自己契約の日数（未設定は7=毎日）、days=月〜日の記録有無
+  week: { goal: number; count: number; days: boolean[]; todayIdx: number };
   badges: BadgeState[];
   newIds: string[];   // 今回の評価で新たに獲得したもの
   // 「いつでも共有」用の素材（実績ページの共有ハブが使う）
@@ -151,7 +184,7 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
   const today = todayJST();
   const from400 = shiftDate(today, -400);
 
-  const [entriesRes, logsRes, foodsRes, usageRes, goalRes, restRaw, earnedRaw] = await Promise.all([
+  const [entriesRes, logsRes, foodsRes, usageRes, goalRes, restRaw, earnedRaw, weekGoalRaw] = await Promise.all([
     supabase.from('entries').select('date,intake,weight,p,f,c').gte('date', from400).order('date', { ascending: true }).limit(1000),
     supabase.from('logs').select('date,at,text,adj,ex_km,ex_minutes').gte('date', from400).order('date', { ascending: true }).limit(2000),
     supabase.from('my_foods').select('id').limit(50),
@@ -159,6 +192,7 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     supabase.from('goals').select('target_weight,start_weight').maybeSingle(),
     AsyncStorage.getItem(REST_COUNT_KEY),
     AsyncStorage.getItem(EARNED_KEY),
+    AsyncStorage.getItem(WEEK_GOAL_KEY),
   ]);
   const entries = (entriesRes.data ?? []) as { date: string; intake: number | null; weight: number | null; p?: number | null; f?: number | null; c?: number | null }[];
   const logs = (logsRes.data ?? []) as { date: string; at: string | null; text: string; adj: number | null; ex_km: number | null; ex_minutes: number | null }[];
@@ -174,6 +208,10 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
   const recordedSorted = [...recorded].sort();
 
   const { days: streak, usedFreeze } = calcStreak(recorded, today);
+
+  // ソフト週目標（未設定は7=毎日と同じ意味。壊れた値も7に倒す）
+  const weekGoal = ['3', '4', '5', '7'].includes(weekGoalRaw ?? '') ? Number(weekGoalRaw) : 7;
+  const week = { goal: weekGoal, ...calcWeekProgress(recorded, today) };
 
   // 週末も欠かさず（直近4週）
   let weekend4 = true;
@@ -237,6 +275,8 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     streak30: streak >= 30, streak60: streak >= 60, streak100: streak >= 100,
     phoenix: hadComeback(recordedSorted, today),
     weekend4, morning14: morningDays >= 14,
+    // 週の約束: 自分で週目標を設定した状態でだけ判定する（未設定=契約していない）
+    week_promise: weekGoalRaw != null && weekPromiseOk(recorded, today, weekGoal),
     photo1: photoN >= 1, photo30: photoN >= 30,
     coach10: coachN >= 10, coach100: coachN >= 100,
     myfood5: foodsN >= 5, myfood20: foodsN >= 20,
@@ -286,7 +326,7 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     pr: prTop ? { name: prTop[0], kg: Math.round(prTop[1].kg), date: prTop[1].date } : null,
   };
 
-  return { streak, usedFreeze, badges, newIds, share };
+  return { streak, usedFreeze, week, badges, newIds, share };
 }
 
 // ===== 軽量ストリーク（食事タブの🔥チップ用。日付列だけの2クエリ＋5分キャッシュ） =====

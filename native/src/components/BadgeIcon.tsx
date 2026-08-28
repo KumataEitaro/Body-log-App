@@ -2,7 +2,7 @@
 // アイコン名はimportで明示する（存在しない名前はtscが弾く＝ビルド前に検出できる）。
 import { View } from 'react-native';
 import {
-  Flame, Bird, Calendar, Sunrise,
+  Flame, Bird, Calendar, CalendarCheck, Sunrise,
   Camera, Aperture, MessageCircle, Brain, Salad, BookOpen, CheckCheck, Timer, Moon,
   Scale, Medal, Trophy, Mountain, Flag, Dumbbell, Weight, Footprints, Route, Zap, TrendingUp,
   Award, type LucideIcon,
@@ -12,7 +12,7 @@ import { C } from '@/lib/ui';
 const MAP: Record<string, LucideIcon> = {
   // 継続
   streak3: Flame, streak7: Flame, streak14: Flame, streak30: Flame, streak60: Flame, streak100: Flame,
-  phoenix: Bird, weekend4: Calendar, morning14: Sunrise,
+  phoenix: Bird, weekend4: Calendar, week_promise: CalendarCheck, morning14: Sunrise,
   // 行動
   photo1: Camera, photo30: Aperture, coach10: MessageCircle, coach100: Brain,
   myfood5: Salad, myfood20: BookOpen, fullday: CheckCheck, rest50: Timer, nolate7: Moon,

@@ -92,6 +92,24 @@ export default function AchievementsScreen() {
               </Text>
             </View>
 
+            {/* 今週（ソフト週目標）: 週◯日でOKの自己契約。「毎日」以外の成功を
+                目に見える形にして、1日欠けた瞬間の全崩壊を防ぐ */}
+            <View style={s.weekCard}>
+              <View style={s.weekHead}>
+                <Text style={s.weekT}>{t('今週 {n}/{m}日', { n: report.week.count, m: report.week.goal })}</Text>
+                {report.week.count >= report.week.goal && <PartyPopper size={16} color={C.teal} />}
+              </View>
+              <View style={s.weekDots}>
+                {report.week.days.map((on, i) => (
+                  // 記録日=teal塗り・未来=枠のみ（まだ失敗ではない）・過去の未記録=薄地
+                  <View key={i} style={[s.weekDot, on ? s.weekDotOn : i > report.week.todayIdx ? s.weekDotFuture : s.weekDotOff]} />
+                ))}
+              </View>
+              {report.week.count >= report.week.goal
+                ? <Text style={s.weekDone}>{t('今週の約束は守れました 🎉')}</Text>
+                : <Text style={s.weekSub}>{t('自分で決めたペースを守れたら、それは成功です。')}</Text>}
+            </View>
+
             {/* いつでも共有ハブ */}
             <View style={s.shareCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -153,6 +171,17 @@ const s = StyleSheet.create({
   heroN: { fontSize: 42, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
   heroU: { fontSize: 15, fontWeight: '700', color: C.sub },
   heroSub: { fontSize: 12, color: C.sub, marginTop: 4, paddingHorizontal: 20, textAlign: 'center' },
+  // 今週（ソフト週目標）
+  weekCard: { backgroundColor: C.panel, borderRadius: 16, padding: 14, marginBottom: 12 },
+  weekHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  weekT: { fontSize: 14.5, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  weekDots: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  weekDot: { width: 14, height: 14, borderRadius: 7 },
+  weekDotOn: { backgroundColor: C.teal },
+  weekDotFuture: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: C.line },
+  weekDotOff: { backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
+  weekDone: { fontSize: 12.5, fontWeight: '700', color: C.teal },
+  weekSub: { fontSize: 12, color: C.sub },
   shareCard: { backgroundColor: C.panel, borderRadius: 16, padding: 14, marginBottom: 16 },
   shareT: { fontSize: 14.5, fontWeight: '800', color: C.ink },
   shareSub: { fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 17 },
