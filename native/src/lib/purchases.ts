@@ -1,13 +1,19 @@
-// RevenueCat（Apple IAP）ラッパー。プラン判定の正本はサーバー（profiles.plan）だが、
+// RevenueCat（アプリ内課金）ラッパー。プラン判定の正本はサーバー（profiles.plan）だが、
 // 端末側の即時反映（購入直後・オフライン時）はここのentitlementを見る。
-// APIキー未設定（EXPO_PUBLIC_RC_IOS_KEY なし）の間は全機能が安全に「未課金」を返す。
+// APIキー未設定（iOS: EXPO_PUBLIC_RC_IOS_KEY / Android: EXPO_PUBLIC_RC_ANDROID_KEY なし）の
+// 間は、そのプラットフォームでは全機能が安全に「未課金」を返す。
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
 export type Plan = 'free' | 'lite' | 'standard' | 'premium';
 const RANK: Record<string, number> = { lite: 1, standard: 2, premium: 3 };
 
-const RC_KEY = process.env.EXPO_PUBLIC_RC_IOS_KEY || '';
+// プラットフォームごとにキーを選ぶ。Androidキーは未発行（2026-08-29時点）なので
+// Androidでは空文字 → purchasesAvailable()がfalse → 課金UIが一切出ない（安全側）。
+// iOSは従来どおり EXPO_PUBLIC_RC_IOS_KEY のみを見る＝挙動不変。
+const RC_KEY = Platform.OS === 'android'
+  ? (process.env.EXPO_PUBLIC_RC_ANDROID_KEY || '')
+  : (process.env.EXPO_PUBLIC_RC_IOS_KEY || '');
 
 // SDKは遅延ロード（キー未設定のビルドやAndroidで起動時クラッシュさせない）
 type RC = typeof import('react-native-purchases').default;
@@ -15,7 +21,8 @@ let rc: RC | null = null;
 let configured = false;
 
 async function ensureConfigured(): Promise<RC | null> {
-  if (!RC_KEY || Platform.OS !== 'ios') return null;
+  // キーがある＝そのOS用のキー（RC_KEYの選択ロジック参照）。iOS/Android以外(web等)は常にnull
+  if (!RC_KEY || (Platform.OS !== 'ios' && Platform.OS !== 'android')) return null;
   if (!rc) {
     try { rc = (await import('react-native-purchases')).default; } catch { return null; }
   }
@@ -30,9 +37,9 @@ async function ensureConfigured(): Promise<RC | null> {
   return rc;
 }
 
-/** 課金機能が使える状態か（キー設定済み・iOS） */
+/** 課金機能が使える状態か（そのOS用のキーが設定済みのiOS/Androidのみ） */
 export function purchasesAvailable(): boolean {
-  return !!RC_KEY && Platform.OS === 'ios';
+  return !!RC_KEY && (Platform.OS === 'ios' || Platform.OS === 'android');
 }
 
 /** 現在のプラン（RevenueCatのentitlementから。未課金・エラー時は'free'） */

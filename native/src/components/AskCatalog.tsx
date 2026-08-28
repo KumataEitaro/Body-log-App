@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Search, ChevronDown, ChevronRight, Sparkles } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { askCategories } from '@/content/askExamples';
 
@@ -35,7 +35,7 @@ export default function AskCatalog({ visible, onClose, onPick }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.wrap, { paddingTop: 16 }]}>
+      <View style={[s.wrap, { paddingTop: sheetTopPad(16) }]}>
         <View style={s.head}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 }}>
             <Sparkles size={18} color={C.teal} />

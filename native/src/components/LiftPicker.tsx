@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Search, Plus, Trash2 } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { LIFTS, LIFT_PARTS, liftName, useCustomLifts, addCustomLift, removeCustomLift } from '@/lib/lifts';
 
@@ -45,7 +45,7 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.wrap, { paddingTop: 16 }]}>
+      <View style={[s.wrap, { paddingTop: sheetTopPad(16) }]}>
         <View style={s.head}>
           <Text style={s.title}>{t('種目を選ぶ')}</Text>
           <Pressable onPress={onClose} hitSlop={10}><X size={22} color={C.sub} /></Pressable>

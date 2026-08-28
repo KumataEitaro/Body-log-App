@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
 import { getColumns, type Column } from '@/content/columns';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const READ_KEY = 'bl-columns-read';
@@ -69,7 +69,7 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
 
   const reader = (
       <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
-        <View style={[s.readerWrap, { paddingTop: 14 }]}>
+        <View style={[s.readerWrap, { paddingTop: sheetTopPad(14) }]}>
           <View style={s.readerHead}>
             <Text style={s.readerEmoji}>{open?.emoji}</Text>
             <Pressable onPress={() => setOpen(null)} hitSlop={10}><X size={22} color={C.sub} /></Pressable>

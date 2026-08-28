@@ -6,7 +6,7 @@ import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
 import { Languages, Check } from 'lucide-react-native';
 
@@ -257,7 +257,7 @@ const s = StyleSheet.create({
     borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
   },
   langBtnT: { fontSize: 13, fontWeight: '700', color: C.sub },
-  sheet: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: 16 },
+  sheet: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(16) },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   sheetClose: { fontSize: 15, fontWeight: '700', color: C.teal },

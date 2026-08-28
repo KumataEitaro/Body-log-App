@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import { Target, Dumbbell, ChevronRight, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import GoalPanel from '@/components/GoalPanel';
 
@@ -76,7 +76,7 @@ const s = StyleSheet.create({
   },
   title: { fontSize: 15, fontWeight: '800', color: C.ink },
   line: { fontSize: 13, color: C.sub, marginTop: 2 },
-  sheet: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
+  sheet: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
 });

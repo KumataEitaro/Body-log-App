@@ -7,7 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
 import { ClipboardList, BookOpen, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
@@ -1061,7 +1061,7 @@ const s = StyleSheet.create({
   },
   actChipOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
   actChipT: { fontSize: 11, fontWeight: '700', color: C.sub, textAlign: 'center' },
-  hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: 18 },
+  hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   hkHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   hkTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   hkClose: { fontSize: 24, color: C.sub, fontWeight: '600', paddingHorizontal: 6 },

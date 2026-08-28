@@ -26,7 +26,7 @@ import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
-import { C } from '@/lib/ui';
+import { C, sheetTopPad } from '@/lib/ui';
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import { WEEK_GOAL_KEY } from '@/lib/achievements';
@@ -839,7 +839,7 @@ const s = StyleSheet.create({
   deleteLink: { alignItems: 'center', marginTop: 18 },
   deleteLinkT: { color: C.coral, fontSize: 15, fontWeight: '700' },
   // モーダル
-  sheetBody: { flex: 1, backgroundColor: C.bg, padding: 18 },
+  sheetBody: { flex: 1, backgroundColor: C.bg, padding: 18, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   sheetClose: { fontSize: 15, fontWeight: '700', color: C.teal },
