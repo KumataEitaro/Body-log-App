@@ -12,7 +12,8 @@ import { C } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
 import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
-import { reregisterAll } from '@/lib/notify';
+import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
+import { Linking } from 'react-native';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import { installCrashReporter } from '@/lib/crash';
@@ -21,6 +22,8 @@ installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モ�
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
+  // 通知タップ→クイック入力（bodylog://log?quick=1）
+  useEffect(() => attachNotificationTapRouting((url) => { Linking.openURL(url).catch(() => {}); }), []);
   useEffect(() => { loadAvatar(); }, []);   // 保存済みのアイコンを反映
   useEffect(() => { loadFoodFreq(); loadPurpose(); }, []); // よく使う順の実績＋ダイエット目的
   const [ready, setReady] = useState(false);
@@ -48,6 +51,10 @@ export default function RootLayout() {
     if (!authed && !inLogin) router.replace('/login');
     else if (authed && inLogin) router.replace('/(tabs)/log');
   }, [ready, authed, segments, router]);
+
+  // 起動ごとに通知を組み直す（smartの単発14日ぶんの補充を兼ねる）。
+  // 「今日すでに記録があるか」をRLS越しに見るため、認証が確立してから
+  useEffect(() => { if (ready && authed) reregisterAll(); }, [ready, authed]);
 
   return (
     // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿

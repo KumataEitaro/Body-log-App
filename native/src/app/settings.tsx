@@ -7,7 +7,7 @@ import {
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setDailyLogReminder, setWeeklyPhotoReminder } from '@/lib/notify';
+import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, type DailyReminderMode } from '@/lib/notify';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
@@ -141,20 +141,21 @@ export default function SettingsScreen() {
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
-  // 通知トグル（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
-  const [notifDaily, setNotifDaily] = useState(false);
+  // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
+  const [remMode, setRemMode] = useState<DailyReminderMode>('off');
+  const [remHour, setRemHour] = useState(21);
   const [notifWeekly, setNotifWeekly] = useState(false);
   useEffect(() => {
-    AsyncStorage.multiGet(['bl-notif-daily', 'bl-notif-weekly']).then((kv) => {
-      setNotifDaily(kv[0]?.[1] === '1');
-      setNotifWeekly(kv[1]?.[1] === '1');
-    }).catch(() => {});
+    getDailyReminderPrefs().then((p) => { setRemMode(p.mode); setRemHour(p.hour); }).catch(() => {});
+    AsyncStorage.getItem('bl-notif-weekly').then((v) => setNotifWeekly(v === '1')).catch(() => {});
   }, []);
-  async function toggleDaily(on: boolean) {
-    setNotifDaily(on);
-    const ok = await setDailyLogReminder(on);
-    if (!ok && on) { setNotifDaily(false); Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。')); return; }
-    AsyncStorage.setItem('bl-notif-daily', on ? '1' : '0').catch(() => {});
+  async function changeReminder(mode: DailyReminderMode, hour: number) {
+    setRemMode(mode); setRemHour(hour);
+    const ok = await setDailyReminderPrefs(mode, hour);
+    if (!ok && mode !== 'off') {
+      setRemMode('off');
+      Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'));
+    }
   }
   async function toggleWeekly(on: boolean) {
     setNotifWeekly(on);
@@ -357,12 +358,34 @@ export default function SettingsScreen() {
       {/* 通知 */}
       <Text style={s.groupLabel}>{t('通知')}</Text>
       <View style={s.group}>
-        <View style={s.notifRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.notifLabel}>{t('記録リマインダー')}</Text>
-            <Text style={s.notifSub}>{t('毎日21:00に「今日の記録」を通知')}</Text>
-          </View>
-          <Switch value={notifDaily} onValueChange={toggleDaily} trackColor={{ true: C.teal }} />
+        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={s.notifLabel}>{t('記録リマインダー')}</Text>
+          <Text style={[s.notifSub, { marginBottom: 10 }]}>
+            {remMode === 'smart' ? t('その日なにか記録していれば通知しません。2週間ひらかないと自動で止まります。')
+              : remMode === 'always' ? t('記録の有無にかかわらず、毎日決まった時刻に通知します。')
+              : t('記録リマインダーは届きません。')}
+          </Text>
+          <SegmentedControl
+            options={[
+              { key: 'off', label: t('オフ') },
+              { key: 'smart', label: t('記録がない日だけ') },
+              { key: 'always', label: t('毎日') },
+            ]}
+            value={remMode} onChange={(m) => changeReminder(m as DailyReminderMode, remHour)}
+          />
+          {remMode !== 'off' && (
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+              {[18, 19, 20, 21, 22, 23].map((h) => (
+                <Pressable key={h} onPress={() => changeReminder(remMode, h)}
+                           style={[s.hourChip, remHour === h && s.hourChipOn]}>
+                  <Text style={[s.hourChipT, remHour === h && s.hourChipTOn]}>{h}:00</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {remMode !== 'off' && (
+            <Text style={[s.notifSub, { marginTop: 8 }]}>{t('通知をタップするとそのまま入力できます。「今日は聞かないで」を押した日も静かになります。')}</Text>
+          )}
         </View>
         <View style={s.sep} />
         <View style={s.notifRow}>
@@ -736,6 +759,10 @@ const s = StyleSheet.create({
   langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.line },
   langT: { fontSize: 17, color: C.ink, fontWeight: '600' },
   notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 },
+  hourChip: { borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7 },
+  hourChipOn: { backgroundColor: C.ink, borderColor: C.ink },
+  hourChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  hourChipTOn: { color: '#fff' },
   notifLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   notifSub: { fontSize: 13, color: C.sub, marginTop: 2 },
   notifNote: { fontSize: 11, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
