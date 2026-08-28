@@ -149,6 +149,38 @@ export async function importWorkouts(uid: string, items: HKWorkout[]): Promise<{
   return { imported, skipped };
 }
 
+// 現在のJST時（0-23）。時間帯別チャートで「未来の時間帯」を空にする判定に使う
+export function jstHourNow(): number {
+  try {
+    return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+  } catch {
+    return new Date().getHours(); // Intl不調時は端末ローカル時で近似
+  }
+}
+
+// その日の歩数を時間帯別（0-23時・JST）にバケツ分け（ヘルスケア式の棒グラフ用）。
+// HealthKitが無い環境（Expo Go / Android）や読み取り失敗はnull（セクションごと出さない）
+export async function readHourlySteps(date: string): Promise<number[] | null> {
+  if (!hk) return null;
+  try {
+    const start = new Date(`${date}T00:00:00+09:00`);
+    const end = new Date(start.getTime() + 86400000);
+    const samples = await hk.queryQuantitySamples('HKQuantityTypeIdentifierStepCount', {
+      unit: 'count', limit: -1, ascending: true,
+      filter: { date: { startDate: start, endDate: end } },
+    });
+    const out: number[] = new Array(24).fill(0);
+    const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' });
+    for (const s of samples) {
+      const h = Number(fmt.format(new Date(s.startDate)));
+      if (h >= 0 && h < 24) out[h] += Number(s.quantity);
+    }
+    return out.map((v) => Math.round(v));
+  } catch {
+    return null;
+  }
+}
+
 // 直近days日の歩数（日別合計）と睡眠時間（日別h）— 表示用サマリー
 export type HealthDaySummary = { date: string; steps: number; sleepH: number };
 
