@@ -11,6 +11,7 @@ import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import MyFoodForm, { type MyFoodDraft } from '@/components/MyFoodForm';
+import MenuAdvisor from '@/components/MenuAdvisor';
 import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
 import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
@@ -1292,6 +1293,15 @@ export default function LogScreen() {
           />
           <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
+          {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
+              「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
+          {profile != null && (
+            <MenuAdvisor
+              remainingKcal={left}
+              pRemain={macros ? Math.round(macros.p) - eatenP : null}
+              onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
+            />
+          )}
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <ArrowUp color="#fff" size={17} strokeWidth={3} />
           </Pressable>
