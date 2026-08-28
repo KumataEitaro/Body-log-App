@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { summarizeDay, type LogRow } from '@/lib/day';
 import { skipTodayReminder, rescheduleMealGapReminder } from '@/lib/notify';
 import { todayJST } from '@/lib/calc';
+import { updateWidgetData } from '@/lib/widget';
 
 export async function syncEntriesForDate(userId: string, d: string): Promise<(LogRow & { id: string; at: string })[]> {
   // 今日のぶんを記録したら、今夜の記録リマインダーは黙る（smartモードの中核。
@@ -29,5 +30,8 @@ export async function syncEntriesForDate(userId: string, d: string): Promise<(Lo
       food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
     }, { onConflict: 'user_id,date' });
   }
+  // ホームウィジェットへ今日サマリーを書き出す（投げっぱなし・失敗無視。
+  // 過去日の穴埋めでもストリークが動くので日付を問わず呼ぶ。未対応環境ではno-op）
+  updateWidgetData().catch(() => {});
   return rows;
 }
