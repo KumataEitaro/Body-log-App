@@ -18,7 +18,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
 import { CalendarDays, CalendarRange, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
 import LeanBulkCard from '@/components/LeanBulkCard';
-import { usePurpose } from '@/lib/purpose';
+import CycleCard from '@/components/CycleCard';
+import { usePurpose, fetchPurposePeriods, cycleLabel, type PurposePeriod } from '@/lib/purpose';
+import { Repeat } from 'lucide-react-native';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import HeaderGear from '@/components/HeaderGear';
@@ -66,12 +68,13 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 // bulkguardは増量目的（purpose==='bulk'）のときだけメニューに現れる（下のvisibleOrderで絞る）
 // lawsは詳細ページではなく /laws（法則図鑑）への外部遷移行（menuRowで分岐する）
-const BODY_ORDER_DEFAULT = ['digest', 'laws', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
+// cyclesは目的の切替履歴（purpose_periods）が2サイクル以上あるときだけ現れる（下のunavailableで絞る）
+const BODY_ORDER_DEFAULT = ['digest', 'laws', 'bulkguard', 'cycles', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
 // マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
 const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
 const CARD_LABELS = (): Record<string, string> => ({
-  digest: t('週間ダイジェスト'), laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
+  digest: t('週間ダイジェスト'), laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
@@ -126,6 +129,8 @@ export default function ChangesScreen() {
   const [foodFx, setFoodFx] = useState<FoodEffect[]>([]);
   // 法則図鑑のサマリー行（最新の法則の一文。端末内のAsyncStorageから読むだけで軽い）
   const [lawLine, setLawLine] = useState<string | null>(null);
+  // サイクル履歴（B-5）。null=テーブル未作成等で取得不能（サイクル機能を静かに非表示）
+  const [periods, setPeriods] = useState<PurposePeriod[] | null>(null);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
@@ -243,6 +248,8 @@ export default function ChangesScreen() {
     } catch { /* 分析はベストエフォート */ }
     // 法則図鑑のサマリー（未発見ならnullのまま＝誘い文に落ちる）
     try { setLawLine(await latestLawSummary()); } catch { /* サマリーは飾り */ }
+    // サイクル履歴（B-5）。テーブル未作成ならnullが返り、cyclesはメニューに出ない
+    setPeriods(await fetchPurposePeriods());
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -490,6 +497,10 @@ export default function ChangesScreen() {
           planValue={serie === 'weight' && goal?.target_weight != null ? Number(goal.target_weight) : null}
           presetDays={range >= 9999 ? null : range}
           onDaysChange={(d, isFull) => { setLiveDays(d); setLiveFull(isFull); }}
+          // サイクル境界（B-5）: 体重系列のみ。先頭の期間開始は「切替」ではないので2本目以降だけ
+          markers={serie === 'weight' && periods != null && periods.length >= 2
+            ? periods.slice(1).map((p) => ({ date: p.started_at, label: t('{name}開始', { name: cycleLabel(p.purpose) }) }))
+            : undefined}
         />
         {/* 期間チップ＝状態表示兼ショートカット。ピンチ後は実表示日数に追従し、どれにも該当しなければ実日数チップが出る */}
         <View style={s.chips}>
@@ -590,6 +601,8 @@ export default function ChangesScreen() {
     switch (key) {
       case 'digest': return digestCard;
       case 'bulkguard': return <LeanBulkCard />;
+      // 画面が既に持っているperiodsと体重rowsを渡す（🏋️日数だけカード側でベストエフォート取得）
+      case 'cycles': return <CycleCard periods={periods ?? []} weights={wRows.map((r) => ({ date: r.date, weight: Number(r.weight) }))} />;
       case 'slots': return slotsCard;
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
@@ -614,8 +627,12 @@ export default function ChangesScreen() {
     }
   }
 
-  // 増量目的でないときはbulkguardをメニューにも⊕シートにも出さない（並び順は保持）
-  const unavailable = purpose === 'bulk' ? [] : ['bulkguard'];
+  // 増量目的でないときはbulkguardをメニューにも⊕シートにも出さない（並び順は保持）。
+  // cyclesも同様: 切替経験なし（サイクル1つ以下）またはテーブル未作成（periods=null）なら出さない
+  const unavailable = [
+    ...(purpose === 'bulk' ? [] : ['bulkguard']),
+    ...((periods?.length ?? 0) >= 2 ? [] : ['cycles']),
+  ];
   const hidden = hiddenAll;
   const visibleOrder = orderAll.filter((k) => !hidden.includes(k) && !unavailable.includes(k));
 
@@ -670,6 +687,16 @@ export default function ChangesScreen() {
       case 'digest': return t('今週のふりかえり');
       case 'laws': return lawLine ?? t('記録が貯まると、あなたの法則が見つかります');
       case 'bulkguard': return t('週あたりの増量ペースを見張る');
+      case 'cycles': {
+        // 現在のサイクル「増量 5週目・+1.2kg」（進行中の期間＋期間内の体重変化）
+        const open = periods?.find((p) => p.ended_at == null);
+        if (!open) return t('サイクルごとの変化を比べる');
+        const days = Math.max(0, Math.round((new Date(today + 'T00:00:00').getTime() - new Date(open.started_at + 'T00:00:00').getTime()) / 86400000));
+        const ws = wRows.filter((r) => r.date >= open.started_at);
+        const d = ws.length >= 2 ? Math.round((Number(ws[ws.length - 1].weight) - Number(ws[0].weight)) * 10) / 10 : null;
+        const wk = t('{n}週目', { n: Math.floor(days / 7) + 1 });
+        return `${cycleLabel(open.purpose)} ${wk}${d != null ? `・${d > 0 ? '+' : ''}${d.toFixed(1)}kg` : ''}`;
+      }
       case 'kpi': {
         if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
         const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
@@ -711,6 +738,7 @@ export default function ChangesScreen() {
       case 'digest': return <Sparkles {...p} />;
       case 'laws': return <BookOpen {...p} />;
       case 'bulkguard': return <Gauge {...p} />;
+      case 'cycles': return <Repeat {...p} />;
       case 'kpi': return <PersonStanding {...p} />;
       case 'calendar': case 'tcal': return <CalendarDays {...p} />;
       case 'chart': case 'tchart': return <TrendingUp {...p} />;

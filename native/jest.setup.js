@@ -7,7 +7,7 @@ jest.mock('@/lib/supabase', () => {
   const makeChain = () => {
     const chain = {};
     const ret = () => chain;
-    for (const m of ['select', 'eq', 'neq', 'in', 'not', 'gte', 'lte', 'lt', 'gt', 'like', 'order', 'limit', 'insert', 'update', 'upsert', 'delete', 'maybeSingle', 'single']) {
+    for (const m of ['select', 'eq', 'neq', 'in', 'is', 'not', 'gte', 'lte', 'lt', 'gt', 'like', 'order', 'limit', 'insert', 'update', 'upsert', 'delete', 'maybeSingle', 'single']) {
       chain[m] = jest.fn(ret);
     }
     chain.then = (resolve) => Promise.resolve({ data: null, error: null }).then(resolve);
