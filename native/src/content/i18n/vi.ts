@@ -1093,4 +1093,11 @@ export const VI: Record<string, string> = {
   "目標内": "Trong mục tiêu",
   "{d}曜日に崩れやすい傾向（平均+{n}kcal）": "Có xu hướng dễ mất kiểm soát vào Thứ {d} (trung bình +{n}kcal)",
   "先回りのコツ: {d}曜は昼を少し厚めにすると夜の反動が減ります": "Mẹo chuẩn bị trước: Ăn trưa nhiều hơn một chút vào Thứ {d} sẽ giúp giảm cảm giác thèm ăn vào buổi tối",
+  "おかえりなさい": "Mừng bạn trở lại",
+  "空白は失敗じゃなくて、休憩です。今日からまた、1行だけ。": "Khoảng trống không phải là thất bại, đó là một khoảng nghỉ. Từ hôm nay, hãy viết tiếp chỉ một dòng thôi nhé.",
+  "前回までの記録はぜんぶ残っています。AIもあなたの法則を覚えています。": "Tất cả nhật ký trước đây vẫn được lưu lại. AI cũng nhớ thói quen của bạn.",
+  "おかえりなさい。今日から再開です 🎉": "Mừng bạn trở lại. Hôm nay chúng ta bắt đầu lại nhé 🎉",
+  "もしよければ、いまの体重だけ（空欄のままでも大丈夫）": "Nếu được, hãy nhập cân nặng hiện tại (để trống cũng không sao nha)",
+  "保存して再開": "Lưu và tiếp tục",
+  "そっと閉じる（開いてくれただけで十分です）": "Đóng nhẹ nhàng (bạn mở app ra là đã tuyệt vời rồi)",
 };

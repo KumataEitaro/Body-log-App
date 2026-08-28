@@ -1193,4 +1193,11 @@ export const EN: Record<string, string> = {
   "目標内": "On Target",
   "{d}曜日に崩れやすい傾向（平均+{n}kcal）": "Tends to get off track on {d}s (Avg. +{n}kcal)",
   "先回りのコツ: {d}曜は昼を少し厚めにすると夜の反動が減ります": "Pro-tip: Eating a slightly heavier lunch on {d}s can help prevent overeating at night",
+  "おかえりなさい": "Welcome back",
+  "空白は失敗じゃなくて、休憩です。今日からまた、1行だけ。": "A blank space isn't a failure—it's just a break. Let's start with just one line today.",
+  "前回までの記録はぜんぶ残っています。AIもあなたの法則を覚えています。": "All your past records are saved. The AI still remembers your habits, too.",
+  "おかえりなさい。今日から再開です 🎉": "Welcome back! Let's get started again today 🎉",
+  "もしよければ、いまの体重だけ（空欄のままでも大丈夫）": "If you'd like, just your current weight (it's okay to leave it blank)",
+  "保存して再開": "Save and resume",
+  "そっと閉じる（開いてくれただけで十分です）": "Close gently (just opening the app is enough)",
 };
