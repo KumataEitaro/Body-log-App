@@ -190,8 +190,10 @@ export async function POST(req: Request) {
     ? '\n【これまでの会話】\n' + history.map((h) => `${h.role === 'user' ? '本人' : 'コーチ'}: ${String(h.text).slice(0, 200)}`).join('\n')
     : '';
 
-  // 増量（bulk）のときはプロンプトの方針も切り替わる（食べ忘れ対策・液体カロリー提案）
-  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang, purposeKey });
+  // 増量（bulk）のときはプロンプトの方針も切り替わる（食べ忘れ対策・液体カロリー提案）。
+  // maternity（妊娠・授乳）は減量提案の全面禁止（G3）。列が無いDBではundefined → false扱い
+  const maternity = (prof as { maternity?: boolean | null }).maternity === true;
+  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang, purposeKey, maternity });
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });

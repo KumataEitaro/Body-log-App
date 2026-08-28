@@ -14,6 +14,7 @@ import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
 import { isBodyweightLift } from '@/lib/lifts';
 import { PURPOSES, setPurpose, usePurpose, purposeOf } from '@/lib/purpose';
+import { bmiFloorKg, weeklyLossPace } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
@@ -31,6 +32,9 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   const [goal, setGoal] = useState<Goal | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [initWeight, setInitWeight] = useState<number | null>(null);
+  // 安全ガード用のプロフィール値。身長はBMI下限チェック、maternityは減量目標ロックに使う
+  const [heightCm, setHeightCm] = useState<number | null>(null);
+  const [maternity, setMaternity] = useState(false);
   const [gDate, setGDate] = useState('');
   const [gWeight, setGWeight] = useState('');
   const [gBf, setGBf] = useState('');
@@ -65,10 +69,16 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('training_goals').select('id,name,target_kg,target_date').order('created_at', { ascending: true }),
       supabase.from('logs').select('date,text').like('text', '🏋️%').order('at', { ascending: false }).limit(200),
-      supabase.from('profiles').select('init_weight').eq('id', session.user.id).maybeSingle(),
+      // select('*')なら maternity 列が無い旧DBでもクエリ自体は失敗しない（列指定だとselectごと落ちる）
+      supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('events').select('id,date,title,extra_kcal').gte('date', todayJST()).order('date', { ascending: true }),
     ]);
-    if (profRes.data?.init_weight != null) setInitWeight(Number(profRes.data.init_weight));
+    if (profRes.data) {
+      const pr = profRes.data as { init_weight?: number | null; height_cm?: number | null; maternity?: boolean | null };
+      if (pr.init_weight != null) setInitWeight(Number(pr.init_weight));
+      if (pr.height_cm != null && Number(pr.height_cm) > 0) setHeightCm(Number(pr.height_cm));
+      setMaternity(pr.maternity === true);   // 列が無いDBではundefined → false扱い（ガードだけ無効）
+    }
     if (gRes.data) {
       const g = gRes.data as Goal;
       setGoal(g);
@@ -98,6 +108,33 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
     if (!/^\d{4}-\d{2}-\d{2}$/.test(gDate) || !(Number(gWeight) > 20)) {
       setMsg({ ok: false, text: t('目標日と目標体重を入力してください。') }); return;
     }
+    const targetW = Number(gWeight);
+    // G1: BMI18.5未満になる目標はハードロック（身長未登録ならこのチェックだけスキップ）
+    if (heightCm != null) {
+      const floor = bmiFloorKg(heightCm);
+      if (targetW < floor) {
+        setMsg({ ok: false, text: t('その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。', { kg: floor.toFixed(1) }) });
+        return;
+      }
+    }
+    const currentW = latestWeight ?? initWeight;
+    // G3: 妊娠・授乳中は減量方向の目標（目標体重<現在体重）を受け付けない
+    if (maternity && currentW != null && targetW < currentW) {
+      setMsg({ ok: false, text: t('妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。') });
+      return;
+    }
+    // G1: 週1kg超の減量ペースはハードロック。週0.5〜1kgは警告だけ添えて保存は許可
+    let paceWarn = '';
+    if (currentW != null) {
+      const pace = weeklyLossPace(currentW, targetW, todayJST(), gDate);
+      if (pace != null && pace > 1) {
+        setMsg({ ok: false, text: t('そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。') });
+        return;
+      }
+      if (pace != null && pace >= 0.5) {
+        paceWarn = t('やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。', { n: pace.toFixed(1) });
+      }
+    }
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -122,7 +159,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await load();
-      setMsg({ ok: true, text: t('目標を保存し、計画を再計算しました。') });
+      // 速めのペース（週0.5〜1kg）は保存自体は通し、注意の一言だけ添える
+      setMsg({ ok: true, text: paceWarn ? `${t('目標を保存し、計画を再計算しました。')} ${paceWarn}` : t('目標を保存し、計画を再計算しました。') });
     } finally { setBusy(false); }
   }
 

@@ -1170,4 +1170,13 @@ export const FR: Record<string, string> = {
   "増量": "Prise de masse",
   "ゆる維持": "Maintien léger",
   "減量": "Perte de poids",
+  "記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。": "Le simple fait d'avoir enregistré est un grand pas en avant. Pas besoin de réduire drastiquement demain. Continuez comme d'habitude, tout va bien.",
+  "妊娠中・授乳中": "Grossesse / Allaitement",
+  "ONの間は減量目標を設定できなくなり、AI相談も維持と栄養を最優先に答えます。": "Lorsqu'il est activé, vous ne pouvez plus définir d'objectif de perte de poids. L'IA répondra en priorité sur le maintien et la nutrition.",
+  "その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。": "Cet objectif est trop exigeant pour votre corps. Impossible de définir un objectif inférieur à un IMC de 18.5 ({kg}kg).",
+  "妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。": "Impossible de définir un objectif de perte de poids pendant la grossesse ou l'allaitement. La priorité actuelle est le maintien et la nutrition.",
+  "そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。": "Ce rythme est trop rapide. Veuillez ajuster la date ou l'objectif pour ne pas dépasser 1kg par semaine.",
+  "やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。": "Le rythme est un peu rapide (environ {n}kg par semaine). Restez à l'écoute de votre corps.",
+  "前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？": "Grand changement depuis la dernière fois ({prev}kg → {next}kg). Cette valeur est-elle correcte ?",
+  "入力し直す": "Corriger",
 };
