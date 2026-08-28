@@ -1078,4 +1078,9 @@ export const DE: Record<string, string> = {
   "直近7日平均と、その前7日平均の差": "Differenz zwischen dem Schnitt der letzten 7 Tage und den 7 Tagen davor",
   "挙上も継続中 → 筋肉の乗る増量です": "Gewichte steigen auch → Muskelbetonter Aufbau",
   "目標を見直す": "Ziel anpassen",
+  "食間リマインド（増量向け）": "Mahlzeiten-Erinnerung (Aufbau)",
+  "最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）": "Benachrichtigung, wenn seit der letzten Mahlzeit 5 Stunden vergangen sind (keine Benachrichtigungen von 21:30 bis 7:00 Uhr)",
+  "そろそろ補給の時間です": "Zeit für eine Stärkung!",
+  "食間が5時間あきました。シェイク1杯でも立派な1食です。": "Seit deiner letzten Mahlzeit sind 5 Stunden vergangen. Selbst ein Shake zählt als vollwertige Mahlzeit.",
+  "あとで（2時間後）": "Später (in 2 Std.)",
 };

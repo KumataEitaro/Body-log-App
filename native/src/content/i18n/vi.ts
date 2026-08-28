@@ -1078,4 +1078,9 @@ export const VI: Record<string, string> = {
   "直近7日平均と、その前7日平均の差": "Chênh lệch giữa trung bình 7 ngày gần nhất và 7 ngày trước đó",
   "挙上も継続中 → 筋肉の乗る増量です": "Vẫn duy trì nâng tạ → Tăng cân tăng cơ",
   "目標を見直す": "Xem lại mục tiêu",
+  "食間リマインド（増量向け）": "Nhắc nhở giữa các bữa ăn (Tăng cân)",
+  "最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）": "Thông báo khi cách bữa ăn cuối 5 giờ (Không thông báo từ 21:30 đến 7:00 sáng hôm sau)",
+  "そろそろ補給の時間です": "Đã đến lúc nạp thêm năng lượng",
+  "食間が5時間あきました。シェイク1杯でも立派な1食です。": "Đã 5 giờ trôi qua kể từ bữa ăn cuối. Chỉ một ly shake cũng là một bữa ăn tuyệt vời.",
+  "あとで（2時間後）": "Để sau (2 giờ nữa)",
 };

@@ -99,6 +99,8 @@ jest.mock('expo-notifications', () => ({
   scheduleNotificationAsync: jest.fn(() => Promise.resolve('notif-id')),
   cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
   setNotificationHandler: jest.fn(),
+  setNotificationCategoryAsync: jest.fn(() => Promise.resolve()),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
 jest.mock('expo-splash-screen', () => ({

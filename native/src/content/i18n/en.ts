@@ -1178,4 +1178,9 @@ export const EN: Record<string, string> = {
   "直近7日平均と、その前7日平均の差": "Difference between the past 7-day average and the previous 7 days",
   "挙上も継続中 → 筋肉の乗る増量です": "Lifting consistently → You're gaining lean muscle",
   "目標を見直す": "Adjust goal",
+  "食間リマインド（増量向け）": "Between-Meal Reminder (Bulking)",
+  "最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）": "Notifies you when 5 hours have passed since your last meal (No notifications between 21:30 and 7:00)",
+  "そろそろ補給の時間です": "Time to refuel!",
+  "食間が5時間あきました。シェイク1杯でも立派な1食です。": "It's been 5 hours since your last meal. Even a single shake counts as a great meal.",
+  "あとで（2時間後）": "Later (In 2 hours)",
 };

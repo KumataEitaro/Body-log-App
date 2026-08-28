@@ -1162,4 +1162,9 @@ export const ES: Record<string, string> = {
   "直近7日平均と、その前7日平均の差": "Diferencia entre el promedio de los últimos 7 días y los 7 días anteriores",
   "挙上も継続中 → 筋肉の乗る増量です": "Sigues aumentando cargas → estás ganando músculo",
   "目標を見直す": "Revisar objetivo",
+  "食間リマインド（増量向け）": "Recordatorio entre comidas (volumen)",
+  "最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）": "Aviso tras 5 horas desde la última comida (sin notificaciones de 21:30 a 7:00)",
+  "そろそろ補給の時間です": "Es hora de recargar energías",
+  "食間が5時間あきました。シェイク1杯でも立派な1食です。": "Han pasado 5 horas desde tu última comida. Incluso un batido cuenta como una comida completa.",
+  "あとで（2時間後）": "Más tarde (en 2 horas)",
 };

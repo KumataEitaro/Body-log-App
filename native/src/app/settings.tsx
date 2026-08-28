@@ -7,7 +7,8 @@ import {
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, type DailyReminderMode } from '@/lib/notify';
+import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, type DailyReminderMode } from '@/lib/notify';
+import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile } from 'lucide-react-native';
 import ColumnReader from '@/components/ColumnReader';
@@ -145,9 +146,12 @@ export default function SettingsScreen() {
   const [remMode, setRemMode] = useState<DailyReminderMode>('off');
   const [remHour, setRemHour] = useState(21);
   const [notifWeekly, setNotifWeekly] = useState(false);
+  const [notifGap, setNotifGap] = useState(false);
+  const purpose = usePurpose(); // 食間リマインド行はbulk（増量）の人にだけ見せる
   useEffect(() => {
     getDailyReminderPrefs().then((p) => { setRemMode(p.mode); setRemHour(p.hour); }).catch(() => {});
     AsyncStorage.getItem('bl-notif-weekly').then((v) => setNotifWeekly(v === '1')).catch(() => {});
+    AsyncStorage.getItem('bl-notif-gap').then((v) => setNotifGap(v === '1')).catch(() => {});
   }, []);
   async function changeReminder(mode: DailyReminderMode, hour: number) {
     setRemMode(mode); setRemHour(hour);
@@ -162,6 +166,18 @@ export default function SettingsScreen() {
     const ok = await setWeeklyPhotoReminder(on);
     if (!ok && on) { setNotifWeekly(false); Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。')); return; }
     AsyncStorage.setItem('bl-notif-weekly', on ? '1' : '0').catch(() => {});
+  }
+  // 食間リマインド（増量向け）: 予約自体は食事保存のたびにlib/syncが行う。
+  // ここでは設定の永続化と、ONにする瞬間の権限確認だけを担う
+  async function toggleGap(on: boolean) {
+    setNotifGap(on);
+    if (on && !(await ensureNotifPermission())) {
+      setNotifGap(false);
+      Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'));
+      return;
+    }
+    AsyncStorage.setItem('bl-notif-gap', on ? '1' : '0').catch(() => {});
+    if (!on) cancelMealGapReminder().catch(() => {}); // OFFにしたら予約済みぶんも消す
   }
 
   async function saveProfile() {
@@ -387,6 +403,19 @@ export default function SettingsScreen() {
             <Text style={[s.notifSub, { marginTop: 8 }]}>{t('通知をタップするとそのまま入力できます。「今日は聞かないで」を押した日も静かになります。')}</Text>
           )}
         </View>
+        {/* 食間リマインドは増量（bulk）の人にだけ意味がある行なので、それ以外には見せない */}
+        {purpose === 'bulk' && (
+          <>
+            <View style={s.sep} />
+            <View style={s.notifRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.notifLabel}>{t('食間リマインド（増量向け）')}</Text>
+                <Text style={s.notifSub}>{t('最後の食事から5時間あくとお知らせ（21:30〜翌7:00は通知しません）')}</Text>
+              </View>
+              <Switch value={notifGap} onValueChange={toggleGap} trackColor={{ true: C.teal }} />
+            </View>
+          </>
+        )}
         <View style={s.sep} />
         <View style={s.notifRow}>
           <View style={{ flex: 1 }}>
