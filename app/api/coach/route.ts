@@ -144,7 +144,8 @@ export async function POST(req: Request) {
     ? planBase + (todayEvent ? Math.round(Number(todayEvent.extra_kcal)) : 0)
     : targetToday;
   // 目的（オンボーディングで選択）。係数が未設定の間は目的の既定値を使う
-  const purpose = PURPOSE_PRESETS[String((prof as { purpose?: string | null }).purpose ?? '')] ?? null;
+  const purposeKey = String((prof as { purpose?: string | null }).purpose ?? '');
+  const purpose = PURPOSE_PRESETS[purposeKey] ?? null;
   const m = macroTargets(latestW, goalKcalToday,
     goalRow?.protein_per_kg ?? purpose?.p, goalRow?.fat_per_kg ?? purpose?.f, goalRow?.fat_max_g);
   const eatenK = Math.round(Number(todayEntry?.intake) || 0);
@@ -189,7 +190,8 @@ export async function POST(req: Request) {
     ? '\n【これまでの会話】\n' + history.map((h) => `${h.role === 'user' ? '本人' : 'コーチ'}: ${String(h.text).slice(0, 200)}`).join('\n')
     : '';
 
-  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang });
+  // 増量（bulk）のときはプロンプトの方針も切り替わる（食べ忘れ対策・液体カロリー提案）
+  const prompt = buildCoachPrompt({ dataBlock, historyBlock, question, answerLang, purposeKey });
 
   const r = await callGemini(key, [{ text: prompt }], 0.4);
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });

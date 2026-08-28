@@ -16,7 +16,9 @@ import Svg, { Polyline } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
-import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell } from 'lucide-react-native';
+import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
+import LeanBulkCard from '@/components/LeanBulkCard';
+import { usePurpose } from '@/lib/purpose';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
@@ -57,12 +59,13 @@ const series = () => [
 const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }, { label: t('全'), d: 9999 }] as const;
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
-const BODY_ORDER_DEFAULT = ['digest', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
+// bulkguardは増量目的（purpose==='bulk'）のときだけメニューに現れる（下のvisibleOrderで絞る）
+const BODY_ORDER_DEFAULT = ['digest', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
 // マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
 const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
 const CARD_LABELS = (): Record<string, string> => ({
-  digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
+  digest: t('週間ダイジェスト'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
@@ -119,6 +122,8 @@ export default function ChangesScreen() {
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
   const guide = useGuide();
+  // リーンバルク・ガードは増量目的のときだけ意味を持つ（減量中は判定が全部ノイズになる）
+  const purpose = usePurpose();
   const chartTarget = useGuideTarget('chart');
   // 開いている詳細ページ（nullならマスタメニュー）。ヘルスケア式のメニュー→詳細
   const [detailKey, setDetailKey] = useState<string | null>(null);
@@ -572,6 +577,7 @@ export default function ChangesScreen() {
   function cardBody(key: string): ReactNode {
     switch (key) {
       case 'digest': return digestCard;
+      case 'bulkguard': return <LeanBulkCard />;
       case 'slots': return slotsCard;
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
@@ -594,13 +600,15 @@ export default function ChangesScreen() {
     }
   }
 
+  // 増量目的でないときはbulkguardをメニューにも⊕シートにも出さない（並び順は保持）
+  const unavailable = purpose === 'bulk' ? [] : ['bulkguard'];
   const hidden = hiddenAll;
-  const visibleOrder = orderAll.filter((k) => !hidden.includes(k));
+  const visibleOrder = orderAll.filter((k) => !hidden.includes(k) && !unavailable.includes(k));
 
-  // 表示中カードの並べ替え結果を、非表示カードの位置を保ったまま全体の順序へ戻す
+  // 表示中カードの並べ替え結果を、非表示・非対象カードの位置を保ったまま全体の順序へ戻す
   const setOrder = (nextVisible: string[]) => {
     let i = 0;
-    setOrderAll(orderAll.map((k) => (hidden.includes(k) ? k : nextVisible[i++])));
+    setOrderAll(orderAll.map((k) => (hidden.includes(k) || unavailable.includes(k) ? k : nextVisible[i++])));
   };
 
   function hideCard(key: string) {
@@ -646,6 +654,7 @@ export default function ChangesScreen() {
   function summaryOf(key: string): string {
     switch (key) {
       case 'digest': return t('今週のふりかえり');
+      case 'bulkguard': return t('週あたりの増量ペースを見張る');
       case 'kpi': {
         if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
         const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
@@ -684,6 +693,7 @@ export default function ChangesScreen() {
     const p = { size: 17, color: C.teal } as const;
     switch (key) {
       case 'digest': return <Sparkles {...p} />;
+      case 'bulkguard': return <Gauge {...p} />;
       case 'kpi': return <PersonStanding {...p} />;
       case 'calendar': case 'tcal': return <CalendarDays {...p} />;
       case 'chart': case 'tchart': return <TrendingUp {...p} />;
@@ -784,7 +794,7 @@ export default function ChangesScreen() {
       {!editing && <QuickLogFab />}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
-        hidden={hidden} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
+        hidden={hidden.filter((k) => !unavailable.includes(k))} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
       />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
