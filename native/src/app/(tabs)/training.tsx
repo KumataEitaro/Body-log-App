@@ -1,7 +1,7 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration, AppState } from 'react-native';
 import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
@@ -21,6 +21,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import LiftPicker from '@/components/LiftPicker';
 import WeightDial from '@/components/WeightDial';
+import PlateCalc from '@/components/PlateCalc';
+import { enqueue, flush, pendingCount, subscribePendingCount, isNetworkError } from '@/lib/offlineQueue';
 import { loadCustomLifts, bwRatioOf, isBodyweightLift, liftPartOf, liftPartLabel, LIFT_PARTS } from '@/lib/lifts';
 import {
   groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, effectiveKg, weightLookup, volumeOf,
@@ -127,6 +129,12 @@ export default function TrainingScreen() {
   const vis = (k: string) => !cards.layout.hidden.includes(k);
   const [editing, setEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+
+  // ===== オフラインキュー（ジム地下の圏外対策）=====
+  // 圏外で保存に失敗した記録は端末に積まれる。ここはその「未同期件数」と自動送信の起点。
+  const [pendingN, setPendingN] = useState(0);
+  // プレート計算機（重量ダイアルの補助。目標総重量→片側のプレート構成）
+  const [plateOpen, setPlateOpen] = useState(false);
 
   // ===== きょうの動き（消費kcal・歩数・目標への逆算）=====
   // コンセプト: 食事タブの「あと食べられる量」と同じ文法で「動き」を見せる。
@@ -291,10 +299,25 @@ export default function TrainingScreen() {
         // DBには canon（日本語固定）を書く。翻訳名を書くと言語切替で集計が分断される
         text: `🏃 ${a.canon} ${actMin}分${km ? ` ${km}km` : ''}（約${kcal}kcal消費）`, photo_urls: [],
       };
-      // v17列（ex_minutes/ex_km）が無い旧DBでも保存できるようフォールバック
-      let { error } = await supabase.from('logs').insert({ ...base, ex_minutes: actMin, ex_km: km });
-      if (error && /ex_minutes|ex_km|column|schema/i.test(error.message)) {
-        ({ error } = await supabase.from('logs').insert(base));
+      // v17列（ex_minutes/ex_km）が無い旧DBでも保存できるようフォールバック。
+      // fetch自体の例外（圏外）もerrorに畳んで、下でネットワーク起因かを判定する
+      let error: { message: string } | null = null;
+      try {
+        ({ error } = await supabase.from('logs').insert({ ...base, ex_minutes: actMin, ex_km: km }));
+        if (error && /ex_minutes|ex_km|column|schema/i.test(error.message) && !isNetworkError(error)) {
+          ({ error } = await supabase.from('logs').insert(base));
+        }
+      } catch (e) {
+        error = { message: String((e as Error)?.message ?? e) };
+      }
+      if (error && isNetworkError(error)) {
+        // 圏外: 端末に積んで成功扱い（電波が戻ったら自動送信。列フォールバックはflush側にもある）
+        await enqueue({ ...base, ex_minutes: actMin, ex_km: km });
+        bumpFoodFreq('act:' + a.id);
+        setActFreq(foodScores(readFoodFreq()));
+        setActId(null); setActKm('');
+        setMsg({ ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期されます。') });
+        return;
       }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
@@ -303,17 +326,52 @@ export default function TrainingScreen() {
       setActFreq(foodScores(readFoodFreq()));
       setActId(null); setActKm('');
       setMsg({ ok: true, text: t('{act}を記録しました。目標カロリーに+{kcal}kcal反映されます🎉', { act: `${activityName(a.id)} ${actMin}${t('分')}${km ? ` ${km}km` : ''}`, kcal }) });
+      doFlush().catch(() => {});   // 保存が通った＝オンライン。積み残しがあれば一緒に送る
     } finally { setActSaving(false); }
   }
 
   const setT = (i: number, patch: Partial<TRow>) => setTRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('logs').select('id,date,text')
-      .like('text', '🏋️%').order('at', { ascending: false }).limit(60);
-    setHistory((data as HistRow[]) || []);
+    try {
+      const { data } = await supabase.from('logs').select('id,date,text')
+        .like('text', '🏋️%').order('at', { ascending: false }).limit(60);
+      // 圏外での失敗（data=null）で既存の履歴を消さない。
+      // 履歴が生きていれば「前回参照」も重量ダイアルの初期位置もオフラインのまま効く
+      if (data) setHistory(data as HistRow[]);
+    } catch { /* 圏外。手元のstateを保つ */ }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // キューの自動送信。起点は ①タブのマウント ②アプリのフォアグラウンド復帰 ③保存成功時。
+  // NetInfoは使わない（依存を増やさない）。失敗＝まだ圏外として次の起点に任せる
+  const doFlush = useCallback(async () => {
+    try {
+      if ((await pendingCount()) === 0) return;
+      const r = await flush();
+      if (r.sent > 0) { await load(); loadMove(viewDate); }   // 送れたぶんを画面に反映
+    } catch { /* 次の起点（復帰・保存・手動タップ）で再試行される */ }
+  }, [load, loadMove, viewDate]);
+  useEffect(() => {
+    pendingCount().then(setPendingN).catch(() => {});
+    const off = subscribePendingCount(setPendingN);
+    doFlush();   // マウント時に一度（前回セッションの積み残しを送る）
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') doFlush(); });
+    return () => { off(); sub.remove(); };
+  }, [doFlush]);
+
+  // 未同期チップのタップ（手動flush）。結果はページ上部のメッセージ欄に出す
+  async function manualFlush() {
+    setMsg(null);
+    try {
+      const r = await flush();
+      if (r.sent > 0) { await load(); loadMove(viewDate); }
+      if (r.left > 0) setMsg({ ok: false, text: t('まだ圏外のようです。電波が戻ったら自動で同期されます。') });
+      else if (r.sent > 0) setMsg({ ok: true, text: t('{n}件を同期しました🎉', { n: r.sent }) });
+    } catch {
+      setMsg({ ok: false, text: t('まだ圏外のようです。電波が戻ったら自動で同期されます。') });
+    }
+  }
 
   // 履歴を日ごとにまとめる（食事の「その日の記録」と同じ見せ方にそろえる）
   const days = groupLiftsByDay(history, weightAt);
@@ -451,10 +509,31 @@ export default function TrainingScreen() {
         const { error: delErr } = await supabase.from('logs').delete().eq('id', rewriting.id);
         if (delErr) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       }
-      const { error } = await supabase.from('logs').insert({
+      const row = {
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
-      });
+      };
+      // fetch自体の例外（圏外）もerrorに畳んで、ネットワーク起因ならキューに退避する
+      let error: { message: string } | null = null;
+      try {
+        ({ error } = await supabase.from('logs').insert(row));
+      } catch (e) {
+        error = { message: String((e as Error)?.message ?? e) };
+      }
+      if (error && isNetworkError(error)) {
+        // 圏外: 端末に積んで成功扱い。オンライン保存と同じ後片付けをして、
+        // レストタイマーも回す（圏外でもトレーニングは続く）。RMフィードバックは通信が要るので出さない
+        await enqueue(row);
+        const wasEditOff = rewriting != null;
+        setRewriting(null);
+        for (const r of tRows.filter(rowReady)) bumpFoodFreq('lift:' + r.name.trim());
+        setActFreq(foodScores(readFoodFreq()));
+        const lastOff = wasEditOff ? null : tRows.filter(rowReady).slice(-1)[0] ?? null;
+        setTRows([lastOff ? { name: lastOff.name, kg: lastOff.kg, reps: '', sets: '' } : { name: '', kg: '', reps: '', sets: '' }]);
+        if (!wasEditOff) { setRestLeft(restSec); bumpRestCount(); }
+        setMsg({ ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期されます。') });
+        return;
+      }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
       const wasEdit = rewriting != null;
@@ -501,6 +580,7 @@ export default function TrainingScreen() {
       await load();
       if (!wasEdit) { setRestLeft(restSec); bumpRestCount(); } // 保存でレストタイマー自動開始（長さは設定した値）
       setMsg({ ok: true, text: wasEdit ? t('書き換えました。') : fb });
+      doFlush().catch(() => {});   // 保存が通った＝オンライン。積み残しがあれば一緒に送る
     } finally {
       setSaving(false);
     }
@@ -531,6 +611,14 @@ export default function TrainingScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* 未同期バッジ: 圏外保存の積み残しがあるときだけ、控えめなチップで知らせる（タップで手動送信） */}
+      {pendingN > 0 && (
+        <Pressable style={s.syncChip} onPress={manualFlush} hitSlop={6}>
+          <Text style={s.syncChipT}>{t('未同期 {n}件', { n: pendingN })}</Text>
+          <Text style={s.syncChipSub}>{t('タップで同期')}</Text>
+        </Pressable>
+      )}
 
       {/* 操作結果のメッセージ（どのカードの操作もここに出す） */}
       {msg && <Text style={[s.msg, { marginTop: 0, marginBottom: 10, color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
@@ -718,7 +806,13 @@ export default function TrainingScreen() {
       {/* 入力 */}
       <View style={[s.card, !vis('liftInput') && { display: 'none' }]}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
-        <View style={s.h2Row}><ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text></View>
+        <View style={s.h2Row}>
+          <ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text>
+          {/* プレート計算機（重量ダイアル付近の小さな入口。目標総重量→片側のプレート構成） */}
+          <Pressable style={s.plateBtn} onPress={() => setPlateOpen(true)} hitSlop={8}>
+            <Text style={s.plateBtnT}>{t('プレート')}</Text>
+          </Pressable>
+        </View>
         {rewriting && (
           <View style={s.editBanner}>
             <Text style={s.editBannerT}>{t('✏️ {date}の記録を書き換え中', { date: dayLabel(rewriting.date) })}</Text>
@@ -982,6 +1076,14 @@ export default function TrainingScreen() {
       );
     })()}
 
+    {/* プレート計算機。初期値は入力中のkg（無ければ60kg=よくある発射台） */}
+    {plateOpen && (
+      <PlateCalc
+        initial={tRows.map((r) => Number(r.kg)).find((n) => n > 0) ?? 60}
+        onClose={() => setPlateOpen(false)}
+      />
+    )}
+
     <LiftPicker
       visible={liftPickRow != null}
       onClose={() => setLiftPickRow(null)}
@@ -1149,4 +1251,18 @@ const s = StyleSheet.create({
   moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
   moreBtnT: { fontSize: 13, color: C.teal, fontWeight: '800' },
   histHint: { fontSize: 13, color: C.faint, marginTop: 8 },
+  // 未同期チップ（圏外保存の積み残し）。責め色にしない・控えめに
+  syncChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    paddingHorizontal: 11, paddingVertical: 6, marginBottom: 10,
+  },
+  syncChipT: { fontSize: 12, fontWeight: '800', color: C.amber, fontVariant: ['tabular-nums'] },
+  syncChipSub: { fontSize: 11, fontWeight: '700', color: C.faint },
+  // プレート計算機の入口（筋トレ入力カードの見出し右端）
+  plateBtn: {
+    marginLeft: 'auto', borderWidth: 1, borderColor: C.line, backgroundColor: C.chipBg,
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  plateBtnT: { fontSize: 11, fontWeight: '800', color: C.sub },
 });
