@@ -138,6 +138,23 @@ workflows:
             plutil -remove aps-environment "$ENT" 2>/dev/null && echo "aps-environment removed" || echo "aps-environment not present (ok)"
             plutil -p "$ENT"
           fi
+      - name: Add widget extension target (ENABLE_WIDGET=true のみ)
+        script: |
+          # ホームウィジェット（B-9）。ENABLE_WIDGET未設定なら何もしない＝従来ビルドと完全に同一。
+          # 上の「未使用のentitlementを除去」はaps-environmentしか触らないため、
+          # ここで足すApp Groupが消されることはない（除去→追加の順序で安全）。
+          if [ "$ENABLE_WIDGET" != "true" ]; then
+            echo "ENABLE_WIDGET != true → ウィジェットなしでビルド（従来と同一）"
+            exit 0
+          fi
+          # 本体アプリのentitlementsにApp Groupを注入（ビルド時のみ・リポジトリは汚さない）
+          ENT="native/ios/BodyLog/BodyLog.entitlements"
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENT" || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.gotcha.bodylog.rn" "$ENT" || true
+          plutil -p "$ENT"
+          # 拡張ターゲットをpbxprojへ注入（この後のagvtoolがウィジェットのビルド番号も揃える）
+          gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
+          ruby scripts/add-widget-target-rn.rb
       - name: Set build number
         script: |
           cd native/ios
