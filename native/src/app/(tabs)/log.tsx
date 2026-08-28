@@ -56,6 +56,7 @@ import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
 import MoodFace, { MoodInline } from '@/components/MoodFace';
 import ComebackSheet from '@/components/ComebackSheet';
+import StartChecklist from '@/components/StartChecklist';
 import { invalidateStreak } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
@@ -69,10 +70,10 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
-const LOG_CARDS = ['hero', 'mood', 'feed', 'recent', 'weight'];
+const LOG_CARDS = ['hero', 'checklist', 'mood', 'feed', 'recent', 'weight'];
 const LOG_LABELS = (): Record<string, string> => ({
-  hero: t('あと食べられる量'), mood: t('いまの気分は？'), feed: t('今日の記録'),
-  recent: t('前の食事をもう一度'), weight: t('体重を記録'),
+  hero: t('あと食べられる量'), checklist: t('スタートチェックリスト'), mood: t('いまの気分は？'),
+  feed: t('今日の記録'), recent: t('前の食事をもう一度'), weight: t('体重を記録'),
 });
 
 type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
@@ -137,6 +138,7 @@ export default function LogScreen() {
   }
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+  const wInputRef = useRef<TextInput>(null);   // 体重クイック入力（スタートチェックリストからの誘導先）
   const kbVisible = useKeyboardVisible();
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
@@ -963,6 +965,18 @@ export default function LogScreen() {
           </Animated.View>
         )}
 
+        {/* スタートチェックリスト（新規ユーザーの最初の1週間・登録14日以内だけ・自動判定） */}
+        {vis('checklist') && (
+          <StartChecklist
+            editing={editing}
+            onHide={() => cards.hide('checklist')}
+            onFocusInput={() => inputRef.current?.focus()}
+            onTakePhoto={takePhoto}
+            onFocusWeight={() => wInputRef.current?.focus()}
+            refreshKey={dayLogs.length}
+          />
+        )}
+
         {/* 昨日の穴埋めカード（責めないトーン） */}
         {backfill && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
@@ -1134,7 +1148,7 @@ export default function LogScreen() {
         <Animated.View style={[s.card, enter[2]]}>
           <MinusBadge editing={editing} onPress={() => cards.hide('weight')} />
           <View style={[s.wRow, { marginTop: 0 }]}>
-            <TextInput style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
+            <TextInput ref={wInputRef} style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
                        placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
             <Text style={s.wUnit}>{units.weight}</Text>
             <OptionButton variant="tonal" label={t('体重を記録')} leading={<Weight size={15} color={C.ink} />}

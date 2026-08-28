@@ -1212,4 +1212,13 @@ export const VI: Record<string, string> = {
   "プレートなし（バーのみで{bar}kg）": "Không dùng bánh tạ (chỉ đòn {bar}kg)",
   "あと片側{n}kgぶんは端数です（1.25kg未満）": "Còn lẻ {n}kg mỗi bên (dưới 1.25kg)",
   "片側 {side}kg × 2 ＋ バー {bar}kg": "Mỗi bên {side}kg × 2 ＋ Đòn {bar}kg",
+  "スタートチェックリスト": "Danh sách bắt đầu",
+  "プロフィールと目標を設定する": "Thiết lập hồ sơ và mục tiêu",
+  "最初の食事を、つぶやきで記録する": "Ghi lại bữa ăn đầu tiên bằng ghi chú nhanh",
+  "写真で1回記録してみる": "Thử ghi lại 1 lần bằng hình ảnh",
+  "体重を1回記録する": "Ghi lại cân nặng 1 lần",
+  "AIに1回相談してみる": "Thử trò chuyện với AI 1 lần",
+  "通知を設定する（記録がない日だけ）": "Cài đặt thông báo (chỉ những ngày chưa ghi lại)",
+  "ぜんぶ完了！あなたの記録生活、いいスタートです 🎉": "Đã hoàn thành tất cả! Khởi đầu tuyệt vời cho hành trình của bạn 🎉",
+  "最初の1週間で、ぜんぶ試してみましょう。やれば自動で✓が付きます。": "Hãy thử trải nghiệm tất cả trong tuần đầu tiên. Hệ thống sẽ tự động đánh dấu ✓ khi bạn hoàn thành.",
 };
