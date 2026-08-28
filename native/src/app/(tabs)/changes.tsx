@@ -16,13 +16,14 @@ import Svg, { Polyline } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
-import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
+import { CalendarDays, CalendarRange, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
 import LeanBulkCard from '@/components/LeanBulkCard';
 import { usePurpose } from '@/lib/purpose';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
+import WeekdayHeatmapCard, { weekdayRhythmSummary } from '@/components/WeekdayHeatmapCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2 } from 'lucide-react-native';
@@ -60,12 +61,12 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 
 // ===== レイアウト並び替え（iOS風Jiggle Mode） =====
 // bulkguardは増量目的（purpose==='bulk'）のときだけメニューに現れる（下のvisibleOrderで絞る）
-const BODY_ORDER_DEFAULT = ['digest', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'trends', 'health'];
+const BODY_ORDER_DEFAULT = ['digest', 'bulkguard', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
 const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
 // マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
 const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
 const CARD_LABELS = (): Record<string, string> => ({
-  digest: t('週間ダイジェスト'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), goal: t('目標'),
+  digest: t('週間ダイジェスト'), bulkguard: t('リーンバルク・ガード'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
@@ -584,6 +585,8 @@ export default function ChangesScreen() {
       case 'chart': return chartCard;
       case 'photos': return <BodyPhotosCard />;
       case 'binge': return <BingeTriggerCard />;
+      // 画面が既に持っているrows（date/intake/target）をそのまま渡す（再取得しない最小構成）
+      case 'weekmap': return <WeekdayHeatmapCard rows={rows} />;
       case 'table': return <TableEntryCard onOpenBody={() => openBodyTable('weight')} onOpenLift={() => setLiftTableOpen(true)} />;
       case 'ttable': return <TableEntryCard onOpenBody={() => openBodyTable('weight')} onOpenLift={() => setLiftTableOpen(true)} />;
       case 'goal': return <GoalSummaryCard mode="weight" />;
@@ -673,6 +676,7 @@ export default function ChangesScreen() {
       case 'table': return t('体重・ウエスト・体脂肪率の一覧');
       case 'photos': return t('見た目の変化を並べて見る');
       case 'binge': return t('食べすぎの引き金を分析');
+      case 'weekmap': return weekdayRhythmSummary(rows, today); // 例:「金曜日に崩れやすい」
       case 'trends': return foodFx.length > 0 ? t('{n}件の食材傾向が見つかっています', { n: foodFx.length }) : t('食材×翌日体重の傾向');
       case 'health': {
         const st = activity?.find((d) => d.date === today)?.steps;
@@ -702,6 +706,7 @@ export default function ChangesScreen() {
       case 'table': case 'ttable': return <Table2 {...p} />;
       case 'photos': return <Camera {...p} />;
       case 'binge': return <Tornado {...p} />;
+      case 'weekmap': return <CalendarRange {...p} />;
       case 'trends': return <Salad {...p} />;
       case 'health': return <Footprints {...p} />;
       case 'tkpi': case 'tbal': case 'tpart': return <Dumbbell {...p} />;
