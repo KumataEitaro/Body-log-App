@@ -1235,4 +1235,9 @@ export const ID: Record<string, string> = {
   "{n}週間で下向き": "Tren turun dalam {n} minggu",
   "{n}週間で上向き": "Tren naik dalam {n} minggu",
   "横ばいです": "Stabil",
+  "{date}を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！": "Mencatat {date} sebagai \"Makan berlebih +{n}kcal\". Yuk, mulai atur kembali hari ini! 💪",
+  "{date}を「目安どおり（±0）」で確定しました。": "Mengonfirmasi {date} sebagai \"Sesuai target (±0)\".",
+  "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Mau catat singkat saja untuk tanggal {date}?",
+  "📝 {date}の食事記録がありません": "📝 Tidak ada catatan makan untuk tanggal {date}",
+  "くわしく記録する": "Catat detail",
 };
