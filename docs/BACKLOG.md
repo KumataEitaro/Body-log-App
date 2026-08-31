@@ -222,12 +222,7 @@
 ## D. 熊田さんのTODO（2026-08-29版・開発側は残件ゼロ）
 
 ### すぐ（アプリを動かすため）
-1. **Supabase SQLを4本実行**（順不同・どれも未実行でもアプリは壊れない）
-   https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
-   - migration-19.sql（free/lite写真枠の日次化）
-   - migration-20.sql（増量サイクル履歴）
-   - migration-21.sql（妊娠・授乳フラグ）
-   - migration-22.sql（AI相談セッション台帳＋制約プロフィール列）
+1. ~~Supabase SQLを4本実行~~ ✅ 完了（2026-08-29・migration-19〜22適用済み）
 2. **Codemagicで rn-testflight ビルド**（次=**1.0.19**・1.0.15以降の全機能入り。
    expo-camera追加のためネイティブ再ビルド必須）
 3. **実機で体感チェック**（体感が合格ラインのもの）: 概要の並べ替えぬるぬる／
