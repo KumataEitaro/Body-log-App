@@ -4,10 +4,10 @@
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // 発見に失敗した時の保険（-latest系を先頭に。旧世代IDはGoogle側で随時廃止されるため保険は薄く）
+// 2026-08-30更新: 実在確認済みの名前に刷新（3-flash/2.5系は404、lite系はスパイク時の生存率が高い）
 const STATIC_FALLBACK = [
-  'gemini-flash-latest', 'gemini-pro-latest',
-  'gemini-3-flash', 'gemini-3.0-flash', 'gemini-3-pro',
-  'gemini-2.5-flash', 'gemini-2.5-pro',
+  'gemini-flash-latest', 'gemini-flash-lite-latest',
+  'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-pro-latest',
 ];
 
 let cachedModels: string[] | null = null;
@@ -85,7 +85,7 @@ const MAX_PARALLEL = 3;
 
 type ModelTry =
   | { ok: true; text: string }
-  | { ok: false; err: string; stale?: boolean; penalize?: boolean };
+  | { ok: false; err: string; stale?: boolean; penalize?: boolean; penaltyMs?: number };
 
 // 1モデルを試す（400→thinking設定を外して再試行 / 429・503→0.8秒後に1回だけ再試行）
 async function tryModel(
@@ -130,9 +130,20 @@ async function tryModel(
         includeThinking = false; // 400はまずthinkingConfig非互換を疑い、外して同モデルで再試行
         continue;
       }
+      if (res.status === 400) {
+        // thinkingを外しても400＝このモデルはこちらのリクエスト形と恒常的に非互換
+        // （2026-08-30実測: gemini-3.6-flashが常時400でヘッジ枠を1つ潰し、
+        //   503スパイク時に生存モデルへ届かず全滅する事故の温床になった）。長めに追放する
+        return { ok: false, err: lastErr, penalize: true, penaltyMs: 6 * 3600_000 };
+      }
       if ((res.status === 503 || res.status === 429) && attempt < 2) {
         await new Promise((r) => setTimeout(r, 800)); // 過負荷は同モデルで1回だけ再試行
         continue;
+      }
+      if (res.status === 503 || res.status === 429) {
+        // 再試行しても過負荷＝短時間だけ候補から外す（スパイクは数分で引くので長く外さない。
+        // 次のリクエストが同じ壁に正面衝突し続けるのを防ぐ）
+        return { ok: false, err: lastErr, penalize: true, penaltyMs: 60_000 };
       }
       // 404=モデル廃止。以後しばらく候補から外し、全滅時の再発見トリガーにもする
       return { ok: false, err: lastErr, stale: res.status === 404, penalize: res.status === 404 };
@@ -193,7 +204,9 @@ export async function callGemini(
     ]);
     if (found.length) cachedModels = found;
   }
-  const discovered = cachedModels && cachedModels.length ? cachedModels.slice(0, 4) : [];
+  // 上位4→6に拡大（2026-08-30: 上位flash族が揃って503になるスパイクで、
+  // lite系まで候補に入っていれば生き残れたため。系統の多様性が可用性そのもの）
+  const discovered = cachedModels && cachedModels.length ? cachedModels.slice(0, 6) : [];
   // コールド（成功実績なし）なら、実測ピンで速いモデルを先に掴む（+最大1.5秒）
   if (!lastGood) {
     lastGood = await probeFastest(key, [...new Set([...discovered, ...STATIC_FALLBACK])].slice(0, 5));
@@ -206,7 +219,7 @@ export async function callGemini(
   const now = Date.now();
   const alive = list.filter((m) => (badUntil.get(m) ?? 0) < now);
   if (alive.length) list = alive;   // 全滅していたらペナルティを無視して全候補で試す
-  list = list.slice(0, 6);
+  list = list.slice(0, 8);
 
   const errs: string[] = [];
   let sawStale = false;
@@ -252,7 +265,7 @@ export async function callGemini(
         }
         errs.push(r.err);
         if (r.stale) sawStale = true;
-        if (r.penalize) badUntil.set(model, Date.now() + BAD_TTL_MS);
+        if (r.penalize) badUntil.set(model, Date.now() + (r.penaltyMs ?? BAD_TTL_MS));
         pump();   // 失敗したら空いた枠で即座に次の候補へ
       });
       // 応答が遅い場合の追い越しを予約
