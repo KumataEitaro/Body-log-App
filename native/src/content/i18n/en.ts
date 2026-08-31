@@ -1335,4 +1335,9 @@ export const EN: Record<string, string> = {
   "{n}週間で下向き": "Trending down over {n} weeks",
   "{n}週間で上向き": "Trending up over {n} weeks",
   "横ばいです": "Trending flat",
+  "{date}を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！": "Recorded {date} as \"Overate by +{n}kcal\". Let's get back on track today!",
+  "{date}を「目安どおり（±0）」で確定しました。": "Confirmed {date} as \"On track (±0)\".",
+  "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Why not do a quick log for {date}?",
+  "📝 {date}の食事記録がありません": "📝 No meal logs for {date}",
+  "くわしく記録する": "Log in detail",
 };

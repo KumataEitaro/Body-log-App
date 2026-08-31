@@ -1235,4 +1235,9 @@ export const VI: Record<string, string> = {
   "{n}週間で下向き": "Xu hướng giảm trong {n} tuần",
   "{n}週間で上向き": "Xu hướng tăng trong {n} tuần",
   "横ばいです": "Đang đi ngang",
+  "{date}を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！": "Đã ghi nhận {date} là \"Ăn quá mức +{n}kcal\". Hãy bắt đầu lại từ hôm nay nhé!",
+  "{date}を「目安どおり（±0）」で確定しました。": "Đã xác nhận {date} là \"Đúng mục tiêu (±0)\".",
+  "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Bạn có muốn ghi lại sơ qua cho {date} không?",
+  "📝 {date}の食事記録がありません": "📝 Không có nhật ký ăn uống cho {date}",
+  "くわしく記録する": "Ghi lại chi tiết",
 };

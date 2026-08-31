@@ -701,7 +701,22 @@ export default function LogScreen() {
   }
 
   // ===== 昨日の穴埋め（未記録の爆食日を翌日に低摩擦で回収する・Web版と同一） =====
+  // 文言は「昨日」ではなく実日付で言う。過去日を表示中のユーザーには
+  // 「昨日」がどの日を指すのか分からなくなるため（βフィードバック 2026-08-30）
   const [backfill, setBackfill] = useState<{ date: string; binge: boolean } | null>(null);
+  function dateLabelOf(date: string): string {
+    const [yy, mm, dd] = date.split('-').map(Number);
+    const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
+    return t('{m}/{d}({w})', { m: mm, d: dd, w: wd[new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay()] });
+  }
+  // 「くわしく記録する」: その日へ移動して通常の入力ドック（つぶやき/写真/バーコード）で
+  // 品目まで入れられるようにする。手軽さ（±0/食べすぎたの2択）はそのまま残す
+  function backfillDetail() {
+    if (!backfill) return;
+    setViewDate(backfill.date);
+    setBackfill(null); // 詳しく書きにいくので帯は畳む（未記録のままなら次回起動でまた出る）
+    setTimeout(() => inputRef.current?.focus(), 400);
+  }
   const [backfillBusy, setBackfillBusy] = useState(false);
   const [backfillMore, setBackfillMore] = useState(false);
   useEffect(() => {
@@ -746,8 +761,8 @@ export default function LogScreen() {
       setMsg({
         ok: true,
         text: extra > 0
-          ? t('昨日を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！', { n: extra.toLocaleString() })
-          : t('昨日を「目安どおり（±0）」で確定しました。'),
+          ? t('{date}を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！', { date: dateLabelOf(backfill.date), n: extra.toLocaleString() })
+          : t('{date}を「目安どおり（±0）」で確定しました。', { date: dateLabelOf(backfill.date) }),
       });
     } finally {
       setBackfillBusy(false);
@@ -980,7 +995,9 @@ export default function LogScreen() {
         {/* 昨日の穴埋めカード（責めないトーン） */}
         {backfill && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>{backfill.binge ? '🍃 昨日の分、ざっくりだけ記録しませんか' : t('📝 昨日の食事記録がありません')}</Text>
+            <Text style={s.h2}>{backfill.binge
+              ? t('🍃 {date}の分、ざっくりだけ記録しませんか', { date: dateLabelOf(backfill.date) })
+              : t('📝 {date}の食事記録がありません', { date: dateLabelOf(backfill.date) })}</Text>
             <Text style={s.mutedT}>
               {backfill.binge
                 ? t('食べすぎた日ほど、記録すると立て直しが速くなります。ざっくりでOK。誰にも見られません。')
@@ -998,9 +1015,14 @@ export default function LogScreen() {
                 ))}
               </View>
             )}
-            <Pressable onPress={backfillSnooze} style={{ marginTop: 8, alignSelf: 'center' }} hitSlop={8}>
-              <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('あとで')}</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 22, marginTop: 10 }}>
+              <Pressable onPress={backfillDetail} hitSlop={8} disabled={backfillBusy}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' }}>{t('くわしく記録する')}</Text>
+              </Pressable>
+              <Pressable onPress={backfillSnooze} hitSlop={8}>
+                <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('あとで')}</Text>
+              </Pressable>
+            </View>
           </View>
         )}
 

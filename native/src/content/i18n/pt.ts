@@ -1235,4 +1235,9 @@ export const PT: Record<string, string> = {
   "{n}週間で下向き": "Tendência de queda em {n} semanas",
   "{n}週間で上向き": "Tendência de alta em {n} semanas",
   "横ばいです": "Estável",
+  "{date}を「食べすぎ +{n}kcal」として記録しました。今日から立て直しましょう！": "Registrou {date} como \"Excesso +{n}kcal\". Vamos recuperar o ritmo a partir de hoje! 💪",
+  "{date}を「目安どおり（±0）」で確定しました。": "Confirmou {date} como \"Dentro da meta (±0)\".",
+  "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Que tal fazer um registro rápido para {date}?",
+  "📝 {date}の食事記録がありません": "📝 Não há registro de refeição para {date}",
+  "くわしく記録する": "Registrar em detalhes",
 };
