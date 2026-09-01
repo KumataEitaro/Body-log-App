@@ -1339,4 +1339,8 @@ export const ES: Record<string, string> = {
   "食べ方の分析": "Análisis de nutrición",
   "週のふりかえり": "Resumen semanal",
   "運動の量": "Volumen de ejercicio",
+  "パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。": "Toma una foto de la tabla de información nutricional en el reverso del empaque para leer los valores exactos. Una vez tomada, envíala con ↑.",
+  "{date} の記録": "Registro del {date}",
+  "写真から読み取る（成分表示）": "Escanear foto (tabla nutricional)",
+  "※日本の商品はヒットしないことが多いです": "※ Es posible que los productos de Japón no aparezcan",
 };

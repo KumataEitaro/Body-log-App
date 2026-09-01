@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -27,6 +27,7 @@ import { featuredQuestions } from '@/content/askExamples';
 import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '@/lib/coachAction';
 import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
+import { useReduceMotion } from '@/lib/motion';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
 
@@ -88,6 +89,20 @@ export default function CoachScreen() {
   const [histOpen, setHistOpen] = useState(false);
   const [histQ, setHistQ] = useState('');
   const [hist, setHist] = useState<HistEntry[]>([]);
+
+  // 入力欄の縁パルス（食事タブの入力ドックと同じ流儀）。
+  // 全開の縁を重ねてopacityだけをネイティブで往復させる（色補間はJS負荷が高いため）
+  const glow = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
+  useEffect(() => {
+    if (reduceMotion) { glow.setValue(0.4); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 1, duration: 1250, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0, duration: 1250, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [glow, reduceMotion]);
 
   // セッション制: 「新しい相談を始める」から次に始めるまでが1セッション（使用回数はセッション開始時のみ1消費）。
   // IDは端末生成のUUID。永続化しない＝アプリ再起動で自然に新セッションになる
@@ -341,7 +356,9 @@ export default function CoachScreen() {
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
         <AskCatalog visible={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={(q) => send(q)} />
 
-        <View style={[s.inRow, { borderColor: C.teal, shadowColor: C.teal }]}>
+        <View style={s.inRow}>
+          {/* 発光レイヤ: 食事タブの入力ドックと同じ縁パルス（opacityのみネイティブ駆動） */}
+          <Animated.View pointerEvents="none" style={[s.inGlow, { opacity: glow }]} />
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
               <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />
@@ -351,12 +368,12 @@ export default function CoachScreen() {
               <MessageCircle color={C.teal} size={17} strokeWidth={2.5} />
             </View>
           )}
-          <TextInput style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.faint}
+          <TextInput style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
                      value={input} onChangeText={setInput} multiline />
           <Pressable
-            style={[s.sendInline, { backgroundColor: input.trim() && !busy ? C.teal : C.line }]}
+            style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
             onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>
-            <ArrowUp color="#fff" size={16} strokeWidth={3} />
+            <ArrowUp color="#fff" size={17} strokeWidth={3} />
           </Pressable>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -457,18 +474,25 @@ const s = StyleSheet.create({
   actionAltT: { color: C.teal, fontSize: 13, fontWeight: '800' },
   actionBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   actionDone: { color: C.teal, fontSize: 13, fontWeight: '800', marginTop: 8 },
+  // 食事タブの入力ドック（log.tsxのs.dock）と同じ見た目（角丸18・アクセント縁・teal影）
   inRow: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 6,
-    backgroundColor: C.panel, borderWidth: 2, borderColor: C.teal, borderRadius: 24,
-    paddingLeft: 6, paddingRight: 5, paddingVertical: 5,
-    shadowColor: C.teal, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 6,
+    backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
+    paddingHorizontal: 9, paddingVertical: 8,
+    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.12, elevation: 8,
+  },
+  // log.tsxのs.dockGlowと同じ（全開の縁を重ねてopacityだけ往復させる）
+  inGlow: {
+    position: 'absolute', top: -2.5, left: -2.5, right: -2.5, bottom: -2.5,
+    borderWidth: 2.5, borderColor: C.teal, borderRadius: 18,
+    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.25,
   },
   pencilBadge: {
     width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge,
     alignItems: 'center', justifyContent: 'center', marginBottom: 1,
   },
-  input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 17, fontWeight: '600', color: C.ink, paddingTop: 6, paddingBottom: 6 },
-  sendInline: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
+  input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 17, fontWeight: '600', color: C.ink, paddingTop: 6, paddingBottom: 6, paddingHorizontal: 4 },
+  sendInline: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   disclaimer: { fontSize: 11, color: C.faint, marginTop: 5 },
   presetLink: { fontSize: 11, color: C.teal, fontWeight: '800', marginTop: 5 },

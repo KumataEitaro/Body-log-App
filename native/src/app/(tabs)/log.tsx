@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, ScanBarcode } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, ReceiptText } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import AdBanner from '@/components/AdBanner';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -333,6 +333,13 @@ export default function LogScreen() {
   // ===== バーコード→公式DB（Open Food Facts）: ヒットで品目をトレイに直接積む =====
   // 端末→OFF直の照会なのでAI枠は消費しない。未ヒットは成分表示写真（AI読み取り）へ案内する
   const [scanOpen, setScanOpen] = useState(false);
+
+  // 成分表示ボタン（ドックの主役導線）: パッケージ裏の栄養成分表示を撮ってAIで読み取る。
+  // 実測で日本の商品はバーコードDBにほぼ無いため、撮影を主・バーコードを長押しの従にした
+  function scanNutritionLabel() {
+    setMsg({ ok: true, text: t('パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。') });
+    takePhoto();
+  }
 
   async function scannedBarcode(jan: string) {
     const pid = ++pendingSeq.current;
@@ -1188,6 +1195,12 @@ export default function LogScreen() {
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
       <Animated.View style={[s.dockWrap, { paddingBottom: insets.bottom + 8 }, enter[3]]} ref={dockTarget} collapsable={false}>
+        {/* いつの記録か（常時表示）: 過去日に書いていることへの気づき（今日以外はアンバー強調）。
+            保存時刻はDB側のnow()で決まる（過去日でも実際の操作時刻が入る）ため、
+            嘘の時刻を見せないよう日付だけを言う */}
+        <Text style={[s.dockDate, viewDate !== todayJST() && s.dockDatePast]}>
+          {t('{date} の記録', { date: dateLabelOf(viewDate) })}
+        </Text>
         {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
         {profile != null && (() => {
           const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
@@ -1387,8 +1400,10 @@ export default function LogScreen() {
           />
           <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
-          {/* バーコード→公式DB（ヒットすればAI枠を使わずトレイへ直行） */}
-          <DockIconButton Icon={ScanBarcode} onPress={() => setScanOpen(true)} />
+          {/* 成分表示を撮る（主役）: パッケージ裏ラベル→AI読み取り。日本の商品はバーコードDB
+              （Open Food Facts）にほぼ無いため主従を逆転した。長押しで従来のバーコードスキャン */}
+          <DockIconButton Icon={ReceiptText} onPress={scanNutritionLabel} onLongPress={() => setScanOpen(true)}
+                          disabled={photos.length >= 4} />
           {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
               「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
           {profile != null && (
@@ -1523,6 +1538,9 @@ const s = StyleSheet.create({
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   reuseBtnT: { color: '#fff', fontSize: 17, fontWeight: '800' },
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
+  // 「いつの記録か」の常設表示。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
+  dockDate: { fontSize: 11, fontWeight: '700', color: C.faint, paddingHorizontal: 6, marginBottom: 3, fontVariant: ['tabular-nums'] },
+  dockDatePast: { color: '#b45309', fontWeight: '800' },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,

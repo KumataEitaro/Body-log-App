@@ -1255,4 +1255,8 @@ export const VI: Record<string, string> = {
   "食べ方の分析": "Phân tích cách ăn uống",
   "週のふりかえり": "Tổng kết tuần",
   "運動の量": "Khối lượng vận động",
+  "パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。": "Chụp ảnh bảng thành phần dinh dưỡng ở mặt sau bao bì để quét chính xác các chỉ số. Sau khi chụp, hãy nhấn ↑ để gửi.",
+  "{date} の記録": "Nhật ký ngày {date}",
+  "写真から読み取る（成分表示）": "Quét từ ảnh (Bảng thành phần)",
+  "※日本の商品はヒットしないことが多いです": "※ Thường khó tìm thấy các sản phẩm của Nhật Bản",
 };

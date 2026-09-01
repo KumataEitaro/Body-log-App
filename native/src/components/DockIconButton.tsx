@@ -4,16 +4,17 @@ import { Pressable, StyleSheet } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 
-export default function DockIconButton({ Icon, onPress, disabled, tint, size = 18 }: {
+export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18 }: {
   Icon: LucideIcon;
   onPress: () => void;
+  onLongPress?: () => void;   // 隠し操作用（例: 成分表示ボタンの長押し=バーコード）
   disabled?: boolean;
   tint?: string;
   size?: number;
 }) {
   return (
     <Pressable
-      onPress={onPress} disabled={disabled} hitSlop={6}
+      onPress={onPress} onLongPress={onLongPress} delayLongPress={450} disabled={disabled} hitSlop={6}
       style={({ pressed }) => [s.btn, pressed && s.pressed, disabled && { opacity: 0.35 }]}
     >
       <Icon size={size} color={tint ?? C.sub} strokeWidth={2} />
