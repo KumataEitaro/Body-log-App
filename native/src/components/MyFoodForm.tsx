@@ -224,25 +224,27 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
             <TextInput style={s.input} value={unit} onChangeText={setUnit}
                        placeholder={t('例: 80g')} placeholderTextColor={C.faint} />
 
-            {/* AI入力: 手入力の代わりに、名前+量のテキスト or 写真から栄養値を埋める */}
+            {/* AI入力: 手入力の代わりに、写真（成分表示）or 名前+量のテキストから栄養値を埋める。
+                成分表示の撮影がいちばん正確に入るので先頭に置く */}
             <View style={s.aiRow}>
+              <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={pickPhotoSource} disabled={aiBusy}>
+                <Camera size={15} color={C.teal} />
+                <Text style={s.aiBtnT}>{t('写真から読み取る（成分表示）')}</Text>
+              </Pressable>
               <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={aiFromText} disabled={aiBusy}>
                 {aiBusy ? <ActivityIndicator size="small" color={C.teal} /> : <Sparkles size={15} color={C.teal} />}
                 <Text style={s.aiBtnT}>{t('AIにおまかせ')}</Text>
               </Pressable>
-              <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={pickPhotoSource} disabled={aiBusy}>
-                <Camera size={15} color={C.teal} />
-                <Text style={s.aiBtnT}>{t('写真から読み取る')}</Text>
-              </Pressable>
             </View>
-            {/* 第4の方式: バーコード→公式DB。ヒットすればAI枠を使わない */}
+            <Text style={s.aiHint}>{t('成分表示のラベルを撮ると表記どおりの数値が入ります。下の欄はいつでも手で直せます。')}</Text>
+            {/* バーコード→公式DB（Open Food Facts）。日本の商品はほぼ未収載のため末尾の従導線に */}
             <View style={s.aiRow}>
               <Pressable style={[s.aiBtn, aiBusy && { opacity: 0.5 }]} onPress={() => { setMsg(null); setScanOpen(true); }} disabled={aiBusy}>
                 <ScanBarcode size={15} color={C.teal} />
                 <Text style={s.aiBtnT}>{t('バーコードで探す')}</Text>
               </Pressable>
             </View>
-            <Text style={s.aiHint}>{t('成分表示のラベルを撮ると表記どおりの数値が入ります。下の欄はいつでも手で直せます。')}</Text>
+            <Text style={s.aiHint}>{t('※日本の商品はヒットしないことが多いです')}</Text>
 
             <Text style={s.label}>{t('カロリー（kcal）')}</Text>
             <TextInput style={s.input} value={kcal} onChangeText={setKcal}

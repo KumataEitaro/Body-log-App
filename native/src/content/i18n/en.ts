@@ -1355,4 +1355,8 @@ export const EN: Record<string, string> = {
   "食べ方の分析": "Diet Analysis",
   "週のふりかえり": "Weekly Review",
   "運動の量": "Activity Level",
+  "パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。": "Take a photo of the nutrition facts label on the back of the package to read the exact values. Tap ↑ to send after taking the photo.",
+  "{date} の記録": "Log for {date}",
+  "写真から読み取る（成分表示）": "Scan from photo (Nutrition Facts)",
+  "※日本の商品はヒットしないことが多いです": "*Japanese products often do not show up in search results",
 };

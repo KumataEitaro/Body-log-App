@@ -1255,4 +1255,8 @@ export const ID: Record<string, string> = {
   "食べ方の分析": "Analisis makan",
   "週のふりかえり": "Ulasan mingguan",
   "運動の量": "Volume latihan",
+  "パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。": "Ambil foto label informasi nilai gizi di bagian belakang kemasan untuk membaca angka yang tertera. Setelah diambil, kirim dengan mengetuk ↑.",
+  "{date} の記録": "Catatan {date}",
+  "写真から読み取る（成分表示）": "Pindai dari foto (Label Gizi)",
+  "※日本の商品はヒットしないことが多いです": "※ Produk Jepang sering kali tidak ditemukan",
 };

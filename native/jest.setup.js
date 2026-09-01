@@ -66,6 +66,7 @@ jest.mock('react-native-reanimated', () => {
     FadeInDown: { duration: () => ({ delay: () => ({}) }) },
     FadeInRight: { duration: () => ({ delay: () => ({}) }) },
     FadeInUp: { duration: () => ({ delay: () => ({}) }) },
+    ZoomIn: { springify: () => ({ damping: () => ({}) }) },
     LinearTransition: { springify: () => ({}) },
   };
 });
