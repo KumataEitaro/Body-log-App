@@ -111,6 +111,7 @@ jest.mock('expo-splash-screen', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useNavigation: () => ({ addListener: () => () => {}, isFocused: () => true }),
   useRouter: () => ({ push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: (cb) => { const React = require('react'); React.useEffect(() => cb(), []); },

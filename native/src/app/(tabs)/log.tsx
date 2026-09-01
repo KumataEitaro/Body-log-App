@@ -31,7 +31,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, useRouter, useNavigation } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed } from '@/lib/quicklog';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -143,6 +143,13 @@ export default function LogScreen() {
   const inputRef = useRef<TextInput>(null);
   const wInputRef = useRef<TextInput>(null);   // 体重クイック入力（スタートチェックリストからの誘導先）
   const kbVisible = useKeyboardVisible();
+  // iOS HIG標準「タブ再選択で先頭へ」: 食事タブ表示中にもう一度「食事」をタップ→最上部へ
+  const navigation = useNavigation();
+  useEffect(() => {
+    const sub = (navigation as { addListener: (ev: string, cb: () => void) => () => void })
+      .addListener('tabPress', () => { scrollRef.current?.scrollTo({ y: 0, animated: true }); });
+    return sub;
+  }, [navigation]);
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
 

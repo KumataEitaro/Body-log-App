@@ -14,7 +14,8 @@ import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-nat
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { BackHandler } from 'react-native';
 import { AppState } from 'react-native';
 import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
 import LeanBulkCard from '@/components/LeanBulkCard';
@@ -172,6 +173,24 @@ export default function ChangesScreen() {
   const chartTarget = useGuideTarget('chart');
   // 開いている詳細ページ（nullならマスタメニュー）。ヘルスケア式のメニュー→詳細
   const [detailKey, setDetailKey] = useState<string | null>(null);
+
+  // iOS HIG標準「タブの再選択でルートへ戻る」: 概要タブを表示中にもう一度「概要」を
+  // タップしたら、詳細ページを閉じてメニューに戻す（迷子のリセットボタンになる）
+  const navigation = useNavigation();
+  useEffect(() => {
+    const sub = (navigation as { addListener: (ev: string, cb: () => void) => () => void })
+      .addListener('tabPress', () => {
+        if (detailKey != null) setDetailKey(null);
+      });
+    return sub;
+  }, [navigation, detailKey]);
+
+  // Androidの戻るボタン/戻るジェスチャ: 詳細表示中はアプリ終了ではなくメニューへ戻る
+  useEffect(() => {
+    if (detailKey == null) return;
+    const h = BackHandler.addEventListener('hardwareBackPress', () => { setDetailKey(null); return true; });
+    return () => h.remove();
+  }, [detailKey]);
   const [editing, setEditing] = useState(false);
   const [orderAll, setOrderAll] = useState<string[]>(ALL_ORDER_DEFAULT);
   const [hiddenAll, setHiddenAll] = useState<string[]>([]);
