@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      {
+        // Appleのパスワード共有（Associated Domains / webcredentials）用ファイル。
+        // 拡張子が無いのでNextはoctet-streamで返してしまう。
+        // 全体に nosniff を付けているため、明示的にJSONを宣言しないとAppleのCDNが読めない
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
     ];
   },
 };

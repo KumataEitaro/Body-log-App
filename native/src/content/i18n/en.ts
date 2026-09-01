@@ -1724,4 +1724,11 @@ export const EN: Record<string, string> = {
   "アクティブカロリーを目標に反映する": "Add active calories to goal",
   "ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）": "When turned ON, the amount you can eat increases by the amount you walked. Since Healthcare measurements include daily movement, it tends to increase more easily (turn OFF if you find it hard to lose weight).",
   "反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。": "Only \"movement more than usual\" is added (daily movement is already included in your goal's activity level, so it won't be double-counted).",
+  "保存済みのアカウントから選ぶ": "Choose from saved accounts",
+  "キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。": "You can choose a saved account by tapping the key icon at the top of your keyboard. If it doesn't appear, please check your device's \"Settings\" → \"General\" → \"AutoFill & Passwords\".",
+  "アカウント": "Account",
+  "アカウントを切り替える": "Switch accounts",
+  "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Sign out of your current account and return to the login screen.",
+  "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Sign out of your current account. Your data won't be deleted. On the next screen, you can choose an account saved on your device.",
+  "切り替える": "Switch",
 };

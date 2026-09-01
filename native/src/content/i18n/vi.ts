@@ -1626,4 +1626,12 @@ export const VI: Record<string, string> = {
   "アクティブカロリーを目標に反映する": "Phản ánh calo hoạt động vào mục tiêu",
   "ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）": "Khi BẬT, \"lượng có thể ăn thêm\" sẽ tăng lên theo số bước đi bộ. Số liệu thực tế từ Sức khỏe bao gồm cả vận động hàng ngày nên lượng calo này dễ tăng lên (hãy TẮT nếu bạn cảm thấy khó giảm cân)",
   "反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。": "Chỉ phản ánh \"lượng vận động nhiều hơn bình thường\" (vận động hàng ngày đã được tính trong hệ số sinh hoạt của mục tiêu nên sẽ không cộng trùng).",
+  "パスワード": "Mật khẩu",
+  "保存済みのアカウントから選ぶ": "Chọn từ tài khoản đã lưu",
+  "キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。": "Bạn có thể chọn tài khoản đã lưu từ biểu tượng chìa khóa ở phía trên bàn phím. Nếu không thấy xuất hiện, vui lòng kiểm tra trong phần \"Cài đặt\" → \"Cài đặt chung\" → \"Tự động điền & Mật khẩu\" trên thiết bị.",
+  "アカウント": "Tài khoản",
+  "アカウントを切り替える": "Chuyển đổi tài khoản",
+  "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Đăng xuất khỏi tài khoản hiện tại và quay lại màn hình đăng nhập",
+  "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Bạn sẽ đăng xuất khỏi tài khoản hiện tại. Lịch sử ghi chép sẽ không bị xóa. Ở màn hình tiếp theo, bạn có thể chọn tài khoản đã được lưu trên thiết bị.",
+  "切り替える": "Chuyển đổi",
 };

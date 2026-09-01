@@ -12,7 +12,7 @@ import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
@@ -675,6 +675,22 @@ export default function SettingsScreen() {
         <Row icon={<BookOpen color={C.teal} size={19} />} label={t('読みもの')}
              sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}
              onPress={() => openSheet('columns')} />
+      </View>
+
+      {/* アカウント */}
+      <Text style={s.groupLabel}>{t('アカウント')}</Text>
+      <View style={s.group}>
+        <Row icon={<Users color={C.teal} size={19} />} label={t('アカウントを切り替える')}
+             sub={t('いまのアカウントからサインアウトして、ログイン画面に戻ります')}
+             onPress={() => Alert.alert(
+               t('アカウントを切り替える'),
+               t('いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。'),
+               [
+                 { text: t('キャンセル'), style: 'cancel' },
+                 // localスコープ: この端末のセッションだけ破棄する（他端末は残す）
+                 { text: t('切り替える'), onPress: () => { supabase.auth.signOut({ scope: 'local' }).catch(() => {}); } },
+               ],
+             )} />
       </View>
 
       {/* アクション */}

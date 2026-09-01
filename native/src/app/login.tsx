@@ -1,6 +1,6 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { useState, useEffect, useRef, memo } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -10,7 +10,7 @@ import { parseAuthCallback } from '@/lib/authCallback';
 import { C, sheetTopPad } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
-import { Languages, Check } from 'lucide-react-native';
+import { Languages, Check, KeyRound } from 'lucide-react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
@@ -20,6 +20,53 @@ const OAUTH_REDIRECT = 'bodylog://auth-callback';
 const SHOW_GOOGLE_SSO = true;
 // SupabaseのAppleプロバイダ有効化済み（2026-08-26）。ボタン表示ON。
 const SHOW_APPLE_SSO = true;
+
+// ===== 入力欄（memo化して切り出す） =====
+// iOSのキーボード上部の自動入力バー（QuickType/パスワード候補）は、
+// フィールドの「意味」が未確定のままだとOSが本文の変化ごとに種別を再判定し、
+// アクセサリビューを作り直す。これが「打鍵のたびにバーが消えて再表示される」点滅の原因。
+// 対策は2つで、どちらもこのコンポーネントで担保する:
+//   1) textContentType を必ず明示する（推測させない）
+//   2) 打鍵中にpropsが変わらないようにする＝親の再レンダー（エラー文・busy・言語シート）を
+//      memoで遮断し、値が変わった欄だけがネイティブへコミットされるようにする
+// また、モード（ログイン/新規登録）で意味が変わるパスワード欄は、propsを差し替えるのではなく
+// keyを分けた別インスタンスとしてレンダーする（呼び出し側）。
+type AuthFieldProps = {
+  inputRef?: React.RefObject<TextInput | null>;
+  placeholder: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  /** iOSのAutoFillに渡すフィールドの意味。必ず明示する（undefinedにしない） */
+  textContentType: 'username' | 'password' | 'newPassword';
+  /** Android/Webのオートフィルヒント（iOSではtextContentTypeが優先される） */
+  autoComplete: 'username' | 'current-password' | 'new-password';
+  secure?: boolean;
+  email?: boolean;
+};
+
+const AuthField = memo(function AuthField({
+  inputRef, placeholder, value, onChangeText, textContentType, autoComplete, secure, email,
+}: AuthFieldProps) {
+  return (
+    <TextInput
+      ref={inputRef}
+      style={s.input}
+      placeholder={placeholder}
+      placeholderTextColor={C.faint}
+      value={value}
+      onChangeText={onChangeText}
+      // 資格情報欄では日本語IMEも自動修正も不要。オフにするとQuickTypeの
+      // 予測変換バー自体が出なくなり、点滅の余地も消える
+      autoCapitalize="none"
+      autoCorrect={false}
+      spellCheck={false}
+      keyboardType={email ? 'email-address' : 'default'}
+      secureTextEntry={secure}
+      textContentType={textContentType}
+      autoComplete={autoComplete}
+    />
+  );
+});
 
 export default function LoginScreen() {
   // Appleサインインボタンの白黒切替に使う（ブランド規定: ライト=黒ボタン/ダーク=白ボタン）
@@ -33,6 +80,22 @@ export default function LoginScreen() {
   const [info, setInfo] = useState('');
   // ログイン失敗時に「初めての方は新規登録へ」を出す（未登録者の行き止まり防止）
   const [showSignupHint, setShowSignupHint] = useState(false);
+  // 「保存済みのアカウントから選ぶ」を押したときだけ操作ヒントを出す（常時出すと画面が説明文だらけになる）
+  const [autofillHint, setAutofillHint] = useState(false);
+  const emailRef = useRef<TextInput>(null);
+
+  // 複数アカウントの切替。アプリ側でパスワードを保存・一覧表示することは意図的にしない
+  // （キーチェーンに任せるのが正道。アプリが平文/独自暗号で持つと漏洩面が増えるだけ）。
+  // ここでやるのは「空のusername欄にフォーカスを当て直す」ことだけ。
+  // iOSは空の資格情報欄にフォーカスが入ると、キーボード上部に保存済みアカウントの候補を出す
+  function pickSavedAccount() {
+    setMsg(''); setInfo(''); setShowSignupHint(false);
+    setEmail(''); setPassword('');   // 前のアカウントが残っていると候補が出ないことがある
+    setAutofillHint(true);
+    emailRef.current?.blur();
+    // blurの反映後にフォーカスし直す（同フレームだとOSが候補を出し直さない）
+    requestAnimationFrame(() => emailRef.current?.focus());
+  }
 
   async function login() {
     if (!email.trim() || !password) { setMsg(t('メールとパスワードを入力してください。')); return; }
@@ -192,13 +255,44 @@ export default function LoginScreen() {
           />
         </View>
 
-        <TextInput style={s.input} placeholder={t('メールアドレス')} placeholderTextColor={C.faint}
-                   autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} />
-        <TextInput style={s.input} placeholder={isLogin ? 'パスワード' : t('パスワード（8文字以上）')} placeholderTextColor={C.faint}
-                   secureTextEntry autoComplete={isLogin ? 'password' : 'new-password'} value={password} onChangeText={setPassword} />
+        {/* メール欄は textContentType="username" にする。
+            iOSのパスワード自動入力は「username欄とpassword欄の対」を見つけて初めて
+            保存の提案と候補表示を行うため、emailAddress（連絡先の自動入力）では対にならない */}
+        <AuthField inputRef={emailRef} placeholder={t('メールアドレス')} email
+                   textContentType="username" autoComplete="username"
+                   value={email} onChangeText={setEmail} />
+
+        {/* パスワード欄はモードごとに別インスタンス（keyを分ける）。
+            同一インスタンスの textContentType / autoComplete を打鍵中に差し替えると
+            iOSがアクセサリを作り直して自動入力バーが点滅するため、意味の違う欄は分ける */}
+        {isLogin ? (
+          <AuthField key="pw-login" placeholder={t('パスワード')} secure
+                     textContentType="password" autoComplete="current-password"
+                     value={password} onChangeText={setPassword} />
+        ) : (
+          <AuthField key="pw-signup" placeholder={t('パスワード（8文字以上）')} secure
+                     textContentType="newPassword" autoComplete="new-password"
+                     value={password} onChangeText={setPassword} />
+        )}
         {!isLogin && (
-          <TextInput style={s.input} placeholder={t('パスワード（確認用）')} placeholderTextColor={C.faint}
-                     secureTextEntry value={password2} onChangeText={setPassword2} />
+          <AuthField key="pw-confirm" placeholder={t('パスワード（確認用）')} secure
+                     textContentType="newPassword" autoComplete="new-password"
+                     value={password2} onChangeText={setPassword2} />
+        )}
+
+        {/* 複数アカウントの切替導線。パスワードはアプリで持たず、OS（キーチェーン）に選ばせる */}
+        {isLogin && (
+          <>
+            <Pressable onPress={pickSavedAccount} hitSlop={8} style={s.pickBtn}>
+              <KeyRound size={14} color={C.teal} />
+              <Text style={s.pickBtnT}>{t('保存済みのアカウントから選ぶ')}</Text>
+            </Pressable>
+            {autofillHint && (
+              <Text style={s.pickHint}>
+                {t('キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。')}
+              </Text>
+            )}
+          </>
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}
         {showSignupHint && mode === 'login' && (
@@ -320,6 +414,10 @@ const s = StyleSheet.create({
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 14,
     paddingHorizontal: 16, paddingVertical: 14, fontSize: 17, color: C.ink, marginBottom: 10,
   },
+  // 「保存済みのアカウントから選ぶ」（OSの自動入力を促す導線）
+  pickBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 4 },
+  pickBtnT: { fontSize: 13.5, fontWeight: '700', color: C.teal },
+  pickHint: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginBottom: 6 },
   err: { color: C.coral, fontSize: 15, marginBottom: 6 },
   info: { color: C.teal, fontSize: 15, marginBottom: 6, lineHeight: 21 },
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },

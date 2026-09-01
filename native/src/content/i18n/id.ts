@@ -1626,4 +1626,12 @@ export const ID: Record<string, string> = {
   "アクティブカロリーを目標に反映する": "Terapkan kalori aktif ke target",
   "ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）": "Jika diaktifkan, \"sisa porsi makan\" akan bertambah sebanyak langkah kaki Anda. Karena pengukuran aktual Health mencakup aktivitas sehari-hari, jumlahnya akan lebih mudah bertambah (matikan jika Anda merasa berat badan sulit turun)",
   "反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。": "Hanya menerapkan \"aktivitas yang lebih banyak dari biasanya\" (aktivitas sehari-hari sudah termasuk dalam faktor aktivitas target, jadi tidak akan dihitung ganda).",
+  "パスワード": "Kata sandi",
+  "保存済みのアカウントから選ぶ": "Pilih dari akun tersimpan",
+  "キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。": "Kamu bisa memilih akun yang tersimpan dari ikon kunci di bagian atas keyboard. Jika tidak muncul, silakan periksa \"Pengaturan\" -> \"Umum\" -> \"Isi Otomatis & Kata Sandi\" pada perangkatmu.",
+  "アカウント": "Akun",
+  "アカウントを切り替える": "Ganti akun",
+  "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Keluar dari akun saat ini dan kembali ke layar masuk",
+  "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Kamu akan keluar dari akun saat ini. Riwayat catatanmu tidak akan dihapus. Di layar berikutnya, kamu bisa memilih akun yang tersimpan di perangkatmu.",
+  "切り替える": "Ganti",
 };
