@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, UtensilsCrossed } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import AdBanner from '@/components/AdBanner';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -46,6 +46,9 @@ import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
+import { listMyMeals, deleteMyMeal, saveMyMeal, type MyMeal } from '@/lib/meals';
+import { applyMult, currentMult, MULT_STEPS } from '@/lib/mealAdjust';
+import SaveMealSheet from '@/components/SaveMealSheet';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { skipTodayReminder, scheduleFirstLawNotification } from '@/lib/notify';
 import { getFirstRunFlag } from '@/lib/firstrun';
@@ -103,6 +106,10 @@ export default function LogScreen() {
   const [events, setEvents] = useState<(PlanEvent & { id: string })[]>([]);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [myFoods, setMyFoods] = useState<MyFood[]>([]);
+  // マイミール（複数品目のセット）。migration-24未適用のDBでは常に空＝チップが出ないだけ
+  const [myMeals, setMyMeals] = useState<MyMeal[]>([]);
+  // マイミール保存シートの下書き（alsoSave=トレイの✓保存長押し経由: 保存も一緒に行う）
+  const [mealDraft, setMealDraft] = useState<{ items: FoodItem[]; alsoSave: boolean } | null>(null);
   const [dayLogs, setDayLogs] = useState<DayLog[]>([]);
   const [chat, setChat] = useState('');
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -230,7 +237,7 @@ export default function LogScreen() {
     const userId = session?.user?.id;
     if (!userId) return;
     setUid(userId);
-    const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes] = await Promise.all([
+    const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes, mealsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('goals').select('*').maybeSingle(),
       supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
@@ -240,12 +247,14 @@ export default function LogScreen() {
       supabase.from('logs').select('id,date,items,kcal')
         .lt('date', viewDate).not('kcal', 'is', null)
         .order('at', { ascending: false }).limit(40),
+      listMyMeals(),   // テーブル未作成なら空（マイミールチップが出ないだけ）
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
     if (goalRes.data) setGoal(goalRes.data as Goal);
     setEvents((evRes.data as (PlanEvent & { id: string })[]) || []);
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
     setMyFoods((foodRes.data as MyFood[]) || []);
+    setMyMeals(mealsRes);
     setDayLogs((logRes.data as DayLog[]) || []);
     // 「もう一度食べる」候補: 品目内訳のある過去の食事を、同じ品目構成は最新1件に重複排除
     const seen = new Set<string>();
@@ -455,6 +464,31 @@ export default function LogScreen() {
     const items = addServing(parsed?.items ?? [], fd);
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
   }
+  // マイミールチップ: タップでセットの全品目をトレイへ投入
+  // （AI解析なし・保存済みの栄養値をそのまま使う＝「前の食事↺」と同じ流儀）
+  function tapMeal(m: MyMeal) {
+    Haptics.selectionAsync().catch(() => {});
+    setParsed((p) => ({
+      items: [...(p?.items ?? []), ...m.items],
+      weight: p?.weight ?? null, waist: p?.waist ?? null,
+      ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null,
+    }));
+  }
+
+  // マイミールチップ: 長押しで削除（確認ダイアログなし・Undoスナックバーで約5秒の取り消し猶予）。
+  // 復元は削除前に控えた内容を新しい行として保存し直す（idはDB採番）
+  async function deleteMealNow(m: MyMeal) {
+    if (!uid) return;
+    const ok = await deleteMyMeal(m.id);
+    if (!ok) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+    setMyMeals(await listMyMeals());
+    undoBar.show(t('マイミール「{name}」を削除しました', { name: m.name }), async () => {
+      const r = await saveMyMeal(uid, m.name, m.items);
+      if (!r.ok) { setMsg({ ok: false, text: t('元に戻せませんでした。通信環境を確認してください。') }); return; }
+      setMyMeals(await listMyMeals());
+    });
+  }
+
   function decFood(fd: MyFood) {
     if (!parsed) return;
     const items = removeServing(parsed.items, fd);
@@ -476,6 +510,14 @@ export default function LogScreen() {
     setAiNote(null); parseHistory.current = [];
   }
 
+  // 量調整ポップ: 注目中の1品に倍率を適用してkcal/PFCを再計算する
+  // （「半分だけ食べた」の1タップ補正。保存前のトレイ内だけで完結し、保存後は既存の書き換え機能）
+  function adjustFocused(mult: number) {
+    if (!parsed || focusItem == null || !parsed.items[focusItem]) return;
+    Haptics.selectionAsync().catch(() => {});
+    setParsed({ ...parsed, items: parsed.items.map((it, i) => (i === focusItem ? applyMult(it, mult) : it)) });
+  }
+
   // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除。
   // 削除は「本当に？」を挟まず即実行し、Undoスナックバーで約5秒の取り消し猶予を出す
   // （確認ダイアログは毎回の手を止めるわりに誤タップ防止にならない。メニュー自体は残す）
@@ -485,6 +527,8 @@ export default function LogScreen() {
     Alert.alert(canEdit ? t('この記録をどうしますか？') : t('この記録を削除しますか？'), logTitle(l), [
       { text: t('キャンセル'), style: 'cancel' },
       ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
+      // マイミール: 品目内訳のある食事だけセット保存できる（気分・体重だけの行では出さない）
+      ...(items.length > 0 ? [{ text: t('マイミールに保存'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
       { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
     ]);
   }
@@ -585,18 +629,18 @@ export default function LogScreen() {
     return names + (items.length > 3 ? t(' ほか{n}品', { n: items.length - 3 }) : '');
   }
 
-  // トレイの内容を確定保存
-  async function save() {
-    if (!uid || !parsed) return;
+  // トレイの内容を確定保存（成功したかを返す: マイミール同時登録の文言出し分けに使う）
+  async function save(): Promise<boolean> {
+    if (!uid || !parsed) return false;
     setSaving(true); setMsg(null);
     try {
       const items = parsed.items;   // setParsed(null)より前に控える（後段の学習で使う）
       // G8: AI解析で体重が載っているときも外れ値を確かめる（「52.8」を「528」と読む事故を保存前に止める）
       if (parsed.weight != null && !(await confirmOutlierWeight(latestWeight, Number(parsed.weight)))) {
-        return;   // トレイは残る。体重チップの×で外すか、値を直して再保存できる
+        return false;   // トレイは残る。体重チップの×で外すか、値を直して再保存できる
       }
       const res = await saveParsed(uid, parsed, stagedNote, viewDate);
-      if (!res.ok) { setMsg({ ok: false, text: res.error }); return; }
+      if (!res.ok) { setMsg({ ok: false, text: res.error }); return false; }
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
       let delFailed = false;
       if (editingId) {
@@ -624,6 +668,7 @@ export default function LogScreen() {
         const s2 = await pickSuggestion(myFoods.map((f) => f.name), viewDate);
         if (s2) { setSuggest(s2); await markShown(viewDate); }
       } catch { /* 案内は本体機能に影響させない */ }
+      return true;
     } finally {
       setSaving(false);
     }
@@ -1285,8 +1330,18 @@ export default function LogScreen() {
             ))}
           </ScrollView>
         )}
-        {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可） */}
-        {myFoods.length > 0 && (() => {
+        {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可）
+            先頭にマイミールチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
+            長押しで削除→Undoスナックバー）。ミールは常に先頭固定＝並び替えの保存対象はマイ食品だけ */}
+        {(myFoods.length > 0 || myMeals.length > 0) && (() => {
+          const mealChipEl = (m: MyMeal) => (
+            <Pressable key={m.id} style={s.mealChip}
+                       onPress={() => tapMeal(m)}
+                       onLongPress={() => deleteMealNow(m)} delayLongPress={450}>
+              <UtensilsCrossed size={13} color={C.teal} />
+              <Text style={s.mealChipT} numberOfLines={1}>{m.name}</Text>
+            </Pressable>
+          );
           /* 案内のハイライト対象。ScrollViewの外側のViewに付ける */
           const chipEl = (fd: MyFood) => {
             const cnt = parsed ? servingCount(parsed.items, fd) : null;
@@ -1311,9 +1366,14 @@ export default function LogScreen() {
               {foodsView === 'row' ? (
                 <View style={{ flex: 1 }}>
                   <ReorderableChips
-                    order={foodsOrder}
-                    onOrderChange={persistFoodsOrder}
+                    order={[...myMeals.map((m) => `meal:${m.id}`), ...foodsOrder]}
+                    // 並び替えの永続化はマイ食品のidだけ（ミールは次の描画で先頭に戻る）
+                    onOrderChange={(next) => persistFoodsOrder(next.filter((id) => !id.startsWith('meal:')))}
                     renderChip={(id) => {
+                      if (id.startsWith('meal:')) {
+                        const m = myMeals.find((x) => `meal:${x.id}` === id);
+                        return m ? mealChipEl(m) : null;
+                      }
                       const fd = myFoods.find((f) => f.id === id);
                       return fd ? chipEl(fd) : null;
                     }}
@@ -1321,7 +1381,7 @@ export default function LogScreen() {
                 </View>
               ) : (
                 <ScrollView style={{ flex: 1, maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{orderedFoods.map(chipEl)}</View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
                 </ScrollView>
               )}
               <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
@@ -1409,13 +1469,37 @@ export default function LogScreen() {
             {parsed != null && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                 <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
-                <Pressable style={s.traySave} onPress={save} disabled={saving}>
+                {/* ✓保存の長押し=保存してマイミールにも登録（書き換え中は保存の意味が変わるため出さない） */}
+                <Pressable style={s.traySave} onPress={save} disabled={saving} delayLongPress={450}
+                           onLongPress={() => {
+                             if (!editingId && !saving && parsed.items.length > 0) setMealDraft({ items: parsed.items, alsoSave: true });
+                           }}>
                   {saving ? <ActivityIndicator color="#fff" /> : (
                     <Text style={s.traySaveT}>{editingId ? t('✓ 書き換える') : t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
                   )}
                 </Pressable>
               </View>
             )}
+          </View>
+        )}
+        {/* 量調整ポップ（トレイ直下にインライン展開・Modal不使用）: 品目チップのタップで開き、
+            倍率チップ1タップでその品のkcal/PFCを再計算する。もう一度チップを押すと閉じる */}
+        {parsed != null && focusItem != null && parsed.items[focusItem] != null && (
+          <View style={s.adjustPop}>
+            <Text style={s.adjustName} numberOfLines={1}>
+              {t('「{name}」の量を補正', { name: parsed.items[focusItem].name })}
+              <Text style={s.adjustHint}>  {t('半分だけ食べたら ×0.5')}</Text>
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 7 }}>
+              {MULT_STEPS.map((mv) => {
+                const on = Math.abs(currentMult(parsed.items[focusItem]) - mv) < 0.001;
+                return (
+                  <Pressable key={mv} style={[s.multChip, on && s.multChipOn]} onPress={() => adjustFocused(mv)}>
+                    <Text style={[s.multChipT, on && s.multChipTOn]}>×{mv}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         )}
         <View style={s.dock}>
@@ -1496,6 +1580,23 @@ export default function LogScreen() {
         onClose={() => setFoodDraft(null)}
         onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に追加しました。下のチップから1タップで足せます。') }); }}
       />
+      {/* マイミール保存シート（記録行の長押しメニュー/✓保存の長押しから。
+          alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う） */}
+      <SaveMealSheet
+        visible={mealDraft != null} uid={uid} items={mealDraft?.items ?? []}
+        onClose={() => setMealDraft(null)}
+        onSaved={async (name) => {
+          const alsoSave = mealDraft?.alsoSave === true;
+          setMealDraft(null);
+          setMyMeals(await listMyMeals());
+          if (alsoSave) {
+            const ok = await save();   // 失敗時はsave()側のエラーメッセージを残す（トレイも残る）
+            if (ok) setMsg({ ok: true, text: t('保存して、マイミール「{name}」にも登録しました。', { name }) });
+          } else {
+            setMsg({ ok: true, text: t('マイミール「{name}」を登録しました。入力欄の上のチップから1タップで呼び出せます。', { name }) });
+          }
+        }}
+      />
       {/* バーコードスキャナ（読み取り成功で即クローズ→公式DB照会→トレイ投入） */}
       <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={scannedBarcode} />
       {/* おかえりフロー: 発火判定はコンポーネント内で完結（マウント直後のみ→既存Modalと競合しない） */}
@@ -1564,6 +1665,27 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.line, borderRadius: 999, marginRight: 6, overflow: 'hidden',
   },
   chipOn: { borderColor: C.ink },
+  // マイミールチップ（マイ食品と見た目で区別: 皿アイコン＋アクセント面・teal文字）
+  mealChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: C.accentBadge, borderWidth: 1.5, borderColor: C.accentBorder,
+    borderRadius: 999, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, maxWidth: 180,
+  },
+  mealChipT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  // 量調整ポップ（トレイ直下のインライン展開）
+  adjustPop: {
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.accentBorder,
+    borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 7,
+  },
+  adjustName: { fontSize: 13, fontWeight: '800', color: C.ink },
+  adjustHint: { fontSize: 11, fontWeight: '600', color: C.sub },
+  multChip: {
+    flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 999,
+    borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel,
+  },
+  multChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
+  multChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  multChipTOn: { color: C.teal },
   chipMain: { paddingVertical: 9, paddingLeft: 13, paddingRight: 11 },
   chipMinus: { paddingVertical: 9, paddingHorizontal: 12, borderLeftWidth: 1.5, borderLeftColor: C.line },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },

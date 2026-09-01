@@ -11,7 +11,8 @@ import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, e
 import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed } from 'lucide-react-native';
+import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
@@ -104,6 +105,10 @@ export default function SettingsScreen() {
   const [constraintsNote, setConstraintsNote] = useState('');
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [foods, setFoods] = useState<MyFoodLite[]>([]);
+  // マイミール（複数品目のセット）。migration-24未適用のDBでは常に空＝節ごと出ない
+  const [meals, setMeals] = useState<MyMeal[]>([]);
+  // 名前変更中のミール（行がその場でTextInputに変わる）
+  const [mealEdit, setMealEdit] = useState<{ id: string; name: string } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [couponOpen, setCouponOpen] = useState(false); // クーポンコード入力（プラン行の隣の入口）
   const [busy, setBusy] = useState(false);
@@ -127,13 +132,15 @@ export default function SettingsScreen() {
     const uid = session?.user?.id;
     if (!uid) return;
     setEmail(session?.user?.email ?? '');
-    const [{ data: prof }, wRes, fRes] = await Promise.all([
+    const [{ data: prof }, wRes, fRes, mealsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
       supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('my_foods').select('id,name,kcal').order('created_at', { ascending: true }).limit(50),
+      listMyMeals(),   // テーブル未作成なら空（マイミール節が出ないだけ）
     ]);
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
     setFoods((fRes.data as MyFoodLite[]) || []);
+    setMeals(mealsRes);
     if (prof) {
       setName(prof.display_name || '');
       if (prof.sex) setSex(prof.sex);
@@ -273,6 +280,30 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  }
+
+  // マイミールの削除（設定側はUndoバーが無いので従来どおり確認ダイアログ）
+  function removeMeal(m: MyMeal) {
+    Alert.alert(`「${m.name}」を削除しますか？`, t('食事タブのマイミールチップから消えます（過去の記録は変わりません）。'), [
+      { text: t('キャンセル'), style: 'cancel' },
+      {
+        text: t('削除する'), style: 'destructive',
+        onPress: async () => {
+          await deleteMyMeal(m.id);
+          setMeals((prev) => prev.filter((x) => x.id !== m.id));
+        },
+      },
+    ]);
+  }
+
+  // マイミールの名前変更を確定
+  async function saveMealRename() {
+    if (!mealEdit) return;
+    const nm = mealEdit.name.trim();
+    if (!nm) { setMealEdit(null); return; }
+    const ok = await renameMyMeal(mealEdit.id, nm);
+    if (ok) setMeals((prev) => prev.map((x) => (x.id === mealEdit.id ? { ...x, name: nm } : x)));
+    setMealEdit(null);
   }
 
   function confirmDelete() {
@@ -735,6 +766,46 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
           ))}
+
+          {/* マイミール節（複数品目のセット。migration-24未適用なら空＝節ごと出ない） */}
+          {meals.length > 0 && (
+            <>
+              <View style={s.mealHead}>
+                <UtensilsCrossed size={15} color={C.teal} />
+                <Text style={s.mealHeadT}>{t('マイミール')}</Text>
+              </View>
+              <Text style={s.note}>{t('複数品目のセットです。食事タブで「今日の記録」の行を長押しすると保存できます。')}</Text>
+              {meals.map((m) => mealEdit?.id === m.id ? (
+                // 名前変更中: 行がその場で入力欄に変わる
+                <View key={m.id} style={s.foodRow}>
+                  <TextInput
+                    style={[s.input, { flex: 1, paddingVertical: 8 }]} value={mealEdit.name}
+                    onChangeText={(v) => setMealEdit({ id: m.id, name: v })}
+                    autoFocus maxLength={40} returnKeyType="done" onSubmitEditing={saveMealRename}
+                  />
+                  <Pressable onPress={saveMealRename} hitSlop={8}>
+                    <Text style={{ color: C.teal, fontWeight: '800', fontSize: 14 }}>{t('保存')}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setMealEdit(null)} hitSlop={8}>
+                    <Text style={{ color: C.sub, fontWeight: '700', fontSize: 14 }}>{t('やめる')}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View key={m.id} style={s.foodRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.foodName, { flex: 0 }]} numberOfLines={1}>{m.name}</Text>
+                    <Text style={s.foodKcal}>{t('{n}品・約{k}kcal', { n: m.items.length, k: mealKcal(m.items).toLocaleString() })}</Text>
+                  </View>
+                  <Pressable onPress={() => setMealEdit({ id: m.id, name: m.name })} hitSlop={8}>
+                    <Pencil color={C.sub} size={16} />
+                  </Pressable>
+                  <Pressable onPress={() => removeMeal(m)} hitSlop={8}>
+                    <Trash2 color={C.coral} size={17} />
+                  </Pressable>
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -931,6 +1002,9 @@ const s = StyleSheet.create({
   note: { fontSize: 13, color: C.sub, lineHeight: 19 },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 10 },
   foodRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line },
+  // マイミール節の小見出し（マイ食品一覧の下に区切って置く）
+  mealHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, marginBottom: 4 },
+  mealHeadT: { fontSize: 15, fontWeight: '800', color: C.ink },
   foodName: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   foodKcal: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
 });
