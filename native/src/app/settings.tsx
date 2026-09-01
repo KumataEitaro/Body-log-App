@@ -9,7 +9,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, type DailyReminderMode } from '@/lib/notify';
 import { usePurpose } from '@/lib/purpose';
-import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
+import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
+import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket } from 'lucide-react-native';
 import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
@@ -167,6 +168,21 @@ export default function SettingsScreen() {
   function changeWeekGoal(v: '7' | '5' | '4' | '3') {
     setWeekGoal(v);
     AsyncStorage.setItem(WEEK_GOAL_KEY, v).catch(() => {});
+  }
+
+  // 歩数の週目標（B-15）。日1万歩と違い、1日サボっても翌日に取り返せる
+  // 「週で帳尻が合えばOK」のゆるい自己契約（記録の週目標=B-13と同じ優しさ設計）。既定はオフ
+  const [stepsGoal, setStepsGoal] = useState<number>(0);   // 0=オフ
+  useEffect(() => {
+    AsyncStorage.getItem(WEEK_STEPS_GOAL_KEY).then((v) => {
+      const n = Number(v);
+      if ([35000, 50000, 70000].includes(n)) setStepsGoal(n);
+    }).catch(() => {});
+  }, []);
+  function changeStepsGoal(n: number) {
+    setStepsGoal(n);
+    if (n > 0) AsyncStorage.setItem(WEEK_STEPS_GOAL_KEY, String(n)).catch(() => {});
+    else AsyncStorage.removeItem(WEEK_STEPS_GOAL_KEY).catch(() => {});
   }
 
   // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
@@ -387,6 +403,19 @@ export default function SettingsScreen() {
             ]}
             value={weekGoal} onChange={changeWeekGoal}
           />
+        </View>
+        <View style={s.sep} />
+        {/* 歩数の週目標（B-15）: 日目標にしない理由はchangeStepsGoal上のコメント参照 */}
+        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
+          <Text style={s.notifLabel}>{t('歩数の週目標')}</Text>
+          <Text style={[s.notifSub, { marginBottom: 10 }]}>{t('1日サボっても、週のなかで取り返せばOK。運動タブと概要に進捗バーが出ます。')}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <Chip label={t('オフ')} tone="ink" selected={stepsGoal === 0} onPress={() => changeStepsGoal(0)} />
+            {[35000, 50000, 70000].map((n) => (
+              <Chip key={n} label={t('{n}歩', { n: n.toLocaleString() })} tone="ink"
+                    selected={stepsGoal === n} onPress={() => changeStepsGoal(n)} />
+            ))}
+          </View>
         </View>
       </View>
 

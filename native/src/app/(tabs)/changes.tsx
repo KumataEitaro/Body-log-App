@@ -17,7 +17,7 @@ import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { AddCardSheet } from '@/components/CardLayout';
 import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Svg, { Polyline, Line } from 'react-native-svg';
+import Svg, { Polyline, Line, Rect } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { BackHandler } from 'react-native';
@@ -47,7 +47,8 @@ import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import LiftHistoryCard from '@/components/LiftHistoryCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, readActivitySummary, readSleepStages, type HealthDaySummary, type SleepStages } from '@/lib/health';
+import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
@@ -317,6 +318,10 @@ export default function ChangesScreen() {
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
+  // 昨夜の睡眠のステージ内訳（B-14a）。null=hk無し/ステージ計測なし＝合計だけの従来表示
+  const [sleepStages, setSleepStages] = useState<SleepStages | null>(null);
+  // 歩数の週目標（B-15・オフ=null）。health詳細にも「きょうの動き」と同じ週プログレスを出す
+  const weekStepsGoal = useWeekStepsGoal();
 
   const load = useCallback(async () => {
     try {
@@ -388,6 +393,8 @@ export default function ChangesScreen() {
       if ('error' in res) { setHealthMsg(res.error); return; }
       setActivity(res);
       if (res.length === 0) setHealthMsg(t('直近7日のデータが見つかりませんでした。'));
+      // 昨夜の睡眠（今朝起きたぶん）のステージ内訳。ステージが無い端末はnull＝従来表示のまま
+      try { setSleepStages(await readSleepStages(todayJST())); } catch { /* ステージは飾り */ }
     } finally { setHealthBusy(false); }
   }
 
@@ -698,6 +705,57 @@ export default function ChangesScreen() {
   const healthCard = healthAvailable() ? (
         <View style={s.card}>
           <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('歩数・睡眠（直近7日）')}</Text></View>
+          {/* 週間歩数目標（B-15）: 「きょうの動き」と同じ週プログレス。目標オフ/未読込時は出さない */}
+          {weekStepsGoal != null && activity != null && activity.length > 0 && (
+            <View style={{ marginTop: -4, marginBottom: 12 }}>
+              <WeekStepsBar days={activity} today={today} goal={weekStepsGoal} />
+            </View>
+          )}
+          {/* 昨夜の睡眠（B-14a・ヘルスケアの円グラフ相当）: 合計の大表示＋ステージ横帯。
+              ステージデータが無い端末（Apple Watch無し等）はsleepStages=null＝下の7日表だけの従来表示 */}
+          {sleepStages != null && (() => {
+            const st = sleepStages;
+            const asleepH = st.deepH + st.coreH + st.remH;   // 「睡眠時間」は覚醒を除いた合計
+            if (asleepH <= 0.01) return null;
+            const fmtHM = (h: number) => {
+              const m = Math.round(h * 60);
+              return m >= 60 ? t('{h}時間{m}分', { h: Math.floor(m / 60), m: m % 60 }) : t('{n}分', { n: m });
+            };
+            // ステージの配色はC.tealの濃淡3段（深いほど濃い）＋覚醒だけ淡いcoral
+            const segs = [
+              { k: 'deep', label: t('深い睡眠'), h: st.deepH, color: C.teal },
+              { k: 'core', label: t('コア睡眠'), h: st.coreH, color: rgba(C.teal, 0.55) },
+              { k: 'rem', label: t('レム睡眠'), h: st.remH, color: rgba(C.teal, 0.3) },
+              { k: 'awake', label: t('覚醒'), h: st.awakeH, color: rgba(C.coral, 0.4) },
+            ].filter((x) => x.h > 0.01);
+            const totalAll = segs.reduce((a, x) => a + x.h, 0);
+            const bw = Math.max(60, winW - 60);   // 画面幅 − ページ余白32 − カード内余白28
+            let x = 0;
+            return (
+              <View style={s.slpBox}>
+                <Text style={s.slpTitle}>{t('昨夜の睡眠')}</Text>
+                <Text style={s.slpVal} maxFontSizeMultiplier={1.3}>{fmtHM(asleepH)}</Text>
+                <View style={s.slpBarWrap}>
+                  <Svg width={bw} height={14}>
+                    {segs.map((sg) => {
+                      const w = (sg.h / totalAll) * bw;
+                      const r = <Rect key={sg.k} x={x} y={0} width={w} height={14} fill={sg.color} />;
+                      x += w;
+                      return r;
+                    })}
+                  </Svg>
+                </View>
+                <View style={s.slpLegend}>
+                  {segs.map((sg) => (
+                    <View key={sg.k} style={s.slpLegendItem}>
+                      <View style={[s.slpDot, { backgroundColor: sg.color }]} />
+                      <Text style={s.slpLegendT}>{sg.label} {fmtHM(sg.h)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
           {activity === null ? (
             <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
               <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : t('ヘルスケアから読み込む')}</Text>
@@ -1161,6 +1219,15 @@ const s = StyleSheet.create({
   actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   actBtnT: { fontSize: 13, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
+  // 昨夜の睡眠（B-14a）: 合計の大表示＋ステージ横帯＋凡例
+  slpBox: { marginBottom: 12 },
+  slpTitle: { fontSize: 11, fontWeight: '800', color: C.sub, letterSpacing: 0.2 },
+  slpVal: { fontSize: 26, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
+  slpBarWrap: { borderRadius: 7, overflow: 'hidden', marginTop: 8, backgroundColor: C.track },
+  slpLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  slpLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  slpDot: { width: 8, height: 8, borderRadius: 4 },
+  slpLegendT: { fontSize: 11, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
   actDate: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
   actVal: { fontSize: 13, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
