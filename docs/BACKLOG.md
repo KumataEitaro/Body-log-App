@@ -241,6 +241,20 @@
 9. **テスター12人を確保してクローズドテスト開始**（14日連続・実使用が必要。
    早く始めるほど公開が早い。詳細: docs/ANDROID.mdの配信戦略）
 
+### 課金列車（広告＋上限ON＋王冠＋課金解放を1本で出す）
+- 開発側は準備完了: 広告(AdBanner・課金有効ビルドのみ自動点灯)・上限(plan_limits設定済み・
+  AI_LIMITS_ENABLEDで起床)・王冠(gate.ts)・ペイウォール。以下は熊田さんの手続き:
+  - [ ] AdMobアカウント作成（admob.google.com・無料）→iOS/Androidアプリを手動登録→
+        **App ID×2をnative/app.jsonへ差し替え**＋バナーユニットID×2をCodemagic環境変数へ
+        （手順: docs/ADS.md。広告主はGoogleが自動配信＝営業不要）
+  - [ ] AdMobの支払い情報・税務情報の登録（収益8,000円到達で振込。後回し可だが配信には本人確認が要る）
+  - [ ] RC_WEBHOOK_SECRETローテーション（RC管理画面＋Vercel環境変数の両方・漏洩済みのため必須）
+  - [ ] RCのiOS APIキーをCodemagic環境変数 EXPO_PUBLIC_RC_IOS_KEY へ（これが列車の点火スイッチ。
+        設定したビルドから課金UI・広告・王冠が一斉に生きる）
+  - [ ] ASCでサブスク3種の状態が「送信準備完了」か確認→アプリ審査提出時にIAPを添付
+  - [ ] 国=日本のSandboxテスターで¥表示確認→3プラン購入テスト
+  - 私側の同時作業（点火の直前に指示ください）: AI_LIMITS_ENABLED=true化・王冠の適用拡大・最終監査
+
 ### 任意（後回し可）
 10. ウィジェット試験: Apple Developer portalでApp Group
     `group.com.gotcha.bodylog.rn` を作成→App ID2つに紐付け→
