@@ -81,9 +81,9 @@
       [
         "react-native-google-mobile-ads",
         {
-          "_comment": "App IDはGoogle公式のテストID仮置き。AdMobで実ID取得後にここを差し替えて再ビルド（手順は docs/ADS.md）",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "_comment": "実App ID設定済み（2026-09-02・AdMob発行）。差し替え時は要再ビルド",
+          "iosAppId": "ca-app-pub-3319916143033433~3403103040",
+          "androidAppId": "ca-app-pub-3319916143033433~9006783518",
           "delayAppMeasurementInit": true
         }
       ]

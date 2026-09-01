@@ -37,13 +37,21 @@ function ensureAdsInit(): void {
   try { ads.default().initialize().catch(() => {}); } catch { /* 初期化失敗でも落とさない */ }
 }
 
-// バナーユニットID: Codemagic環境変数の実IDを優先し、未設定ならGoogle公式テストID。
-// 実IDの取得と設定手順は docs/ADS.md（熊田さん向け）を参照
+// 本番のバナーユニットID（2026-09-02発行・banner-ios/banner-android）。
+// ユニットIDは公開クライアントに埋め込まれる識別子で秘密ではない。
+// 環境変数があれば上書き可（差し替え実験用）。__DEV__ではGoogle公式テストIDを使い、
+// 開発中の自己表示が実ユニットの無効トラフィックに数えられないようにする
+const PROD_BANNER = {
+  ios: 'ca-app-pub-3319916143033433/6775266640',
+  android: 'ca-app-pub-3319916143033433/4738084646',
+} as const;
+
 function bannerUnitId(m: AdsModule): string {
-  const real = Platform.OS === 'ios'
+  if (__DEV__) return m.TestIds.ADAPTIVE_BANNER;
+  const env = Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_ADMOB_BANNER_IOS
     : process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID;
-  return real || m.TestIds.ADAPTIVE_BANNER;
+  return env || (Platform.OS === 'ios' ? PROD_BANNER.ios : PROD_BANNER.android);
 }
 
 export default function AdBanner() {
