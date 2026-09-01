@@ -19,7 +19,10 @@
         "NSHealthShareUsageDescription": "体重とワークアウトの記録をヘルスケアから読み取り、アプリのグラフや消費カロリー計算に反映するために使用します。",
         "NSHealthUpdateUsageDescription": "このアプリがヘルスケアへデータを書き込むことはありません。"
       },
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "webcredentials:bodylog-orcin.vercel.app"
+      ]
     },
     "android": {
       "package": "com.gotcha.bodylog.rn",

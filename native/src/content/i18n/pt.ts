@@ -1626,4 +1626,12 @@ export const PT: Record<string, string> = {
   "アクティブカロリーを目標に反映する": "Refletir calorias ativas na meta",
   "ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）": "Se ativado, o quanto você pode comer a mais aumenta conforme você caminha. Como a medição do Saúde inclui movimentos diários, esse valor tende a subir mais fácil (desative se sentir dificuldade para perder peso).",
   "反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。": "Apenas o \"gasto extra além do normal\" é refletido (movimentos diários já estão inclusos no seu nível de atividade física da meta, para não somar duas vezes).",
+  "パスワード": "Senha",
+  "保存済みのアカウントから選ぶ": "Escolher de contas salvas",
+  "キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。": "Você pode escolher uma conta salva tocando no ícone de chave acima do teclado. Se não aparecer, verifique \"Ajustes\" → \"Geral\" → \"Preenchimento Automático e Senhas\" no seu dispositivo.",
+  "アカウント": "Conta",
+  "アカウントを切り替える": "Alternar conta",
+  "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Sair da conta atual e voltar para a tela de login",
+  "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Você sairá da conta atual. Seus registros não serão apagados. Na próxima tela, você poderá escolher uma conta salva no seu dispositivo.",
+  "切り替える": "Alternar",
 };

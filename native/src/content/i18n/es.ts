@@ -1709,4 +1709,11 @@ export const ES: Record<string, string> = {
   "アクティブカロリーを目標に反映する": "Reflejar calorías activas en el objetivo",
   "ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）": "Al activarlo, \"lo que te queda por comer\" aumentará según lo que camines. Como la medición de Salud incluye el movimiento diario, es más fácil que aumente (desactívalo si sientes que te cuesta perder peso).",
   "反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。": "Solo se refleja \"lo que te has movido más de lo habitual\" (el movimiento diario ya está incluido en el factor de actividad de tu objetivo, por lo que no se duplica).",
+  "保存済みのアカウントから選ぶ": "Elegir de las cuentas guardadas",
+  "キーボード上部の鍵アイコンから、保存済みのアカウントを選べます。出てこない場合は、端末の「設定」→「一般」→「自動入力とパスワード」をご確認ください。": "Puedes elegir una cuenta guardada desde el icono de llave arriba del teclado. Si no aparece, ve a \"Ajustes\" → \"General\" → \"Autocompletar y contraseñas\" en tu dispositivo.",
+  "アカウント": "Cuenta",
+  "アカウントを切り替える": "Cambiar de cuenta",
+  "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Cerrarás la sesión actual para volver a la pantalla de inicio de sesión.",
+  "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Cerrarás la sesión actual. No perderás tus datos. En la siguiente pantalla, podrás elegir una cuenta guardada en tu dispositivo.",
+  "切り替える": "Cambiar",
 };

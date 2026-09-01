@@ -64,5 +64,7 @@ export const config = {
   // （sw.jsがリダイレクトされるとService Workerの登録自体が失敗する）
   // app-ads.txt はAdMobのクローラが匿名で取りに来る（リダイレクトすると
   // アプリ確認が永遠に通らない）ため必ず素通しする
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|apple-touch-icon|app-ads\\.txt|api/).*)'],
+  // .well-known/ も同様。apple-app-site-association はAppleのCDNが匿名で取りに来るので、
+  // 認証で弾いたりリダイレクトすると「Webとアプリでパスワードを共有」が機能しない
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|apple-touch-icon|app-ads\\.txt|\\.well-known/|api/).*)'],
 };
