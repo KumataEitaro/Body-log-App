@@ -12,6 +12,7 @@ import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
+import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
@@ -20,7 +21,7 @@ import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
 import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
-import { BellRing, FileText } from 'lucide-react-native';
+import { BellRing, FileText, Droplet } from 'lucide-react-native';
 import { shareMedicalReport } from '@/lib/medicalReport';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
@@ -233,6 +234,17 @@ export default function SettingsScreen() {
     setActiveToGoal(v);
     if (v) AsyncStorage.setItem(ACTIVE_KCAL_TO_GOAL_KEY, '1').catch(() => {});
     else AsyncStorage.removeItem(ACTIVE_KCAL_TO_GOAL_KEY).catch(() => {});
+  }
+
+  // 生理周期モード（既定OFF）。ONにした人にだけ概要「からだ」に記録カードが現れ、
+  // 体重グラフに月経期間の帯が重なる。**記録しない人の画面には一切現れない**
+  // （最も機微なデータなので、既定で見せない・OFFの間は問い合わせもしない）。
+  // OFFに戻しても記録は消えない（消したい人はカード内の各行から自分で消せる）
+  const [cycleOn, setCycleOn] = useState(false);
+  useEffect(() => { isCycleEnabled().then(setCycleOn).catch(() => {}); }, []);
+  function toggleCycle(v: boolean) {
+    setCycleOn(v);
+    setCycleEnabled(v).catch(() => {});
   }
 
   // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
@@ -499,6 +511,22 @@ export default function SettingsScreen() {
         <Row icon={<UserRound color={C.teal} size={ICON.xl} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
         <Row icon={<Salad color={C.teal} size={ICON.xl} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
+      </View>
+
+      {/* からだの記録。既定OFFの、本人が選んだときだけ現れる記録 */}
+      <Text style={s.groupLabel}>{t('からだの記録')}</Text>
+      <View style={s.group}>
+        <View style={s.notifRow}>
+          <View style={s.cycleRowText}>
+            <View style={s.cycleLabelRow}>
+              <Droplet color={C.teal} size={ICON.xl} />
+              <Text style={s.notifLabel}>{t('生理周期を記録する')}</Text>
+            </View>
+            <Text style={s.notifSub}>{t('体重の増減が周期と重なっているかを見られます。記録しない人には表示されません')}</Text>
+          </View>
+          <Switch value={cycleOn} onValueChange={toggleCycle} trackColor={{ true: C.teal }} />
+        </View>
+        <Text style={s.notifNote}>{t('記録するのは開始日とメモだけです。あなたにだけ見え、次がいつ来るかの予測はしません（診断や避妊・妊活の判断には使えません）。')}</Text>
       </View>
 
       {/* 食事の制約（B-18）。オンボーディングには入れない（同意を流し読みさせたくないため） */}
@@ -1193,6 +1221,8 @@ const s = StyleSheet.create({
   hourChipTOn: { color: C.panel },  // ink地の文字はダークで反転するため背景トークンで吸収
   notifLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   notifSub: { fontSize: 13, color: C.sub, marginTop: 2 },
+  cycleRowText: { flex: 1 },
+  cycleLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   notifNote: { fontSize: 11, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
   group: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.panel, overflow: 'hidden', marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
