@@ -292,6 +292,9 @@ export async function bumpRestCount(): Promise<void> {
 export type AchievementReport = {
   streak: number;
   usedFreeze: string | null;
+  // 通算の記録日数と目標到達。★レビュー依頼の判定（lib/reviewPrompt.ts）が使う材料でもある
+  recordedDays: number;
+  goalReached: boolean;
   // ソフト週目標の進捗（実績ページの「今週」ブロック用）。
   // goal=自己契約の日数（未設定は7=毎日）、days=月〜日の記録有無
   week: { goal: number; count: number; days: boolean[]; todayIdx: number };
@@ -498,7 +501,7 @@ async function runEvaluate(): Promise<AchievementReport> {
     pr: prTop ? { name: prTop[0], kg: Math.round(prTop[1].kg), date: prTop[1].date } : null,
   };
 
-  return { streak, usedFreeze, week, badges, newIds, retroIds, share };
+  return { streak, usedFreeze, recordedDays: recorded.size, goalReached: goalDone, week, badges, newIds, retroIds, share };
 }
 
 // ===== 軽量ストリーク（食事タブの🔥チップ用。日付列だけの2クエリ＋5分キャッシュ） =====

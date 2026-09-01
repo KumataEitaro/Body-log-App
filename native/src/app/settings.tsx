@@ -13,9 +13,10 @@ import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
+import FeedbackSheet from '@/components/FeedbackSheet';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
@@ -126,6 +127,7 @@ export default function SettingsScreen() {
   const [mealEdit, setMealEdit] = useState<{ id: string; name: string } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [couponOpen, setCouponOpen] = useState(false); // クーポンコード入力（プラン行の隣の入口）
+  const [feedbackOpen, setFeedbackOpen] = useState(false); // ご意見・不具合の報告（サポート節の入口）
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
@@ -713,6 +715,12 @@ export default function SettingsScreen() {
              sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}
              onPress={() => openSheet('columns')} />
         <View style={s.sep} />
+        {/* ご意見・不具合の報告。βで「不満を言う口がアプリに無い」状態を解消する入口。
+            ここで受け止められなかった声は、そのままApp Storeの★1になる */}
+        <Row icon={<MessageSquare color={C.teal} size={ICON.xl} />} label={t('ご意見・不具合の報告')}
+             sub={t('不具合・要望を開発者に直接送れます（個別の返信はできません）')}
+             onPress={() => setFeedbackOpen(true)} />
+        <View style={s.sep} />
         {/* 友だちを誘う（feat/invite）。共有シートに紹介文＋招待リンクを渡す。
             リンク先は未ログインでも見える紹介ページ（/invite）で、名前は表示だけに使う */}
         <Row icon={<UserPlus color={C.teal} size={ICON.xl} />} label={t('友だちを誘う')}
@@ -1144,6 +1152,9 @@ export default function SettingsScreen() {
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
     {/* クーポンコード入力（成功時はシート内で祝祭＋gateキャッシュ更新まで完結する） */}
     <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
+
+    {/* ===== ご意見・不具合の報告（サポート節） ===== */}
+    <FeedbackSheet visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     <StatusBarMask />
     </View>
   );
