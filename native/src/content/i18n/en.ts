@@ -1738,4 +1738,9 @@ export const EN: Record<string, string> = {
   "獲得条件": "How to earn",
   "{d} に獲得": "Earned on {d}",
   "まだ獲得していません": "Not earned yet",
+  "苦手なもの・食べないものはありますか？": "Any dislikes or dietary restrictions?",
+  "登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。": "Add them here, and the AI will flag potential matches when scanning photos or menus. Perfect for vegan, gluten-free, or allergy-prone ingredients.",
+  "※ 表示は推定です。安全確認には使えません。": "*Estimates only. Do not use for safety verification.",
+  "設定してみる": "Set up now",
+  "いまはしない": "Not now",
 };

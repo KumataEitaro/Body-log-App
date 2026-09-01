@@ -9,7 +9,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 import { ClipboardList, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
@@ -522,7 +522,7 @@ export default function TrainingScreen() {
         {editing ? (
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-              <Plus size={16} color="#fff" strokeWidth={3} />
+              <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
             </Pressable>
             <Pressable onPress={() => setEditing(false)} style={s.doneBtn2} hitSlop={8}>
               <Text style={s.doneBtn2T}>{t('完了')}</Text>
@@ -1033,15 +1033,15 @@ export default function TrainingScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
-  h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  scroll: { padding: SPACE.screen, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
+  h: { ...HEAD.section, color: C.ink, marginBottom: 12 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
-  doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
+  doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   doneBtn2T: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 12 },
+  pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 12 },
   // きょうの動きカード
   mvRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
-  mvStat: { flex: 1, backgroundColor: C.bg, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14 },
+  mvStat: { flex: 1, backgroundColor: C.bg, borderRadius: RADIUS.tile, paddingVertical: 12, paddingHorizontal: 14 },
   mvLblRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   mvLbl: { fontSize: 12, fontWeight: '700', color: C.sub },
   mvVal: { fontSize: 25, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
@@ -1065,7 +1065,7 @@ const s = StyleSheet.create({
   hrAxisT: { flex: 1, fontSize: 11, color: C.faint, fontWeight: '700', textAlign: 'left' },
   segWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   segBtn: {
-    flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
+    flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip,
     paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6,
   },
   segBtnOn: { backgroundColor: C.teal, borderColor: C.teal },
@@ -1073,7 +1073,7 @@ const s = StyleSheet.create({
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   actPickUsed: {
     fontSize: 11, fontWeight: '800', color: C.teal,
-    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 6, paddingVertical: 2,
   },
   tDial: { justifyContent: 'center', alignItems: 'center' },
   tDialT: { fontSize: 15, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
@@ -1082,7 +1082,7 @@ const s = StyleSheet.create({
   restRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' },
   restOpt: {
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
-    borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
+    borderRadius: RADIUS.chip, paddingHorizontal: 11, paddingVertical: 6,
   },
   restOptOn: { borderColor: C.teal, backgroundColor: C.accentBadge, borderWidth: 1.5 },
   restOptT: { fontSize: 13, fontWeight: '800', color: C.sub },
@@ -1104,14 +1104,14 @@ const s = StyleSheet.create({
   actCheckT: { color: '#fff', fontSize: 13, fontWeight: '900' },
   actChipAdd: { borderStyle: 'dashed', borderColor: C.accentBorder, backgroundColor: C.accentSoft },
   actChip: {
-    width: '23%', backgroundColor: C.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
+    width: '23%', backgroundColor: C.chipBg, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.panel,
     paddingVertical: 10, alignItems: 'center', gap: 3,
   },
   actChipOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
   actChipT: { fontSize: 11, fontWeight: '700', color: C.sub, textAlign: 'center' },
-  hkWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
+  hkWrap: { flex: 1, backgroundColor: C.bg, padding: SPACE.screen, paddingTop: sheetTopPad(18) },
   hkHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  hkTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  hkTitle: { ...HEAD.card, color: C.ink },
   hkClose: { fontSize: 24, color: C.sub, fontWeight: '600', paddingHorizontal: 6 },
   hkSub: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
   hkMsg: { fontSize: 13, fontWeight: '600', color: C.sub, marginTop: 16, textAlign: 'center' },
@@ -1121,15 +1121,15 @@ const s = StyleSheet.create({
   hkName: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink },
   hkMeta: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   freeMin: {
-    width: 72, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    width: 72, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip,
     paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: C.ink, textAlign: 'center',
   },
-  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 10 },
+  h2: { ...HEAD.card, color: C.ink, marginBottom: 10 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   rest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
+    borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
     overflow: 'hidden',
   },
   restBarTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, backgroundColor: 'transparent' },
@@ -1138,14 +1138,14 @@ const s = StyleSheet.create({
   restIdle: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
-    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
+    borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
   },
   restIdleT: { fontSize: 13, fontWeight: '700', color: C.sub },
   restIdleStart: { fontSize: 13, fontWeight: '800', color: C.teal },
   goalRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
-    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12,
+    borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 12,
   },
   goalIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
   goalRowT: { fontSize: 13.5, fontWeight: '800', color: C.ink },
@@ -1155,17 +1155,17 @@ const s = StyleSheet.create({
   restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
   restHint: { fontSize: 11, color: C.sub },
   prevRef: { fontSize: 13, color: C.sub, marginTop: 4, lineHeight: 18 },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   tRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
-  tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 17, color: C.ink },
+  tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input, padding: 10, fontSize: 17, color: C.ink },
   tNum: { width: 56, textAlign: 'center' },
-  btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  btnPrimary: { backgroundColor: C.ink, borderRadius: RADIUS.chip, paddingVertical: 12, alignItems: 'center' },
   btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
-  btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
+  btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 12, alignItems: 'center' },
   btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
-  chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   verdict: { fontSize: 13, fontWeight: '600', lineHeight: 19, marginTop: 4 },
@@ -1180,7 +1180,7 @@ const s = StyleSheet.create({
   // 未同期チップ（圏外保存の積み残し）。責め色にしない・控えめに
   syncChip: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip,
     paddingHorizontal: 11, paddingVertical: 6, marginBottom: 10,
   },
   syncChipT: { fontSize: 12, fontWeight: '800', color: C.amber, fontVariant: ['tabular-nums'] },
@@ -1188,7 +1188,7 @@ const s = StyleSheet.create({
   // プレート計算機の入口（筋トレ入力カードの見出し右端）
   plateBtn: {
     marginLeft: 'auto', borderWidth: 1, borderColor: C.line, backgroundColor: C.chipBg,
-    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 4,
   },
   plateBtnT: { fontSize: 11, fontWeight: '800', color: C.sub },
 });

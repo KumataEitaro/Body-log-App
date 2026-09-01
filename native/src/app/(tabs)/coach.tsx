@@ -18,7 +18,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import VoiceHintButton from '@/components/VoiceHintButton';
@@ -310,7 +310,7 @@ export default function CoachScreen() {
               <View style={s.quickGrid}>
                 {quickList().map((q) => (
                   <Pressable key={q.t} style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.7 }]} onPress={() => send(q.t)}>
-                    <q.Icon color={C.teal} size={21} strokeWidth={2.2} />
+                    <q.Icon color={C.teal} size={ICON.hero} strokeWidth={ICON.stroke} />
                     <Text style={s.quickT}>{q.t}</Text>
                   </Pressable>
                 ))}
@@ -400,11 +400,11 @@ export default function CoachScreen() {
           <Animated.View pointerEvents="none" style={[s.inGlow, { opacity: glow }]} />
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
-              <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />
+              <ChevronDown color={C.teal} size={ICON.xl} strokeWidth={ICON.stroke} />
             </Pressable>
           ) : (
             <View style={s.pencilBadge}>
-              <MessageCircle color={C.teal} size={17} strokeWidth={2.5} />
+              <MessageCircle color={C.teal} size={ICON.md} strokeWidth={ICON.stroke} />
             </View>
           )}
           <TextInput ref={inputRef} style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
@@ -417,7 +417,7 @@ export default function CoachScreen() {
           <Pressable
             style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
             onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>
-            <ArrowUp color="#fff" size={17} strokeWidth={3} />
+            <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
           </Pressable>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -450,7 +450,7 @@ export default function CoachScreen() {
         <View style={s.histWrap}>
           <View style={s.histHead}>
             <Text style={s.histTitle}>{t('相談履歴')}</Text>
-            <Pressable onPress={() => setHistOpen(false)} hitSlop={10}><X size={20} color={C.sub} /></Pressable>
+            <Pressable onPress={() => setHistOpen(false)} hitSlop={10}><X size={ICON.xl} color={C.sub} /></Pressable>
           </View>
           <TextInput
             style={s.histSearch} placeholder={t('日付やキーワードで検索（例: 8/15、タンパク質）')} placeholderTextColor={C.faint}
@@ -481,40 +481,40 @@ export default function CoachScreen() {
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, paddingHorizontal: 16, paddingBottom: 6 },
+  wrap: { flex: 1, paddingHorizontal: SPACE.screen, paddingBottom: 6 },
   welcomeScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 10 },
   welcomeWrap: { alignItems: 'center', paddingBottom: 30 },
   welcomeIcon: {
     width: 76, height: 76, borderRadius: 38, backgroundColor: C.panel,
     borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  welcomeTitle: { fontSize: 21, fontWeight: '800', color: C.ink },
+  welcomeTitle: { ...HEAD.section, color: C.ink },
   welcomeSub: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 20, textAlign: 'center', lineHeight: 19 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   moreBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     alignSelf: 'center', marginTop: 16,
     borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
-    borderRadius: 999, paddingVertical: 10, paddingHorizontal: 18,
+    borderRadius: RADIUS.chip, paddingVertical: 10, paddingHorizontal: 18,
   },
   moreBtnT: { fontSize: 15, fontWeight: '800', color: C.teal },
   quickCard: {
-    width: '46%', backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,
+    width: '46%', backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.panel,
     paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center', gap: 6,
   },
   quickEmoji: { fontSize: 21 },
   quickT: { fontSize: 13, fontWeight: '700', color: C.ink, textAlign: 'center', lineHeight: 18 },
-  bubble: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, maxWidth: '88%' },
+  bubble: { borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, maxWidth: '88%' },
   bUser: { backgroundColor: C.ink, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
   bAi: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   bubbleT: { fontSize: 17, lineHeight: 22, color: C.ink },
   actionCard: {
     alignSelf: 'flex-start', maxWidth: '88%', backgroundColor: C.accentBadge,
-    borderWidth: 1, borderColor: C.teal, borderRadius: 14, padding: 12, marginBottom: 8, marginTop: -2,
+    borderWidth: 1, borderColor: C.teal, borderRadius: RADIUS.tile, padding: 12, marginBottom: 8, marginTop: -2,
   },
   actionLabel: { fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
-  actionBtn: { backgroundColor: C.teal, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
-  actionAlt: { borderWidth: 1.5, borderColor: C.teal, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.panel },
+  actionBtn: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 9, paddingHorizontal: 16 },
+  actionAlt: { borderWidth: 1.5, borderColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.panel },
   actionAltT: { color: C.teal, fontSize: 13, fontWeight: '800' },
   actionBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   actionDone: { color: C.teal, fontSize: 13, fontWeight: '800', marginTop: 8 },
@@ -541,24 +541,24 @@ const s = StyleSheet.create({
   // 王冠バナー（入力ドックの上）。責め色にせずCrownBadgeと同じ「開けるお楽しみ」トーン
   gateBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6,
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 14,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.tile,
     paddingHorizontal: 12, paddingVertical: 9,
   },
   gateBannerT: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: C.faint, marginTop: 5 },
   presetLink: { fontSize: 11, color: C.teal, fontWeight: '800', marginTop: 5 },
-  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 10, marginLeft: 2 },
+  pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 10, marginLeft: 2 },
   histBtn: {
     position: 'absolute', right: 54, zIndex: 30,
     width: 30, height: 30, borderRadius: 9,
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
     alignItems: 'center', justifyContent: 'center',
   },
-  histWrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
+  histWrap: { flex: 1, backgroundColor: C.bg, padding: SPACE.screen, paddingTop: sheetTopPad(18) },
   histHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  histTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  histTitle: { ...HEAD.card, color: C.ink },
   histSearch: {
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 12,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input,
     paddingHorizontal: 12, paddingVertical: 9, fontSize: 15, color: C.ink, marginBottom: 12,
   },
   histDate: { fontSize: 13, fontWeight: '800', color: C.sub, marginBottom: 6 },

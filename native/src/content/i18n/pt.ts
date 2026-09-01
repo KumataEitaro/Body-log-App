@@ -1641,4 +1641,9 @@ export const PT: Record<string, string> = {
   "獲得条件": "Como conquistar",
   "{d} に獲得": "Conquistada em {d}",
   "まだ獲得していません": "Ainda não conquistada",
+  "苦手なもの・食べないものはありますか？": "Tem algo que você não gosta ou não come?",
+  "登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。": "Ao cadastrar, a IA avisa se detectar esses itens em fotos ou menus. Útil para veganos, sem glúten ou para quem tem alergias alimentares.",
+  "※ 表示は推定です。安全確認には使えません。": "※ Os valores são estimativas. Não use para confirmação de segurança.",
+  "設定してみる": "Configurar",
+  "いまはしない": "Agora não",
 };

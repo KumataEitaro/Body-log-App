@@ -14,7 +14,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Sparkles } from 'lucide-react-native';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
@@ -235,7 +235,7 @@ export default function PaywallScreen() {
         <Text style={[s.planLead, isHero && s.planLeadHero]}>{info.lead()}</Text>
         {info.features().map((f) => (
           <View key={f} style={s.featRow}>
-            <Check size={15} color={C.teal} />
+            <Check size={ICON.sm} color={C.teal} />
             <Text style={s.featT}>{f}</Text>
           </View>
         ))}
@@ -312,7 +312,7 @@ export default function PaywallScreen() {
         <View style={s.badge}>
           {/* アクセント塗りの上の文字・線画は白固定（全画面共通の約束）。ダークパレットの
               tealは明るく持ち上げてあるので、暗所でも白のほうがコントラストが立つ */}
-          <Sparkles size={12} color="#fff" />
+          <Sparkles size={ICON.xs} color="#fff" />
           <Text style={s.badgeT}>{t('おすすめ')}</Text>
         </View>
       </View>
@@ -389,28 +389,28 @@ export default function PaywallScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 8, paddingBottom: 48 },
-  h: { fontSize: 26, fontWeight: '800', color: C.ink },
+  scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 48 },
+  h: { ...HEAD.page, color: C.ink },
   lead: { fontSize: 14, color: C.sub, marginTop: 4, marginBottom: 14 },
-  pending: { backgroundColor: C.panel, borderRadius: 14, padding: 24, alignItems: 'center', marginTop: 12 },
+  pending: { backgroundColor: C.panel, borderRadius: RADIUS.tile, padding: 24, alignItems: 'center', marginTop: 12 },
   pendingT: { color: C.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 },
   // 控えめなカード（スタンダード）: 面は素・枠線のみ
-  card: { backgroundColor: C.panel, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: C.line },
+  card: { backgroundColor: C.panel, borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12, borderWidth: 1, borderColor: C.line },
   // 主役カード（プレミアム）: グラデ縁のリング（2px）の中に、アクセントをごく薄く敷いた面
   heroWrap: { marginTop: 10, marginBottom: 12 },
-  heroRing: { borderRadius: 18, padding: 2 },
-  heroGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: C.teal },
-  cardHero: { backgroundColor: C.accentSoft, borderRadius: 16, padding: 16 },
-  badge: { position: 'absolute', top: -10, left: 14, backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heroRing: { borderRadius: RADIUS.card + 2, padding: 2 },
+  heroGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: RADIUS.card + 2, backgroundColor: C.teal },
+  cardHero: { backgroundColor: C.accentSoft, borderRadius: RADIUS.card, padding: SPACE.card },
+  badge: { position: 'absolute', top: -10, left: 14, backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeT: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  planName: { fontSize: 18, fontWeight: '800', color: C.ink },
+  planName: { ...HEAD.sub, color: C.ink },
   // 「誰のためのプランか」の1行（社会的証明ではなく価値の言語化）
   planLead: { fontSize: 12.5, color: C.sub, marginTop: 2, marginBottom: 8 },
   planLeadHero: { color: C.teal, fontWeight: '700' },
   // 価格オプション行（月額/年額の同時提示。選択中はアクセント縁）
   priceOpt: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
-    borderWidth: 1.5, borderColor: C.line, borderRadius: 12,
+    borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.input,
     paddingHorizontal: 12, paddingVertical: 10, marginTop: 8,
     backgroundColor: C.panel,
   },
@@ -425,9 +425,9 @@ const s = StyleSheet.create({
   featRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
   featT: { fontSize: 13.5, color: C.ink, flex: 1 },
   // CTA: 未選択カードは輪郭だけ（控えめ）、選択中だけアクセント塗り。主役はさらに一段大きく
-  cta: { marginTop: 12, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
+  cta: { marginTop: 12, borderRadius: RADIUS.input, paddingVertical: 12, alignItems: 'center', backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
   ctaOn: { backgroundColor: C.teal, borderColor: C.teal },
-  ctaHero: { paddingVertical: 14, borderRadius: 14 },
+  ctaHero: { paddingVertical: 14, borderRadius: RADIUS.tile },
   ctaOff: { opacity: 0.5 },
   ctaT: { fontSize: 15, fontWeight: '700', color: C.teal },
   ctaTOn: { color: '#fff' },

@@ -40,7 +40,7 @@ import {
   claimOnce, releaseClaim, loadJobs, saveJobs, readPhotoPayloads, type ParseJob,
 } from '@/lib/parseJobs';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
 import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal } from '@/lib/activeKcal';
@@ -69,6 +69,7 @@ import StreakChip from '@/components/StreakChip';
 import BadgeIcon from '@/components/BadgeIcon';
 // 食事の制約（B-18・docs/DIET-MODES.md）。警告は情報提供だけで、保存は絶対にブロックしない
 import { useDiet, isDietOff } from '@/lib/diet';
+import { shouldShowDietTip, markDietTipShown, markDietTipDeclined } from '@/lib/dietTip';
 import { mergeAlerts, rulesFor, type DietAlert, type DietLevel } from '@/lib/dietCheck';
 import { DietWarnRow, DietMark, DietSilenceNote } from '@/components/DietNotes';
 import { useGate } from '@/lib/gate';
@@ -787,6 +788,10 @@ export default function LogScreen() {
         await recordItems(items, viewDate);
         const s2 = await pickSuggestion(myFoods.map((f) => f.name), viewDate);
         if (s2) { setSuggest(s2); await markShown(viewDate); }
+        else if (await shouldShowDietTip(dietProfile)) {
+          // 食事の制約が未設定のまま解析を何度も使っている人にだけ、存在を知らせる
+          setDietTip(true); await markDietTipShown();
+        }
       } catch { /* 案内は本体機能に影響させない */ }
       return true;
     } finally {
@@ -1052,6 +1057,10 @@ export default function LogScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   // よく食べる食品の登録案内（保存後に1件だけ出す）
   const [suggest, setSuggest] = useState<Suggestion | null>(null);
+  // 食事の制約（除外アラート）の存在を知らせる案内。
+  // 設定の奥にあって気づかれないので、未設定＋AI解析3回以上の人に**1回だけ**出す。
+  // マイ食品の案内とは同時に出さない（Modalが重なる）ので、そちらが出ない回に譲る。
+  const [dietTip, setDietTip] = useState(false);
   // 品目単位で操作するために展開している記録行（1回の食事＝1レコードのまま、中身を開く）
   const [openLog, setOpenLog] = useState<string | null>(null);
   const [foodDraft, setFoodDraft] = useState<MyFoodDraft | null>(null);
@@ -1120,7 +1129,7 @@ export default function LogScreen() {
           {editing ? (
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-                <Plus size={16} color="#fff" strokeWidth={3} />
+                <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
               </Pressable>
               <Pressable onPress={() => setEditing(false)} style={s.doneBtn} hitSlop={8}>
                 <Text style={s.doneBtnT}>{t('完了')}</Text>
@@ -1592,7 +1601,7 @@ export default function LogScreen() {
             <View style={{ flex: 1 }}>
             {aiNote && (
               <View style={s.aiNoteRow}>
-                <Sparkles size={12} color={C.teal} />
+                <Sparkles size={ICON.xs} color={C.teal} />
                 <View style={{ flex: 1 }}>
                   {!!aiNote.reply && <Text style={s.aiNoteT}>{aiNote.reply}</Text>}
                   {aiNote.assumptions.map((a) => (
@@ -1638,7 +1647,7 @@ export default function LogScreen() {
               })}
               {parsed?.weight != null && (
                 <View style={s.trayChip}>
-                  <Weight size={12} color={C.sub} />
+                  <Weight size={ICON.xs} color={C.sub} />
                   <Text style={s.trayChipT}>{parsed.weight}kg</Text>
                   <Pressable hitSlop={8} onPress={() => setParsed((p) => (p && (p.items.length > 0 || p.ex) ? { ...p, weight: null } : null))}>
                     <Text style={s.trayX}>×</Text>
@@ -1647,7 +1656,7 @@ export default function LogScreen() {
               )}
               {parsed?.ex && parsed.ex !== 'オフ' && (
                 <View style={s.trayChip}>
-                  <Activity size={12} color={C.sub} />
+                  <Activity size={ICON.xs} color={C.sub} />
                   <Text style={s.trayChipT}>{parsed.ex}</Text>
                 </View>
               )}
@@ -1732,11 +1741,11 @@ export default function LogScreen() {
           {/* 通常時=「ここが入力欄」のペンサイン / キーボード表示中=しまうボタン */}
           {kbVisible ? (
             <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
-              <ChevronDown color={C.teal} size={19} strokeWidth={2.5} />
+              <ChevronDown color={C.teal} size={ICON.xl} strokeWidth={ICON.stroke} />
             </Pressable>
           ) : (
             <View style={s.pencilBadge}>
-              <Pencil color={C.teal} size={16} strokeWidth={2.5} />
+              <Pencil color={C.teal} size={ICON.md} strokeWidth={ICON.stroke} />
             </View>
           )}
           <TextInput
@@ -1770,7 +1779,7 @@ export default function LogScreen() {
           )}
           </>)}
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
-            <ArrowUp color="#fff" size={17} strokeWidth={3} />
+            <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
           </Pressable>
         </View>
       </Animated.View>
@@ -1800,6 +1809,26 @@ export default function LogScreen() {
         onSecondary={() => {
           if (suggest) markDeclined(suggest.key).catch(() => {});
           setSuggest(null);
+        }}
+      />
+      {/* 食事の制約（除外アラート・B-18）の存在を知らせる案内。
+          docs/DIET-MODES.md §3のとおりオンボーディングには入れず、食事入力の文脈で1回だけ。
+          注記の免責は DietNotes.tsx の正本（「これは推定です」「安全確認には使えません」）と
+          同じ内容を短くしたもの。この案内で機能を安全確認に使えると誤解させない（§6-3）。 */}
+      <SpotlightTip
+        visible={dietTip}
+        title={t('苦手なもの・食べないものはありますか？')}
+        text={t('登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。')}
+        note={t('※ 表示は推定です。安全確認には使えません。')}
+        primaryLabel={t('設定してみる')}
+        onPrimary={() => {
+          setDietTip(false);
+          router.push({ pathname: '/settings', params: { open: 'diet', ts: String(Date.now()) } });
+        }}
+        secondaryLabel={t('いまはしない')}
+        onSecondary={() => {
+          setDietTip(false);
+          markDietTipDeclined().catch(() => {});   // 一度断られたら二度と出さない
         }}
       />
       <MyFoodForm
@@ -1835,24 +1864,24 @@ export default function LogScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16 },
+  scroll: { padding: SPACE.screen },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   // B-7: 最初の法則の帯（今日のひとこと帯と同じ「帯」の文法・アクセント面で一段目立たせる）
   lawBand: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
+    borderRadius: RADIUS.tile, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
   },
   lawBandT: { flex: 1, fontSize: 13, fontWeight: '800', color: C.ink, lineHeight: 18 },
   lawBandGo: { fontSize: 13, fontWeight: '800', color: C.teal },
   lawBandX: { fontSize: 17, color: C.faint, fontWeight: '700', paddingHorizontal: 2 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
-  doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.teal },
+  doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   doneBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
+  pageTitle: { ...HEAD.page, color: C.ink },
   hero: {
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
   },
   heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
@@ -1864,9 +1893,9 @@ const s = StyleSheet.create({
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
-  h2: { fontSize: 17, fontWeight: '800', color: C.ink, letterSpacing: 0.8, marginBottom: 8 },
-  h2sub: { fontWeight: '400', color: C.sub, letterSpacing: 0 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
+  h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
+  h2sub: { fontWeight: '400', color: C.sub },
   mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },
   // 展開した品目行。記録行より一段内側に置き、従属関係を見せる
   itemRow: {
@@ -1887,29 +1916,29 @@ const s = StyleSheet.create({
   msg: { fontSize: 15, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
   ta: {
     minHeight: 88, maxHeight: 180, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line,
-    borderRadius: 14, padding: 12, fontSize: 17, color: C.ink, textAlignVertical: 'top',
+    borderRadius: RADIUS.tile, padding: 12, fontSize: 17, color: C.ink, textAlignVertical: 'top',
   },
   chip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.panel,
-    borderWidth: 1.5, borderColor: C.line, borderRadius: 999, marginRight: 6, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, marginRight: 6, overflow: 'hidden',
   },
   chipOn: { borderColor: C.ink },
   // マイミールチップ（マイ食品と見た目で区別: 皿アイコン＋アクセント面・teal文字）
   mealChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: C.accentBadge, borderWidth: 1.5, borderColor: C.accentBorder,
-    borderRadius: 999, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, maxWidth: 180,
+    borderRadius: RADIUS.chip, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, maxWidth: 180,
   },
   mealChipT: { fontSize: 13, fontWeight: '800', color: C.teal },
   // 量調整ポップ（トレイ直下のインライン展開）
   adjustPop: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 7,
+    borderRadius: RADIUS.tile, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 7,
   },
   adjustName: { fontSize: 13, fontWeight: '800', color: C.ink },
   adjustHint: { fontSize: 11, fontWeight: '600', color: C.sub },
   multChip: {
-    flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 999,
+    flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: RADIUS.chip,
     borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel,
   },
   multChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
@@ -1919,20 +1948,20 @@ const s = StyleSheet.create({
   chipMinus: { paddingVertical: 9, paddingHorizontal: 12, borderLeftWidth: 1.5, borderLeftColor: C.line },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   moodBtn: {
-    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.tile,
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, marginBottom: 8,
   },
-  btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  btnPrimary: { backgroundColor: C.ink, borderRadius: RADIUS.chip, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従
   wRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   wInput: {
-    width: 90, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12,
+    width: 90, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input,
     padding: 10, fontSize: 17, color: C.ink, textAlign: 'center', fontVariant: ['tabular-nums'],
   },
   wUnit: { fontSize: 15, color: C.sub, fontWeight: '600' },
-  btnGhost: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  btnGhost: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
-  chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
+  chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 13, paddingVertical: 9 },
   chipBtnT: { fontSize: 13, fontWeight: '700', color: C.sub },
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   reuseBtnT: { color: C.panel, fontSize: 17, fontWeight: '800' },  // ink地（ダーク=明色）に追従
@@ -1967,18 +1996,18 @@ const s = StyleSheet.create({
   aiNoteT: { fontSize: 12.5, color: C.ink, fontWeight: '600', lineHeight: 18 },
   aiNoteSub: { fontSize: 11, color: C.sub, lineHeight: 16 },
   aiQChip: {
-    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 5,
     maxWidth: '100%',
   },
   aiQChipT: { fontSize: 12, color: C.teal, fontWeight: '700' },
   tray: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 7, marginBottom: 7,
+    borderRadius: RADIUS.tile, paddingHorizontal: 8, paddingVertical: 7, marginBottom: 7,
   },
   trayChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip,
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
@@ -1990,7 +2019,7 @@ const s = StyleSheet.create({
   trayWaitT: { fontSize: 12, fontWeight: '600', color: C.sub, marginTop: 1 },
   // 失敗した送信。トークンで組むのでダークでも反転が効く（coralWeak地にcoral文字）。
   // 複数行になるのでピル型（999）ではなく角丸の面にする
-  trayChipFail: { backgroundColor: C.coralWeak, borderColor: C.coral, borderRadius: 14, gap: 7, maxWidth: 280 },
+  trayChipFail: { backgroundColor: C.coralWeak, borderColor: C.coral, borderRadius: RADIUS.tile, gap: 7, maxWidth: 280 },
   trayFailT: { fontSize: 13, fontWeight: '800', color: C.coral },
   trayFailSub: { fontSize: 11, fontWeight: '600', color: C.sub, marginTop: 1 },
   trayFailWhat: { fontSize: 11, fontWeight: '700', color: C.ink, marginTop: 1 },
@@ -1998,14 +2027,14 @@ const s = StyleSheet.create({
   trayDropT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
+    backgroundColor: C.accentBadge, borderRadius: RADIUS.tile, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
   },
   editBannerT: { fontSize: 13, fontWeight: '800', color: C.teal },
   editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
   trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
   trayChipPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
   trayX: { fontSize: 15, fontWeight: '800', color: C.coral, marginLeft: 2 },
-  traySave: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
+  traySave: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 13, paddingVertical: 9 },
   traySaveT: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
   trayClearT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   previewMain: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
@@ -2018,7 +2047,7 @@ const s = StyleSheet.create({
   pfcAb: { fontSize: 11, fontWeight: '700', color: C.faint },
   adviceBox: {
     marginTop: 8, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9,
+    borderRadius: RADIUS.tile, paddingHorizontal: 12, paddingVertical: 9,
   },
   adviceT: { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '500' },
   pfcBar: { flex: 1, height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden' },
@@ -2026,6 +2055,6 @@ const s = StyleSheet.create({
   pfcT: { width: 96, fontSize: 13, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
   hint: { fontSize: 11, color: C.faint, textAlign: 'right', marginTop: 6 },
   thumbWrap: { marginRight: 8 },
-  thumb: { width: 64, height: 64, borderRadius: 12, borderWidth: 1, borderColor: C.line },
+  thumb: { width: 64, height: 64, borderRadius: RADIUS.input, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
 });
