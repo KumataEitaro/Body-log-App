@@ -11,7 +11,7 @@
 // - 肯定的断定（安全です・食べられます・OK・緑の✓）を作らない（§6-やらないこと）
 // - 触覚・音を鳴らさない（不安を煽らない・§5）
 // - 警告のたびに免責を1行添える（§6-3）／無警告時も常設表記を出す（§6-4）
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { TriangleAlert, Info } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { t } from '@/lib/i18n';
@@ -145,6 +145,9 @@ export function DietWarnRow({ alerts, onDetail }: { alerts: DietAlert[]; onDetai
     : t('「{name}」は対象を含む可能性があります。表示をご確認ください。', { name: a.name }));
   return (
     <View style={[s.warn, high.length > 0 ? s.warnHigh : s.warnMaybe]}>
+      {/* 品目が多いと警告が縦に伸びてトレイが画面を埋め、下のリストや保存ボタンに
+          手が届かなくなる（βフィードバック 2026-09-01）。高さ上限で止めて中だけ流す */}
+      <ScrollView style={{ maxHeight: 168 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
       {high.map((a, i) => (
         <View key={`h${i}-${a.name}`} style={s.warnLine}>
           <TriangleAlert size={13} color={C.coral} />
@@ -157,6 +160,8 @@ export function DietWarnRow({ alerts, onDetail }: { alerts: DietAlert[]; onDetai
           <Text style={s.warnMaybeT}>{maybeText(a)}</Text>
         </View>
       ))}
+      </ScrollView>
+      {/* 免責はスクロールの外に置く（流れて見えなくならないように・§6-3） */}
       <DietEstimateNote onDetail={onDetail} />
     </View>
   );

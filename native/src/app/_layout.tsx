@@ -65,7 +65,17 @@ export default function RootLayout() {
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         {/* GuideProviderはルートに置く（設定画面がタブ外に出たため、タブ内限定だとuseGuideが届かない） */}
         <GuideProvider>
-          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.scheme}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
+          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.scheme}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: C.bg },
+            // ヘッダー（設定などタブ外のスタック画面）もテーマに追従させる。
+            // 既定のナビゲーションテーマはライト固定で、ダークだと『戻る』の下に
+            // 白い帯が残っていた（βフィードバック 2026-09-01）
+            headerStyle: { backgroundColor: C.bg },
+            headerTintColor: C.teal,
+            headerTitleStyle: { color: C.ink },
+            headerShadowVisible: false,
+          }} />
         </GuideProvider>
         {/* 規約改定時の再同意ゲート。認証済みのときだけ判定が走る（lib/consent.ts）。
             ルートに置くのは、どの画面からでも必ず表示させるため */}
