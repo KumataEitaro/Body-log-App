@@ -1540,7 +1540,7 @@ const s = StyleSheet.create({
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   // 「いつの記録か」の常設表示。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
   dockDate: { fontSize: 11, fontWeight: '700', color: C.faint, paddingHorizontal: 6, marginBottom: 3, fontVariant: ['tabular-nums'] },
-  dockDatePast: { color: '#b45309', fontWeight: '800' },
+  dockDatePast: { color: C.amber, fontWeight: '800' },  // 生HEX禁止（ダーク対応はCトークン経由）
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
