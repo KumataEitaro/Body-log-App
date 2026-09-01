@@ -60,6 +60,9 @@ import { trendPhrase, trendBands } from '@/lib/trend';
 import { MoodInline } from '@/components/MoodFace';
 import HighlightCard from '@/components/HighlightCard';
 import { type HighlightTarget } from '@/lib/highlight';
+import VitalsCard from '@/components/VitalsCard';
+import { listVitals, vitalsSummary, type Vital } from '@/lib/vitals';
+import { HeartPulse } from 'lucide-react-native';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
@@ -83,7 +86,7 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 //
 // 統合カード（項目が多すぎ・概念かぶりのβ指摘対応）: 旧23行を10行前後に統合し、
 // 詳細ページで統合元カードを縦に積む（各カード自体は無改造）
-const ALL_ORDER_DEFAULT = ['body', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
+const ALL_ORDER_DEFAULT = ['body', 'vitals', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
 // 統合行→詳細で縦に積む旧カードの並び
 const DETAIL_STACKS: Record<string, string[]> = {
   body: ['goal', 'kpi', 'chart', 'table'],
@@ -97,7 +100,7 @@ const DETAIL_STACKS: Record<string, string[]> = {
 // キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
 // ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
-  { title: () => t('からだ'), keys: ['body', 'photos', 'laws', 'bulkguard', 'cycles'] },
+  { title: () => t('からだ'), keys: ['body', 'vitals', 'photos', 'laws', 'bulkguard', 'cycles'] },
   { title: () => t('食事'), keys: ['eating', 'week'] },
   { title: () => t('運動'), keys: ['volume', 'strength', 'health'] },
 ];
@@ -112,6 +115,7 @@ const CARD_LABELS = (): Record<string, string> => ({
   // 統合行（メニュー・詳細タイトル・⊕シートで使う）
   body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
   laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), photos: t('体の写真'), health: t('歩数・睡眠'),
+  vitals: t('バイタル'),
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
@@ -205,6 +209,8 @@ export default function ChangesScreen() {
   const [lawLine, setLawLine] = useState<string | null>(null);
   // サイクル履歴（B-5）。null=テーブル未作成等で取得不能（サイクル機能を静かに非表示）
   const [periods, setPeriods] = useState<PurposePeriod[] | null>(null);
+  // バイタル（血圧・脈拍・血糖）のメニュー要約用。migration-25未適用なら空配列＝誘い文
+  const [vitals, setVitals] = useState<Vital[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
@@ -372,6 +378,8 @@ export default function ChangesScreen() {
     try { setLawLine(await latestLawSummary()); } catch { /* サマリーは飾り */ }
     // サイクル履歴（B-5）。テーブル未作成ならnullが返り、cyclesはメニューに出ない
     setPeriods(await fetchPurposePeriods());
+    // バイタルの要約（migration-25未適用・通信失敗は空配列＝誘い文のまま）
+    try { setVitals(await listVitals(30)); } catch { /* 要約は飾り */ }
   };
   useEffect(() => { load(); }, [load]);
 
@@ -801,6 +809,8 @@ export default function ChangesScreen() {
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
       case 'photos': return <BodyPhotosCard />;
+      // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
+      case 'vitals': return <VitalsCard width={winW - 60} />;
       case 'binge': return <BingeTriggerCard />;
       // 画面が既に持っているrows（date/intake/target）をそのまま渡す（再取得しない最小構成）
       case 'weekmap': return <WeekdayHeatmapCard rows={rows} />;
@@ -933,6 +943,8 @@ export default function ChangesScreen() {
         return `${cycleLabel(open.purpose)} ${wk}${d != null ? `・${d > 0 ? '+' : ''}${d.toFixed(1)}kg` : ''}`;
       }
       case 'photos': return t('見た目の変化を並べて見る');
+      // 最新の血圧（無ければ誘い文）。取得は画面ロードのベストエフォート
+      case 'vitals': return vitalsSummary(vitals);
       // 旧tkpi/tprの誘い文（週次集計はカード側が持つデータなのでここでは静的に）
       case 'volume': return t('今週のセット数・ボリューム');
       case 'strength': return t('自己ベストと共有ステッカー');
@@ -955,6 +967,7 @@ export default function ChangesScreen() {
       case 'bulkguard': return <Gauge {...p} />;
       case 'cycles': return <Repeat {...p} />;
       case 'photos': return <Camera {...p} />;
+      case 'vitals': return <HeartPulse {...p} />;
       case 'health': return <Footprints {...p} />;
       default: return <FlaskConical {...p} />;
     }
