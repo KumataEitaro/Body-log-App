@@ -49,7 +49,9 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
   // 選択インジケータ（チップの塗り）はバネで滑らせる
   const ix = useSharedValue(index * STEP);
   useEffect(() => {
-    ix.value = withSpring(index * STEP, { damping: 20, stiffness: 240 });
+    // damping高め＋行き過ぎ抑制: 「ぬるぬるだが揺れない」（βフィードバック 2026-09-02:
+    // 揺れ幅が大きすぎる。滑らかさは維持しつつオーバーシュートをほぼゼロに）
+    ix.value = withSpring(index * STEP, { damping: 30, stiffness: 260, overshootClamping: true });
   }, [index, ix]);
   const indStyle = useAnimatedStyle(() => ({ transform: [{ translateX: ix.value }] }));
 
