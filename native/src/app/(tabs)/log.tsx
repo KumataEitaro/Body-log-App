@@ -1445,6 +1445,10 @@ export default function LogScreen() {
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />
+          {/* 文字を打ち始めたら補助アイコンを畳み、テキストに全幅を渡す（LINE式）。
+              5個のアイコンが同じ行にいると入力幅が半分になり、10文字弱で不自然に
+              改行していた（βフィードバック 2026-09-02）。キーボードを閉じれば全部戻る */}
+          {!(kbVisible && chat.trim().length > 0) && (<>
           <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} guideKey="dockCamera" />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
           {/* 成分表示を撮る（主役）: パッケージ裏ラベル→AI読み取り。日本の商品はバーコードDB
@@ -1460,6 +1464,7 @@ export default function LogScreen() {
               onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
             />
           )}
+          </>)}
           <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
             <ArrowUp color="#fff" size={17} strokeWidth={3} />
           </Pressable>

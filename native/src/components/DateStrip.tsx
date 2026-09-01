@@ -7,12 +7,12 @@
 // props（value/onChange）は旧DateStripと互換。食事/運動の両タブがそのまま使う
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, ZoomIn } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CalendarDays } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { todayJST } from '@/lib/calc';
-import { C } from '@/lib/ui';
+import { C, rgba } from '@/lib/ui';
 import { t, apiLang } from '@/lib/i18n';
 
 // チップの寸法。ヘッダー行に収まるよう小ぶりに固定する
@@ -76,8 +76,10 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
     <View style={s.row}>
       <ScrollView
         ref={scRef} horizontal showsHorizontalScrollIndicator={false}
-        // 「今日」ピルが出る間はその分だけ表示チップを減らし、ヘッダー行からはみ出さない
-        style={{ flexGrow: 0, maxWidth: (isToday ? 7 : 5) * STEP - GAP }}
+        // ビューポート幅は常に一定（6チップ）。以前は今日/過去で7⇄5に伸縮していて、
+        // 日付を変えるたびストリップ全体が「パッと」動いて見にくかった（βフィードバック 2026-09-02）。
+        // 「今日」ピルの分は常に席を確保しておく（下のピルは非表示時もレイアウトに残る）
+        style={{ flexGrow: 0, maxWidth: 6 * STEP - GAP }}
         onLayout={(e) => { visW.current = e.nativeEvent.layout.width; }}
         onContentSizeChange={(w) => {
           if (!didInit.current) { scRef.current?.scrollTo({ x: w, animated: false }); didInit.current = true; }
@@ -102,18 +104,14 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
         </View>
       </ScrollView>
 
-      {/* 今日へワンタップ帰還（今日以外を見ているときだけ・スプリング入場） */}
-      {!isToday && (
-        <Animated.View entering={ZoomIn.springify().damping(14)}>
-          <Pressable style={s.todayPill} onPress={() => pick(today)} hitSlop={6}>
-            <Text style={s.todayPillT} maxFontSizeMultiplier={1.3}>{t('今日')}</Text>
-          </Pressable>
-        </Animated.View>
-      )}
+      {/* 今日へワンタップ帰還。常にレイアウトに置き（席の確保＝ストリップが動かない）、
+          今日を見ている間は静かにフェードアウトするだけ（バネ入場は「びよーん」と
+          不評だったため廃止・βフィードバック 2026-09-02） */}
+      <TodayPill visible={!isToday} onPress={() => pick(today)} />
 
       {/* 月カレンダー（任意日ジャンプ）。過去日を見ている間はアンバーで気づかせる */}
       <Pressable onPress={() => setOpen(true)} hitSlop={8} style={[s.calBtn, !isToday && s.calBtnPast]}>
-        <CalendarDays size={15} color={isToday ? C.sub : '#b45309'} strokeWidth={2.2} />
+        <CalendarDays size={15} color={isToday ? C.sub : C.amber} strokeWidth={2.2} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -142,6 +140,21 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
   );
 }
 
+// 「今日」ピル: 非表示でもレイアウトに残す（幅の席を確保→ストリップが動かない）。
+// 表示切替は150msのフェードだけ（誇張しない）
+function TodayPill({ visible, onPress }: { visible: boolean; onPress: () => void }) {
+  const op = useSharedValue(visible ? 1 : 0);
+  useEffect(() => { op.value = withTiming(visible ? 1 : 0, { duration: 150 }); }, [visible, op]);
+  const st = useAnimatedStyle(() => ({ opacity: op.value }));
+  return (
+    <Animated.View style={st} pointerEvents={visible ? 'auto' : 'none'}>
+      <Pressable style={s.todayPill} onPress={onPress} hitSlop={6}>
+        <Text style={s.todayPillT} maxFontSizeMultiplier={1.3}>{t('今日')}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chips: { flexDirection: 'row', columnGap: GAP },
@@ -160,7 +173,7 @@ const s = StyleSheet.create({
   },
   todayPillT: { fontSize: 11, fontWeight: '800', color: C.teal },
   calBtn: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  calBtnPast: { backgroundColor: '#fef7e8', borderWidth: 1, borderColor: '#f59e0b' },
+  calBtnPast: { backgroundColor: rgba(C.amber, 0.12), borderWidth: 1, borderColor: rgba(C.amber, 0.55) },  // 生HEX禁止（Cトークン由来）
   back: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)', justifyContent: 'center', padding: 24 },
   pickerCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
   pickerTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
