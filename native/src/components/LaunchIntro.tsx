@@ -56,11 +56,12 @@ export function LaunchProvider({ ready, children }: { ready: boolean; children: 
 }
 
 const s = StyleSheet.create({
-  // app.jsonのsplash設定（背景#FFFFFF・imageWidth 160）と完全に同じ見た目にして、
-  // ネイティブスプラッシュ→JSオーバーレイのつなぎ目を消す
+  // app.jsonのsplash設定（背景#C8FAFB＝アイコンの水色・imageWidth 160）と完全に同じ見た目にして、
+  // ネイティブスプラッシュ→JSオーバーレイのつなぎ目を消す。
+  // ここを変えるときは app.json の splash.backgroundColor も必ず一緒に変える（色が飛ぶ）
   cover: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+    backgroundColor: '#C8FAFB', alignItems: 'center', justifyContent: 'center', zIndex: 999,
   },
   icon: { width: 160, height: 160, resizeMode: 'contain' },
 });
