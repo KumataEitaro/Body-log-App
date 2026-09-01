@@ -13,7 +13,10 @@ import { purchasesAvailable } from './purchases';
 import { isUnlimited } from './calc';
 
 // ゲート対象の機能キー。画面を足すたびにここへ追加する（文字列unionで拡張）
-export type GatedFeature = 'laws' | 'digest' | 'eating' | 'coach' | 'insights';
+// 'diet'（食事の制約・B-18）は「AI判定・自由記述・メニュー判定」だけをゲートする。
+// 端末内の辞書判定（黒のみ）は無料でも必ず動く＝安全に関わる最低限は有料の壁の裏に置かない
+// （docs/DIET-MODES.md §4）
+export type GatedFeature = 'laws' | 'digest' | 'eating' | 'coach' | 'insights' | 'diet';
 
 // ===== plan のモジュールスコープキャッシュ =====
 // プラン判定の正本はサーバー（profiles.plan。RC webhookとクーポンAPIが更新する）。

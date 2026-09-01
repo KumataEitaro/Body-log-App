@@ -6,6 +6,7 @@ import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { buildParseFoodPrompt, buildParseHistoryBlock } from '@/lib/parseFoodPrompt';
+import { buildDietBlock, dietAiPlan } from '@/lib/dietPrompt';
 
 // 日本のユーザーが主のため東京リージョンで実行（画像アップロードとSupabase往復を短縮）
 export const preferredRegion = 'hnd1';
@@ -58,11 +59,14 @@ export async function POST(req: Request) {
   // ===== 使用回数チェック・全体上限・マイ食品辞書を並列取得（直列往復→1往復分の時間に） =====
   const today = todayJST();
   const kind = images.length > 0 ? 'photo' as const : 'text' as const;
-  const [usageRes, capReached, myFoodsRes, profRes] = await Promise.all([
+  const [usageRes, capReached, myFoodsRes, profRes, dietRes] = await Promise.all([
     supabase.from('ai_usage').select('count,text_count,photo_count,coach_count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
     supabase.from('my_foods').select('name,kind,unit,kcal,p,f,c,note,serving_label,serving_ratio').limit(60),
     supabase.from('profiles').select('plan,plan_until,premium_until,photo_trial_used').eq('id', user.id).maybeSingle(), // 列未作成でもerror→無料扱いで安全
+    // 食事の制約（B-18・migration-26）。プラン取得とは別クエリにする＝列が無い環境で
+    // このselectが失敗しても、プラン判定まで巻き込んで無料に落ちることがない
+    supabase.from('profiles').select('diet_modes,diet_custom,diet_consent_at').eq('id', user.id).maybeSingle(),
   ]);
   const used = usageRes.data?.count ?? 0;
   const photoTrialUsed = Number((profRes.data as { photo_trial_used?: number } | null)?.photo_trial_used ?? 0);
@@ -107,7 +111,15 @@ export async function POST(req: Request) {
       '- 分量の記載がなく、基準量が1個・1杯など単品の場合は基準量1つ分として計算する。\n';
   }
 
-  const prompt = buildParseFoodPrompt({ text, dictBlock, outLang, historyBlock: buildParseHistoryBlock(history) });
+  // 食事の制約（B-18）の注入。docs/DIET-MODES.md §2の②＋§4の線引き＋§6の同意ゲート。
+  // ・AI判定はスタンダード以上（無料は端末内の辞書判定だけが動く）
+  // ・免責への同意（diet_consent_at）が無いユーザーには注入しない＝同意ゲートをサーバー側にも置く
+  const diet = dietRes.data as { diet_modes?: unknown; diet_custom?: unknown; diet_consent_at?: string | null } | null;
+  const dietBlock = (dietAiPlan(plan) || isUnlimited(user.email)) && diet?.diet_consent_at
+    ? buildDietBlock({ modes: diet.diet_modes, custom: diet.diet_custom, noun: '品目', field: 'items' })
+    : '';
+
+  const prompt = buildParseFoodPrompt({ text, dictBlock, outLang, historyBlock: buildParseHistoryBlock(history), dietBlock });
 
   const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [{ text: prompt }];
   for (const im of images) {
