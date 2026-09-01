@@ -1501,4 +1501,8 @@ export const ID: Record<string, string> = {
   "セット名を入力してください。": "Silakan masukkan nama set.",
   "マイミールを保存できませんでした。通信環境を確認してもう一度お試しください。": "Gagal menyimpan Makanan Saya. Silakan periksa koneksi internetmu dan coba lagi.",
   "{name}セット": "Set {name}",
+  "写真の解析を再開できませんでした。もう一度撮影して送信してください。": "Gagal melanjutkan analisis foto. Silakan ambil foto lagi dan kirim ulang.",
+  "解析に失敗しました": "Analisis gagal",
+  "再試行": "Coba lagi",
+  "混み合っています…そのまま離れてOK": "Sistem sedang sibuk... Anda boleh keluar dari halaman ini",
 };
