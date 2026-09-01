@@ -1259,4 +1259,7 @@ export const VI: Record<string, string> = {
   "{date} の記録": "Nhật ký ngày {date}",
   "写真から読み取る（成分表示）": "Quét từ ảnh (Bảng thành phần)",
   "※日本の商品はヒットしないことが多いです": "※ Thường khó tìm thấy các sản phẩm của Nhật Bản",
+  "本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。": "Dành cho người tập nghiêm túc. Quản lý toàn bộ miễn phí từ khối lượng, tiến độ mục tiêu đến thời gian nghỉ.",
+  "筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）": "Xem lịch sử tập ở tab \"Tổng quan\" → \"Sự phát triển cơ bắp\" (chạm để chuyển)",
+  "行を長押しで削除、×でその種目だけ削除できます": "Nhấn giữ dòng để xóa, hoặc dùng × để xóa riêng bài tập đó",
 };

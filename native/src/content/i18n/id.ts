@@ -1259,4 +1259,7 @@ export const ID: Record<string, string> = {
   "{date} の記録": "Catatan {date}",
   "写真から読み取る（成分表示）": "Pindai dari foto (Label Gizi)",
   "※日本の商品はヒットしないことが多いです": "※ Produk Jepang sering kali tidak ditemukan",
+  "本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。": "Untuk yang serius angkat beban. Volume, progres target, hingga waktu istirahat, semuanya gratis.",
+  "筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）": "Riwayat latihan bisa dilihat di tab 'Ringkasan' → 'Perkembangan Latihan' (ketuk untuk beralih)",
+  "行を長押しで削除、×でその種目だけ削除できます": "Tekan lama baris untuk menghapus, atau gunakan × untuk menghapus latihan itu saja",
 };

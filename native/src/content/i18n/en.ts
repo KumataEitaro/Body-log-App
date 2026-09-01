@@ -1359,4 +1359,7 @@ export const EN: Record<string, string> = {
   "{date} の記録": "Log for {date}",
   "写真から読み取る（成分表示）": "Scan from photo (Nutrition Facts)",
   "※日本の商品はヒットしないことが多いです": "*Japanese products often do not show up in search results",
+  "本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。": "For serious lifters. Track volume, goal progress, and rest timers completely for free.",
+  "筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）": "View your workout history in the Summary tab → Muscle Growth (tap to go)",
+  "行を長押しで削除、×でその種目だけ削除できます": "Long press a row to delete, or use × to delete just that exercise",
 };

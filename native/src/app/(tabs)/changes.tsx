@@ -39,6 +39,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
+import LiftHistoryCard from '@/components/LiftHistoryCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { healthAvailable, requestHealthAuth, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
@@ -80,7 +81,8 @@ const DETAIL_STACKS: Record<string, string[]> = {
   eating: ['slots', 'weekmap', 'trends', 'binge'],
   week: ['digest', 'calendar'],
   volume: ['tkpi', 'tcal', 'tbal', 'tpart', 'ttable'],
-  strength: ['tchart', 'tpr', 'tgoal'],
+  // lifthist=筋トレ履歴（運動タブから移設。入力は運動タブ・振り返りは概要タブの役割分離）
+  strength: ['tchart', 'tpr', 'tgoal', 'lifthist'],
 };
 // メニューのセクション小見出し（Appleヘルスケアの「トレンド」「ハイライト」式）。
 // キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
@@ -104,7 +106,7 @@ const CARD_LABELS = (): Record<string, string> => ({
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
-  tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
+  tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'), lifthist: t('筋トレ履歴'),
 });
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
 function mergeOrder(saved: string[], def: string[]): string[] {
@@ -657,6 +659,7 @@ export default function ChangesScreen() {
       case 'tchart': return <LiftChartCard />;
       case 'tpr': return <PersonalBestCard />;
       case 'tgoal': return <GoalSummaryCard mode="training" />;
+      case 'lifthist': return <LiftHistoryCard />;
       default: return null;
     }
   }
