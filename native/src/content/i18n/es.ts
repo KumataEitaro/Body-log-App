@@ -1716,4 +1716,11 @@ export const ES: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Cerrarás la sesión actual para volver a la pantalla de inicio de sesión.",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Cerrarás la sesión actual. No perderás tus datos. En la siguiente pantalla, podrás elegir una cuenta guardada en tu dispositivo.",
   "切り替える": "Cambiar",
+  "{n}つのバッジを獲得しました": "¡Has ganado {n} insignias!",
+  "「{name}」バッジを獲得しました": "Has ganado la insignia \"{name}\"",
+  "過去の記録から獲得しました": "Obtenido de registros anteriores",
+  "ほか{n}個": "y {n} más",
+  "獲得条件": "Requisitos",
+  "{d} に獲得": "Obtenido el {d}",
+  "まだ獲得していません": "Aún no obtenido",
 };

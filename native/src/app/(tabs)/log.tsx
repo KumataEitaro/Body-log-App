@@ -66,6 +66,7 @@ import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
+import BadgeIcon from '@/components/BadgeIcon';
 // 食事の制約（B-18・docs/DIET-MODES.md）。警告は情報提供だけで、保存は絶対にブロックしない
 import { useDiet, isDietOff } from '@/lib/diet';
 import { mergeAlerts, rulesFor, type DietAlert, type DietLevel } from '@/lib/dietCheck';
@@ -74,7 +75,7 @@ import { useGate } from '@/lib/gate';
 import MoodFace, { MoodInline } from '@/components/MoodFace';
 import ComebackSheet from '@/components/ComebackSheet';
 import StartChecklist from '@/components/StartChecklist';
-import { invalidateStreak } from '@/lib/achievements';
+import { invalidateStreak, maybeEvaluateBadges, peekBadgeBanner, consumeBadgeBanner, badgeById } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { t } from '@/lib/i18n';
 import { useReduceMotion, useCountUp } from '@/lib/motion';
@@ -780,6 +781,7 @@ export default function LogScreen() {
           : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
 
       invalidateStreak();   // 🔥チップを最新化
+      refreshBadgeBand(true).catch(() => {});   // 保存で条件を満たしたバッジをその場で拾う
       // よく食べる食品の検出（保存が成功したときだけ学習する）
       try {
         await recordItems(items, viewDate);
@@ -877,6 +879,27 @@ export default function LogScreen() {
     if (goSee) {
       Haptics.selectionAsync().catch(() => {});
       router.push('/laws' as never);
+    }
+  }
+
+  // ===== バッジ獲得の帯 =====
+  // 「獲得に気づけない」が最大の不満だったため、実績ページを開いていなくても
+  // 食事タブで一度だけ知らせる（×またはタップで消化。判定はmaybeEvaluateBadgesが間隔付きで走る）
+  const [badgeIds, setBadgeIds] = useState<string[]>([]);
+  const refreshBadgeBand = useCallback(async (force = false) => {
+    try {
+      await maybeEvaluateBadges(force);
+      setBadgeIds(await peekBadgeBanner());
+    } catch { /* 帯が出ないだけ */ }
+  }, []);
+  // 画面に戻るたびに読み直す（実績ページで見たら帯は消えている）
+  useFocusEffect(useCallback(() => { refreshBadgeBand(); }, [refreshBadgeBand]));
+  function dismissBadgeBand(goSee: boolean) {
+    consumeBadgeBanner().catch(() => {});
+    setBadgeIds([]);
+    if (goSee) {
+      Haptics.selectionAsync().catch(() => {});
+      router.push('/achievements' as never);
     }
   }
 
@@ -1217,6 +1240,23 @@ export default function LogScreen() {
               </View>
             )}
           </Animated.View>
+        )}
+
+        {/* バッジ獲得の帯（ヒーロー直下・一度きり。タップで実績ページへ・×は見ずに消化）。
+            B-7の法則の帯と同じ「帯」の文法（面・枠・→の位置）を共有する */}
+        {badgeIds.length > 0 && (
+          <Pressable style={[s.lawBand, { marginTop: -8 }]} onPress={() => dismissBadgeBand(true)}>
+            <BadgeIcon id={badgeIds[0]} size={30} earned />
+            <Text style={s.lawBandT} numberOfLines={2}>
+              {badgeIds.length > 1
+                ? t('{n}つのバッジを獲得しました', { n: badgeIds.length })
+                : t('「{name}」バッジを獲得しました', { name: badgeById(badgeIds[0])?.name ?? '' })}
+            </Text>
+            <Text style={s.lawBandGo}>{t('見にいく')} →</Text>
+            <Pressable hitSlop={10} onPress={() => dismissBadgeBand(false)}>
+              <Text style={s.lawBandX}>×</Text>
+            </Pressable>
+          </Pressable>
         )}
 
         {/* スタートチェックリスト（新規ユーザーの最初の1週間・登録14日以内だけ・自動判定） */}

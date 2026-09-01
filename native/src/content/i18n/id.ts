@@ -1634,4 +1634,11 @@ export const ID: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Keluar dari akun saat ini dan kembali ke layar masuk",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Kamu akan keluar dari akun saat ini. Riwayat catatanmu tidak akan dihapus. Di layar berikutnya, kamu bisa memilih akun yang tersimpan di perangkatmu.",
   "切り替える": "Ganti",
+  "{n}つのバッジを獲得しました": "Berhasil mendapatkan {n} lencana",
+  "「{name}」バッジを獲得しました": "Berhasil mendapatkan lencana \"{name}\"",
+  "過去の記録から獲得しました": "Didapatkan dari catatan masa lalu",
+  "ほか{n}個": "dan {n} lainnya",
+  "獲得条件": "Syarat mendapatkan",
+  "{d} に獲得": "Didapatkan pada {d}",
+  "まだ獲得していません": "Belum didapatkan",
 };

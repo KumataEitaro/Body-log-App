@@ -1731,4 +1731,11 @@ export const EN: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Sign out of your current account and return to the login screen.",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Sign out of your current account. Your data won't be deleted. On the next screen, you can choose an account saved on your device.",
   "切り替える": "Switch",
+  "{n}つのバッジを獲得しました": "You earned {n} badges!",
+  "「{name}」バッジを獲得しました": "You earned the \"{name}\" badge!",
+  "過去の記録から獲得しました": "Earned from past records",
+  "ほか{n}個": "and {n} more",
+  "獲得条件": "How to earn",
+  "{d} に獲得": "Earned on {d}",
+  "まだ獲得していません": "Not earned yet",
 };
