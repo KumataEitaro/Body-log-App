@@ -20,6 +20,7 @@ import HeaderGear from '@/components/HeaderGear';
 import QuickLogFab from '@/components/QuickLogFab';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
+import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import LiftPicker from '@/components/LiftPicker';
 import WeightDial from '@/components/WeightDial';
 import PlateCalc from '@/components/PlateCalc';
@@ -161,6 +162,8 @@ export default function TrainingScreen() {
     if (await requestHealthAuth()) { await loadHealth(); loadHourly(viewDate); }
   }
   const stepsOfView = healthDays?.find((d) => d.date === viewDate)?.steps ?? null;
+  // 歩数の週目標（B-15・オフ=null）。日目標と違い1日サボっても取り返せる、ゆるい自己契約
+  const weekStepsGoal = useWeekStepsGoal();
 
   // かんたん記録の状態
   const [actId, setActId] = useState<string | null>(null);
@@ -580,6 +583,10 @@ export default function TrainingScreen() {
             </View>
             {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
             </View>
+            {/* 週間歩数目標（B-15）: ミニバーの上に週プログレス1本。目標オフ/未連携時は出さない */}
+            {weekStepsGoal != null && (healthDays?.length ?? 0) > 0 && (
+              <WeekStepsBar days={healthDays!} today={todayJST()} goal={weekStepsGoal} />
+            )}
             {last7.length > 1 && (
               <View style={s.mvBars}>
                 {last7.map((d) => {

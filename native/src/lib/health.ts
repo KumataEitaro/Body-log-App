@@ -181,6 +181,51 @@ export async function readHourlySteps(date: string): Promise<number[] | null> {
   }
 }
 
+// ===== 睡眠ステージの内訳（B-14a・ヘルスケアの円グラフ相当） =====
+// HKCategoryValueSleepAnalysis の実値（@kingstinct/react-native-healthkit
+// src/generated/healthkit.generated.ts の enum CategoryValueSleepAnalysis で確認）:
+//   0=inBed / 1=asleepUnspecified(asleep) / 2=awake / 3=asleepCore / 4=asleepDeep / 5=asleepREM
+export type SleepStages = { awakeH: number; remH: number; coreH: number; deepH: number };
+
+/**
+ * dateの「起きた日」に計上される睡眠のステージ内訳（readActivitySummaryと同じ流儀＝
+ * JSTで終了時刻がdateに落ちるサンプルを合算する）。
+ * ステージデータが無い端末（Apple Watch無し等・全サンプルがasleepUnspecified）は
+ * nullを返し、呼び出し側は合計だけの従来表示のままにする。
+ * 1=asleepUnspecifiedはステージ計測があるときだけcore扱いで合算する。
+ * HealthKitが無い環境（Expo Go / Android）や読み取り失敗もnull（非表示）。
+ */
+export async function readSleepStages(date: string): Promise<SleepStages | null> {
+  if (!hk) return null;
+  try {
+    // 「昨夜の睡眠」はdate前日の昼〜date当日中に終わる。前日昼からの窓で十分に覆える
+    const end = new Date(`${date}T23:59:59+09:00`);
+    const start = new Date(new Date(`${date}T12:00:00+09:00`).getTime() - 86400000);
+    const samples = await hk.queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
+      limit: -1, ascending: true, filter: { date: { startDate: start, endDate: end } },
+    });
+    const out: SleepStages = { awakeH: 0, remH: 0, coreH: 0, deepH: 0 };
+    let staged = false;   // 3/4/5（Core/Deep/REM）が1つでもあればステージ計測あり
+    for (const s of samples) {
+      const v = Number(s.value);
+      if (v === 0) continue;                              // inBedは睡眠ではない
+      const en = new Date(s.endDate).getTime();
+      if (dateKeyJST(new Date(en)) !== date) continue;    // 「起きた日」に計上（既存流儀）
+      const h = Math.max(0, en - new Date(s.startDate).getTime()) / 3600000;
+      if (v === 2) out.awakeH += h;
+      else if (v === 5) { out.remH += h; staged = true; }
+      else if (v === 4) { out.deepH += h; staged = true; }
+      else if (v === 3) { out.coreH += h; staged = true; }
+      else if (v === 1) out.coreH += h;                   // unspecifiedはcore扱い
+    }
+    if (!staged) return null;   // ステージ計測が無い（unspecifiedだけ）＝従来の合計表示に任せる
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return { awakeH: r2(out.awakeH), remH: r2(out.remH), coreH: r2(out.coreH), deepH: r2(out.deepH) };
+  } catch {
+    return null;
+  }
+}
+
 // 直近days日の歩数（日別合計）と睡眠時間（日別h）— 表示用サマリー
 export type HealthDaySummary = { date: string; steps: number; sleepH: number };
 

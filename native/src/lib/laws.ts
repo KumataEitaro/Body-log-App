@@ -20,6 +20,7 @@ import { foodWeightEffects, buildItemDays, type ItemDay, type WeightPoint } from
 import { analyzeBinge, type AnalysisDay } from './bingeAnalysis';
 import { hadComeback } from './achievements';
 import { slotOf } from './itemLog';
+import { healthAvailable, readActivitySummary } from './health';
 import { weekdayRhythm } from '@/components/WeekdayHeatmapCard';
 
 // ===== 型 =====
@@ -32,7 +33,8 @@ export type LawKind =
   | 'binge_trigger'  // 過食の引き金1位（analyzeBinge.triggers[0]）
   | 'timeslot'       // 食べる時間帯の偏り（夜シェア・slotOf）
   | 'recover'        // お守り: 食べすぎ後に体重が戻るまでの日数（analyzeBinge.after）
-  | 'comeback';      // 復帰パターン: 途切れてもまた30日つないだ（hadComeback）
+  | 'comeback'       // 復帰パターン: 途切れてもまた30日つないだ（hadComeback）
+  | 'sleep_factor';  // 21時以降に食べた日は当夜の睡眠が短い/長い（B-14b・HealthKitの睡眠×食事時刻）
 
 // 文章生成に使う生値（数値・食材名など）。翻訳せずにこのまま保存する
 export type LawParams = Record<string, string | number>;
@@ -54,10 +56,13 @@ export type LawInput = {
   weights: WeightPoint[];                                    // 体重系列
   itemHours: { date: string; hour: number | null; kcal: number }[]; // 品目×時刻（直近4週）
   recordedDates: string[];                                   // 記録があった日（昇順）
+  // 日別の睡眠時間（HealthKit readActivitySummary由来・「起きた日」に計上）。
+  // entriesに睡眠列は無いためHealthKitが唯一のソース。hk無し環境では未指定/空＝sleep_factorはスキップ
+  sleepDays?: { date: string; sleepH: number }[];
 };
 
 // 図鑑の「未発見枠」を出すための全種類リスト（表示順）
-export const LAW_KINDS: LawKind[] = ['food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback'];
+export const LAW_KINDS: LawKind[] = ['food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback', 'sleep_factor'];
 
 const STORE_KEY = 'bl-laws';         // { [id]: { at, kind, p } } 一度見つけた法則の永続化
 const SEEN_KEY = 'bl-laws-seen';     // string[] 祝祭を見せ終わったid（freshの判定に使う）
@@ -72,6 +77,8 @@ const NIGHT_MIN_DAYS = 14;     // 時間帯: 時刻つき記録がこれ未満�
 const NIGHT_MIN_SHARE = 0.3;   // 時間帯: 夜(21時〜)が30%以上で「偏り」と呼ぶ
 const RECOVER_MIN_BINGES = 3;  // お守り: 食べすぎがこれ未満なら平均に意味がない
 const RECOVER_MAX_DAYS = 4;    // お守り: 4日以内に戻る人にだけ「戻る」と言う
+const SLEEP_MIN_GROUP = 5;     // 睡眠×夜食: 「食べた日」「食べない日」それぞれ最低5日
+const SLEEP_MIN_DIFF_H = 0.5;  // 睡眠×夜食: 差が30分未満は法則と呼ばない
 
 // ===== 文章生成（表示のたびに現在の言語で組み立てる） =====
 
@@ -87,6 +94,7 @@ export function lawKindHint(kind: LawKind): string {
     case 'timeslot': return t('食べる時間帯のこと');
     case 'recover': return t('立ち直りの早さのこと');
     case 'comeback': return t('途切れたあとのこと');
+    case 'sleep_factor': return t('夜食と睡眠のこと');
   }
 }
 
@@ -129,6 +137,14 @@ export function lawText(kind: LawKind, p: LawParams): { title: string; sub: stri
       };
     case 'comeback':
       return { title: t('あなたは一度途切れても、また戻ってこられる'), sub: t('記録の空白と再開の履歴から') };
+    case 'sleep_factor':
+      // MFPが有料で売っている「食事×睡眠の洞察」の無料版。dirは翻訳非依存の生値
+      return {
+        title: p.dir === 'long'
+          ? t('あなたは21時以降に食べた日、睡眠が平均{n}分長い', { n: Number(p.min) })
+          : t('あなたは21時以降に食べた日、睡眠が平均{n}分短い', { n: Number(p.min) }),
+        sub: t('食べた日{a}日・食べなかった日{b}日の睡眠から', { a: Number(p.late), b: Number(p.off) }),
+      };
   }
 }
 
@@ -206,6 +222,38 @@ export function detectLaws(input: LawInput): Law[] {
   try {
     if (hadComeback([...input.recordedDates].sort(), today)) {
       out.push(makeLaw('comeback', 'comeback', {}, today));
+    }
+  } catch { /* 同上 */ }
+
+  // --- 夜食×睡眠（B-14b・sleep_factor） ---
+  // 「21時以降の摂取がある日」vs「無い日」で当夜の睡眠時間を比べる。
+  // 睡眠は「起きた日」に計上される（health.ts）ため、日dの当夜の睡眠＝d+1のsleepH。
+  // 差30分以上・各群5日以上のときだけ法則にする（ノイズを出さない側に倒す）
+  try {
+    const sleepMap = new Map((input.sleepDays ?? []).filter((x) => x.sleepH > 0).map((x) => [x.date, x.sleepH]));
+    if (sleepMap.size > 0) {
+      // 時刻つきの食事記録がある日を「食べた/食べない」に分ける（時刻が無い記録だけの日は判定不能で除外）
+      const withHour = input.itemHours.filter((x) => x.hour != null && x.kcal > 0);
+      const lateDays = new Set(withHour.filter((x) => (x.hour as number) >= 21).map((x) => x.date));
+      const allDays = new Set(withHour.map((x) => x.date));
+      const late: number[] = [];
+      const off: number[] = [];
+      for (const d of allDays) {
+        const sleep = sleepMap.get(shiftDate(d, 1));   // 当夜の睡眠＝翌朝「起きた日」の値
+        if (sleep == null) continue;
+        (lateDays.has(d) ? late : off).push(sleep);
+      }
+      if (late.length >= SLEEP_MIN_GROUP && off.length >= SLEEP_MIN_GROUP) {
+        const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+        const diffH = avg(off) - avg(late);   // 正=食べた日のほうが短い
+        if (Math.abs(diffH) >= SLEEP_MIN_DIFF_H) {
+          out.push(makeLaw('sleep_factor', 'sleep_factor', {
+            dir: diffH > 0 ? 'short' : 'long',
+            min: Math.round(Math.abs(diffH) * 60),
+            late: late.length, off: off.length,
+          }, today));
+        }
+      }
     }
   } catch { /* 同上 */ }
 
@@ -330,11 +378,23 @@ async function fetchLawInput(): Promise<LawInput | null> {
   for (const e of entries) if (e.intake != null || e.weight != null) recorded.add(e.date);
   for (const r of logs) recorded.add(r.date);
 
+  // 日別の睡眠（sleep_factor用）。呼び出し元（/laws・checkFirstLawUnlock）はHealthKit読取を
+  // 持っていないため、ここで1回だけ読む。窓はitemHours（28日）＋翌朝ぶんで30日あれば足りる。
+  // hk無し環境（Expo Go / Android）や未許可・失敗は空＝sleep_factorだけ静かにスキップ
+  let sleepDays: LawInput['sleepDays'] = [];
+  try {
+    if (healthAvailable()) {
+      const r = await readActivitySummary(30);
+      if (!('error' in r)) sleepDays = r.filter((d) => d.sleepH > 0).map((d) => ({ date: d.date, sleepH: d.sleepH }));
+    }
+  } catch { /* 睡眠はベストエフォート */ }
+
   return {
     today, days,
     itemDays: buildItemDays(logs.map((r) => ({ date: r.date, items: r.items }))),
     weights, itemHours,
     recordedDates: [...recorded].sort(),
+    sleepDays,
   };
 }
 
