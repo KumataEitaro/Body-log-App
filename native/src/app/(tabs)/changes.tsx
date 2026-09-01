@@ -1,14 +1,19 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Skeleton from '@/components/Skeleton';
+import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { AddCardSheet } from '@/components/CardLayout';
 import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -173,6 +178,36 @@ export default function ChangesScreen() {
   const chartTarget = useGuideTarget('chart');
   // 開いている詳細ページ（nullならマスタメニュー）。ヘルスケア式のメニュー→詳細
   const [detailKey, setDetailKey] = useState<string | null>(null);
+  // 初回ロードが終わったか（スケルトン解除の判定。ロード自体は既存のload()）
+  const [menuLoaded, setMenuLoaded] = useState(false);
+  // 削除のUndoスナックバー（筋トレ履歴カードに貸す。カード内の絶対配置では
+  // 画面下部に固定できないため、画面側で1つだけ持つ）
+  const undoBar = useUndoSnackbar(insets.bottom + 16);
+
+  // ===== エッジスワイプで戻る（iOS標準の戻りジェスチャ・Material 3のpredictive backと同方向） =====
+  // 画面左端(32px)から始まった右スワイプだけを拾い、指に追従して詳細ページをスライドさせる。
+  // 左端開始の条件を厳守することで、詳細内の横スクロール要素（チップ等）と取り合わない
+  const winW = useWindowDimensions().width;
+  const detailTx = useSharedValue(0);
+  const closeDetailByGesture = useCallback(() => { setDetailKey(null); }, []);
+  const backPan = useMemo(() => Gesture.Pan()
+    .hitSlop({ left: 0, width: 32 })   // 左端32pxで始まったタッチだけを対象にする
+    .activeOffsetX(12)                 // 右へ12px動いてはじめて発火（タップと区別）
+    .failOffsetY([-16, 16])            // 先に縦へ動いたら縦スクロールに譲る
+    .onUpdate((e) => {
+      'worklet';
+      detailTx.value = Math.max(0, e.translationX);   // 左へは押し戻さない（追従は右方向だけ）
+    })
+    .onEnd((e) => {
+      'worklet';
+      // 離した位置が幅の1/3超 or 十分な速度なら閉じる。未満ならスプリングで元の位置へ
+      if (e.translationX > winW / 3 || e.velocityX > 800) {
+        detailTx.value = withTiming(winW, { duration: 150 }, () => { runOnJS(closeDetailByGesture)(); });
+      } else {
+        detailTx.value = withSpring(0, { damping: 20, stiffness: 220 });
+      }
+    }), [winW, detailTx, closeDetailByGesture]);
+  const detailSlide = useAnimatedStyle(() => ({ transform: [{ translateX: detailTx.value }] }));
 
   // iOS HIG標準「タブの再選択でルートへ戻る」: 概要タブを表示中にもう一度「概要」を
   // タップしたら、詳細ページを閉じてメニューに戻す（迷子のリセットボタンになる）
@@ -247,6 +282,14 @@ export default function ChangesScreen() {
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    try {
+      await loadBody();
+    } finally {
+      // スケルトン解除はロードの成否に関わらず必ず（未ログイン・失敗時は空状態の誘い文に落ちる）
+      setMenuLoaded(true);
+    }
+  }, []);
+  const loadBody = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
     const [profRes, entResRaw, goalRes, itemRes] = await Promise.all([
@@ -287,7 +330,7 @@ export default function ChangesScreen() {
     try { setLawLine(await latestLawSummary()); } catch { /* サマリーは飾り */ }
     // サイクル履歴（B-5）。テーブル未作成ならnullが返り、cyclesはメニューに出ない
     setPeriods(await fetchPurposePeriods());
-  }, []);
+  };
   useEffect(() => { load(); }, [load]);
 
   // カレンダーの日タップ → その日の記録を取得して下に表示
@@ -678,7 +721,7 @@ export default function ChangesScreen() {
       case 'tchart': return <LiftChartCard />;
       case 'tpr': return <PersonalBestCard />;
       case 'tgoal': return <GoalSummaryCard mode="training" />;
-      case 'lifthist': return <LiftHistoryCard />;
+      case 'lifthist': return <LiftHistoryCard showUndo={undoBar.show} />;
       default: return null;
     }
   }
@@ -825,6 +868,7 @@ export default function ChangesScreen() {
   const sparkVals = wRows.slice(-30).map((r) => Number(r.weight));
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
+    detailTx.value = 0;   // 前回スワイプ途中の位置が残らないようにする
     setDetailKey(key);
   }
 
@@ -941,7 +985,23 @@ export default function ChangesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {detailKey == null ? (
+      {detailKey == null && !menuLoaded && rows.length === 0 ? (
+        // ===== スケルトンローディング =====
+        // 初回ロード中（rowsが空でロード完了前）だけ、メニュー行の骨組みを5本見せる。
+        // 空白よりも「ここに行リストが出る」ことが先に伝わり、体感の待ちが短くなる
+        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
+          {headerJSX}
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View key={i} style={s.skelRow}>
+              <Skeleton width={34} height={34} radius={17} />
+              <View style={{ flex: 1, gap: 7 }}>
+                <Skeleton width="52%" height={13} radius={6} />
+                <Skeleton width="78%" height={10} radius={5} />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      ) : detailKey == null ? (
         // ===== マスタメニュー（ヘルスケア式: 要約行のリスト。行の長押しで並び替え） =====
         <ReorderableCards
           editing={editing}
@@ -958,23 +1018,30 @@ export default function ChangesScreen() {
         />
       ) : (
         // ===== 詳細ページ（メニュー行タップで展開。既存カードをそのまま全画面で見せる） =====
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-        >
-          <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
-            <Pressable style={s.backRow} onPress={() => { Haptics.selectionAsync().catch(() => {}); setDetailKey(null); }} hitSlop={8}>
-              <ChevronLeft size={20} color={C.teal} />
-              <Text style={s.backT}>{t('概要')}</Text>
-            </Pressable>
-            <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
-            {detailHeader(detailKey)}
-            <ErrorBoundary>{card(detailKey)}</ErrorBoundary>
+        // エッジスワイプ（左端開始のPan）で指に追従してスライドし、1/3超か勢いがあれば閉じる
+        <GestureDetector gesture={backPan}>
+          <Animated.View style={[{ flex: 1 }, detailSlide]}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+            >
+              <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
+                <Pressable style={s.backRow} onPress={() => { Haptics.selectionAsync().catch(() => {}); setDetailKey(null); }} hitSlop={8}>
+                  <ChevronLeft size={20} color={C.teal} />
+                  <Text style={s.backT}>{t('概要')}</Text>
+                </Pressable>
+                <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
+                {detailHeader(detailKey)}
+                <ErrorBoundary>{card(detailKey)}</ErrorBoundary>
+              </Animated.View>
+            </ScrollView>
           </Animated.View>
-        </ScrollView>
+        </GestureDetector>
       )}
       {!editing && <QuickLogFab />}
+      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
+      {undoBar.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={hidden.filter((k) => !unavailable.includes(k))} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
@@ -1087,6 +1154,12 @@ const s = StyleSheet.create({
   menuIcon: {
     width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentSoft,
     alignItems: 'center', justifyContent: 'center',
+  },
+  // スケルトン行（menuRowと同じ枠寸法。中身だけ角丸ブロックに置き換える）
+  skelRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 15, marginBottom: 9,
   },
   menuT: { fontSize: 15.5, fontWeight: '800', color: C.ink },
   menuSub: { fontSize: 12.5, color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },

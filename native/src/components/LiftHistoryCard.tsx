@@ -18,8 +18,19 @@ import {
   type LiftEntry,
 } from '@/lib/liftLog';
 import { t } from '@/lib/i18n';
+import { type ShowUndo } from '@/components/UndoSnackbar';
 
-type HistRow = { id: string; date: string; text: string };
+type HistRow = { id: string; date: string; text: string; at?: string | null };
+
+// 運動タブの筋トレ保存と同じ行の形（Undoの再insert用）。
+// atは元の時刻を保って日内の並びを維持する（無ければDBのnow()に任せる）
+function liftRowOf(uid: string, date: string, text: string, at?: string | null) {
+  return {
+    user_id: uid, date, items: [], kcal: null, p: null, f: null, c: null,
+    weight: null, ex: 'オフ', adj: 0, mood: '', text, photo_urls: [],
+    ...(at ? { at } : {}),
+  };
+}
 
 // 日見出し（例: 8/20(水)）。t()はモジュール読み込み時に評価すると言語切替に追従しないため関数内で呼ぶ
 function dayLabel(date: string): string {
@@ -29,7 +40,9 @@ function dayLabel(date: string): string {
   return t('{m}/{d}({w})', { m, d, w: dow });
 }
 
-export default function LiftHistoryCard() {
+// showUndo: 親画面（概要タブ）のUndoスナックバー。カード内に描くと絶対配置が
+// カード相対になり画面下部に固定できないため、画面側のものを借りる
+export default function LiftHistoryCard({ showUndo }: { showUndo?: ShowUndo }) {
   const [history, setHistory] = useState<HistRow[]>([]);
   // 自重種目の負荷は体重で変わるので、履歴の日付ごとに体重を引けるようにする
   const [weightRows, setWeightRows] = useState<{ date: string; weight: number | null }[]>([]);
@@ -43,7 +56,8 @@ export default function LiftHistoryCard() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await supabase.from('logs').select('id,date,text')
+      // atも取る: 削除Undoの再insertで元の時刻を保つため（並びがorder by atのため）
+      const { data } = await supabase.from('logs').select('id,date,text,at')
         .like('text', '🏋️%').order('at', { ascending: false }).limit(60);
       // 圏外での失敗（data=null）で既存の履歴を消さない（運動タブと同じ流儀）
       if (data) setHistory(data as HistRow[]);
@@ -78,49 +92,61 @@ export default function LiftHistoryCard() {
   }
   const visDays = partFilter == null ? shownDays : shownDays.filter((d) => dayStats(d).any);
 
-  // 記録から1種目だけ取り除く（他の種目は残す）
-  function deleteOneLift(rec: { id: string; entries: LiftEntry[] }, index: number, date: string) {
+  // 記録から1種目だけ取り除く（他の種目は残す）。
+  // 確認は出さず即実行し、Undoで元のtext（種目一式）へ戻す
+  async function deleteOneLift(rec: { id: string; text: string; entries: LiftEntry[] }, index: number, date: string) {
     const e = rec.entries[index];
     if (!e) return;
-    Alert.alert(t('「{name}」を削除しますか？', { name: e.name }), t('この記録の他の種目は残ります。'), [
-      { text: t('キャンセル'), style: 'cancel' },
-      {
-        text: t('削除する'),
-        style: 'destructive' as const,
-        onPress: async () => {
-          const r = removeLiftAt(rec.entries, index);
-          const q = r.kind === 'delete'
-            ? supabase.from('logs').delete().eq('id', rec.id)
-            : supabase.from('logs').update({ text: r.text }).eq('id', rec.id);
-          const { error } = await q;
-          if (error) { setMsg(t('削除に失敗しました。もう一度お試しください。')); return; }
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
-          setMsg(null);
-          await load();
-        },
-      },
-    ]);
+    // 復元データは削除前にメモリへ控える（textが記録の正本。行ごと消えたら同じ形で作り直す）
+    const originalText = rec.text;
+    const at = history.find((h) => h.id === rec.id)?.at ?? null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id ?? null;
+    const r = removeLiftAt(rec.entries, index);
+    const q = r.kind === 'delete'
+      ? supabase.from('logs').delete().eq('id', rec.id)
+      : supabase.from('logs').update({ text: r.text }).eq('id', rec.id);
+    const { error } = await q;
+    // 削除APIが失敗したらスナックバーは出さず従来のエラーメッセージ
+    if (error) { setMsg(t('削除に失敗しました。もう一度お試しください。')); return; }
+    if (uid) await syncEntriesForDate(uid, date);
+    setMsg(null);
+    await load();
+    showUndo?.(t('削除しました'), async () => {
+      const { error: e2 } = r.kind === 'delete'
+        ? await supabase.from('logs').insert(liftRowOf(uid ?? '', date, originalText, at))
+        : await supabase.from('logs').update({ text: originalText }).eq('id', rec.id);
+      if (e2) { setMsg(t('元に戻せませんでした。通信環境を確認してください。')); return; }
+      if (uid) await syncEntriesForDate(uid, date);
+      await load();
+    });
   }
 
   // 記録の長押しメニュー。書き換え（入力欄へ戻す）は運動タブの入力欄に依存していたため、
-  // 概要タブでは出さない＝削除のみ（冒頭のコメント参照）
+  // 概要タブでは出さない＝削除のみ（冒頭のコメント参照）。削除は即実行＋Undo
   function confirmRecord(rec: { id: string; text: string }, date: string) {
     Alert.alert(t('この記録をどうしますか？'), rec.text.replace(/^🏋️ /, ''), [
       { text: t('キャンセル'), style: 'cancel' },
-      {
-        text: t('削除する'),
-        style: 'destructive' as const,
-        onPress: async () => {
-          const { error } = await supabase.from('logs').delete().eq('id', rec.id);
-          if (error) { setMsg(t('削除に失敗しました。もう一度お試しください。')); return; }
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
-          setMsg(null);
-          await load();
-        },
-      },
+      { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteRecordNow(rec, date) },
     ]);
+  }
+
+  // 記録まるごとの即削除＋Undo（元と同じ形の行をid無しで再insertして戻す）
+  async function deleteRecordNow(rec: { id: string; text: string }, date: string) {
+    const at = history.find((h) => h.id === rec.id)?.at ?? null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id ?? null;
+    const { error } = await supabase.from('logs').delete().eq('id', rec.id);
+    if (error) { setMsg(t('削除に失敗しました。もう一度お試しください。')); return; }
+    if (uid) await syncEntriesForDate(uid, date);
+    setMsg(null);
+    await load();
+    showUndo?.(t('削除しました'), async () => {
+      const { error: e2 } = await supabase.from('logs').insert(liftRowOf(uid ?? '', date, rec.text, at));
+      if (e2) { setMsg(t('元に戻せませんでした。通信環境を確認してください。')); return; }
+      if (uid) await syncEntriesForDate(uid, date);
+      await load();
+    });
   }
 
   return (
