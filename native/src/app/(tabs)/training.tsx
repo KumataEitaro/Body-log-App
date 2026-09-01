@@ -1,7 +1,8 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Alert, Vibration, AppState } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState } from 'react-native';
+import { useRouter } from 'expo-router';
 import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
@@ -10,7 +11,7 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { C, sheetTopPad } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST } from '@/lib/calc';
-import { ClipboardList, BookOpen, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
+import { ClipboardList, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
@@ -23,11 +24,8 @@ import LiftPicker from '@/components/LiftPicker';
 import WeightDial from '@/components/WeightDial';
 import PlateCalc from '@/components/PlateCalc';
 import { enqueue, flush, pendingCount, subscribePendingCount, isNetworkError } from '@/lib/offlineQueue';
-import { loadCustomLifts, bwRatioOf, isBodyweightLift, liftPartOf, liftPartLabel, LIFT_PARTS } from '@/lib/lifts';
-import {
-  groupLiftsByDay, removeLiftAt, liftSetLabel, parseLiftText, effectiveKg, weightLookup, volumeOf,
-  type LiftEntry,
-} from '@/lib/liftLog';
+import { loadCustomLifts, bwRatioOf, isBodyweightLift } from '@/lib/lifts';
+import { liftSetLabel, parseLiftText, effectiveKg, weightLookup } from '@/lib/liftLog';
 import {
   ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
 } from '@/lib/activities';
@@ -40,13 +38,6 @@ import { t } from '@/lib/i18n';
 
 type TRow = { name: string; kg: string; reps: string; sets: string };
 
-// 履歴の日見出し（例: 8/20(水)）。t()はモジュール読み込み時に評価すると言語切替に追従しないため関数内で呼ぶ
-function dayLabel(date: string): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
-  const dow = wd[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  return t('{m}/{d}({w})', { m, d, w: dow });
-}
 type HistRow = { id: string; date: string; text: string };
 
 // 種目の定義は lib/activities.ts（54種・METsはCompendium 2011準拠）
@@ -57,13 +48,13 @@ const REST_OPTIONS = [30, 60, 90, 120, 180, 300, 600];
 // レスト秒数の表示（60の倍数は「分」、90秒などはそのまま「秒」）
 const fmtRest = (n: number) => (n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n }));
 
-// 表示/非表示できるカード（上から: きょうの動き→ゆる記録→筋トレ入力→履歴）
-const EX_CARDS = ['move', 'quick', 'liftInput', 'liftHistory'];
+// 表示/非表示できるカード（上から: きょうの動き→ゆる記録→筋トレ入力）。
+// 筋トレ履歴カードは概要タブ「筋トレの成長」へ移設した（components/LiftHistoryCard.tsx）
+const EX_CARDS = ['move', 'quick', 'liftInput'];
 const EX_LABELS = (): Record<string, string> => ({
   move: t('きょうの動き'),
   quick: t('今日の消費カロリーを記録'),
   liftInput: t('今日のトレーニングを記録'),
-  liftHistory: t('筋トレ履歴'),
 });
 
 export default function TrainingScreen() {
@@ -78,15 +69,8 @@ export default function TrainingScreen() {
   const [liftPickRow, setLiftPickRow] = useState<number | null>(null);
   // 重量ダイアルを開いている行（nullなら閉じている）
   const [dialRow, setDialRow] = useState<number | null>(null);
-  // 履歴の部位フィルタ（nullなら全部）
-  const [partFilter, setPartFilter] = useState<string | null>(null);
-  // 履歴でひらいている日（食事と同じで、直近の日は最初からひらいておく）
-  const [openDay, setOpenDay] = useState<string | null>(null);
-  // 履歴に出す日数。ひと目で見渡せる量から始めて、必要なら遡れるようにする
-  const [dayLimit, setDayLimit] = useState(10);
-  // 書き換え中の記録。保存すると元の記録を置き換える（食事の「書き換える」と同じ考え方）
-  const [rewriting, setRewriting] = useState<{ id: string; date: string } | null>(null);
   const trainInputTarget = useGuideTarget('trainInput');
+  const router = useRouter();
   const trScrollRef = useRef<ScrollView>(null);
   const trY = useRef(0);
   useGuideScroller('/training', useCallback((delta: number) => {
@@ -380,88 +364,10 @@ export default function TrainingScreen() {
     }
   }
 
-  // 履歴を日ごとにまとめる（食事の「その日の記録」と同じ見せ方にそろえる）
-  const days = groupLiftsByDay(history, weightAt);
-  // 直近の日は最初からひらく。ユーザーが開閉したらその選択を優先する
-  const shownDay = openDay ?? days[0]?.date ?? null;
-  const shownDays = days.slice(0, dayLimit);
-
-  // 部位フィルタ。削除は元の並びのindexで行うため、entriesは絞らず描画時に飛ばす
-  const matchPart = (e: LiftEntry) => partFilter == null || liftPartOf(e.name) === partFilter;
-  // 日の見出しの数字は、フィルタ中はその部位ぶんだけで数え直す
-  function dayStats(d: (typeof days)[number]) {
-    if (partFilter == null) return { lifts: d.lifts, sets: d.sets, volume: d.volume, any: true };
-    const w = weightAt(d.date);
-    const names = new Set<string>();
-    let sets = 0; let volume = 0; let any = false;
-    for (const rec of d.records) for (const e of rec.entries) {
-      if (!matchPart(e)) continue;
-      any = true; names.add(e.name); sets += e.sets; volume += volumeOf(e, w);
-    }
-    return { lifts: names.size, sets, volume: Math.round(volume), any };
-  }
-  const visDays = partFilter == null ? shownDays : shownDays.filter((d) => dayStats(d).any);
-
-  // 記録から1種目だけ取り除く（他の種目は残す）
-  function deleteOneLift(rec: { id: string; entries: LiftEntry[] }, index: number, date: string) {
-    const e = rec.entries[index];
-    if (!e) return;
-    Alert.alert(t('「{name}」を削除しますか？', { name: e.name }), t('この記録の他の種目は残ります。'), [
-      { text: t('キャンセル'), style: 'cancel' },
-      {
-        text: t('削除する'),
-        style: 'destructive' as const,
-        onPress: async () => {
-          const r = removeLiftAt(rec.entries, index);
-          const q = r.kind === 'delete'
-            ? supabase.from('logs').delete().eq('id', rec.id)
-            : supabase.from('logs').update({ text: r.text }).eq('id', rec.id);
-          const { error } = await q;
-          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
-          if (rewriting?.id === rec.id) cancelRewrite();   // 書き換え中の記録が消えたら編集も解除
-          await load();
-        },
-      },
-    ]);
-  }
-
-  // 記録の長押しメニュー: 書き換え（入力欄へ戻す）と削除
-  function confirmRecord(rec: { id: string; text: string; entries: LiftEntry[] }, date: string) {
-    Alert.alert(t('この記録をどうしますか？'), rec.text.replace(/^🏋️ /, ''), [
-      { text: t('キャンセル'), style: 'cancel' },
-      ...(rec.entries.length > 0 ? [{ text: t('書き換える'), onPress: () => startEditRecord(rec, date) }] : []),
-      {
-        text: t('削除する'),
-        style: 'destructive' as const,
-        onPress: async () => {
-          const { error } = await supabase.from('logs').delete().eq('id', rec.id);
-          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) await syncEntriesForDate(session.user.id, date);
-          if (rewriting?.id === rec.id) cancelRewrite();
-          await load();
-        },
-      },
-    ]);
-  }
-
-  // 記録を入力欄へ戻して書き換え状態にする（保存すると元の記録を置き換える）
-  function startEditRecord(rec: { id: string; entries: LiftEntry[] }, date: string) {
-    setTRows(rec.entries.map((e) => ({
-      name: e.name, kg: String(e.kg), reps: String(e.reps), sets: e.sets > 1 ? String(e.sets) : '',
-    })));
-    setRewriting({ id: rec.id, date });
-    setMsg({ ok: true, text: t('入力欄に戻しました。直して保存すると置き換わります。') });
-    trScrollRef.current?.scrollTo({ y: 0, animated: true });
-  }
-
-  function cancelRewrite() {
-    setRewriting(null);
-    setTRows([{ name: '', kg: '', reps: '', sets: '' }]);
-    setMsg(null);
-  }
+  // 筋トレ履歴のカードは概要タブ「筋トレの成長」へ移設した（components/LiftHistoryCard.tsx）。
+  // history/load はここに残す: 「前回参照」と重量ダイアルの初期位置・RMフィードバックが依存している。
+  // 履歴カードにあった「書き換える（入力欄へ戻す）」はこのタブの入力欄前提の機能だったため、
+  // 移設にあわせて廃止した（概要側は削除のみ）。
 
   /** 入力1行が記録できる状態か。自重種目は加重なし（kg空欄）でも成立する */
   function rowReady(r: TRow): boolean {
@@ -510,12 +416,7 @@ export default function TrainingScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      // 書き換えのときは元の記録の日付を保つ（過去の記録を今日に移動させない）
-      const today = rewriting?.date ?? viewDate;
-      if (rewriting) {
-        const { error: delErr } = await supabase.from('logs').delete().eq('id', rewriting.id);
-        if (delErr) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
-      }
+      const today = viewDate;
       const row = {
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: null, ex: 'オフ', adj: 0, mood: '', text: tr, photo_urls: [],
@@ -531,20 +432,16 @@ export default function TrainingScreen() {
         // 圏外: 端末に積んで成功扱い。オンライン保存と同じ後片付けをして、
         // レストタイマーも回す（圏外でもトレーニングは続く）。RMフィードバックは通信が要るので出さない
         await enqueue(row);
-        const wasEditOff = rewriting != null;
-        setRewriting(null);
         for (const r of tRows.filter(rowReady)) bumpFoodFreq('lift:' + r.name.trim());
         setActFreq(foodScores(readFoodFreq()));
-        const lastOff = wasEditOff ? null : tRows.filter(rowReady).slice(-1)[0] ?? null;
+        const lastOff = tRows.filter(rowReady).slice(-1)[0] ?? null;
         setTRows([lastOff ? { name: lastOff.name, kg: lastOff.kg, reps: '', sets: '' } : { name: '', kg: '', reps: '', sets: '' }]);
-        if (!wasEditOff) { setRestLeft(restSec); bumpRestCount(); }
+        setRestLeft(restSec); bumpRestCount();
         setMsg({ ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期されます。') });
         return;
       }
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
       await syncEntriesForDate(uid, today);
-      const wasEdit = rewriting != null;
-      setRewriting(null);
 
       // RMフィードバック: 推定1RM(Epley)を目標・自己ベストと照合して一言返す
       let fb = t('保存しました。継続が最強の種目です💪');
@@ -581,12 +478,12 @@ export default function TrainingScreen() {
       for (const r of tRows.filter(rowReady)) bumpFoodFreq('lift:' + r.name.trim());
       setActFreq(foodScores(readFoodFreq()));
       // 同じ種目を重量やセットを変えながら重ねて記録する使い方が主流なので、
-      // 保存後も種目とkgは残して回数だけ空ける（書き換えのときはまっさらに戻す）
-      const lastRow = wasEdit ? null : tRows.filter(rowReady).slice(-1)[0] ?? null;
+      // 保存後も種目とkgは残して回数だけ空ける
+      const lastRow = tRows.filter(rowReady).slice(-1)[0] ?? null;
       setTRows([lastRow ? { name: lastRow.name, kg: lastRow.kg, reps: '', sets: '' } : { name: '', kg: '', reps: '', sets: '' }]);
       await load();
-      if (!wasEdit) { setRestLeft(restSec); bumpRestCount(); } // 保存でレストタイマー自動開始（長さは設定した値）
-      setMsg({ ok: true, text: wasEdit ? t('書き換えました。') : fb });
+      setRestLeft(restSec); bumpRestCount(); // 保存でレストタイマー自動開始（長さは設定した値）
+      setMsg({ ok: true, text: fb });
       doFlush().catch(() => {});   // 保存が通った＝オンライン。積み残しがあれば一緒に送る
     } finally {
       setSaving(false);
@@ -853,14 +750,8 @@ export default function TrainingScreen() {
             <Text style={s.plateBtnT}>{t('プレート')}</Text>
           </Pressable>
         </View>
-        {rewriting && (
-          <View style={s.editBanner}>
-            <Text style={s.editBannerT}>{t('✏️ {date}の記録を書き換え中', { date: dayLabel(rewriting.date) })}</Text>
-            <Pressable onPress={cancelRewrite} hitSlop={8}>
-              <Text style={s.editBannerCancel}>{t('やめる')}</Text>
-            </Pressable>
-          </View>
-        )}
+        {/* 誰向け・何ができるかの1行（β指摘対応）。押し付けずmutedトーンで */}
+        <Text style={s.liftIntro}>{t('本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。')}</Text>
         {favLifts.length > 0 && (
           <View style={s.favRow}>
             {favLifts.map((n) => (
@@ -932,9 +823,8 @@ export default function TrainingScreen() {
           );
         })()}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          <OptionButton style={{ flex: 1 }} variant="tonal" label={rewriting ? t('やめる') : t('＋ 種目を追加')}
-                        onPress={() => (rewriting ? cancelRewrite() : addLiftRow())} />
-          <OptionButton style={{ flex: 1 }} label={rewriting ? t('✓ 書き換える') : t('保存する')} onPress={save} busy={saving} />
+          <OptionButton style={{ flex: 1 }} variant="tonal" label={t('＋ 種目を追加')} onPress={addLiftRow} />
+          <OptionButton style={{ flex: 1 }} label={t('保存する')} onPress={save} busy={saving} />
         </View>
         <Text style={s.muted}>{t('レストの長さ')}</Text>
         <View style={s.restRow}>
@@ -977,71 +867,13 @@ export default function TrainingScreen() {
         </View>
       </Modal>
 
-      <View style={[s.card, !vis('liftHistory') && { display: 'none' }]}>
-        <MinusBadge editing={editing} onPress={() => cards.hide('liftHistory')} />
-        <View style={s.h2Row}><BookOpen size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレ履歴')}</Text></View>
-        {days.length === 0 && <Text style={s.muted}>{t('まだ記録がありません。今日の1セット目から始めましょう。')}</Text>}
-        {/* 部位フィルタ: 「肩の日はいつだったか」を部位ごとに遡れるようにする */}
-        {days.length > 0 && (() => {
-          const present = new Set<string>();
-          for (const d of days) for (const rec of d.records) for (const e of rec.entries) present.add(liftPartOf(e.name));
-          const keys = [...LIFT_PARTS.map((x) => x.key), 'other'].filter((k) => present.has(k));
-          if (keys.length < 2) return null;
-          return (
-            <View style={s.partRow}>
-              <Chip label={t('全部')} selected={partFilter == null} onPress={() => setPartFilter(null)} />
-              {keys.map((k) => (
-                <Chip key={k} label={t(liftPartLabel(k))} selected={partFilter === k}
-                      onPress={() => setPartFilter((cur) => (cur === k ? null : k))} />
-              ))}
-            </View>
-          );
-        })()}
-        {visDays.map((d) => {
-          const open = shownDay === d.date;
-          const st = dayStats(d);
-          return (
-            <View key={d.date}>
-              {/* 日の見出し: たたんだままでもその日の手応えが数字で分かる */}
-              <Pressable style={s.dayHead} onPress={() => setOpenDay(open ? '' : d.date)} hitSlop={4}>
-                <Text style={s.dayDate}>{dayLabel(d.date)}</Text>
-                <Text style={s.daySum} numberOfLines={1}>
-                  {t('{n}種目', { n: st.lifts })}・{t('{n}セット', { n: st.sets })}
-                  {st.volume > 0 ? `・${st.volume.toLocaleString()}kg` : ''}
-                </Text>
-                <Text style={s.dayCaret}>{open ? '▴' : '▾'}</Text>
-              </Pressable>
-              {open && d.records
-                .filter((rec) => partFilter == null || rec.entries.some(matchPart))
-                .map((rec) => (
-                <View key={rec.id}>
-                  {rec.entries.length === 0 && partFilter == null && (
-                    <Pressable style={s.liftRow} onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
-                      <Text style={s.liftName}>{rec.text.replace(/^🏋️ /, '')}</Text>
-                    </Pressable>
-                  )}
-                  {rec.entries.map((e, ix) => (matchPart(e) ? (
-                    <Pressable key={`${rec.id}-${ix}`} style={s.liftRow}
-                               onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
-                      <Text style={s.liftName} numberOfLines={1}>{e.name}</Text>
-                      <Text style={s.liftSet}>{liftSetLabel(e, t('自重'))}</Text>
-                      <Pressable onPress={() => deleteOneLift(rec, ix, d.date)} hitSlop={10}>
-                        <Text style={s.liftX}>×</Text>
-                      </Pressable>
-                    </Pressable>
-                  ) : null))}
-                </View>
-              ))}
-            </View>
-          );
-        })}
-        {days.length > shownDays.length && (
-          <Pressable style={s.moreBtn} onPress={() => setDayLimit((n) => n + 10)} hitSlop={6}>
-            <Text style={s.moreBtnT}>{t('さらに前の{n}日を見る', { n: Math.min(10, days.length - shownDays.length) })}</Text>
-          </Pressable>
-        )}
-        {days.length > 0 && <Text style={s.histHint}>{t('行を長押しで書き換え・削除、×でその種目だけ削除できます')}</Text>}
-      </View>
+      {/* 筋トレ履歴カードは概要タブ「筋トレの成長」へ移設（入力は運動タブ・振り返りは概要タブ）。
+          ここには小さな導線だけ残す。NativeTabsでもrouter.pushでタブ遷移できる（coach.tsxと同じ流儀） */}
+      {history.length > 0 && (
+        <Pressable style={s.moveNoteRow} onPress={() => router.push('/(tabs)/changes')} hitSlop={6}>
+          <Text style={s.moveNote}>{t('筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
+        </Pressable>
+      )}
     </ScrollView>
     <QuickLogFab />
     <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
@@ -1179,7 +1011,6 @@ const s = StyleSheet.create({
   },
   tDial: { justifyContent: 'center', alignItems: 'center' },
   tDialT: { fontSize: 15, color: C.ink, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  partRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
   tPick: { flex: 1, justifyContent: 'center' },
   tPickT: { fontSize: 15, color: C.ink, fontWeight: '600' },
   restRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' },
@@ -1273,33 +1104,13 @@ const s = StyleSheet.create({
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   verdict: { fontSize: 13, fontWeight: '600', lineHeight: 19, marginTop: 4 },
   moveNote: { fontSize: 13, color: C.sub, marginBottom: 12, paddingHorizontal: 4, lineHeight: 18 },
+  moveNoteRow: { paddingVertical: 2 },
+  // 筋トレ入力カードの「誰向け・何ができる」1行（見出し直下・mutedトーン）
+  liftIntro: { fontSize: 13, color: C.sub, lineHeight: 18, marginBottom: 4 },
   muted: { fontSize: 15, color: C.sub },
-  dayHead: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 9, borderTopWidth: 0.5, borderTopColor: C.line,
-  },
-  dayDate: { fontSize: 13, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  daySum: { flex: 1, fontSize: 13, color: C.sub, fontWeight: '700' },
-  dayCaret: { fontSize: 15, color: C.sub, fontWeight: '800' },
-  liftRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 7, paddingLeft: 10, borderTopWidth: 0.5, borderTopColor: C.line,
-  },
-  liftName: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
-  liftSet: { fontSize: 15, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  liftX: { fontSize: 17, color: C.coral, fontWeight: '800', paddingHorizontal: 2 },
-  editBanner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginTop: 6,
-  },
-  editBannerT: { fontSize: 13, fontWeight: '800', color: C.teal },
-  editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
   bwNoteMuted: { fontSize: 13, color: C.faint, fontWeight: '600', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   favRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
   bwNote: { fontSize: 13, color: C.teal, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
-  moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
-  moreBtnT: { fontSize: 13, color: C.teal, fontWeight: '800' },
-  histHint: { fontSize: 13, color: C.faint, marginTop: 8 },
   // 未同期チップ（圏外保存の積み残し）。責め色にしない・控えめに
   syncChip: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',

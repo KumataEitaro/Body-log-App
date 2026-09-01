@@ -1259,4 +1259,7 @@ export const FR: Record<string, string> = {
   "{date} の記録": "Enregistrement du {date}",
   "写真から読み取る（成分表示）": "Scanner une photo (tableau nutritionnel)",
   "※日本の商品はヒットしないことが多いです": "※ Les produits japonais ne sont souvent pas trouvés",
+  "本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。": "Pour les accros de la fonte. Gérez tout gratuitement : volume, progression et temps de repos.",
+  "筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）": "Retrouvez votre historique dans l'onglet « Résumé » > « Progression » (tapez pour y aller)",
+  "行を長押しで削除、×でその種目だけ削除できます": "Maintenez une ligne enfoncée pour la supprimer, ou touchez × pour supprimer l'exercice",
 };

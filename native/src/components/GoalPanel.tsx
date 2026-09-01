@@ -12,7 +12,9 @@ import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
 import { OptionButton, Chip } from '@/components/ui/Selectable';
 import { epley1RM } from '@/lib/rm';
-import { isBodyweightLift } from '@/lib/lifts';
+import { isBodyweightLift, loadCustomLifts } from '@/lib/lifts';
+import { parseLiftText } from '@/lib/liftLog';
+import LiftPicker from '@/components/LiftPicker';
 import { PURPOSES, setPurpose, usePurpose, purposeOf } from '@/lib/purpose';
 import { bmiFloorKg, weeklyLossPace } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
@@ -50,6 +52,11 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   const [tGoals, setTGoals] = useState<TGoal[]>([]);
   const [bests, setBests] = useState<Map<string, number>>(new Map());
   const [tName, setTName] = useState('');
+  // 種目名は筋トレ記録と同じLiftPickerで選ぶ（表記ゆれ「ベンチ」vs「ベンチプレス」で
+  // 目標と記録が紐づかない事故を根治するため、フリーテキスト入力はやめた）
+  const [liftPickOpen, setLiftPickOpen] = useState(false);
+  // 過去に記録した種目名（ピッカーの「最近の種目」に出すため）
+  const [liftHist, setLiftHist] = useState<string[]>([]);
   const [tKg, setTKg] = useState('');
   const [tReps, setTReps] = useState(1); // 目標回数（既定=1回。1回で挙げたいMAX重量が主役）
   // 運動習慣目標（週N回・週kcal・最低分数）
@@ -97,12 +104,15 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
     if (!tgRes.error) setTGoals((tgRes.data as TGoal[]) || []);
     setEvents((evRes.data as Ev[]) || []);
-    const series = trainingSeries((histRes.data as { date: string; text: string }[]) || []);
+    const histRows = (histRes.data as { date: string; text: string }[]) || [];
+    const series = trainingSeries(histRows);
     const b = new Map<string, number>();
     for (const [name, pts] of series) b.set(name, Math.max(...pts.map((p) => p.maxKg)));
     setBests(b);
+    // 記録済みの種目名をピッカーの「最近の種目」へ（記録側と同じ並び＝直近が先頭）
+    setLiftHist(histRows.flatMap((h) => parseLiftText(h.text).map((e) => e.name)));
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadCustomLifts(); }, [load]);
 
   async function saveWeightGoal() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(gDate) || !(Number(gWeight) > 20)) {
@@ -435,7 +445,12 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 1.5 }}>
               <Text style={s.label}>{t('種目名')}</Text>
-              <TextInput style={s.input} placeholder={t('ベンチプレス')} placeholderTextColor={C.faint} value={tName} onChangeText={setTName} />
+              {/* フリーテキストではなく記録側と同じピッカーで選ぶ（表記ゆれで目標と記録が紐づかない事故の根治） */}
+              <Pressable style={[s.input, { justifyContent: 'center' }]} onPress={() => setLiftPickOpen(true)}>
+                <Text style={{ fontSize: 17, color: tName ? C.ink : C.faint }} numberOfLines={1}>
+                  {tName || t('タップして選ぶ')}
+                </Text>
+              </Pressable>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.label}>{t('重量（kg）')}</Text>
@@ -458,6 +473,16 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             <Text style={s.rmPreview}>RM換算: {tName.trim() || t('この種目')}のMAX目標 ≈ {Math.round(epley1RM(Number(tKg), tReps))}kg</Text>
           )}
           <OptionButton style={{ marginTop: 12 }} variant="tonal" label={t('筋トレ目標を追加')} onPress={addTrainingGoal} busy={busy} />
+
+          {/* 種目ピッカー。GoalPanelはpageSheetシートの中に置かれることがあるため、
+              LiftPickerのModalはこのツリーの内側でレンダリングする
+              （そのシートの内側に重なる。MyFoodForm内のBarcodeScannerと同じ流儀） */}
+          <LiftPicker
+            visible={liftPickOpen}
+            onClose={() => setLiftPickOpen(false)}
+            history={liftHist}
+            onPick={(name) => setTName(name)}
+          />
         </View>
       )}
 
