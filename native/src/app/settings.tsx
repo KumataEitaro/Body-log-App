@@ -27,7 +27,11 @@ import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, rgba, sheetTopPad } from '@/lib/ui';
+
+// Androidリップル（Material 3の作法）。テーマ色の微透明・行のborderRadius内にクリップ。
+// iOSはandroid_rippleを無視するため分岐不要
+const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const });
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import { WEEK_GOAL_KEY } from '@/lib/achievements';
@@ -43,7 +47,7 @@ function ExportRow() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   return (
-    <Pressable style={bt.row} disabled={busy} onPress={async () => {
+    <Pressable style={bt.row} android_ripple={ripple()} disabled={busy} onPress={async () => {
       setBusy(true); setErr('');
       const r = await exportAllCsv();
       if (!r.ok) setErr(r.error);
@@ -61,7 +65,7 @@ function BriefToggle() {
   const [off, setOff] = useState(false);
   useEffect(() => { AsyncStorage.getItem('bl-brief-off').then((v) => setOff(v === '1')).catch(() => {}); }, []);
   return (
-    <Pressable style={bt.row} onPress={() => {
+    <Pressable style={bt.row} android_ripple={ripple()} onPress={() => {
       const next = !off;
       setOff(next);
       AsyncStorage.setItem('bl-brief-off', next ? '1' : '0').catch(() => {});
@@ -281,7 +285,8 @@ export default function SettingsScreen() {
   // 1行メニュー（アイコン＋ラベル＋chevron）
   function Row({ icon, label, sub, onPress, danger }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; danger?: boolean }) {
     return (
-      <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]} onPress={onPress}>
+      <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]}
+                 android_ripple={ripple()} onPress={onPress}>
         <View style={s.rowIcon}>{icon}</View>
         <View style={{ flex: 1 }}>
           <Text style={[s.rowLabel, danger && { color: C.coral }]}>{label}</Text>
@@ -334,7 +339,7 @@ export default function SettingsScreen() {
       {/* 通知センター（メニュー最上部） */}
       <View style={[s.group, { marginBottom: 18 }]}>
         <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]}
-                   onPress={() => { todo.refresh(); setNoticeOpen(true); }}>
+                   android_ripple={ripple()} onPress={() => { todo.refresh(); setNoticeOpen(true); }}>
           <View style={s.rowIcon}><BellRing color={C.teal} size={19} /></View>
           <View style={{ flex: 1 }}>
             <Text style={s.rowLabel}>{t('通知センター')}</Text>

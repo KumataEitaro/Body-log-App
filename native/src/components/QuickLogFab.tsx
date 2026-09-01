@@ -109,7 +109,8 @@ export default function QuickLogFab() {
   return (
     <>
       <Pressable style={[s.fab, { bottom: insets.bottom + 12 }]} onPress={() => { setMsg(null); setOpen(true); }} hitSlop={6}>
-        <Text style={s.fabT}>＋</Text>
+        {/* FABは円形固定サイズのため「＋」の文字サイズ拡大は上限1.3 */}
+        <Text style={s.fabT} maxFontSizeMultiplier={1.3}>＋</Text>
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>

@@ -91,8 +91,9 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
             const isT = d === today;
             return (
               <Pressable key={d} style={s.chip} onPress={() => pick(d)} hitSlop={{ top: 6, bottom: 6 }}>
-                <Text style={[s.chipW, on && s.chipTOn]}>{WD()[cdt.getDay()]}</Text>
-                <Text style={[s.chipD, on && s.chipTOn]}>{cdt.getDate()}</Text>
+                {/* チップは幅26px固定のため、文字サイズ拡大は上限1.3で頭打ちにする */}
+                <Text style={[s.chipW, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{WD()[cdt.getDay()]}</Text>
+                <Text style={[s.chipD, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{cdt.getDate()}</Text>
                 {/* 今日チップの小さなドット（選択中は白に反転） */}
                 {isT && <View style={[s.todayDot, on && { backgroundColor: '#fff' }]} />}
               </Pressable>
@@ -105,7 +106,7 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
       {!isToday && (
         <Animated.View entering={ZoomIn.springify().damping(14)}>
           <Pressable style={s.todayPill} onPress={() => pick(today)} hitSlop={6}>
-            <Text style={s.todayPillT}>{t('今日')}</Text>
+            <Text style={s.todayPillT} maxFontSizeMultiplier={1.3}>{t('今日')}</Text>
           </Pressable>
         </Animated.View>
       )}

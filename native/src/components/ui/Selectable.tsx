@@ -3,13 +3,23 @@
 // - Chip: カプセル型の選択チップ（未選択=薄グレー地 / 選択=teal or inkソリッド）
 // - OptionButton: 2択アクションボタン（1行固定＋自動縮小で文字ずれを構造的に防止）
 // 共通: 押下でscale縮小＋Haptics.selectionAsync
+// Android: Material 3の作法に合わせてタッチにリップルを出す（iOSはandroid_rippleを無視するため分岐不要）
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, rgba } from '@/lib/ui';
 
 
 function hapt() { Haptics.selectionAsync().catch(() => {}); }
+
+// Androidリップル。テーマ色（C.teal）の微透明で導出し、Pressable自体のborderRadiusで
+// 角丸内にクリップされる（overflow:'hidden'を足すと選択チップのelevation影が切れるため使わない）。
+// レンダーごとに評価する関数にしておくことで、テーマ変更（ツリー再構築）にも追従する
+const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const });
+
+// 端末の文字サイズ拡大時の上限。数字の大表示やセグメント等「固定寸法のUI」だけに適用し、
+// 本文系には付けない（アクセシビリティ尊重）
+export const FONT_CAP = 1.3;
 
 // ===== SegmentedControl =====
 export function SegmentedControl<T extends string>({ options, value, onChange }: {
@@ -31,10 +41,10 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
           style={[s.plate, { width: segW, transform: [{ translateX: Animated.multiply(x, segW) }] }]} />
       )}
       {options.map((o) => (
-        <Pressable key={o.key} style={s.segBtn}
+        <Pressable key={o.key} style={s.segBtn} android_ripple={ripple()}
                    onPress={() => { if (o.key !== value) { hapt(); onChange(o.key); } }}>
           {o.icon}
-          <Text numberOfLines={1} style={[s.segT, o.key === value && s.segTOn]}>{o.label}</Text>
+          <Text numberOfLines={1} maxFontSizeMultiplier={FONT_CAP} style={[s.segT, o.key === value && s.segTOn]}>{o.label}</Text>
         </Pressable>
       ))}
     </View>
@@ -63,10 +73,11 @@ export function Chip({ label, selected, onPress, onLongPress, tone = 'teal', lea
     : { color: '#fff' };
   return (
     <Pressable onPressIn={() => press(0.96)} onPressOut={() => press(1)} disabled={disabled}
+               style={{ borderRadius: 999 }} android_ripple={ripple()}
                onPress={() => { if (haptics) hapt(); onPress(); }} onLongPress={onLongPress}>
       <Animated.View style={[s.chip, onStyle, disabled && { opacity: 0.4 }, { transform: [{ scale: sc }] }]}>
         {leading}
-        <Text numberOfLines={1} style={[s.chipT, onText]}>{label}</Text>
+        <Text numberOfLines={1} maxFontSizeMultiplier={FONT_CAP} style={[s.chipT, onText]}>{label}</Text>
       </Animated.View>
     </Pressable>
   );
@@ -88,12 +99,13 @@ export function OptionButton({ label, onPress, variant = 'filled', busy, disable
   const txt = variant === 'tonal' ? { color: C.ink } : { color: '#fff' };
   return (
     <Pressable onPressIn={() => press(0.95)} onPressOut={() => press(1)}
-               onPress={() => { hapt(); onPress(); }} disabled={disabled || busy} style={style}>
+               onPress={() => { hapt(); onPress(); }} disabled={disabled || busy}
+               style={[{ borderRadius: 999 }, style]} android_ripple={ripple()}>
       <Animated.View style={[s.opt, box, (disabled && !busy) && { opacity: 0.4 }, { transform: [{ scale: sc }] }]}>
         {busy ? <ActivityIndicator color={variant === 'tonal' ? C.ink : '#fff'} /> : (
           <>
             {leading}
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={[s.optT, txt]}>{label}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={FONT_CAP} style={[s.optT, txt]}>{label}</Text>
           </>
         )}
       </Animated.View>

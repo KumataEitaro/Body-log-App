@@ -46,6 +46,7 @@
 ### B4. unstable APIへの依存 🟢（運用リスク）
 - タブが expo-router/unstable-native-tabs。iOSメジャーアップデートで挙動が変わる可能性。
   秋のiOS新版が出たら早めにTestFlightで確認する習慣を
+- OS新版時の確認項目一覧と両OSの差分台帳は docs/PLATFORM.md を参照
 
 ## C. Google Play固有
 

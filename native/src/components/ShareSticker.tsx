@@ -34,7 +34,8 @@ function Stat({ label, value, unit, tone, big }: { label: string; value: string;
   return (
     <View style={{ alignItems: 'center', marginVertical: 6 }}>
       <Text style={[st.label, { color: toneSub(tone) }]}>{label}</Text>
-      <Text style={[big ? st.big : st.mid, { color: toneColor(tone) }]}>
+      {/* ステッカーはPNGにキャプチャする固定レイアウトのため文字サイズ拡大は上限1.3 */}
+      <Text style={[big ? st.big : st.mid, { color: toneColor(tone) }]} maxFontSizeMultiplier={1.3}>
         {value}
         {unit ? <Text style={[st.unit, { color: toneSub(tone) }]}> {unit}</Text> : null}
       </Text>

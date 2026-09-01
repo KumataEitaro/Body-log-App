@@ -964,7 +964,9 @@ export default function LogScreen() {
                 : (left < 0 ? t('オーバー') : t('あと食べられる'))}
               {plan ? t('（計画）') : t('（維持）')}
             </Text>
-            <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : left < 0 && { color: C.coral }]}>
+            {/* ヒーローの大数字は文字サイズ拡大で崩れやすいため上限1.3（本文系は制限しない） */}
+            <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : left < 0 && { color: C.coral }]}
+                  maxFontSizeMultiplier={1.3}>
               {Math.abs(heroLeft).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
             <View style={[s.hline, { flexDirection: 'row' }]}>

@@ -147,15 +147,16 @@ export function LiftKpiCard() {
       <View style={s.kpiRow}>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('回数')}</Text>
-          <Text style={s.kpiV}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? ` / ${habit.perWeek}回` : t('回')}</Text></Text>
+          {/* KPIの大数字は3列固定グリッドのため文字サイズ拡大は上限1.3 */}
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? ` / ${habit.perWeek}回` : t('回')}</Text></Text>
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('消費')}</Text>
-          <Text style={s.kpiV}>{kcal.toLocaleString()}<Text style={s.kpiU}>{habit.weeklyKcal != null ? ` / ${Number(habit.weeklyKcal).toLocaleString()}` : 'kcal'}</Text></Text>
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{kcal.toLocaleString()}<Text style={s.kpiU}>{habit.weeklyKcal != null ? ` / ${Number(habit.weeklyKcal).toLocaleString()}` : 'kcal'}</Text></Text>
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('時間')}</Text>
-          <Text style={s.kpiV}>{mins}<Text style={s.kpiU}>{t('分')}</Text></Text>
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{mins}<Text style={s.kpiU}>{t('分')}</Text></Text>
         </View>
       </View>
       {kcal > 0 && <Text style={s.earnT}>{t('🍚 今週の運動で +{n}kcal 食べられる分を稼ぎました', { n: kcal.toLocaleString() })}</Text>}
@@ -284,7 +285,7 @@ export function PartVolumeCard() {
       </View>
       {/* 今週の到達点と先週比。棒より先に「増えたか減ったか」を言葉で返す */}
       <View style={s.pvHead}>
-        <Text style={s.pvNow}>{cur.toLocaleString()}<Text style={s.pvUnit}> kg</Text></Text>
+        <Text style={s.pvNow} maxFontSizeMultiplier={1.3}>{cur.toLocaleString()}<Text style={s.pvUnit}> kg</Text></Text>
         <Text style={s.pvDelta}>
           {delta == null ? t('今週') : delta >= 0 ? t('今週（先週比 +{p}%）', { p: delta }) : t('今週（先週比 {p}%）', { p: delta })}
         </Text>

@@ -564,12 +564,13 @@ export default function TrainingScreen() {
             <View style={s.mvRow}>
               <View style={s.mvStat}>
                 <View style={s.mvLblRow}><Flame size={13} color={C.sub} /><Text style={s.mvLbl}>{t('消費（運動）')}</Text></View>
-                <Text style={s.mvVal}>{Math.round(burnToday).toLocaleString()}<Text style={s.mvUnit}> kcal</Text></Text>
+                {/* 2スタットの大数字は横並び固定のため文字サイズ拡大は上限1.3 */}
+                <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>{Math.round(burnToday).toLocaleString()}<Text style={s.mvUnit}> kcal</Text></Text>
               </View>
               <View style={s.mvStat}>
                 <View style={s.mvLblRow}><Footprints size={13} color={C.sub} /><Text style={s.mvLbl}>{t('歩数')}</Text></View>
                 {stepsOfView != null ? (
-                  <Text style={s.mvVal}>{stepsOfView.toLocaleString()}<Text style={s.mvUnit}> {t('歩')}</Text></Text>
+                  <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>{stepsOfView.toLocaleString()}<Text style={s.mvUnit}> {t('歩')}</Text></Text>
                 ) : (
                   <Pressable onPress={connectHealth} hitSlop={6}>
                     <Text style={s.mvLink}>{t('ヘルスケアと連携する')}</Text>
@@ -726,7 +727,8 @@ export default function TrainingScreen() {
               <Timer size={15} color={C.teal} />
               <Text style={s.restL}>{t('レスト')}</Text>
             </View>
-            <Text style={s.restN}>
+            {/* タイマーのMM:SSは1行固定のため文字サイズ拡大は上限1.3 */}
+            <Text style={s.restN} maxFontSizeMultiplier={1.3}>
               {restLeft > 0
                 ? `${String(Math.floor(restLeft / 60)).padStart(2, '0')}:${String(restLeft % 60).padStart(2, '0')}`
                 : t('終了💪')}
