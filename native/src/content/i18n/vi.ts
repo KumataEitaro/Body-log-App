@@ -1244,4 +1244,10 @@ export const VI: Record<string, string> = {
   "ライトプラン以上で広告が消えて、記録に集中できます。": "Nâng cấp lên gói Lite trở lên để tắt quảng cáo và tập trung vào việc ghi chép.",
   "広告": "Quảng cáo",
   "ライトプランで広告を消せます": "Tắt quảng cáo với gói Lite",
+  "品目つきの食事記録と翌日の体重が3組以上たまると、「あなたに合う食材・合わない食材」の傾向がここに出ます。いつもの記録を続けるだけで大丈夫です。": "Khi bạn ghi lại từ 3 bữa ăn kèm nguyên liệu và cân nặng ngày hôm sau, xu hướng \"thực phẩm hợp/không hợp với bạn\" sẽ xuất hiện ở đây. Chỉ cần tiếp tục ghi chép như thường lệ là được.",
+  "いまのところ、体重をはっきり動かす食材は見つかっていません（それ自体が良い知らせです）。記録が増えると小さな傾向も見えてきます。": "Hiện tại, vẫn chưa tìm thấy loại thực phẩm nào tác động rõ rệt đến cân nặng (đó bản thân nó đã là tin vui). Khi có thêm dữ liệu ghi nhận, những xu hướng nhỏ cũng sẽ dần lộ diện.",
+  "ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。": "Tính năng liên kết Apple Health khả dụng trên bản TestFlight của iOS. Khi liên kết, số bước chân và giấc ngủ trong 7 ngày gần nhất sẽ hiển thị ở đây.",
+  "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Không thể tải phân tích. Vui lòng kiểm tra kết nối mạng và mở lại để thử lại.",
+  "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Chưa có ghi nhận tập luyện nào. Hãy ghi lại hiệp đầu tiên trong tab Tập luyện, {what} sẽ bắt đầu phát triển ở đây.",
+  "今週のサマリー": "Tổng quan tuần này",
 };
