@@ -490,9 +490,9 @@ export default function SettingsScreen() {
       {/* サポート */}
       <Text style={s.groupLabel}>{t('サポート')}</Text>
       <View style={s.group}>
-        <Row icon={<CircleHelp color={C.teal} size={19} />} label={t('使い方ガイドをもう一度見る')}
-             sub={t('各画面の説明と初期設定をやり直せます')}
-             onPress={() => guide.start()} />
+        <Row icon={<CircleHelp color={C.teal} size={19} />} label={t('使い方ガイド')}
+             sub={t('5つの章に分かれています。見たい章だけどうぞ')}
+             onPress={() => guide.start('menu')} />
         <View style={s.sep} />
         <Row icon={<BookOpen color={C.teal} size={19} />} label={t('読みもの')}
              sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}

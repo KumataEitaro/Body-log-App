@@ -183,7 +183,7 @@ export default function LogScreen() {
   useEffect(() => {
     if (!introDone) return; // 起動イントロが終わってから案内を始める
     AsyncStorage.getItem('bl-guide-done').then((v) => {
-      if (!v) setTimeout(() => guide.start(), 900);
+      if (!v) setTimeout(() => guide.start('auto'), 900); // 初回は「入力のきほん」だけ自動再生
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [introDone]);
@@ -1399,12 +1399,12 @@ export default function LogScreen() {
             value={chat} onChangeText={setChat}
             onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
           />
-          <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
+          <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} guideKey="dockCamera" />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
           {/* 成分表示を撮る（主役）: パッケージ裏ラベル→AI読み取り。日本の商品はバーコードDB
               （Open Food Facts）にほぼ無いため主従を逆転した。長押しで従来のバーコードスキャン */}
           <DockIconButton Icon={ReceiptText} onPress={scanNutritionLabel} onLongPress={() => setScanOpen(true)}
-                          disabled={photos.length >= 4} />
+                          disabled={photos.length >= 4} guideKey="dockLabel" />
           {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
               「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
           {profile != null && (

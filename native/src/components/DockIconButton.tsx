@@ -3,17 +3,22 @@
 import { Pressable, StyleSheet } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { C } from '@/lib/ui';
+import { useGuideTarget } from '@/components/GuideTour';
 
-export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18 }: {
+export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18, guideKey }: {
   Icon: LucideIcon;
   onPress: () => void;
   onLongPress?: () => void;   // 隠し操作用（例: 成分表示ボタンの長押し=バーコード）
   disabled?: boolean;
   tint?: string;
   size?: number;
+  guideKey?: string;          // ガイドツアーの照射対象キー（食事ドックのカメラ・成分表示が渡す）
 }) {
+  // ガイドの照射対象になれる（HeaderGearと同じ流儀: 未指定はダミーキーで登録）
+  const target = useGuideTarget(guideKey ?? '__dock_unused__');
   return (
     <Pressable
+      ref={target} collapsable={false}
       onPress={onPress} onLongPress={onLongPress} delayLongPress={450} disabled={disabled} hitSlop={6}
       style={({ pressed }) => [s.btn, pressed && s.pressed, disabled && { opacity: 0.35 }]}
     >
