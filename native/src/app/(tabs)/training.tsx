@@ -70,6 +70,9 @@ export default function TrainingScreen() {
   // 重量ダイアルを開いている行（nullなら閉じている）
   const [dialRow, setDialRow] = useState<number | null>(null);
   const trainInputTarget = useGuideTarget('trainInput');
+  const moveTarget = useGuideTarget('moveCard');   // ガイド章「食べる前に分かる」: きょうの動き（逆算の1行）
+  const restTarget = useGuideTarget('restTimer');  // ガイド章「筋トレは全部無料」: レストタイマー
+  const liftTarget = useGuideTarget('liftInput');  // ガイド章「筋トレは全部無料」: 筋トレ入力カード
   const router = useRouter();
   const trScrollRef = useRef<ScrollView>(null);
   const trY = useRef(0);
@@ -554,6 +557,9 @@ export default function TrainingScreen() {
         return (
           <Animated.View entering={FadeInDown.duration(320)} style={s.card}>
             <MinusBadge editing={editing} onPress={() => cards.hide('move')} />
+            {/* ガイドの照射対象は上段（見出し・2スタット・逆算の1行）だけ。カード全体は縦に長く、
+                スポットライトが画面からはみ出すため（レイアウトへの影響なし: 親はgap未使用） */}
+            <View ref={moveTarget} collapsable={false}>
             <View style={s.h2Row}><Activity size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('きょうの動き')}</Text></View>
             <View style={s.mvRow}>
               <View style={s.mvStat}>
@@ -572,6 +578,7 @@ export default function TrainingScreen() {
               </View>
             </View>
             {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
+            </View>
             {last7.length > 1 && (
               <View style={s.mvBars}>
                 {last7.map((d) => {
@@ -705,7 +712,9 @@ export default function TrainingScreen() {
         </View>
       </Modal>
 
-      {/* レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー） */}
+      {/* レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー）
+          ガイドの照射対象: 稼働中/待機中どちらの見た目でも同じ枠で照らせるよう外側をViewで包む */}
+      <View ref={restTarget} collapsable={false}>
       {(
         restLeft != null ? (
           <Pressable style={s.rest} onPress={() => setRestLeft(restSec)}>
@@ -739,9 +748,10 @@ export default function TrainingScreen() {
           </Pressable>
         )
       )}
+      </View>
 
       {/* 入力 */}
-      <View style={[s.card, !vis('liftInput') && { display: 'none' }]}>
+      <View style={[s.card, !vis('liftInput') && { display: 'none' }]} ref={liftTarget} collapsable={false}>
         <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
         <View style={s.h2Row}>
           <ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text>
