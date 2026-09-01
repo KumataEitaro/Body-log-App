@@ -261,7 +261,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <View style={s.h2Row}><Target size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('目標設定')}</Text></View>
           {goal && latestWeight != null && (
             <View style={s.statusRow}>
-              <Text style={s.statusBig}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
+              {/* 「現在→目標」の大数字は1行固定のため文字サイズ拡大は上限1.3 */}
+              <Text style={s.statusBig} maxFontSizeMultiplier={1.3}>{latestWeight.toFixed(1)} → {Number(goal.target_weight).toFixed(1)}kg</Text>
               {status && (
                 <Text style={[s.statusSub, { color: status.state === 'behind' ? C.coral : C.teal }]}>
                   {status.state === 'ahead' ? t('{n}日先行 🎉', { n: Math.abs(status.diffDays) }) : status.state === 'behind' ? t('{n}日遅れ', { n: Math.abs(status.diffDays) }) : t('順調 👍')}

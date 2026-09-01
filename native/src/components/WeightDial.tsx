@@ -20,7 +20,8 @@ const MAX_KG = 300;
 const Row = memo(function Row({ label, selected }: { label: string; selected: boolean }) {
   return (
     <View style={{ height: ITEM_H, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={[s.rowT, selected && s.rowTOn]}>{label}</Text>
+      {/* ホイールは行高ITEM_H固定のため文字サイズ拡大は上限1.3 */}
+      <Text style={[s.rowT, selected && s.rowTOn]} maxFontSizeMultiplier={1.3}>{label}</Text>
     </View>
   );
 });
@@ -105,7 +106,7 @@ export default function WeightDial({ title, subtitle, unitLabel, initial, allowZ
 
         <View style={s.wheels}>
           <Wheel width={96} values={wholeValues} index={Math.floor(init)} onChange={setWhole} />
-          <Text style={s.dot}>.</Text>
+          <Text style={s.dot} maxFontSizeMultiplier={1.3}>.</Text>
           <Wheel width={64} values={['0', '5']} index={init % 1 >= 0.25 ? 1 : 0} onChange={setHalf} />
           <Text style={s.unit}>{unitLabel}</Text>
         </View>

@@ -119,7 +119,8 @@ export default function LeanBulkCard() {
       ) : (
         <>
           <View style={s.paceRow}>
-            <Text style={[s.paceN, { color: tone }]}>
+            {/* 週ペースの大数字はバッジと横並び固定のため文字サイズ拡大は上限1.3 */}
+            <Text style={[s.paceN, { color: tone }]} maxFontSizeMultiplier={1.3}>
               {pace > 0 ? '+' : ''}{pace.toFixed(2)}
               <Text style={s.paceU}> {t('kg/週')}</Text>
             </Text>

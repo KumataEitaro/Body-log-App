@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, rgba } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -505,7 +505,7 @@ export default function ChangesScreen() {
       <View style={s.kpiRow}>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('体重')}</Text>
-          <Text style={s.kpiV}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
           {latestW != null && firstW != null && (
             <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.teal : C.coral }]}>
               {t('30日で')}{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
@@ -514,12 +514,12 @@ export default function ChangesScreen() {
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('累計収支')}</Text>
-          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
+          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]} maxFontSizeMultiplier={1.3}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
           <Text style={s.kpiD}>{t('脂肪 約')}{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('未記録（30日）')}</Text>
-          <Text style={s.kpiV}>{unrecorded}<Text style={s.kpiU}>{t('{n}日', { n: '' })}</Text></Text>
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{unrecorded}<Text style={s.kpiU}>{t('{n}日', { n: '' })}</Text></Text>
           <Text style={s.kpiD}>{t('±0扱い')}</Text>
         </View>
       </View>
@@ -895,7 +895,8 @@ export default function ChangesScreen() {
     }
     return (
       <View style={s.detailHead}>
-        <Text style={s.detailVal}>
+        {/* 大数字は文字サイズ拡大でレイアウトが崩れやすいため上限1.3（本文系は制限しない） */}
+        <Text style={s.detailVal} maxFontSizeMultiplier={1.3}>
           {val}
           <Text style={s.detailUnit}> {unit}</Text>
         </Text>
@@ -920,6 +921,8 @@ export default function ChangesScreen() {
     const secTitle = sectionHeadOf.get(key);
     const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+                 // Androidリップル（Material 3の作法）。menuRow自身のborderRadius 16内にクリップされる
+                 android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
                  // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
                  ref={key === 'body' ? chartTarget : undefined} collapsable={false}
                  onPress={() => {

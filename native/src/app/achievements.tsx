@@ -84,7 +84,8 @@ export default function AchievementsScreen() {
             {/* ストリークのヒーロー */}
             <View style={s.hero}>
               <View style={s.heroFlame}><Flame size={30} color={C.teal} fill={C.teal} /></View>
-              <Text style={s.heroN}>{report.streak}<Text style={s.heroU}>{t('日連続')}</Text></Text>
+              {/* ストリークの大数字は文字サイズ拡大で崩れやすいため上限1.3 */}
+              <Text style={s.heroN} maxFontSizeMultiplier={1.3}>{report.streak}<Text style={s.heroU}>{t('日連続')}</Text></Text>
               <Text style={s.heroSub}>
                 {report.usedFreeze
                   ? t('お守りが{d}の抜けをつなぎました（週1回まで自動）', { d: report.usedFreeze.slice(5).replace('-', '/') })
