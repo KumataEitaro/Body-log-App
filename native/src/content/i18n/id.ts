@@ -1447,4 +1447,6 @@ export const ID: Record<string, string> = {
   "増やしたい人も主役": "Menambah berat badan juga menjadi fokus utama",
   "目的を増量にすると残量の意味が反転して、「あと820kcal食べる」がノルマになります。食間が空いたら教えるリマインドも。": "Atur tujuanmu ke penambahan berat badan, dan arti sisa kalori akan berbalik menjadi target seperti \"Makan 820kcal lagi\". Ada juga pengingat jika jarak antar makanmu terlalu lama.",
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 warna tema, 11 bahasa, satuan, notifikasi, dan integrasi kesehatan. Kelola profil dan makanan kustommu kapan saja dari ⚙ ini.",
+  "Googleログインに失敗しました: {reason}": "Gagal masuk dengan Google: {reason}",
+  "初めての方はこちら → 新規登録に切り替える": "Baru di sini? → Beralih ke Daftar Baru",
 };

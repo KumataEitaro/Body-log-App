@@ -1447,4 +1447,6 @@ export const VI: Record<string, string> = {
   "増やしたい人も主役": "Người muốn tăng cân cũng là nhân vật chính",
   "目的を増量にすると残量の意味が反転して、「あと820kcal食べる」がノルマになります。食間が空いたら教えるリマインドも。": "Đổi mục tiêu sang tăng cân là chỉ số còn lại đổi ngược thành chỉ tiêu \"cần nạp thêm 820kcal\". Có cả nhắc nhở nếu để bụng đói lâu quá.",
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 màu chủ đề, 11 ngôn ngữ, đơn vị, thông báo, kết nối sức khỏe. Quản lý hồ sơ hay món ăn riêng lúc nào cũng được qua nút ⚙ này.",
+  "Googleログインに失敗しました: {reason}": "Đăng nhập Google thất bại: {reason}",
+  "初めての方はこちら → 新規登録に切り替える": "Lần đầu sử dụng? → Chuyển sang Đăng ký",
 };

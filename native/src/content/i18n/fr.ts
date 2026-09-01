@@ -1447,4 +1447,6 @@ export const FR: Record<string, string> = {
   "増やしたい人も主役": "La prise de masse aussi à l'honneur",
   "目的を増量にすると残量の意味が反転して、「あと820kcal食べる」がノルマになります。食間が空いたら教えるリマインドも。": "En objectif prise de masse, le compteur s'inverse : votre mission devient « Encore 820 kcal à manger ». Des rappels vous alertent si les repas sont trop espacés.",
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 thèmes, 11 langues, unités, notifications et connexion Santé. Gérez aussi votre profil et vos aliments personnalisés à tout moment depuis ⚙.",
+  "Googleログインに失敗しました: {reason}": "Échec de la connexion Google : {reason}",
+  "初めての方はこちら → 新規登録に切り替える": "Nouveau ici ? → S'inscrire",
 };

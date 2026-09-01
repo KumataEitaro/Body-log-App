@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setFirstRunFlag } from '@/lib/firstrun';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
@@ -75,7 +76,7 @@ export default function Onboarding() {
 
   function done() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    AsyncStorage.setItem(DONE_KEY, '1').catch(() => {});
+    setFirstRunFlag(DONE_KEY, '1').catch(() => {});
     router.replace('/(tabs)/log' as never);
     // 目標を決めた直後が課金の意思決定に最適なタイミング（2026年の実測でも
     // オンボーディング直後ペイウォールが最良構成）。スキップ可のソフト型として重ねる。

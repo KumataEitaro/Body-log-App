@@ -28,11 +28,23 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path === '/login';
   const isPublicPage = path === '/terms' || path === '/privacy' || path === '/support' // 規約・サポートは未ログインでも閲覧可（審査要件）
+    || path === '/sunset' // ブラウザ版クローズの案内ページ
     || (path.startsWith('/dev-preview') && process.env.NODE_ENV !== 'production') // UI確認用（開発時のみ）
     || path.startsWith('/dev-preview/concept') // UIコンセプト比較モック（静的・データなし・実機確認用に公開）
     || path.startsWith('/dev-preview/fonts'); // フォント比較（静的・実機確認用に公開）
 
   if (isPublicPage) return response;
+
+  // ブラウザ版のUIはクローズ（2026-09-02・アプリへ一本化）。
+  // 残すのは: /login（/admin入場用）・/admin（運営）・公開ページ・API/静的（matcherで除外済み）。
+  // それ以外のアプリ画面はログイン状態にかかわらず案内ページへ
+  const isAdminPage = path.startsWith('/admin');
+  if (!isAuthPage && !isAdminPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/sunset';
+    return NextResponse.redirect(url);
+  }
+
   if (!user && !isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
@@ -40,7 +52,7 @@ export async function proxy(request: NextRequest) {
   }
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = '/log'; // 起動タブ＝入力に合わせる
+    url.pathname = '/admin'; // Web UIクローズ後、ログインの行き先は運営画面だけ
     return NextResponse.redirect(url);
   }
   return response;

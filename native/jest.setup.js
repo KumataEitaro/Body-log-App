@@ -47,6 +47,7 @@ jest.mock('react-native-reanimated', () => {
     },
     useSharedValue: (v) => ({ value: v }),
     useAnimatedStyle: () => ({}),
+    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 0 } }),
     useAnimatedScrollHandler: () => () => {},
     useAnimatedRef: () => ({ current: null }),
     useDerivedValue: (fn) => ({ value: typeof fn === 'function' ? undefined : fn }),
