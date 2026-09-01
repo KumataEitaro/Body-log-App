@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronRight, ListChecks, PartyPopper, X } from 'lucide-react-native';
 import { C } from '@/lib/ui';
@@ -61,7 +62,7 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
       if (!user) { setShow(false); return; }
-      const doneRaw = await AsyncStorage.getItem(DONE_KEY);
+      const doneRaw = await getFirstRunFlag(DONE_KEY);
       const doneAt = doneRaw != null && Number.isFinite(Number(doneRaw)) ? Number(doneRaw) : null;
       if (!shouldShowChecklist((user as { created_at?: string }).created_at, doneAt, Date.now())) {
         setShow(false);
@@ -97,7 +98,7 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
       setShow(true);
       // 全完了の初検出: 祝祭（成功ハプティクス）＋完了時刻を永続化（翌日から自動で消える起点）
       if (done && doneAt == null) {
-        await AsyncStorage.setItem(DONE_KEY, String(Date.now())).catch(() => {});
+        await setFirstRunFlag(DONE_KEY, String(Date.now()));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
     } catch { setShow(false); /* 判定に失敗しても画面は壊さない */ }

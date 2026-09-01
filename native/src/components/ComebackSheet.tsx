@@ -17,6 +17,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import { Flame } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
@@ -59,8 +60,8 @@ export default function ComebackSheet({ onSaved }: {
         const gapDays = Math.round((Date.parse(todayJST()) - Date.parse(last)) / 86400000);
         if (!(gapDays >= 3)) return;
         // 同じ空白期間には一度だけ。「表示した」時点で記憶する（閉じ方を問わない）
-        if ((await AsyncStorage.getItem(SHOWN_KEY)) === last) return;
-        await AsyncStorage.setItem(SHOWN_KEY, last);
+        if ((await getFirstRunFlag(SHOWN_KEY)) === last) return;
+        await setFirstRunFlag(SHOWN_KEY, last);
         if (!alive) return;
         setUid(userId);
         setVisible(true);

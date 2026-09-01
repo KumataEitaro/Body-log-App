@@ -19,6 +19,7 @@ import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion }
 import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
 import * as Haptics from 'expo-haptics';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
@@ -47,6 +48,7 @@ import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { skipTodayReminder, scheduleFirstLawNotification } from '@/lib/notify';
+import { getFirstRunFlag } from '@/lib/firstrun';
 import { checkFirstLawUnlock, consumeFirstLawBanner } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
 import StatusBarMask from '@/components/StatusBarMask';
@@ -182,7 +184,8 @@ export default function LogScreen() {
   const { introDone } = useLaunch();
   useEffect(() => {
     if (!introDone) return; // 起動イントロが終わってから案内を始める
-    AsyncStorage.getItem('bl-guide-done').then((v) => {
+    // ユーザー単位フラグ（同じ端末の別アカウントでもチュートリアルが正しく始まる）
+    getFirstRunFlag('bl-guide-done').then((v: string | null) => {
       if (!v) setTimeout(() => guide.start('auto'), 900); // 初回は「入力のきほん」だけ自動再生
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -858,10 +861,20 @@ export default function LogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagedP, stagedF, stagedC]);
 
+  // キーボード追従はKAVをやめreanimatedのUIスレッド追従に（βフィードバック 2026-09-02:
+  // 日本語IMEの候補バーが1打鍵ごとに高さを変え、KAVの再レイアウトで画面全体が揺れる＋
+  // タブバー高さぶん過剰に持ち上がってドック下に無駄な空白が出ていた）
+  const kb = useAnimatedKeyboard();
+  const dockLift = useAnimatedStyle(() => ({
+    // 端末下端からの持ち上げ量。ドック自体が insets.bottom を持っているのでその分は相殺
+    transform: [{ translateY: -Math.max(kb.height.value - insets.bottom, 0) }],
+  }));
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
         ref={scrollRef}
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         keyboardShouldPersistTaps="handled"
@@ -1195,6 +1208,7 @@ export default function LogScreen() {
       </ScrollView>
 
       {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
+      <Reanimated.View style={dockLift}>
       <Animated.View style={[s.dockWrap, { paddingBottom: insets.bottom + 8 }, enter[3]]} ref={dockTarget} collapsable={false}>
         {/* いつの記録か（常時表示）: 過去日に書いていることへの気づき（今日以外はアンバー強調）。
             保存時刻はDB側のnow()で決まる（過去日でも実際の操作時刻が入る）ため、
@@ -1419,6 +1433,7 @@ export default function LogScreen() {
           </Pressable>
         </View>
       </Animated.View>
+      </Reanimated.View>
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={cards.layout.hidden} shownKeys={cards.visible} labels={LOG_LABELS()} onShow={cards.show}
@@ -1455,7 +1470,7 @@ export default function LogScreen() {
       <ComebackSheet onSaved={load} />
       <StatusBarMask />
       <HeaderGear />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

@@ -6,6 +6,7 @@ import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
+import { parseAuthCallback } from '@/lib/authCallback';
 import { C, sheetTopPad } from '@/lib/ui';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
 import { Languages, Check } from 'lucide-react-native';
@@ -27,6 +28,8 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [info, setInfo] = useState('');
+  // ログイン失敗時に「初めての方は新規登録へ」を出す（未登録者の行き止まり防止）
+  const [showSignupHint, setShowSignupHint] = useState(false);
 
   async function login() {
     if (!email.trim() || !password) { setMsg(t('メールとパスワードを入力してください。')); return; }
@@ -34,7 +37,14 @@ export default function LoginScreen() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) {
-        setMsg(/invalid login/i.test(error.message) ? t('メールまたはパスワードが違います。') : t('ログインに失敗しました。通信環境を確認してください。'));
+        if (/invalid login/i.test(error.message)) {
+          // セキュリティ上「未登録」と「パスワード違い」は区別されない（列挙攻撃対策の業界標準）。
+          // かわりに新規登録への救済導線を出す（βフィードバック: 未登録の人が行き止まりになる）
+          setMsg(t('メールまたはパスワードが違います。'));
+          setShowSignupHint(true);
+        } else {
+          setMsg(t('ログインに失敗しました。通信環境を確認してください。'));
+        }
       }
       // 成功時は_layoutの認証ゲートが自動でタブへ遷移させる
     } catch {
@@ -89,21 +99,21 @@ export default function LoginScreen() {
       }
       const res = await WebBrowser.openAuthSessionAsync(data.url, OAUTH_REDIRECT);
       if (res.type !== 'success' || !res.url) return; // ユーザーが閉じた
-      const url = new URL(res.url);
-      const code = url.searchParams.get('code');
-      if (code) {
-        const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-        if (exErr) setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
-        return;
-      }
-      // フォールバック: implicitフローで #access_token=… が返ってきた場合
-      const frag = new URLSearchParams(res.url.split('#')[1] ?? '');
-      const access_token = frag.get('access_token');
-      const refresh_token = frag.get('refresh_token');
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token });
-      } else {
-        setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
+      const parsed = parseAuthCallback(res.url);
+      switch (parsed.kind) {
+        case 'code': {
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(parsed.code);
+          if (exErr) setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
+          return;
+        }
+        case 'tokens': // フォールバック: implicitフローで #access_token=… が返ってきた場合
+          await supabase.auth.setSession({ access_token: parsed.access_token, refresh_token: parsed.refresh_token });
+          return;
+        case 'error': // Supabase/Google側が理由を返したら握りつぶさず見せる（原因調査を可能にする）
+          setMsg(t('Googleログインに失敗しました: {reason}', { reason: parsed.message.slice(0, 120) }));
+          return;
+        default:
+          setMsg(t('ログインの完了処理に失敗しました。もう一度お試しください。'));
       }
     } finally { setGBusy(false); }
   }
@@ -154,7 +164,14 @@ export default function LoginScreen() {
   const langLabel = LOCALES.find((l) => l.code === locale)?.label ?? '日本語';
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
+    // KAV(padding)は日本語IMEの候補バーが1打鍵ごとに高さを変えるたび画面全体を
+    // 再レイアウトし「ガタガタ揺れる」原因になっていた（βフィードバック 2026-09-02）。
+    // ScrollView + automaticallyAdjustKeyboardInsets（iOSネイティブのインセット追従）に変更
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }}
+                contentContainerStyle={s.wrap}
+                automaticallyAdjustKeyboardInsets
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
       <View style={s.inner}>
         <Pressable style={s.langBtn} onPress={() => setLangOpen(true)} hitSlop={8}>
           <Languages size={15} color={C.sub} />
@@ -168,7 +185,7 @@ export default function LoginScreen() {
         <View style={{ marginBottom: 16 }}>
           <SegmentedControl
             options={[{ key: 'login', label: t('ログイン') }, { key: 'signup', label: t('新規登録') }]}
-            value={mode} onChange={(m) => { setMode(m); setMsg(''); setInfo(''); }}
+            value={mode} onChange={(m) => { setMode(m); setMsg(''); setInfo(''); setShowSignupHint(false); }}
           />
         </View>
 
@@ -181,6 +198,14 @@ export default function LoginScreen() {
                      secureTextEntry value={password2} onChangeText={setPassword2} />
         )}
         {msg ? <Text style={s.err}>{msg}</Text> : null}
+        {showSignupHint && mode === 'login' && (
+          <Pressable onPress={() => { setMode('signup'); setMsg(''); setShowSignupHint(false); }} hitSlop={8}
+                     style={{ alignSelf: 'center', marginTop: 6 }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' }}>
+              {t('初めての方はこちら → 新規登録に切り替える')}
+            </Text>
+          </Pressable>
+        )}
         {info ? <Text style={s.info}>{info}</Text> : null}
         <OptionButton style={{ marginTop: 8 }} label={isLogin ? t('ログイン') : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
@@ -242,14 +267,14 @@ export default function LoginScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
   appleBtn: { backgroundColor: '#000', borderColor: '#000' },
   appleMark: { color: '#fff', fontSize: 17, fontWeight: '700', marginRight: 6 },
-  wrap: { flex: 1, backgroundColor: C.bg, justifyContent: 'center' },
+  wrap: { flexGrow: 1, backgroundColor: C.bg, justifyContent: 'center', paddingVertical: 40 },
   inner: { paddingHorizontal: 28 },
   langBtn: {
     alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 14,

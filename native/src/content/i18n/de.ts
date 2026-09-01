@@ -1447,4 +1447,6 @@ export const DE: Record<string, string> = {
   "増やしたい人も主役": "Auch Zunehmen ist ein Ziel",
   "目的を増量にすると残量の意味が反転して、「あと820kcal食べる」がノルマになります。食間が空いたら教えるリマインドも。": "Wenn du Zunehmen als Ziel wählst, kehrt sich die Bedeutung um: „Noch 820kcal essen“ wird zu deinem Soll. Es gibt auch Erinnerungen, wenn die Pausen zwischen den Mahlzeiten zu lang werden.",
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 Farbthemen, 11 Sprachen, Einheiten, Benachrichtigungen und Health-Connect-Verbindung. Verwalte dein Profil und deine eigenen Lebensmittel jederzeit über dieses ⚙.",
+  "Googleログインに失敗しました: {reason}": "Google-Login fehlgeschlagen: {reason}",
+  "初めての方はこちら → 新規登録に切り替える": "Neu hier? → Zur Registrierung wechseln",
 };

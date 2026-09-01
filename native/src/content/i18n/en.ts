@@ -1546,4 +1546,6 @@ export const EN: Record<string, string> = {
   "「ベンチ90kg」を目標にすると、75kg×6回の日もRM換算で進捗に数えます。5×5の日もマックス挑戦の日も、同じものさしで。": "Set a goal for \"90kg bench press\", and even a day of 75kg × 6 reps counts toward progress via 1RM conversion. Whether it's 5x5 day or max-out day, use the same yardstick.",
   "ボリュームで管理する": "Manage by volume",
   "週ごとの総挙上量を部位別に集計。「先週より脚が+12%」のように、言葉でも教えます。": "Calculates weekly total lifted volume by muscle group. Tells you in plain words like \"legs up +12% from last week\".",
+  "Googleログインに失敗しました: {reason}": "Google sign-in failed: {reason}",
+  "初めての方はこちら → 新規登録に切り替える": "First time? → Switch to Sign Up",
 };

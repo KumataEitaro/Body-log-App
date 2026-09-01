@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import Svg, { Rect, Mask } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import { useRouter } from 'expo-router';
 import { Hand, PartyPopper, CheckCircle2, ChevronRight, X } from 'lucide-react-native';
 import { C } from '@/lib/ui';
@@ -39,7 +40,7 @@ type GuideMode = 'auto' | 'menu'; // auto=初回の自動再生（1章だけ）/
 // ---- 既読章の読み書き ----
 async function loadDoneChapters(): Promise<GuideChapterId[]> {
   try {
-    const raw = await AsyncStorage.getItem(CHAPTERS_DONE_KEY);
+    const raw = await getFirstRunFlag(CHAPTERS_DONE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr : [];
   } catch { return []; }
@@ -47,7 +48,7 @@ async function loadDoneChapters(): Promise<GuideChapterId[]> {
 async function saveDoneChapter(id: GuideChapterId): Promise<GuideChapterId[]> {
   const cur = await loadDoneChapters();
   const next = cur.includes(id) ? cur : [...cur, id];
-  try { await AsyncStorage.setItem(CHAPTERS_DONE_KEY, JSON.stringify(next)); } catch { /* 表示だけの記録 */ }
+  try { await setFirstRunFlag(CHAPTERS_DONE_KEY, JSON.stringify(next)); } catch { /* 表示だけの記録 */ }
   return next;
 }
 
@@ -144,16 +145,16 @@ function GuideOverlay({ mode, targets, scrollers, close }: {
 
   // 初回ツアーの完了/スキップ: 既読フラグを立てて、未実施ならオンボーディングへ
   const finishAuto = useCallback(() => {
-    AsyncStorage.setItem(GUIDE_DONE_KEY, '1').catch(() => {});
+    setFirstRunFlag(GUIDE_DONE_KEY, '1').catch(() => {});
     // ※ 遷移先を決めてから閉じる。閉じた後に遷移すると、復帰時にクラッシュすることがある
-    AsyncStorage.getItem('bl-onboard-done')
+    getFirstRunFlag('bl-onboard-done')
       .then((v) => { close(); router.navigate((v ? '/log' : '/onboarding') as never); })
       .catch(() => { close(); router.navigate('/log' as never); });
   }, [close, router]);
 
   // 章選択からの終了: 画面遷移せずそっと閉じる（設定画面に戻るだけ）
   const closeMenu = useCallback(() => {
-    AsyncStorage.setItem(GUIDE_DONE_KEY, '1').catch(() => {}); // ここまで見た人に初回を再強制しない
+    setFirstRunFlag(GUIDE_DONE_KEY, '1').catch(() => {}); // ここまで見た人に初回を再強制しない
     close();
   }, [close]);
 
