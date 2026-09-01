@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
-import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { activeKcalGoalBonus, useActiveKcalToGoal } from '@/lib/activeKcal';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C, sheetTopPad } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { todayJST } from '@/lib/calc';
+import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 import { ClipboardList, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
@@ -130,10 +131,15 @@ export default function TrainingScreen() {
   const [burnToday, setBurnToday] = useState(0);
   const [entryToday, setEntryToday] = useState<{ intake: number | null; target: number | null }>({ intake: null, target: null });
   const [healthDays, setHealthDays] = useState<HealthDaySummary[] | null>(null);
+  // 「アクティブカロリーを目標に反映する」（設定・既定OFF）。ONのときだけ逆算の目標に上乗せする
+  const activeToGoal = useActiveKcalToGoal();
+  // 上乗せ額の計算にはBMRと生活係数が必要（食事タブと同じ考え方＝二重計上を避ける式）
+  const [prof, setProf] = useState<{ sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number } | null>(null);
   const loadMove = useCallback(async (date: string) => {
-    const [ls, en] = await Promise.all([
+    const [ls, en, pr] = await Promise.all([
       supabase.from('logs').select('adj').eq('date', date),
       supabase.from('entries').select('intake,target').eq('date', date).maybeSingle(),
+      supabase.from('profiles').select('sex,height_cm,age,life_factor').maybeSingle(),
     ]);
     setBurnToday(((ls.data as { adj: number | null }[]) || []).reduce((sum, l) => sum + Math.max(0, Number(l.adj) || 0), 0));
     const e = en.data as { intake: number | null; target: number | null } | null;
@@ -141,6 +147,7 @@ export default function TrainingScreen() {
       intake: e?.intake != null ? Number(e.intake) : null,
       target: e?.target != null ? Number(e.target) : null,
     });
+    setProf((pr.data as { sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number } | null) ?? null);
   }, []);
   useEffect(() => { loadMove(viewDate); }, [viewDate, loadMove]);
   const loadHealth = useCallback(async () => {
@@ -160,7 +167,14 @@ export default function TrainingScreen() {
     if (!healthAvailable()) { setMsg({ ok: false, text: t('歩数の自動表示はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
     if (await requestHealthAuth()) { await loadHealth(); loadHourly(viewDate); }
   }
-  const stepsOfView = healthDays?.find((d) => d.date === viewDate)?.steps ?? null;
+  const dayOfView = healthDays?.find((d) => d.date === viewDate) ?? null;
+  const stepsOfView = dayOfView?.steps ?? null;
+  // アクティブkcal（ヘルスケア実測・歩行や日常活動を含む）。未連携/非対応環境はnull＝
+  // 従来どおりアプリ記録ぶん（logs adj）だけを「消費（記録）」として見せる。
+  // 直近7日が全部0のときも「実測が取れていない」と見て従来表示に落とす
+  // （アクティブの許可だけ拒否された場合に「0 kcal」を実測として誇らないため）
+  const activeOfView = healthDays != null && healthDays.some((d) => d.activeKcal > 0)
+    ? (dayOfView?.activeKcal ?? 0) : null;
   // 歩数の週目標（B-15・オフ=null）。日目標と違い1日サボっても取り返せる、ゆるい自己契約
   const weekStepsGoal = useWeekStepsGoal();
 
@@ -501,7 +515,7 @@ export default function TrainingScreen() {
       ref={trScrollRef}
       style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); invalidateActiveEnergyCache(); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
         <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
@@ -536,7 +550,14 @@ export default function TrainingScreen() {
       {vis('move') && (() => {
         const kcalPerStep = Math.max(0.02, myWeight * 0.0005); // 87kgで約0.044kcal/歩
         const walkKcalMin = 0.0613 * myWeight;                 // はや歩き3.5METs相当
-        const target = entryToday.target;
+        // 目標への上乗せ（設定「アクティブカロリーを目標に反映する」がONのときだけ）。
+        // アクティブ全量ではなく max(0, アクティブ − BMR×(生活係数−1)) を足す
+        // ＝生活係数にすでに含まれる日常活動ぶんとの二重計上を避ける（根拠は lib/activeKcal.ts）
+        const bmrOfMe = prof ? mifflinBMR(prof.sex, myWeight, Number(prof.height_cm), Number(prof.age)) : 0;
+        const lifeFactor = prof?.life_factor != null ? Number(prof.life_factor) : LIFE_FACTOR_DEFAULT;
+        const activeBonus = activeToGoal && activeOfView != null
+          ? activeKcalGoalBonus(activeOfView, bmrOfMe, lifeFactor) : 0;
+        const target = entryToday.target != null ? entryToday.target + activeBonus : null;
         const over = target != null ? Math.round((entryToday.intake ?? 0) - target) : null;
         let line: { text: string; color: string } | null = null;
         if (over == null) {
@@ -564,10 +585,26 @@ export default function TrainingScreen() {
             <View ref={moveTarget} collapsable={false}>
             <View style={s.h2Row}><Activity size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('きょうの動き')}</Text></View>
             <View style={s.mvRow}>
+              {/* 消費スタット: ヘルスケア連携があれば「アクティブ実測」を主に出す。
+                  歩数10,013歩なのに消費0kcalという不合理（βFB 2026-09-01）は、
+                  アプリに手で記録した運動（logs adj）だけを見ていたことが原因。
+                  実測は歩行・日常活動を含むので1万歩なら数百kcalになる。
+                  副にアプリ記録ぶんを小さく添え、どちらの数字かが分かるようにする */}
               <View style={s.mvStat}>
-                <View style={s.mvLblRow}><Flame size={13} color={C.sub} /><Text style={s.mvLbl}>{t('消費（運動）')}</Text></View>
+                <View style={s.mvLblRow}><Flame size={13} color={C.sub} />
+                  <Text style={s.mvLbl}>{activeOfView != null ? t('消費（運動）') : t('消費（記録）')}</Text>
+                </View>
                 {/* 2スタットの大数字は横並び固定のため文字サイズ拡大は上限1.3 */}
-                <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>{Math.round(burnToday).toLocaleString()}<Text style={s.mvUnit}> kcal</Text></Text>
+                <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>
+                  {(activeOfView != null ? activeOfView : Math.round(burnToday)).toLocaleString()}
+                  <Text style={s.mvUnit}> kcal</Text>
+                </Text>
+                {activeOfView != null && (
+                  <>
+                    <Text style={s.mvStatSub}>{t('アクティブ（ヘルスケア実測）')}</Text>
+                    <Text style={s.mvStatSub}>{t('うちアプリ記録ぶん {n}kcal', { n: Math.round(burnToday).toLocaleString() })}</Text>
+                  </>
+                )}
               </View>
               <View style={s.mvStat}>
                 <View style={s.mvLblRow}><Footprints size={13} color={C.sub} /><Text style={s.mvLbl}>{t('歩数')}</Text></View>
@@ -580,7 +617,17 @@ export default function TrainingScreen() {
                 )}
               </View>
             </View>
+            {/* 重複計上の注意: 同じランニングをアプリにも記録していれば、実測の中にも
+                そのぶんが入っている。厳密な差分計算はしない（過剰に賢くしない）ので、
+                「重なりうる」ことだけ正直に断る */}
+            {activeOfView != null && (
+              <Text style={s.mvNote}>{t('ヘルスケアの実測にはアプリ記録ぶんも含まれることがあります')}</Text>
+            )}
             {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
+            {/* 目標を黙って増やさない: ONで上乗せが起きた日は、その額をここに出す */}
+            {activeBonus > 0 && (
+              <Text style={s.mvNote}>{t('歩いたぶん +{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })}</Text>
+            )}
             </View>
             {/* 週間歩数目標（B-15）: ミニバーの上に週プログレス1本。目標オフ/未連携時は出さない */}
             {weekStepsGoal != null && (healthDays?.length ?? 0) > 0 && (
@@ -1000,6 +1047,9 @@ const s = StyleSheet.create({
   mvVal: { fontSize: 25, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
   mvUnit: { fontSize: 13, fontWeight: '700', color: C.sub },
   mvLink: { fontSize: 14, fontWeight: '800', color: C.teal, textDecorationLine: 'underline', paddingVertical: 6 },
+  // スタット内の副表示（実測の出どころ・アプリ記録ぶん）。主の数字を邪魔しない小ささに留める
+  mvStatSub: { fontSize: 11, fontWeight: '700', color: C.sub, marginTop: 2, lineHeight: 15 },
+  mvNote: { fontSize: 11.5, color: C.faint, lineHeight: 16, marginTop: 8 },
   mvLine: { fontSize: 13.5, fontWeight: '700', lineHeight: 20, marginTop: 12 },
   mvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 14 },
   mvBar: { width: '62%', borderRadius: 4, backgroundColor: C.line },

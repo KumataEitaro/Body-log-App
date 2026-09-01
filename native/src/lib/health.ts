@@ -25,6 +25,9 @@ const READ_TYPES = [
   'HKQuantityTypeIdentifierStepCount',
   'HKCategoryTypeIdentifierSleepAnalysis',
   'HKWorkoutTypeIdentifier',
+  // アクティブエネルギー（歩行・日常活動を含む実測消費）。歩数だけでは消費kcalが出せず
+  // 「1万歩なのに消費0kcal」という不合理な表示になるため読み取り対象に加えた
+  'HKQuantityTypeIdentifierActiveEnergyBurned',
 ] as const;
 
 export async function requestHealthAuth(): Promise<boolean> {
@@ -226,8 +229,67 @@ export async function readSleepStages(date: string): Promise<SleepStages | null>
   }
 }
 
-// 直近days日の歩数（日別合計）と睡眠時間（日別h）— 表示用サマリー
-export type HealthDaySummary = { date: string; steps: number; sleepH: number };
+// ===== アクティブカロリー（HKQuantityTypeIdentifierActiveEnergyBurned） =====
+export type ActiveEnergyDay = { date: string; kcal: number };
+
+/**
+ * 直近days日のアクティブエネルギー（日別合計kcal・JST）。
+ * 「アクティブ」は安静時代謝を超えて消費したぶんの実測で、歩行や日常活動も含む
+ * （＝1万歩なら数百kcalになる）。HealthKitが無い環境（Expo Go / Android）や
+ * 読み取り失敗はnull（呼び出し側は従来の手記録ぶんだけの表示にする）。
+ * readHourlySteps / readSleepStages と同じ流儀。
+ */
+export async function readActiveEnergy(days: number): Promise<ActiveEnergyDay[] | null> {
+  if (!hk) return null;
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - days * 86400000);
+    const samples = await hk.queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
+      unit: 'kcal', limit: -1, ascending: true,
+      filter: { date: { startDate: start, endDate: end } },
+    });
+    const map = new Map<string, number>();
+    for (const s of samples) {
+      const d = dateKeyJST(new Date(s.startDate));
+      map.set(d, (map.get(d) ?? 0) + Math.max(0, Number(s.quantity) || 0));
+    }
+    return [...map.entries()]
+      .map(([date, kcal]) => ({ date, kcal: Math.round(kcal) }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+  } catch {
+    return null;
+  }
+}
+
+// アクティブカロリーの読み取りキャッシュ。
+// 「きょうの動き」「食事タブのヒーロー」「概要の歩数・睡眠」の3か所が同じ値を欲しがるので、
+// 画面ごと・レンダーごとにHealthKitへ問い合わせるとムダが大きい。
+// 過去日の値は変わらないが今日のぶんは動き続けるため、丸1日固定はしない
+// （TTL内は同じ値を配り、TTLを過ぎた最初の1回だけ読み直す＝実質1日数回）。
+const ACTIVE_TTL_MS = 15 * 60 * 1000;
+let activeCache: { days: number; at: number; data: ActiveEnergyDay[] | null } | null = null;
+let activeInflight: Promise<ActiveEnergyDay[] | null> | null = null;
+
+/** readActiveEnergyのキャッシュ付き版（同時呼び出しは1本の読み取りに合流させる） */
+export async function readActiveEnergyCached(days = 14): Promise<ActiveEnergyDay[] | null> {
+  const now = Date.now();
+  if (activeCache && activeCache.days >= days && now - activeCache.at < ACTIVE_TTL_MS) return activeCache.data;
+  if (activeInflight) return activeInflight;
+  activeInflight = (async () => {
+    const data = await readActiveEnergy(days);
+    activeCache = { days, at: Date.now(), data };
+    return data;
+  })().finally(() => { activeInflight = null; });
+  return activeInflight;
+}
+
+/** 運動を記録した直後など、次の読み取りで必ず取り直したいときに呼ぶ */
+export function invalidateActiveEnergyCache(): void {
+  activeCache = null;
+}
+
+// 直近days日の歩数（日別合計）と睡眠時間（日別h）とアクティブkcal — 表示用サマリー
+export type HealthDaySummary = { date: string; steps: number; sleepH: number; activeKcal: number };
 
 export async function readActivitySummary(days: number): Promise<HealthDaySummary[] | { error: string }> {
   if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
@@ -235,14 +297,16 @@ export async function readActivitySummary(days: number): Promise<HealthDaySummar
     const end = new Date();
     const start = new Date(end.getTime() - days * 86400000);
     const filter = { date: { startDate: start, endDate: end } };
-    const [steps, sleep] = await Promise.all([
+    const [steps, sleep, active] = await Promise.all([
       hk.queryQuantitySamples('HKQuantityTypeIdentifierStepCount', { unit: 'count', limit: -1, ascending: true, filter }),
       hk.queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', { limit: -1, ascending: true, filter }),
+      // アクティブkcalはキャッシュ経由（食事タブのヒーローも同じ値を使う＝読み取りは1本に集約）
+      readActiveEnergyCached(Math.max(days, 14)),
     ]);
     const map = new Map<string, HealthDaySummary>();
     const get = (d: string) => {
       let v = map.get(d);
-      if (!v) { v = { date: d, steps: 0, sleepH: 0 }; map.set(d, v); }
+      if (!v) { v = { date: d, steps: 0, sleepH: 0, activeKcal: 0 }; map.set(d, v); }
       return v;
     };
     for (const s of steps) get(dateKeyJST(new Date(s.startDate))).steps += Number(s.quantity);
@@ -253,6 +317,13 @@ export async function readActivitySummary(days: number): Promise<HealthDaySummar
       const en = new Date(s.endDate).getTime();
       // 睡眠は「起きた日」に計上（JSTで終了時刻の日付）
       get(dateKeyJST(new Date(en))).sleepH += Math.max(0, en - st) / 3600000;
+    }
+    // アクティブkcalはキャッシュの都合で窓より長い期間を持つことがあるため、
+    // この呼び出しの期間（start以降）だけを取り込む＝返す日数が勝手に増えない
+    const minDate = dateKeyJST(start);
+    for (const a of active ?? []) {
+      if (a.date < minDate) continue;
+      get(a.date).activeKcal = a.kcal;
     }
     return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
       .map((v) => ({ ...v, steps: Math.round(v.steps), sleepH: Math.round(v.sleepH * 10) / 10 }));

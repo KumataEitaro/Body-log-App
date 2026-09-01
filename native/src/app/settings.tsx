@@ -11,6 +11,7 @@ import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, e
 import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
+import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
@@ -211,6 +212,19 @@ export default function SettingsScreen() {
     setStepsGoal(n);
     if (n > 0) AsyncStorage.setItem(WEEK_STEPS_GOAL_KEY, String(n)).catch(() => {});
     else AsyncStorage.removeItem(WEEK_STEPS_GOAL_KEY).catch(() => {});
+  }
+
+  // アクティブカロリーを目標に反映するか（既定OFF）。
+  // 表示（運動タブの実測kcal）は常に出すが、目標=「あと食べられる量」を増やすかは本人の判断。
+  // ONにすると歩いた分だけ食べられる量が増えるため、痩せにくくなる人が必ず出る＝黙って有効にしない
+  const [activeToGoal, setActiveToGoal] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(ACTIVE_KCAL_TO_GOAL_KEY).then((v) => setActiveToGoal(v === '1')).catch(() => {});
+  }, []);
+  function toggleActiveToGoal(v: boolean) {
+    setActiveToGoal(v);
+    if (v) AsyncStorage.setItem(ACTIVE_KCAL_TO_GOAL_KEY, '1').catch(() => {});
+    else AsyncStorage.removeItem(ACTIVE_KCAL_TO_GOAL_KEY).catch(() => {});
   }
 
   // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
@@ -624,6 +638,18 @@ export default function SettingsScreen() {
         <Row icon={<HeartPulse color={C.teal} size={19} />} label={t('ヘルスケア連携')}
              sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
              onPress={() => openSheet('health')} />
+        <View style={s.sep} />
+        {/* アクティブカロリーの目標反映（既定OFF）。
+            表示（運動タブの実測kcal）は連携すれば常に出るが、目標を増やすかは別問題。
+            トレードオフを隠さずサブ文言で正直に伝え、本人に選ばせる */}
+        <View style={s.notifRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.notifLabel}>{t('アクティブカロリーを目標に反映する')}</Text>
+            <Text style={s.notifSub}>{t('ONにすると、歩いた分だけ「あと食べられる量」が増えます。ヘルスケアの実測は日常の動きも含むため、増えやすくなります（体重が減りにくいと感じたらOFFに）')}</Text>
+          </View>
+          <Switch value={activeToGoal} onValueChange={toggleActiveToGoal} trackColor={{ true: C.teal }} />
+        </View>
+        <Text style={s.notifNote}>{t('反映するのは「いつもより多く動いたぶん」だけです（日常の動きは目標の生活係数に既に入っているため、二重に足しません）。')}</Text>
         <View style={s.sep} />
         {/* 受診用レポート（1500人監査Later群・中高年層の本丸）。
             診察室で見せるのはアプリ画面ではなくPDF。作成中は行が待ち状態になる */}

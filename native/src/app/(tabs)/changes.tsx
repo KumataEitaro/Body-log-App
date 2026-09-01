@@ -15,7 +15,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { AddCardSheet } from '@/components/CardLayout';
-import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
+import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft, Flame } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line, Rect } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
@@ -768,13 +768,21 @@ export default function ChangesScreen() {
               <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : t('ヘルスケアから読み込む')}</Text>
             </Pressable>
           ) : (
-            activity.map((a) => (
-              <View key={a.date} style={s.actRow}>
-                <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Footprints size={13} color={C.sub} /><Text style={s.actVal}>{a.steps.toLocaleString()}歩</Text></View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Moon size={13} color={C.sub} /><Text style={s.actVal}>{a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text></View>
-              </View>
-            ))
+            <>
+              {activity.map((a) => (
+                <View key={a.date} style={s.actRow}>
+                  <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Footprints size={13} color={C.sub} /><Text style={s.actVal}>{a.steps.toLocaleString()}歩</Text></View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Moon size={13} color={C.sub} /><Text style={s.actVal}>{a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text></View>
+                  {/* アクティブkcal（ヘルスケア実測・歩行や日常活動を含む）。
+                      歩数だけでは「動いた量」がカロリーで見えないため列を足した */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Flame size={13} color={C.sub} /><Text style={s.actVal}>{a.activeKcal > 0 ? `${a.activeKcal.toLocaleString()}kcal` : '—'}</Text></View>
+                </View>
+              ))}
+              {activity.some((a) => a.activeKcal > 0) && (
+                <Text style={s.note}>{t('アクティブは安静時を超えて消費したぶんの実測です（歩行・日常の動きを含み、アプリ記録ぶんも含まれることがあります）。')}</Text>
+              )}
+            </>
           )}
           {healthMsg && <Text style={[s.note, { color: C.coral }]}>{healthMsg}</Text>}
         </View>
