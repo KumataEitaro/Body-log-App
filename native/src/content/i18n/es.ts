@@ -1535,4 +1535,8 @@ export const ES: Record<string, string> = {
   "初めての方はこちら → 新規登録に切り替える": "¿Es tu primera vez? → Registrarse",
   "削除しました": "Eliminado",
   "元に戻せませんでした。通信環境を確認してください。": "No se pudo deshacer. Comprueba tu conexión a internet.",
+  "文字だけで、カロリーとPFCが出る": "Obtén calorías y P/F/C solo con texto",
+  "「バナナと卵2個」と打って↑。写真がなくても、この一言だけでAIがカロリー・たんぱく質・脂質・炭水化物まで計算します。これがこのアプリのいちばんの発明です。量があいまいなら、AIのほうから聞き返してくれます。": "Escribe \"un plátano y 2 huevos\" y pulsa ↑. Aunque no tengas foto, la IA calculará las calorías, proteínas, grasas y carbohidratos solo con esta frase. Este es el mayor invento de la app. Si las cantidades no están claras, la IA te preguntará.",
+  "カメラは1つで2役": "Una sola cámara con doble función",
+  "料理を撮れば見た目から推定、パッケージ裏の栄養成分表示を撮れば表記どおりの正確な数値。同じカメラボタンでAIが読み分けます。長押しでバーコード読み取りも。": "Haz una foto al plato para estimar los nutrientes o a la tabla nutricional del envase para obtener datos exactos. La IA los distingue usando el mismo botón de cámara. Mantén pulsado para escanear el código de barras.",
 };

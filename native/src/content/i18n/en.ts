@@ -1550,4 +1550,8 @@ export const EN: Record<string, string> = {
   "初めての方はこちら → 新規登録に切り替える": "First time? → Switch to Sign Up",
   "削除しました": "Deleted",
   "元に戻せませんでした。通信環境を確認してください。": "Could not undo. Please check your connection.",
+  "文字だけで、カロリーとPFCが出る": "Get kcal and P/F/C with just text",
+  "「バナナと卵2個」と打って↑。写真がなくても、この一言だけでAIがカロリー・たんぱく質・脂質・炭水化物まで計算します。これがこのアプリのいちばんの発明です。量があいまいなら、AIのほうから聞き返してくれます。": "Just type \"banana and 2 eggs\" and tap ↑. Even without a photo, the AI calculates kcal, protein, fat, and carbs from just these words. This is our biggest invention. If the amount is unclear, the AI will ask you back.",
+  "カメラは1つで2役": "One camera, two roles",
+  "料理を撮れば見た目から推定、パッケージ裏の栄養成分表示を撮れば表記どおりの正確な数値。同じカメラボタンでAIが読み分けます。長押しでバーコード読み取りも。": "Snap a photo of your meal to estimate by its look, or snap the nutrition facts on the back of a package for exact numbers. The AI automatically detects which is which from the same camera button. Long press to scan barcodes, too.",
 };

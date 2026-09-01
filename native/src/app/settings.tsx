@@ -317,7 +317,7 @@ export default function SettingsScreen() {
       headerShown: true, title: '', headerBackTitle: t('戻る'),
       headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
     }} />
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }} contentContainerStyle={s.scroll}>
       <Text style={s.h}>{t('マイページ')}</Text>
 
       {/* ヘッダーサマリーカード */}

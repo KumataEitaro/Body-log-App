@@ -1,7 +1,7 @@
 // 実績ページ: 🔥ストリーク（お守りつき）＋バッジ一覧＋「いつでもストーリー共有」ハブ。
 // バッジは獲得済み=カラー、未獲得=グレー＋条件文（次に何をすればいいか常に見える）。
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { Share2, Flame, PartyPopper } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -73,8 +73,8 @@ export default function AchievementsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         <Text style={s.h}>{t('実績')}</Text>
 
         {report == null ? (

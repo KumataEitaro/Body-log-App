@@ -1451,4 +1451,8 @@ export const VI: Record<string, string> = {
   "初めての方はこちら → 新規登録に切り替える": "Lần đầu sử dụng? → Chuyển sang Đăng ký",
   "削除しました": "Đã xóa",
   "元に戻せませんでした。通信環境を確認してください。": "Không thể hoàn tác. Vui lòng kiểm tra kết nối mạng.",
+  "文字だけで、カロリーとPFCが出る": "Chỉ cần nhập chữ, có ngay Calo và P/F/C",
+  "「バナナと卵2個」と打って↑。写真がなくても、この一言だけでAIがカロリー・たんぱく質・脂質・炭水化物まで計算します。これがこのアプリのいちばんの発明です。量があいまいなら、AIのほうから聞き返してくれます。": "Chỉ cần nhập \"chuối và 2 quả trứng\" rồi nhấn ↑. Ngay cả khi không có ảnh, AI vẫn tự động tính toán lượng Calo, Protein, Lipid và Carbohydrate. Đây chính là tính năng đột phá nhất của ứng dụng này. Nếu lượng thức ăn chưa rõ ràng, AI sẽ chủ động hỏi lại bạn.",
+  "カメラは1つで2役": "Một camera, hai vai trò",
+  "料理を撮れば見た目から推定、パッケージ裏の栄養成分表示を撮れば表記どおりの正確な数値。同じカメラボタンでAIが読み分けます。長押しでバーコード読み取りも。": "Chụp món ăn để ước lượng qua hình ảnh, hoặc chụp bảng thành phần dinh dưỡng phía sau bao bì để có số liệu chính xác nhất. AI sẽ tự động nhận diện bằng cùng một nút camera. Nhấn giữ để quét mã vạch.",
 };

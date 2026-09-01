@@ -5,7 +5,7 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
 } from 'react-native';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, ReceiptText } from 'lucide-react-native';
+import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import AdBanner from '@/components/AdBanner';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -346,13 +346,6 @@ export default function LogScreen() {
   // ===== バーコード→公式DB（Open Food Facts）: ヒットで品目をトレイに直接積む =====
   // 端末→OFF直の照会なのでAI枠は消費しない。未ヒットは成分表示写真（AI読み取り）へ案内する
   const [scanOpen, setScanOpen] = useState(false);
-
-  // 成分表示ボタン（ドックの主役導線）: パッケージ裏の栄養成分表示を撮ってAIで読み取る。
-  // 実測で日本の商品はバーコードDBにほぼ無いため、撮影を主・バーコードを長押しの従にした
-  function scanNutritionLabel() {
-    setMsg({ ok: true, text: t('パッケージ裏の栄養成分表示を撮ると、表記どおりの数値で読み取れます。撮ったら↑で送信してください。') });
-    takePhoto();
-  }
 
   async function scannedBarcode(jan: string) {
     const pid = ++pendingSeq.current;
@@ -1449,12 +1442,12 @@ export default function LogScreen() {
               5個のアイコンが同じ行にいると入力幅が半分になり、10文字弱で不自然に
               改行していた（βフィードバック 2026-09-02）。キーボードを閉じれば全部戻る */}
           {!(kbVisible && chat.trim().length > 0) && (<>
-          <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} guideKey="dockCamera" />
+          {/* カメラ1本に統合（βフィードバック 2026-09-02: 成分表示ボタンも結局カメラが
+              開くだけで体験が同一＝ややこしい）。料理も成分表示も同じ撮影でAIが読み分ける。
+              長押し＝バーコードスキャン（旧・成分表示ボタンから引き継ぎ） */}
+          <DockIconButton Icon={Camera} onPress={takePhoto} onLongPress={() => setScanOpen(true)}
+                          disabled={photos.length >= 4} guideKey="dockCamera" />
           <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
-          {/* 成分表示を撮る（主役）: パッケージ裏ラベル→AI読み取り。日本の商品はバーコードDB
-              （Open Food Facts）にほぼ無いため主従を逆転した。長押しで従来のバーコードスキャン */}
-          <DockIconButton Icon={ReceiptText} onPress={scanNutritionLabel} onLongPress={() => setScanOpen(true)}
-                          disabled={photos.length >= 4} guideKey="dockLabel" />
           {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
               「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
           {profile != null && (
