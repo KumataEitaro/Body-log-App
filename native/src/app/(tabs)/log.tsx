@@ -42,7 +42,8 @@ import {
 import { syncEntriesForDate } from '@/lib/sync';
 import { C, rgba } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { mifflinBMR, EX_ADD, todayJST, type ExLevel } from '@/lib/calc';
+import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
+import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal } from '@/lib/activeKcal';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 import { buildDailyBrief, type Brief } from '@/lib/dailyBrief';
 import DailyBrief from '@/components/DailyBrief';
@@ -250,6 +251,10 @@ export default function LogScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [viewDate, setViewDate] = useState(todayJST());
   const today = viewDate;
+  // ヘルスケアのアクティブkcal（実測）と、それを目標へ反映する設定（既定OFF）。
+  // 読み取りはlib/health.ts側でキャッシュ済み＝毎レンダーでHealthKitを叩かない
+  const activeKcalToday = useActiveKcal(viewDate);
+  const activeToGoal = useActiveKcalToGoal();
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -298,7 +303,14 @@ export default function LogScreen() {
 
   const weightForBmr = summary.weight ?? latestWeight ?? (profile?.init_weight != null ? Number(profile.init_weight) : 70);
   const bmr = profile ? mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) : 0;
-  const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) : 0;
+  // アクティブぶんの上乗せ（設定「アクティブカロリーを目標に反映する」・既定OFF）。
+  // OFFのときは activeBonus=0 ＝これまでの目標計算から一切変わらない。
+  // ONのときも足すのは max(0, アクティブ − BMR×(生活係数−1)) だけ。
+  // 生活係数（既定1.3）には日常活動がすでに入っているので、実測全量を足すと
+  // 日常活動を二重に数えてしまう。だから「想定より多く動いた分」に絞る（lib/activeKcal.ts）
+  const activeBonus = activeToGoal && activeKcalToday != null
+    ? activeKcalGoalBonus(activeKcalToday, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
+  const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
   const todayEvent = events.find((e) => e.date === today) ?? null;
   const planIntakeBase = plan ? Math.max(target - plan.requiredDailyWithEvents, Math.round(bmr)) : null;
@@ -1146,6 +1158,11 @@ export default function LogScreen() {
               <Text style={s.metaT}>{t('摂取')} {eaten.toLocaleString()}</Text>
               <Text style={s.metaT}>{t('目標')} {goalKcal.toLocaleString()}</Text>
             </View>
+            {/* 目標を黙って増やさない: アクティブ反映ONで上乗せが起きた日だけ内訳を1行出す。
+                「なぜ今日は多いのか」が分からない増加はアプリへの信頼を削る */}
+            {activeBonus > 0 && (
+              <Text style={s.heroActive}>{t('歩いたぶん +{n}kcal', { n: activeBonus.toLocaleString() })}</Text>
+            )}
             {/* 残りPFCプログレスバー（英字P/F/Cは初心者に伝わらないため日本語を主・英字は補助） */}
             {macros && (
               <View style={{ marginTop: 10, gap: 5 }}>
@@ -1801,6 +1818,8 @@ const s = StyleSheet.create({
   heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 17, color: C.sub, fontWeight: '600' },
+  // アクティブぶんの上乗せ内訳（目標が増えた理由の1行）。増加は良い知らせなのでアクセント色
+  heroActive: { fontSize: 12, fontWeight: '800', color: C.teal, marginTop: 4 },
   hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
