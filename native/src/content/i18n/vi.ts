@@ -1501,4 +1501,8 @@ export const VI: Record<string, string> = {
   "セット名を入力してください。": "Vui lòng nhập tên bộ món ăn.",
   "マイミールを保存できませんでした。通信環境を確認してもう一度お試しください。": "Không thể lưu Bữa ăn của tôi. Vui lòng kiểm tra kết nối mạng và thử lại.",
   "{name}セット": "Bộ {name}",
+  "写真の解析を再開できませんでした。もう一度撮影して送信してください。": "Không thể tiếp tục phân tích ảnh. Vui lòng chụp và gửi lại.",
+  "解析に失敗しました": "Phân tích thất bại",
+  "再試行": "Thử lại",
+  "混み合っています…そのまま離れてOK": "Hệ thống đang bận... Bạn có thể rời khỏi trang này",
 };

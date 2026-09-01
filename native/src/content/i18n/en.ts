@@ -1599,4 +1599,8 @@ export const EN: Record<string, string> = {
   "セット名を入力してください。": "Please enter a set name.",
   "マイミールを保存できませんでした。通信環境を確認してもう一度お試しください。": "Failed to save My Meal. Please check your connection and try again.",
   "{name}セット": "{name} Set",
+  "写真の解析を再開できませんでした。もう一度撮影して送信してください。": "Couldn't resume photo analysis. Please take another photo and submit it.",
+  "解析に失敗しました": "Analysis failed",
+  "再試行": "Retry",
+  "混み合っています…そのまま離れてOK": "We're busy... You can close this screen",
 };

@@ -1501,4 +1501,8 @@ export const DE: Record<string, string> = {
   "セット名を入力してください。": "Bitte gib einen Namen für das Set ein.",
   "マイミールを保存できませんでした。通信環境を確認してもう一度お試しください。": "Eigene Mahlzeit konnte nicht gespeichert werden. Bitte überprüfe deine Verbindung und versuche es erneut.",
   "{name}セット": "Set „{name}“",
+  "写真の解析を再開できませんでした。もう一度撮影して送信してください。": "Foto-Analyse konnte nicht fortgesetzt werden. Bitte nimm das Foto neu auf und sende es noch einmal.",
+  "解析に失敗しました": "Analyse fehlgeschlagen",
+  "再試行": "Wiederholen",
+  "混み合っています…そのまま離れてOK": "Viel los gerade… Du kannst diese Seite ruhig verlassen",
 };

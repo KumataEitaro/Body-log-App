@@ -1584,4 +1584,8 @@ export const ES: Record<string, string> = {
   "セット名を入力してください。": "Ingresa el nombre del conjunto.",
   "マイミールを保存できませんでした。通信環境を確認してもう一度お試しください。": "No se pudo guardar Mi plato. Comprueba tu conexión a internet e inténtalo de nuevo.",
   "{name}セット": "Conjunto {name}",
+  "写真の解析を再開できませんでした。もう一度撮影して送信してください。": "No se pudo reanudar el análisis de la foto. Por favor, toma otra y envíala de nuevo.",
+  "解析に失敗しました": "Error al analizar",
+  "再試行": "Reintentar",
+  "混み合っています…そのまま離れてOK": "Servidor ocupado... Puedes salir de esta pantalla",
 };

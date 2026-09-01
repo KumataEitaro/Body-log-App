@@ -33,7 +33,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useLocalSearchParams, useFocusEffect, useRouter, useNavigation } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { analyzeFood, saveParsed } from '@/lib/quicklog';
+import { analyzeFood, saveParsed, type QuickImage } from '@/lib/quicklog';
+import {
+  makeJob, addJob, removeJob, markFailed, markRunning, triageJobs, isSlow,
+  claimOnce, releaseClaim, loadJobs, saveJobs, readPhotoPayloads, type ParseJob,
+} from '@/lib/parseJobs';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C, rgba } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -121,9 +125,15 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
-  // 解析中の行。連投できるため配列。idで管理し、完了した本人の分だけを消す
-  // （以前は slice(1) で先頭を消していたため、2件目が先に終わると1件目の表示が残り続けた）
+  // バーコード照会中の行（AIを使わない端末→OFF直の問い合わせ。数秒で終わるので永続化しない）
   const [pendingTexts, setPendingTexts] = useState<{ id: number; text: string }[]>([]);
+  // AI解析の送信ジョブ。送信の瞬間に端末（bl-parse-jobs）へ書き、トレイに反映できたら消す。
+  // アプリを閉じても残るので、次にこの画面を開いたときに未完了ぶんを自動で再送する
+  const [jobs, setJobs] = useState<ParseJob[]>([]);
+  const jobsRef = useRef<ParseJob[]>([]);       // 非同期の完了同士が互いの更新を消さないための現在値
+  const startedRef = useRef<Set<string>>(new Set());   // 同じジョブを二重に投げない
+  const settledRef = useRef<Set<string>>(new Set());   // 同じジョブの結果を二重に反映しない
+  const [nowMs, setNowMs] = useState(() => Date.now());   // 「混み合っています」の判定用（解析中だけ1秒刻み）
   // AIの会話的な返し（一言・仮定・聞き返し）。表示のみでDBには書かない
   const [aiNote, setAiNote] = useState<{ reply: string; questions: string[]; assumptions: string[] } | null>(null);
   // 聞き返しに「1/4玉」とだけ返しても文脈が繋がるように、直前のやりとりを覚えておく
@@ -395,23 +405,32 @@ export default function LogScreen() {
   // ===== ボトムドックからの送信: AI解析→トレイに積む（保存は✓保存で確定・連投可） =====
   const canSend = chat.trim().length > 0 || photos.length > 0;
 
-  async function sendQuick() {
-    if (!canSend || !uid) return;
-    const text = chat.trim();
-    const imgs = photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' }));
-    setChat(''); setPhotos([]); setMsg(null);
-    inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
-    const pid = ++pendingSeq.current;
-    setPendingTexts((p) => [...p, { id: pid, text: text || t('（写真）') }]);
+  // ジョブ一覧の更新は必ずここを通す（画面・現在値・端末の3つを同時に合わせる）
+  const putJobs = useCallback((fn: (l: ParseJob[]) => ParseJob[]) => {
+    const next = fn(jobsRef.current);
+    jobsRef.current = next;
+    setJobs(next);
+    saveJobs(next);
+  }, []);
+
+  // ジョブ1件を実行してトレイへ反映する。成功＝ジョブを消す／失敗＝失敗のまま残す（静かに消さない）
+  const runJob = useCallback(async (job: ParseJob, imgs: QuickImage[]) => {
     try {
-      const res = await analyzeFood(text, imgs, parseHistory.current);
-      if (!res.ok) { setMsg({ ok: false, text: res.error, upgrade: res.upgrade, kind: res.kind }); setChat(text); return; }
+      const res = await analyzeFood(job.text, imgs, parseHistory.current);
+      // 冪等の要: 再送中に旧い応答が返ってきても、先に着いた1回ぶんだけを反映する
+      if (!claimOnce(settledRef.current, job.id)) return;
+      if (!res.ok) {
+        putJobs((l) => markFailed(l, job.id, res.error));
+        // プラン上限だけは「プランを見る →」の導線が要るので画面のメッセージ欄にも出す
+        if (res.upgrade) setMsg({ ok: false, text: res.error, upgrade: true, kind: res.kind });
+        return;
+      }
       const r = res.result;
       const ex2 = res.extras;
       // 会話の記憶は直近1往復だけ（古い文脈を引きずると誤解釈のもと）
       const aiSaid = [ex2.reply, ...ex2.questions].filter(Boolean).join(' ');
       parseHistory.current = [
-        { role: 'user' as const, text },
+        { role: 'user' as const, text: job.text },
         ...(aiSaid ? [{ role: 'ai' as const, text: aiSaid }] : []),
       ];
       // AIの一言。何も抽出できなかったときも、ここが必ず何か言う（無言の禁止）
@@ -433,14 +452,89 @@ export default function LogScreen() {
         if (p == null && next.items.length === 0 && next.weight == null && next.waist == null && !next.ex && !next.mood) return null;
         return next;
       });
-      if (text && r.items.length > 0) setStagedNote((n) => (n ? `${n}、${text}` : text));
+      if (job.text && r.items.length > 0) setStagedNote((n) => (n ? `${n}、${job.text}` : job.text));
+      putJobs((l) => removeJob(l, job.id));   // トレイに載ったのでジョブは役目を終える
     } catch {
-      // analyzeFoodは例外を投げない作りだが、想定外の失敗でも必ずここで拾う
-      setMsg({ ok: false, text: t('通信に失敗しました。電波状況を確認してください。') });
-      setChat(text);
-    } finally {
-      setPendingTexts((p) => p.filter((x) => x.id !== pid));   // 自分の分だけ消す
+      // analyzeFoodは例外を投げない作りだが、想定外の失敗でも送信を無かったことにしない
+      if (!claimOnce(settledRef.current, job.id)) return;
+      putJobs((l) => markFailed(l, job.id, t('通信に失敗しました。電波状況を確認してください。')));
     }
+  }, [putJobs]);
+
+  // 未完了ジョブを走らせる（復元・再試行の共通経路）。写真はURIから読み直す
+  const resumeJob = useCallback(async (job: ParseJob) => {
+    let imgs: QuickImage[] = [];
+    if (job.photoUris.length > 0) {
+      const got = await readPhotoPayloads(job.photoUris);
+      if (!got) {
+        // カメラの一時ファイルはOSがいつでも掃除する。再開できない旨を告げて捨てる
+        putJobs((l) => removeJob(l, job.id));
+        setMsg({ ok: false, text: t('写真の解析を再開できませんでした。もう一度撮影して送信してください。') });
+        return;
+      }
+      imgs = got;
+    }
+    await runJob(job, imgs);
+  }, [putJobs, runJob]);
+
+  // マウント時: 端末に残った未完了ジョブを引き取る（アプリを閉じても解析が迷子にならない）
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const stored = await loadJobs();
+      if (!alive || stored.length === 0) return;
+      const { resume, keep } = triageJobs(stored, todayJST(), Date.now());
+      // 別の日のぶん・24時間より古いぶんは黙って捨てる（勝手に今日へ積まない）
+      const kept = [...resume.map((j) => ({ ...j, state: 'running' as const, error: undefined })), ...keep];
+      jobsRef.current = kept;
+      setJobs(kept);
+      saveJobs(kept);
+      for (const j of resume) {
+        if (!claimOnce(startedRef.current, j.id)) continue;
+        resumeJob(j);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 解析中のあいだだけ1秒刻みで現在時刻を進める（8秒超えで「混み合っています」を添えるため）
+  const hasRunningJob = jobs.some((j) => j.state === 'running');
+  useEffect(() => {
+    if (!hasRunningJob) return;
+    setNowMs(Date.now());
+    const h = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(h);
+  }, [hasRunningJob]);
+
+  async function sendQuick() {
+    if (!canSend || !uid) return;
+    const text = chat.trim();
+    const imgs = photos.map((p) => ({ data: p.base64, mime: 'image/jpeg' }));
+    const uris = photos.map((p) => p.uri);
+    setChat(''); setPhotos([]); setMsg(null);
+    // 送信できたことを指先で返す（AIの返事を待たずに次の行動へ移ってよい、という合図）
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
+    const job = makeJob({ text, photoUris: uris, date: viewDate }, Date.now(), Math.random);
+    putJobs((l) => addJob(l, job));
+    claimOnce(startedRef.current, job.id);
+    await runJob(job, imgs);   // 初回は手元のbase64をそのまま使う（ファイル読み直し不要）
+  }
+
+  // 失敗した送信をもう一度投げる（本人が押したときだけ関門を開け直す）
+  async function retryJob(job: ParseJob) {
+    releaseClaim(settledRef.current, job.id);
+    releaseClaim(startedRef.current, job.id);
+    const now = Date.now();
+    putJobs((l) => markRunning(l, job.id, now));
+    claimOnce(startedRef.current, job.id);
+    await resumeJob({ ...job, state: 'running', error: undefined, createdAt: now });
+  }
+
+  // 失敗した送信を捨てる（本人の判断。勝手に消さないための対）
+  function discardJob(job: ParseJob) {
+    putJobs((l) => removeJob(l, job.id));
   }
 
   // マイ食品チップ: 長押しで「1回分をそのまま即記録」（トレイを経由しない最短経路）
@@ -1400,7 +1494,7 @@ export default function LogScreen() {
             </Pressable>
           </View>
         )}
-        {(parsed != null || pendingTexts.length > 0 || aiNote != null) && (
+        {(parsed != null || pendingTexts.length > 0 || jobs.length > 0 || aiNote != null) && (
           <View style={s.tray}>
             <View style={{ flex: 1 }}>
             {aiNote && (
@@ -1465,6 +1559,34 @@ export default function LogScreen() {
                   <Text style={[s.trayChipT, { marginLeft: 4 }]} numberOfLines={1}>{pt.text}</Text>
                 </View>
               ))}
+              {/* AI解析の送信ジョブ。解析中は待ち時間を、失敗は理由と次の一手（再試行/破棄）を
+                  同じ位置に出す。黙って消えることが無いので「送れたのか」が常に分かる */}
+              {jobs.map((j) => (j.state === 'failed' ? (
+                <View key={j.id} style={[s.trayChip, s.trayChipFail]}>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={s.trayFailT} numberOfLines={1}>{t('解析に失敗しました')}</Text>
+                    {/* なぜ失敗したか（再試行が効くかどうかの判断材料）と、どの送信だったか */}
+                    {!!j.error && <Text style={s.trayFailSub} numberOfLines={3}>{j.error}</Text>}
+                    <Text style={s.trayFailWhat} numberOfLines={1}>{j.text || t('（写真）')}</Text>
+                  </View>
+                  <Pressable hitSlop={8} onPress={() => retryJob(j)}>
+                    <Text style={s.trayRetryT}>{t('再試行')}</Text>
+                  </Pressable>
+                  <Pressable hitSlop={8} onPress={() => discardJob(j)}>
+                    <Text style={s.trayDropT}>{t('破棄')}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View key={j.id} style={[s.trayChip, isSlow(j, nowMs) && s.trayChipWide]}>
+                  <ActivityIndicator size="small" color={C.teal} />
+                  <View style={{ flexShrink: 1, marginLeft: 4 }}>
+                    <Text style={s.trayChipT} numberOfLines={1}>{j.text || t('（写真）')}</Text>
+                    {isSlow(j, nowMs) && (
+                      <Text style={s.trayWaitT} numberOfLines={2}>{t('混み合っています…そのまま離れてOK')}</Text>
+                    )}
+                  </View>
+                </View>
+              )))}
             </ScrollView>
             </View>
             {parsed != null && (
@@ -1754,6 +1876,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
+  // 混雑時の待ち文言（解析中チップの中に添える）。文言のぶんチップを広げる
+  trayChipWide: { maxWidth: 260 },
+  trayWaitT: { fontSize: 12, fontWeight: '600', color: C.sub, marginTop: 1 },
+  // 失敗した送信。トークンで組むのでダークでも反転が効く（coralWeak地にcoral文字）。
+  // 複数行になるのでピル型（999）ではなく角丸の面にする
+  trayChipFail: { backgroundColor: C.coralWeak, borderColor: C.coral, borderRadius: 14, gap: 7, maxWidth: 280 },
+  trayFailT: { fontSize: 13, fontWeight: '800', color: C.coral },
+  trayFailSub: { fontSize: 11, fontWeight: '600', color: C.sub, marginTop: 1 },
+  trayFailWhat: { fontSize: 11, fontWeight: '700', color: C.ink, marginTop: 1 },
+  trayRetryT: { fontSize: 13, fontWeight: '800', color: C.teal, textDecorationLine: 'underline' },
+  trayDropT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
