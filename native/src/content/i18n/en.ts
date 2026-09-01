@@ -1344,4 +1344,10 @@ export const EN: Record<string, string> = {
   "ライトプラン以上で広告が消えて、記録に集中できます。": "Upgrade to Lite Plan or higher to remove ads and focus on your logs.",
   "広告": "Ads",
   "ライトプランで広告を消せます": "Remove ads with the Lite Plan",
+  "品目つきの食事記録と翌日の体重が3組以上たまると、「あなたに合う食材・合わない食材」の傾向がここに出ます。いつもの記録を続けるだけで大丈夫です。": "Once you have at least 3 pairs of logged meals and next-day weights, trends for foods that work (or don't work) well for you will show up here. Just keep logging like usual!",
+  "いまのところ、体重をはっきり動かす食材は見つかっていません（それ自体が良い知らせです）。記録が増えると小さな傾向も見えてきます。": "So far, we haven't found any foods that noticeably affect your weight (which is good news!). As you log more, smaller trends may appear.",
+  "ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。": "Apple Health sync is available in the iOS TestFlight version. Once connected, your steps and sleep from the past 7 days will show up here.",
+  "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Couldn't load your analysis. Check your connection and try reopening to retry.",
+  "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "No workouts logged yet. Log your first set in the Workouts tab, and your {what} will start growing here.",
+  "今週のサマリー": "This Week's Summary",
 };

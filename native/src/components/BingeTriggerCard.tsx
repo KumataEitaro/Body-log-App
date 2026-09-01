@@ -71,7 +71,15 @@ export default function BingeTriggerCard() {
       </View>
     );
   }
-  if (!report) return null;
+  // nullを返すと概要の詳細ページが真っ白になるため、読み込み失敗も言葉で伝える
+  if (!report) {
+    return (
+      <View style={s.card}>
+        <View style={s.h2Row}><Tornado size={16} color={C.teal} /><Text style={s.h2}>{t('過食の引き金')}</Text></View>
+        <Text style={s.muted}>{t('分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。')}</Text>
+      </View>
+    );
+  }
 
   if (!report.enough) {
     return (

@@ -534,10 +534,21 @@ export default function ChangesScreen() {
       </View>
   );
 
-  const trendsCard = foodFx.length >= 3 ? (() => {
+  // 詳細ページの空白防止: nullを返すと「タイトルだけの真っ白なページ」になる
+  // （βフィードバック 2026-09-01「食材の傾向」が空）。条件を満たさない時も必ず説明カードを出す
+  const emptyDetail = (text: string) => (
+    <View style={s.emptyCard}><Text style={s.emptyCardT}>{text}</Text></View>
+  );
+
+  const trendsCard = (() => {
+        if (foodFx.length < 3) {
+          return emptyDetail(t('品目つきの食事記録と翌日の体重が3組以上たまると、「あなたに合う食材・合わない食材」の傾向がここに出ます。いつもの記録を続けるだけで大丈夫です。'));
+        }
         const down = foodFx.filter((f) => f.effect < -0.02).slice(0, 3);
         const up = [...foodFx].reverse().filter((f) => f.effect > 0.02).slice(0, 3);
-        if (down.length === 0 && up.length === 0) return null;
+        if (down.length === 0 && up.length === 0) {
+          return emptyDetail(t('いまのところ、体重をはっきり動かす食材は見つかっていません（それ自体が良い知らせです）。記録が増えると小さな傾向も見えてきます。'));
+        }
         const g = (kg: number) => `${kg > 0 ? '+' : ''}${Math.round(kg * 1000)}g`;
         return (
           <View style={s.card}>
@@ -566,7 +577,7 @@ export default function ChangesScreen() {
             <Text style={s.note}>{t('※相関であり因果ではありません（水分・塩分・食べ合わせの影響を含みます）。データが増えるほど精度が上がります。')}</Text>
           </View>
         );
-      })() : null;
+      })();
 
   const healthCard = healthAvailable() ? (
         <View style={s.card}>
@@ -586,7 +597,7 @@ export default function ChangesScreen() {
           )}
           {healthMsg && <Text style={[s.note, { color: C.coral }]}>{healthMsg}</Text>}
         </View>
-  ) : null;
+  ) : emptyDetail(t('ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。'));
 
   // カード1枚の例外で概要タブ全体が落ちないよう、1枚ずつ境界で包む。
   // どのカードで起きたかを名前で出せるので、原因の切り分けにもなる
@@ -987,6 +998,12 @@ const s = StyleSheet.create({
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
   },
   ghostT: { fontSize: 13, color: C.sub, fontWeight: '600' },
+  // 詳細ページの空状態（データが揃う前の説明。ghostCardより読ませる文章向けに左寄せ・行間広め）
+  emptyCard: {
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
+    borderRadius: 20, padding: 18, marginBottom: 12,
+  },
+  emptyCardT: { fontSize: 13.5, color: C.sub, fontWeight: '600', lineHeight: 21 },
   moveCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,

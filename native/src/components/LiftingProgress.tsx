@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
-import { TrendingUp, CalendarDays, Trophy, Share2, Flame } from 'lucide-react-native';
+import { TrendingUp, CalendarDays, Trophy, Share2, Flame, Dumbbell } from 'lucide-react-native';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
@@ -93,13 +93,26 @@ function useLifting() {
   return { history, cardio, goalKg, series, exercises, habit, weightAt };
 }
 
+// 運動の記録がまだ無い人向けの空状態。nullを返すと概要の詳細ページが
+// 「タイトルだけの真っ白な画面」になる（βフィードバック 2026-09-01）ため、必ず説明を出す
+function LiftEmpty({ what }: { what: string }) {
+  return (
+    <View style={[s.card, { borderStyle: 'dashed', alignItems: 'center', gap: 8 }]}>
+      <Dumbbell size={20} color={C.faint} />
+      <Text style={{ fontSize: 13.5, color: C.sub, fontWeight: '600', lineHeight: 21, textAlign: 'center' }}>
+        {t('まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。', { what })}
+      </Text>
+    </View>
+  );
+}
+
 // ===== ① 週間サマリー（習慣目標との対比・🔥ストリーク・+食べられるkcal） =====
 export function LiftKpiCard() {
   const { history, cardio, habit } = useLifting();
   const router = useRouter();
   const today = todayJST();
   const all = [...history, ...cardio];
-  if (all.length === 0) return null;
+  if (all.length === 0) return <LiftEmpty what={t('今週のサマリー')} />;
   const ws = weekStartOf(today);
   const minOk = habit.minMin ?? 0;
   // 「有効カウント」= 筋トレは常に1回、有酸素は最低分数以上のみ
@@ -160,7 +173,7 @@ export function LiftCalendarCard() {
   const { history, cardio } = useLifting();
   const [daySel, setDaySel] = useState<string | null>(null);
   const all = [...history, ...cardio];
-  if (all.length === 0) return null;
+  if (all.length === 0) return <LiftEmpty what={t('運動カレンダー')} />;
   const today = todayJST();
   const kindMap = new Map<string, 'lift' | 'cardio' | 'both'>();
   for (const r of all) {
@@ -194,7 +207,7 @@ export function LiftCalendarCard() {
 export function BalanceCard() {
   const { history, cardio } = useLifting();
   const all = [...history, ...cardio];
-  if (all.length === 0) return null;
+  if (all.length === 0) return <LiftEmpty what={t('週別バランス')} />;
   const ws = weekStartOf(todayJST());
   const weeks: { label: string; lift: number; cardio: number }[] = [];
   for (let i = 7; i >= 0; i--) {
@@ -243,7 +256,7 @@ export function PartVolumeCard() {
   const present = new Set<string>();
   for (const w of data) for (const k of Object.keys(w.byPart)) if (w.byPart[k] > 0) present.add(k);
   const parts = [...LIFT_PARTS.map((x) => x.key), 'other'].filter((k) => present.has(k));
-  if (parts.length === 0) return null;
+  if (parts.length === 0) return <LiftEmpty what={t('部位別ボリューム')} />;
 
   const valOf = (w: (typeof data)[number]) => (selPart ? (w.byPart[selPart] ?? 0) : w.total);
   const vals = data.map(valOf);
@@ -309,6 +322,9 @@ export function LiftChartCard() {
     setExView(v);
     AsyncStorage.setItem('bl-ex-view', v).catch(() => {});
   }
+
+  // 種目ゼロ（筋トレ未記録）はチップも線も無い骨だけのカードになるため空状態を出す
+  if (exercises.length === 0) return <LiftEmpty what={t('挙上重量の推移')} />;
 
   const activeEx = selEx && series.has(selEx) ? selEx : exercises[0] ?? null;
   const exPoints = activeEx ? series.get(activeEx)! : [];
@@ -399,7 +415,7 @@ export function PersonalBestCard() {
   }).filter((r) => r.kg > 0)
     .sort((a, b) => b.kg - a.kg)
     .slice(0, 8);
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return <LiftEmpty what={t('自己ベスト')} />;
   const isNew = (d: string) => shiftDate(d, 14) >= today;   // 直近14日以内の更新
   const topKg = rows[0].kg;
   return (

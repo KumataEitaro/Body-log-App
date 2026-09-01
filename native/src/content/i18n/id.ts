@@ -1244,4 +1244,10 @@ export const ID: Record<string, string> = {
   "ライトプラン以上で広告が消えて、記録に集中できます。": "Bebas iklan dengan Paket Lite atau lebih tinggi, agar Anda bisa fokus mencatat.",
   "広告": "Iklan",
   "ライトプランで広告を消せます": "Hapus iklan dengan Paket Lite",
+  "品目つきの食事記録と翌日の体重が3組以上たまると、「あなたに合う食材・合わない食材」の傾向がここに出ます。いつもの記録を続けるだけで大丈夫です。": "Setelah terkumpul 3 pasang data catatan makanan dan berat badan keesokan harinya, tren \"makanan yang cocok & tidak cocok untukmu\" akan muncul di sini. Cukup lanjutkan pencatatan seperti biasa.",
+  "いまのところ、体重をはっきり動かす食材は見つかっていません（それ自体が良い知らせです）。記録が増えると小さな傾向も見えてきます。": "Sejauh ini, belum ada makanan yang secara signifikan memengaruhi berat badan (ini kabar baik). Seiring bertambahnya catatan, tren kecil pun akan mulai terlihat.",
+  "ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。": "Sinkronisasi Health Care tersedia di versi iOS TestFlight. Jika dihubungkan, jumlah langkah dan tidur 7 hari terakhir akan ditampilkan di sini.",
+  "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Gagal memuat analisis. Periksa koneksi internetmu dan buka kembali untuk mencoba lagi.",
+  "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Belum ada catatan latihan. Catat set pertamamu di tab Latihan, dan {what} akan mulai tumbuh di sini.",
+  "今週のサマリー": "Ringkasan minggu ini",
 };

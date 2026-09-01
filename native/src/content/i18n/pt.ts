@@ -1244,4 +1244,10 @@ export const PT: Record<string, string> = {
   "ライトプラン以上で広告が消えて、記録に集中できます。": "Com o plano Lite ou superior, os anúncios somem para você focar no seu registro.",
   "広告": "Anúncios",
   "ライトプランで広告を消せます": "Remova os anúncios com o plano Lite",
+  "品目つきの食事記録と翌日の体重が3組以上たまると、「あなたに合う食材・合わない食材」の傾向がここに出ます。いつもの記録を続けるだけで大丈夫です。": "Assim que você juntar pelo menos 3 registros de refeições com itens e o peso do dia seguinte, a tendência de \"alimentos que funcionam ou não para você\" aparecerá aqui. É só continuar registrando como de costume.",
+  "いまのところ、体重をはっきり動かす食材は見つかっていません（それ自体が良い知らせです）。記録が増えると小さな傾向も見えてきます。": "Por enquanto, nenhum ingrediente chamou atenção por alterar significativamente o seu peso (o que já é uma boa notícia). Conforme você registrar mais, até pequenas tendências vão aparecer.",
+  "ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。": "A sincronização com o Apple Saúde está disponível na versão TestFlight para iOS. Ao conectar, os passos e o sono dos últimos 7 dias aparecerão aqui.",
+  "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Não foi possível carregar a análise. Verifique sua conexão e reabra para tentar novamente.",
+  "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Ainda não há registros de exercícios. Registre a primeira série na aba Exercícios para o {what} começar a crescer aqui.",
+  "今週のサマリー": "Resumo da semana",
 };
