@@ -10,6 +10,7 @@ import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { evaluateAchievements, markBadgesSeen, type AchievementReport, type BadgeCat, type BadgeState } from '@/lib/achievements';
+import { maybeAskReview } from '@/lib/reviewPrompt';
 import { shareInvite } from '@/lib/invite';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import BadgeIcon from '@/components/BadgeIcon';
@@ -136,6 +137,17 @@ export default function AchievementsScreen() {
       }
       // このページを見た時点で未読は消す（🔥チップと設定の赤ドットも同時に消える）
       markBadgesSeen().catch(() => {});
+      // ★レビューの依頼は「うまくいっている人の、うまくいった直後」にだけ出す。
+      // 条件（14日以上の記録＋成功体験＋未依頼＋不具合報告から30日）は lib/reviewPrompt.ts 側。
+      // 祝祭のオーバーレイと重ならないよう、少し置いてから声をかける
+      setTimeout(() => {
+        maybeAskReview({
+          recordedDays: r.recordedDays,
+          streak: r.streak,
+          justEarnedBadge: r.newIds.length > 0,
+          goalReached: r.goalReached,
+        }).catch(() => {});
+      }, 2500);
     }).catch(() => setReport(null));
   }, []);
 
