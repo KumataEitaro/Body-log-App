@@ -10,7 +10,10 @@ import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowUp, Utensils, TrendingDown, Dumbbell, Moon, ChevronDown, History, X, MessageCircle, Sparkles, SquarePen, type LucideIcon } from 'lucide-react-native';
 import * as Crypto from 'expo-crypto';
+import * as Haptics from 'expo-haptics';
 import { Keyboard } from 'react-native';
+import { useGate } from '@/lib/gate';
+import CrownBadge from '@/components/CrownBadge';
 import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
@@ -29,7 +32,7 @@ import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
 import { useReduceMotion } from '@/lib/motion';
 
-type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean };
+type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean; upgrade?: boolean };
 
 // 相談セッションのID（UUID v4）。expo-cryptoが使えない環境（jest等）ではMath.random版に
 // フォールバックする（秘匿用途ではなく「今日はじめて見たIDか」の識別にしか使わないため十分）
@@ -78,6 +81,10 @@ function RichText({ text, style }: { text: string; style: object }) {
 
 export default function CoachScreen() {
   const router = useRouter();
+  const gate = useGate();
+  // 王冠ゲーティング: AI相談はスタンダード以上（新ティア）。バナー表示中も入力欄は
+  // 触れるようにして体験を完全に殺さない（送信の瞬間にペイウォールへ＝moment of intent）
+  const coachLocked = gate.gated('coach');
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -168,19 +175,34 @@ export default function CoachScreen() {
     return groups.reverse();
   }, [hist, histQ]);
 
+  // ペイウォールへ（バナー・ロック中の送信の共通口）
+  function openCoachPaywall() {
+    Keyboard.dismiss();
+    Haptics.selectionAsync().catch(() => {});
+    // typed routesが動的srcを知らないためas never（changes.tsxと同じ流儀）
+    router.push('/paywall?src=coach' as never);
+  }
+
   async function send(q: string) {
     const question = q.trim();
     if (!question || busy) return;
+    // ロック中は送信の瞬間にペイウォールへ。入力文は消さない（戻ってきてすぐ続けられる）
+    if (coachLocked) { openCoachPaywall(); return; }
     const history = msgs.slice(-6);
     setMsgs((m) => [...m, { role: 'user', text: question }]);
     logHist('user', question);
     setInput('');
     setBusy(true);
     try {
-      const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string }>(
+      const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string; code?: string }>(
         '/api/coach', { question, history, lang: apiLang(), sessionId: sessionIdRef.current });
       if (!ok || !json?.ok || !json.answer) {
-        setMsgs((m) => [...m, { role: 'ai', text: json?.error || t('うまく答えられませんでした。もう一度お試しください。') }]);
+        // code:'plan_limit'（本日のセッション上限）はアップグレード導線つきで案内する
+        setMsgs((m) => [...m, {
+          role: 'ai',
+          text: json?.error || t('うまく答えられませんでした。もう一度お試しください。'),
+          upgrade: json?.code === 'plan_limit',
+        }]);
         return;
       }
       // 検証を通らない提案はカードを出さない（押しても何も起きないボタンを見せないため）
@@ -314,6 +336,13 @@ export default function CoachScreen() {
                     ? <RichText text={m.text} style={s.bubbleT} />
                     : <Text style={[s.bubbleT, { color: '#fff' }]}>{m.text}</Text>}
                 </View>
+                {/* プラン上限（429 plan_limit）のときだけ、上限到達の文脈つきペイウォールへの導線 */}
+                {m.upgrade && (
+                  <Pressable hitSlop={8} style={{ alignSelf: 'flex-start', marginBottom: 8, marginTop: -2 }}
+                             onPress={() => router.push('/paywall?src=limit_coach' as never)}>
+                    <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+                  </Pressable>
+                )}
                 {/* 目標変更の提案アクションカード（承認制） */}
                 {m.action && (
                   <View style={s.actionCard}>
@@ -355,6 +384,14 @@ export default function CoachScreen() {
 
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
         <AskCatalog visible={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={(q) => send(q)} />
+
+        {/* 王冠バナー: ロック中も入力欄は隠さない（書ける→送る瞬間に誘う）。タップでもペイウォールへ */}
+        {coachLocked && (
+          <Pressable style={({ pressed }) => [s.gateBanner, pressed && { opacity: 0.8 }]} onPress={openCoachPaywall}>
+            <CrownBadge size={14} />
+            <Text style={s.gateBannerT}>{t('AI相談はスタンダードから。1つの相談の中は往復無制限です')}</Text>
+          </Pressable>
+        )}
 
         <View style={s.inRow}>
           {/* 発光レイヤ: 食事タブの入力ドックと同じ縁パルス（opacityのみネイティブ駆動） */}
@@ -494,6 +531,13 @@ const s = StyleSheet.create({
   input: { flex: 1, minHeight: 32, maxHeight: 100, fontSize: 17, fontWeight: '600', color: C.ink, paddingTop: 6, paddingBottom: 6, paddingHorizontal: 4 },
   sendInline: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   kbDismiss: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
+  // 王冠バナー（入力ドックの上）。責め色にせずCrownBadgeと同じ「開けるお楽しみ」トーン
+  gateBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 9,
+  },
+  gateBannerT: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: C.faint, marginTop: 5 },
   presetLink: { fontSize: 11, color: C.teal, fontWeight: '800', marginTop: 5 },
   pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink, marginBottom: 10, marginLeft: 2 },

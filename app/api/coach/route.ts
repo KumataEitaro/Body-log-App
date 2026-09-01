@@ -75,9 +75,12 @@ export async function POST(req: Request) {
     const limits = await getLimits(supabase, userPlan);
     const chk = checkKindLimit(limits, 'coach', usageRes.data, 0);
     if (!chk.ok) {
+      // 上限0=そのプランでは1回も使えない（新ティアのfree/lite）。「0回を使い切った」と言わない
       return NextResponse.json({
         ok: false, code: 'plan_limit', plan: userPlan, kind: 'coach', reason: chk.reason,
-        error: `本日のAI相談回数（${chk.limit}回）を使い切りました。明日また使えます。`,
+        error: chk.limit === 0
+          ? 'AI相談はスタンダードプラン以上で使えます。'
+          : `本日のAI相談回数（${chk.limit}回）を使い切りました。明日また使えます。`,
       }, { status: 429 });
     }
   }

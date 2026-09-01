@@ -8,6 +8,7 @@ import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAv
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Sparkles, Camera, Salad, ScanBarcode } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { apiLang } from '@/lib/i18n';
@@ -30,6 +31,7 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;            // 一覧の再読込に使う
 }) {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('');
   const [kcal, setKcal] = useState('');
@@ -38,7 +40,7 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
   const [c, setC] = useState('');
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; upgrade?: boolean; kind?: 'text' | 'photo' } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);   // バーコードスキャナの表示
   const [dbMiss, setDbMiss] = useState(false);       // DB未ヒット時に写真経路への案内ボタンを出す
 
@@ -68,7 +70,8 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
     try {
       const { ok, json } = await apiPost<{ ok: boolean; error?: string; code?: string; result?: ParseResult }>(
         '/api/parse-food', { text: q, lang: apiLang() });
-      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。') }); return; }
+      // プラン上限（429 plan_limit）はアップグレード導線を出す（テキスト枠）
+      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。'), upgrade: json?.code === 'plan_limit', kind: 'text' }); return; }
       fillFrom(json.result);
     } finally { setAiBusy(false); }
   }
@@ -89,9 +92,10 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
       const small = await ImageManipulator.manipulateAsync(
         res.assets[0].uri, [{ resize: { width: 1280 } }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true });
-      const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: ParseResult }>(
+      const { ok, json } = await apiPost<{ ok: boolean; error?: string; code?: string; result?: ParseResult }>(
         '/api/parse-food', { text: name.trim(), lang: apiLang(), images: [{ data: small.base64, mime: 'image/jpeg' }] });
-      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。') }); return; }
+      // プラン上限（429 plan_limit）はアップグレード導線を出す（写真枠）
+      if (!ok || !json?.ok) { setMsg({ ok: false, text: json?.error || t('解析に失敗しました。もう一度お試しください。'), upgrade: json?.code === 'plan_limit', kind: 'photo' }); return; }
       fillFrom(json.result);
     } catch {
       setMsg({ ok: false, text: t('写真を処理できませんでした。もう一度お試しください。') });
@@ -269,6 +273,13 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
             </View>
 
             {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+            {/* 上限到達（429 plan_limit）→ フォームを閉じてkind別の文脈ペイウォールへ */}
+            {msg?.upgrade && (
+              <Pressable hitSlop={8} style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: 6 }, pressed && { opacity: 0.7 }]}
+                         onPress={() => { onClose(); router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never); }}>
+                <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+              </Pressable>
+            )}
             {/* DB未ヒット時: 既存の成分表示写真経路（AI読み取り）へワンタップで進める */}
             {dbMiss && (
               <Pressable style={[s.aiBtn, { marginTop: 8 }]} onPress={() => { setDbMiss(false); pickPhotoSource(); }}>

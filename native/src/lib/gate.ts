@@ -10,15 +10,17 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { purchasesAvailable } from './purchases';
+import { isUnlimited } from './calc';
 
 // ゲート対象の機能キー。画面を足すたびにここへ追加する（文字列unionで拡張）
-export type GatedFeature = 'laws' | 'digest' | 'insights';
+export type GatedFeature = 'laws' | 'digest' | 'eating' | 'coach' | 'insights';
 
 // ===== plan のモジュールスコープキャッシュ =====
-// プラン判定の正本はサーバー（profiles.plan。RC webhookが更新する）。
+// プラン判定の正本はサーバー（profiles.plan。RC webhookとクーポンAPIが更新する）。
 // アプリ起動中に何度も引かない: 最初のuseGateマウントで1回だけ取得し、全画面で共有。
 // useSyncExternalStore なので取得完了時だけ再レンダーされる（再レンダー地獄にしない）。
 let plan: string | null = null;
+let unlimited = false; // UNLIMITED_EMAILS（管理者）は常にゲートしない。plan取得と同時にemailで判定
 let fetched = false;   // 取得成功後はtrue（失敗時はfalseのまま＝次のマウントで再試行）
 let fetching = false;  // 多重リクエストの抑止
 const listeners = new Set<() => void>();
@@ -32,6 +34,8 @@ async function fetchPlanOnce(): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession();
     const uid = session?.user?.id;
     if (!uid) return; // 未ログイン中は保留（ログイン後のマウントで再試行）
+    // UNLIMITED免除: 管理者アカウントはプランに関係なく全機能を開放する（追加クエリなし）
+    unlimited = isUnlimited(session?.user?.email);
     const { data, error } = await supabase.from('profiles').select('plan').eq('id', uid).maybeSingle();
     if (error) return; // plan列が無い環境・通信断は「無料扱い」のまま次回に任せる
     plan = (data?.plan as string | null) ?? null;
@@ -39,6 +43,13 @@ async function fetchPlanOnce(): Promise<void> {
     listeners.forEach((l) => l());
   } catch { /* 失敗しても機能は止めない（gatedはnull=無料として判定する） */ }
   finally { fetching = false; }
+}
+
+/** クーポン適用など「サーバーのplanがいま変わった」直後にキャッシュを引き直す */
+export async function refreshGate(): Promise<void> {
+  fetched = false;
+  fetching = false;
+  await fetchPlanOnce();
 }
 
 export type Gate = {
@@ -49,6 +60,9 @@ export type Gate = {
   /** この機能に王冠を出すべきか。active=falseなら常にfalse（何もゲートしない） */
   gated: (feature: GatedFeature) => boolean;
 };
+
+// スタンダード以上で解放されるプランか（新ティア: 全ゲート機能ともstandard解放で統一）
+const STANDARD_UP = new Set(['standard', 'premium']);
 
 /** 王冠ゲーティングの判定。各画面はこれ1つで「王冠を出すか」を決められる */
 export function useGate(): Gate {
@@ -61,13 +75,13 @@ export function useGate(): Gate {
   return {
     active,
     plan: active ? p : null,
-    // 今はプラン差なし（free以外=有料は全機能開放）。プラン別の出し分けが必要に
-    // なったらここで feature ごとに必要プランを引く
-    gated: (_feature: GatedFeature) => active && (p == null || p === 'free'),
+    // 新ティア: ゲート機能はすべて「standard未満（null/'free'/'lite'）でロック」に統一。
+    // UNLIMITED_EMAILS（管理者）は常に開放。feature別の必要プランが生まれたらここで出し分ける
+    gated: (_feature: GatedFeature) => active && !unlimited && !STANDARD_UP.has(p ?? 'free'),
   };
 }
 
 /** テスト用: キャッシュを初期状態に戻す */
 export function __resetGateForTest(): void {
-  plan = null; fetched = false; fetching = false; listeners.clear();
+  plan = null; unlimited = false; fetched = false; fetching = false; listeners.clear();
 }

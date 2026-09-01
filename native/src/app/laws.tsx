@@ -2,7 +2,7 @@
 // 貯まった記録から見つかった「あなただけの法則」を1枚ずつのカードとして収集するページ。
 //  ・新規発見は祝祭（実績ページのCelebrateOverlayと同じ流儀: スプリング＋触覚）
 //  ・未発見はシルエットで見せて「まだ見つかっていない法則がある」という好奇心を残す
-//  ・無料プラン（課金ゲート有効時）は最新3枚だけ通常表示、4枚目以降は半透明＋王冠
+//  ・スタンダード未満（無料・ライト。課金ゲート有効時）は最新3枚だけ通常表示、4枚目以降は半透明＋王冠
 //  ・分析は全て端末内ローカル（lib/laws.ts）。サーバへは何も送らない
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated } from 'react-native';
@@ -17,7 +17,7 @@ import CrownBadge from '@/components/CrownBadge';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import { refreshLaws, markLawsSeen, lawKindHint, LAW_KINDS, type Law, type LawKind } from '@/lib/laws';
 
-// 無料プランで通常表示する枚数（最新から数える）。それ以降は王冠つきのぼかし表示
+// スタンダード未満（無料・ライト）で通常表示する枚数（最新から数える）。それ以降は王冠つきのぼかし表示
 const FREE_VISIBLE = 3;
 
 /** 種類ごとのアイコン（図鑑の「同じ種類のカード」を目で束ねる） */

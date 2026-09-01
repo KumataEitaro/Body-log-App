@@ -45,6 +45,17 @@ export async function POST(req: Request) {
   const update = expired
     ? { plan: 'free', plan_until: null as string | null }
     : { plan: strongest, plan_until: expMs > 0 ? new Date(expMs).toISOString() : null };
+
+  // クーポン付与のガード: plan_untilがnullの有料行は「無期限付与（/api/redeem-coupon）」なので、
+  // RC購読イベントで降格させない（クーポンpremiumの人がliteを買った/解約した等で上書きしない）。
+  // RC由来の行は必ずplan_untilが入る（購入時expiration_at_ms）ためここには該当しない
+  const { data: cur } = await svc.from('profiles').select('plan,plan_until').eq('id', uid).maybeSingle();
+  const curRank = RANK[String(cur?.plan ?? '')] ?? 0;
+  if (cur && cur.plan_until == null && curRank > 0 && (RANK[String(update.plan)] ?? 0) < curRank) {
+    console.log(`[rc-webhook] ${ev.type} uid=${uid} skip: クーポン無期限(${cur.plan})を${update.plan}へ降格しない`);
+    return NextResponse.json({ ok: true, skipped: 'coupon_grant' });
+  }
+
   const { error } = await svc.from('profiles').update(update).eq('id', uid);
   if (error) {
     console.log(`[rc-webhook] update失敗 uid=${uid} ${error.message}`);

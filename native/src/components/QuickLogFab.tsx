@@ -19,8 +19,10 @@ import { useDayStatus } from '@/lib/dayStatus';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveBar, usePulse } from '@/components/LivePreviewBar';
 import { t } from '@/lib/i18n';
+import { useRouter } from 'expo-router';
 
 export default function QuickLogFab() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
@@ -28,7 +30,7 @@ export default function QuickLogFab() {
   const [staged, setStaged] = useState<ParsedResult | null>(null); // 解析結果（保存前の確認用）
   const [stagedNote, setStagedNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; upgrade?: boolean; kind?: 'text' | 'photo' | 'coach' } | null>(null);
   const inputRef = useRef<TextInput>(null);
   // 食事タブが計算した「今日の残り」。FAB単体では計画計算をしない（重複と食い違いを避ける）
   const day = useDayStatus();
@@ -65,7 +67,7 @@ export default function QuickLogFab() {
     inputRef.current?.focus(); // 連投: キーボードを維持
     try {
       const res = await analyzeFood(t, imgs);
-      if (!res.ok) { setMsg({ ok: false, text: res.error }); setText(t); return; }
+      if (!res.ok) { setMsg({ ok: false, text: res.error, upgrade: res.upgrade, kind: res.kind }); setText(t); return; }
       const r = res.result;
       setStaged((p) => ({
         items: [...(p?.items ?? []), ...r.items],
@@ -126,6 +128,13 @@ export default function QuickLogFab() {
               </View>
             )}
             {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+            {/* 上限到達（429 plan_limit）→ シートを閉じてkind別の文脈ペイウォールへ（log.tsxと同じ導線） */}
+            {msg?.upgrade && (
+              <Pressable hitSlop={8} style={({ pressed }) => [{ alignSelf: 'flex-start', marginBottom: 6 }, pressed && { opacity: 0.7 }]}
+                         onPress={() => { setOpen(false); router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never); }}>
+                <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+              </Pressable>
+            )}
             {pending > 0 && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                 <ActivityIndicator size="small" color={C.teal} />
