@@ -68,6 +68,9 @@ jest.mock('react-native-reanimated', () => {
     FadeInRight: { duration: () => ({ delay: () => ({}) }) },
     FadeInUp: { duration: () => ({ delay: () => ({}) }) },
     ZoomIn: { springify: () => ({ damping: () => ({}) }) },
+    // UndoSnackbarの入退場（スプリング入場/タイミング退場）
+    SlideInDown: { springify: () => ({ damping: () => ({}) }) },
+    SlideOutDown: { duration: () => ({}) },
     LinearTransition: { springify: () => ({}) },
   };
 });

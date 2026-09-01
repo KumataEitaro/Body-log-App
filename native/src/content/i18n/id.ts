@@ -1449,4 +1449,6 @@ export const ID: Record<string, string> = {
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 warna tema, 11 bahasa, satuan, notifikasi, dan integrasi kesehatan. Kelola profil dan makanan kustommu kapan saja dari ⚙ ini.",
   "Googleログインに失敗しました: {reason}": "Gagal masuk dengan Google: {reason}",
   "初めての方はこちら → 新規登録に切り替える": "Baru di sini? → Beralih ke Daftar Baru",
+  "削除しました": "Berhasil dihapus",
+  "元に戻せませんでした。通信環境を確認してください。": "Gagal memulihkan. Silakan periksa koneksi internet Anda.",
 };

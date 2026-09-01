@@ -68,6 +68,7 @@ import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
 import { setDayStatus } from '@/lib/dayStatus';
 import { confirmOutlierWeight } from '@/lib/guard';
+import { useUndoSnackbar } from '@/components/UndoSnackbar';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -94,6 +95,8 @@ function shiftDate(d: string, n: number): string {
 export default function LogScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // 削除のUndoスナックバー。インプットドックの上に重なる位置に出す（ドック高より少し上）
+  const undoBar = useUndoSnackbar(insets.bottom + 96);
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -480,22 +483,37 @@ export default function LogScreen() {
     setAiNote(null); parseHistory.current = [];
   }
 
-  // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除
+  // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除。
+  // 削除は「本当に？」を挟まず即実行し、Undoスナックバーで約5秒の取り消し猶予を出す
+  // （確認ダイアログは毎回の手を止めるわりに誤タップ防止にならない。メニュー自体は残す）
   function confirmDeleteLog(l: DayLog) {
     const items = (l.items as FoodItem[] | null) ?? [];
     const canEdit = items.length > 0 || l.weight != null;
     Alert.alert(canEdit ? t('この記録をどうしますか？') : t('この記録を削除しますか？'), logTitle(l), [
       { text: t('キャンセル'), style: 'cancel' },
       ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
-      {
-        text: t('削除する'), style: 'destructive' as const,
-        onPress: async () => {
-          await supabase.from('logs').delete().eq('id', l.id);
-          if (uid) await syncEntriesForDate(uid, today);
-          await load();
-        },
-      },
+      { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
     ]);
+  }
+
+  // 即削除＋Undo。復元データ（行の全カラム）は削除前にメモリへ控え、
+  // 「元に戻す」で元のid無しで再insertする（idはDB採番・atは元の時刻のまま＝並びが崩れない）
+  async function deleteLogNow(l: DayLog) {
+    const restore = { ...(l as unknown as Record<string, unknown>) };
+    delete restore.id;
+    // 行が持つ日付でサマリーを合わせる（過去日の記録を消したときも正しい日が再集計される）
+    const date = typeof restore.date === 'string' ? restore.date : viewDate;
+    const { error } = await supabase.from('logs').delete().eq('id', l.id);
+    // 削除APIが失敗したらスナックバーは出さず従来のエラーメッセージ
+    if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+    if (uid) await syncEntriesForDate(uid, date);
+    await load();
+    undoBar.show(t('削除しました'), async () => {
+      const { error: e2 } = await supabase.from('logs').insert(restore);
+      if (e2) { setMsg({ ok: false, text: t('元に戻せませんでした。通信環境を確認してください。') }); return; }
+      if (uid) await syncEntriesForDate(uid, date);
+      await load();
+    });
   }
 
   // 記録をトレイへ戻して編集状態にする（保存すると元の記録を置き換える）
@@ -523,26 +541,31 @@ export default function LogScreen() {
     setMsg(null);
   }
 
-  // 記録から1品目だけを取り除く（合計は残りから再計算される）
+  // 記録から1品目だけを取り除く（合計は残りから再計算される）。
+  // 確認は出さず即実行し、Undoで元のitems配列（と元の合計値）へ戻す
   async function deleteOneItem(l: DayLog, index: number) {
     const items = (l.items ?? []) as FoodItem[];
-    const name = items[index]?.name ?? '';
-    Alert.alert(t('「{name}」を削除しますか？', { name }), t('この食事の他の品目は残ります。'), [
-      { text: t('キャンセル'), style: 'cancel' },
-      {
-        text: t('削除する'), style: 'destructive',
-        onPress: async () => {
-          const r = removeItemAt(items, index);
-          const q = r.kind === 'delete'
-            ? supabase.from('logs').delete().eq('id', l.id)
-            : supabase.from('logs').update({ items: r.items, kcal: r.kcal, p: r.p, f: r.f, c: r.c }).eq('id', l.id);
-          const { error } = await q;
-          if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
-          if (uid) await syncEntriesForDate(uid, viewDate);   // 日次サマリーを合わせる
-          await load();
-        },
-      },
-    ]);
+    // 復元データは削除前にメモリへ控える。最後の1品で行ごと消えるケースは行の全カラムで戻す
+    const original = { items, kcal: l.kcal ?? null, p: l.p ?? null, f: l.f ?? null, c: l.c ?? null };
+    const restoreRow = { ...(l as unknown as Record<string, unknown>) };
+    delete restoreRow.id;
+    const r = removeItemAt(items, index);
+    const q = r.kind === 'delete'
+      ? supabase.from('logs').delete().eq('id', l.id)
+      : supabase.from('logs').update({ items: r.items, kcal: r.kcal, p: r.p, f: r.f, c: r.c }).eq('id', l.id);
+    const { error } = await q;
+    // 削除APIが失敗したらスナックバーは出さず従来のエラーメッセージ
+    if (error) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
+    if (uid) await syncEntriesForDate(uid, viewDate);   // 日次サマリーを合わせる
+    await load();
+    undoBar.show(t('削除しました'), async () => {
+      const { error: e2 } = r.kind === 'delete'
+        ? await supabase.from('logs').insert(restoreRow)         // 行ごと消えた→id無しで再insert
+        : await supabase.from('logs').update(original).eq('id', l.id);  // 品目だけ→元のitemsへ戻す
+      if (e2) { setMsg({ ok: false, text: t('元に戻せませんでした。通信環境を確認してください。') }); return; }
+      if (uid) await syncEntriesForDate(uid, viewDate);
+      await load();
+    });
   }
 
   // 過去の食事の品目一式を保存前確認へ投入（AI解析なし・栄養素は記録済みの値をそのまま使う）
@@ -1441,6 +1464,8 @@ export default function LogScreen() {
         </View>
       </Animated.View>
       </Reanimated.View>
+      {/* 削除のUndoスナックバー（ドックの上に重ねる。触れない領域は素通し） */}
+      {undoBar.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={cards.layout.hidden} shownKeys={cards.visible} labels={LOG_LABELS()} onShow={cards.show}

@@ -1449,4 +1449,6 @@ export const VI: Record<string, string> = {
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 màu chủ đề, 11 ngôn ngữ, đơn vị, thông báo, kết nối sức khỏe. Quản lý hồ sơ hay món ăn riêng lúc nào cũng được qua nút ⚙ này.",
   "Googleログインに失敗しました: {reason}": "Đăng nhập Google thất bại: {reason}",
   "初めての方はこちら → 新規登録に切り替える": "Lần đầu sử dụng? → Chuyển sang Đăng ký",
+  "削除しました": "Đã xóa",
+  "元に戻せませんでした。通信環境を確認してください。": "Không thể hoàn tác. Vui lòng kiểm tra kết nối mạng.",
 };

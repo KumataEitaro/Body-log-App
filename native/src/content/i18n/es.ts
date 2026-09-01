@@ -1533,4 +1533,6 @@ export const ES: Record<string, string> = {
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 colores de tema, 11 idiomas, unidades, notificaciones y conexión con Salud. Gestiona tu perfil y tus alimentos guardados en cualquier momento desde este ⚙.",
   "Googleログインに失敗しました: {reason}": "Error al iniciar sesión con Google: {reason}",
   "初めての方はこちら → 新規登録に切り替える": "¿Es tu primera vez? → Registrarse",
+  "削除しました": "Eliminado",
+  "元に戻せませんでした。通信環境を確認してください。": "No se pudo deshacer. Comprueba tu conexión a internet.",
 };

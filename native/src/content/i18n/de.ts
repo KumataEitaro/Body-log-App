@@ -1449,4 +1449,6 @@ export const DE: Record<string, string> = {
   "テーマ12色・11言語・単位・通知・ヘルスケア連携。プロフィールやマイ食品の管理も、この⚙からいつでも。": "12 Farbthemen, 11 Sprachen, Einheiten, Benachrichtigungen und Health-Connect-Verbindung. Verwalte dein Profil und deine eigenen Lebensmittel jederzeit über dieses ⚙.",
   "Googleログインに失敗しました: {reason}": "Google-Login fehlgeschlagen: {reason}",
   "初めての方はこちら → 新規登録に切り替える": "Neu hier? → Zur Registrierung wechseln",
+  "削除しました": "Gelöscht",
+  "元に戻せませんでした。通信環境を確認してください。": "Konnte nicht rückgängig gemacht werden. Bitte überprüfe deine Internetverbindung.",
 };

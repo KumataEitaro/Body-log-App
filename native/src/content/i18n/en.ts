@@ -1548,4 +1548,6 @@ export const EN: Record<string, string> = {
   "週ごとの総挙上量を部位別に集計。「先週より脚が+12%」のように、言葉でも教えます。": "Calculates weekly total lifted volume by muscle group. Tells you in plain words like \"legs up +12% from last week\".",
   "Googleログインに失敗しました: {reason}": "Google sign-in failed: {reason}",
   "初めての方はこちら → 新規登録に切り替える": "First time? → Switch to Sign Up",
+  "削除しました": "Deleted",
+  "元に戻せませんでした。通信環境を確認してください。": "Could not undo. Please check your connection.",
 };
