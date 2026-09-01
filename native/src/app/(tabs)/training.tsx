@@ -17,7 +17,6 @@ import { bumpRestCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import HeaderGear from '@/components/HeaderGear';
-import QuickLogFab from '@/components/QuickLogFab';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
@@ -893,9 +892,7 @@ export default function TrainingScreen() {
           <Text style={s.moveNote}>{t('筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
         </Pressable>
       )}
-    </ScrollView>
-    <QuickLogFab />
-    <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
+    </ScrollView>    <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
            onRequestClose={() => setPickerOpen(false)}>
       <View style={s.hkWrap}>
         <View style={s.hkHead}>
