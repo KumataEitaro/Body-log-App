@@ -851,8 +851,9 @@ export default function ChangesScreen() {
     const withSpark = key === 'body' && sparkVals.length >= 2;
     // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
     // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり。
-    // 旧digest行の王冠は統合先のweek行へ付け替え（ペイウォールsrcはdigestのまま）
-    const crowned = key === 'week' && gate.gated('digest');
+    // 旧digest行の王冠は統合先のweek行へ付け替え（ペイウォールsrcはdigestのまま）。
+    // 新ティア: 食べ方の分析（eating詳細）もスタンダード以上の機能（src=eating）
+    const crowned = (key === 'week' && gate.gated('digest')) || (key === 'eating' && gate.gated('eating'));
     const secTitle = sectionHeadOf.get(key);
     const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
@@ -862,7 +863,7 @@ export default function ChangesScreen() {
                    if (crowned) {
                      Haptics.selectionAsync().catch(() => {});
                      // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
-                     router.push('/paywall?src=digest' as never);
+                     router.push((key === 'eating' ? '/paywall?src=eating' : '/paywall?src=digest') as never);
                      return;
                    }
                    // lawsはカード詳細ではなく法則図鑑（スタック画面）への外部遷移

@@ -21,11 +21,14 @@ export type ParsedResult = {
   mood: string | null;
 };
 
+/** プラン上限（429 plan_limit）で止まった種類。ペイウォールの文脈src（limit_text等）に使う */
+export type LimitKind = 'text' | 'photo' | 'coach';
+
 // テキスト/写真をAIで解析（保存はしない）
 export async function analyzeFood(
   text: string, images: QuickImage[], history: ParseTurn[] = [],
-): Promise<{ ok: true; result: ParsedResult; extras: ParsedExtras } | { ok: false; error: string; upgrade?: boolean }> {
-  const { ok, json, failure } = await apiPost<{ ok: boolean; error?: string; code?: string; result?: {
+): Promise<{ ok: true; result: ParsedResult; extras: ParsedExtras } | { ok: false; error: string; upgrade?: boolean; kind?: LimitKind }> {
+  const { ok, json, failure } = await apiPost<{ ok: boolean; error?: string; code?: string; kind?: string; result?: {
     items?: FoodItem[]; weight?: number; waist?: number; ex?: string; adj?: number; mood?: string;
     reply?: string; questions?: string[]; assumptions?: string[];
   } }>('/api/parse-food', { text, lang: apiLang(), images, history });
@@ -37,8 +40,10 @@ export async function analyzeFood(
     if (failure === 'offline') {
       return { ok: false, error: t('通信できませんでした。電波状況を確認してもう一度お試しください。') };
     }
-    // プラン上限（code:'plan_limit'）はアップグレード導線を出す合図
-    return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。'), upgrade: json?.code === 'plan_limit' };
+    // プラン上限（code:'plan_limit'）はアップグレード導線を出す合図。kindで文脈srcを出し分ける
+    const upgrade = json?.code === 'plan_limit';
+    const kind = json?.kind === 'photo' ? 'photo' as const : 'text' as const;
+    return { ok: false, error: json?.error || t('解析に失敗しました。もう一度お試しください。'), upgrade, kind: upgrade ? kind : undefined };
   }
   const r = json.result;
   const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 4) : []);

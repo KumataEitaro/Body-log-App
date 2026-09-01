@@ -11,6 +11,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { UtensilsCrossed } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import { OptionButton } from '@/components/ui/Selectable';
+import { useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { t, apiLang } from '@/lib/i18n';
 import { getPurpose } from '@/lib/purpose';
@@ -27,10 +28,12 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
   /** 「これにする」で品名を受け取る（入力欄への充填は呼び出し側の責務） */
   onPick: (name: string) => void;
 }) {
+  const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AdviceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [upgrade, setUpgrade] = useState(false); // 429 plan_limit（写真枠に相乗り）のときだけ導線を出す
 
   // 入口: 既存の写真ソース選択の流儀（カメラ/ライブラリの2択シート）
   function start() {
@@ -56,13 +59,13 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
     if (res.canceled || !res.assets?.[0]?.uri) return;
 
     // 結果シートを先に開いてローディングを見せる（無反応に見せない）
-    setVisible(true); setLoading(true); setResult(null); setError(null);
+    setVisible(true); setLoading(true); setResult(null); setError(null); setUpgrade(false);
     try {
       // 既存流儀と同じ最大辺1280px・JPEG圧縮でAPIへ
       const small = await manipulateAsync(res.assets[0].uri, [{ resize: { width: 1280 } }],
         { compress: 0.72, format: SaveFormat.JPEG, base64: true });
       if (!small.base64) throw new Error('no-base64');
-      const { ok, json } = await apiPost<{ ok: boolean; error?: string; result?: AdviceResult }>(
+      const { ok, json } = await apiPost<{ ok: boolean; error?: string; code?: string; result?: AdviceResult }>(
         '/api/menu-advice', {
           image: small.base64,
           remainingKcal: Math.round(remainingKcal),
@@ -71,8 +74,10 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
           lang: apiLang(),
         });
       if (!ok || !json?.ok || !json.result) {
-        // サーバーが理由を返したらそれを、返せない失敗は非審判の定型文で
+        // サーバーが理由を返したらそれを、返せない失敗は非審判の定型文で。
+        // プラン上限（429 plan_limit・写真枠に相乗り）はアップグレード導線も出す
         setError(json?.error || t('うまく読めませんでした。明るいところでもう一度お試しください。'));
+        setUpgrade(json?.code === 'plan_limit');
         return;
       }
       setResult(json.result);
@@ -115,6 +120,13 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
           {error != null && !loading && (
             <View style={s.loadingBox}>
               <Text style={s.errT}>{error}</Text>
+              {/* 上限到達 → シートを閉じてから文脈ペイウォールへ（このAPIは写真枠に相乗りなのでlimit_photo） */}
+              {upgrade && (
+                <Pressable hitSlop={8} style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.7 }]}
+                           onPress={() => { setVisible(false); router.push('/paywall?src=limit_photo' as never); }}>
+                  <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+                </Pressable>
+              )}
             </View>
           )}
 

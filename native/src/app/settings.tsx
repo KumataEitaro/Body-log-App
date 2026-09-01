@@ -10,7 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, type DailyReminderMode } from '@/lib/notify';
 import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket } from 'lucide-react-native';
+import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
 import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
@@ -99,6 +100,7 @@ export default function SettingsScreen() {
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [foods, setFoods] = useState<MyFoodLite[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
+  const [couponOpen, setCouponOpen] = useState(false); // クーポンコード入力（プラン行の隣の入口）
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
@@ -349,6 +351,9 @@ export default function SettingsScreen() {
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
         <Row icon={<Crown color={C.teal} size={19} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
+        <View style={s.sep} />
+        {/* クーポン: プラン行の隣に置く（コード配布キャンペーンの入口。適用はサーバー直付与） */}
+        <Row icon={<Ticket color={C.teal} size={19} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
         <View style={s.sep} />
         <Row icon={<Award color={C.teal} size={19} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} onPress={() => router2.push('/achievements' as never)} />
         <View style={s.sep} />
@@ -781,6 +786,8 @@ export default function SettingsScreen() {
       </View>
     </Modal>
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
+    {/* クーポンコード入力（成功時はシート内で祝祭＋gateキャッシュ更新まで完結する） */}
+    <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
     <StatusBarMask />
     </View>
   );

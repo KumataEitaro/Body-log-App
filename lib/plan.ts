@@ -16,12 +16,13 @@ export type PlanLimits = {
   ads: boolean;
 };
 
-// DBのplan_limitsが読めない時の保険（値はmigration-18の初期値と揃えること）
+// DBのplan_limitsが読めない時の保険（値はmigration-23の新ティアと揃えること）
 const FALLBACK: Record<Plan, PlanLimits> = {
-  // 写真は「累計5枚のお試し」ではなく日次リセットに変更（2026-08-26 1500人ペルソナ監査:
-  // 全6層共通のペイン1位。初日に尽きて看板機能を体験できないまま離脱していた）
-  free:     { plan: 'free',     text_day: 5,   photo_day: 2,  coach_day: 3,  photo_trial_total: 0, ads: true },
-  lite:     { plan: 'lite',     text_day: 5,   photo_day: 2,  coach_day: 3,  photo_trial_total: 0, ads: false },
+  // 新ティア設計（2026-09-01）: AI相談はスタンダード以上の看板機能（free/liteはcoach_day=0でロック）。
+  // 写真は日次リセット（2026-08-26 1500人ペルソナ監査: 累計お試し枠は初日に尽きて
+  // 看板機能を体験できないまま離脱していたため撤廃済み）
+  free:     { plan: 'free',     text_day: 3,   photo_day: 1,  coach_day: 0,  photo_trial_total: 0, ads: true },
+  lite:     { plan: 'lite',     text_day: 5,   photo_day: 2,  coach_day: 0,  photo_trial_total: 0, ads: false },
   standard: { plan: 'standard', text_day: 50,  photo_day: 5,  coach_day: 10, photo_trial_total: 0, ads: false },
   premium:  { plan: 'premium',  text_day: 100, photo_day: 30, coach_day: 50, photo_trial_total: 0, ads: false },
 };
@@ -72,6 +73,8 @@ export function checkKindLimit(
       ? { ok: false, reason: 'trial', limit: limits.photo_trial_total }
       : { ok: false, reason: 'day', limit: day };
   }
+  // day=0 は「そのプランでは1回も使えない」（例: 新ティアのfree/liteのcoach_day=0）。
+  // null（無制限）とは意味が違うことに注意
   const day = kind === 'text' ? limits.text_day : limits.coach_day;
   if (day == null) return { ok: true };
   const u = kind === 'text' ? (used.text_count ?? 0) : (used.coach_count ?? 0);
