@@ -1646,4 +1646,8 @@ export const FR: Record<string, string> = {
   "※ 表示は推定です。安全確認には使えません。": "* Les estimations sont indicatives et ne doivent pas être utilisées pour garantir votre sécurité.",
   "設定してみる": "Essayer",
   "いまはしない": "Plus tard",
+  "アプリを紹介する": "Partager l'application",
+  "友だちを誘う": "Inviter des amis",
+  "紹介ページのリンクを共有します（Androidは準備中）": "Partager le lien de parrainage (bientôt disponible sur Android)",
+  "BodyLogerで記録してます。「親子丼たべた」って書くだけでカロリーが出ます。一緒にやりませんか？": "J'utilise BodyLoger pour suivre mes repas. Il suffit d'écrire « J'ai mangé un bol de poulet et d'œufs » pour obtenir les calories. Tu veux me rejoindre ?",
 };

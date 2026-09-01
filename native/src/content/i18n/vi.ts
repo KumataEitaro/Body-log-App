@@ -1646,4 +1646,8 @@ export const VI: Record<string, string> = {
   "※ 表示は推定です。安全確認には使えません。": "※ Hiển thị chỉ mang tính chất ước tính. Không dùng để xác nhận an toàn.",
   "設定してみる": "Thiết lập ngay",
   "いまはしない": "Để sau",
+  "アプリを紹介する": "Giới thiệu ứng dụng",
+  "友だちを誘う": "Mời bạn bè",
+  "紹介ページのリンクを共有します（Androidは準備中）": "Chia sẻ liên kết trang giới thiệu (Android đang được chuẩn bị)",
+  "BodyLogerで記録してます。「親子丼たべた」って書くだけでカロリーが出ます。一緒にやりませんか？": "Mình đang ghi lại bằng BodyLoger. Chỉ cần viết \"Đã ăn Oyakodon\" là ra lượng kcal ngay. Tham gia cùng mình nhé?",
 };
