@@ -1250,4 +1250,9 @@ export const VI: Record<string, string> = {
   "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Không thể tải phân tích. Vui lòng kiểm tra kết nối mạng và mở lại để thử lại.",
   "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Chưa có ghi nhận tập luyện nào. Hãy ghi lại hiệp đầu tiên trong tab Tập luyện, {what} sẽ bắt đầu phát triển ở đây.",
   "今週のサマリー": "Tổng quan tuần này",
+  "からだ": "Cơ thể",
+  "体の記録": "Hồ sơ cơ thể",
+  "食べ方の分析": "Phân tích cách ăn uống",
+  "週のふりかえり": "Tổng kết tuần",
+  "運動の量": "Khối lượng vận động",
 };
