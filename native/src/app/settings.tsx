@@ -29,7 +29,7 @@ import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { C, rgba, sheetTopPad } from '@/lib/ui';
 import { useGate } from '@/lib/gate';
@@ -43,7 +43,7 @@ import { DietDisclaimerPanel, DietConsentCheck, dietModeLabel, dietModeSub } fro
 const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const });
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
-import { WEEK_GOAL_KEY } from '@/lib/achievements';
+import { WEEK_GOAL_KEY, unseenBadgeCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
@@ -179,6 +179,13 @@ export default function SettingsScreen() {
   const units = useUnits();
   const theme = useTheme();
   const todo = useTodoBadge();
+  // 未読バッジ数（実績行の赤ドット）。実績ページを開くと消えるので、戻るたびに読み直す
+  const [unseenBadges, setUnseenBadges] = useState(0);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    unseenBadgeCount().then((n) => { if (alive) setUnseenBadges(n); }).catch(() => {});
+    return () => { alive = false; };
+  }, []));
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [foodFormOpen, setFoodFormOpen] = useState(false);
   const avatar = useAvatar();
@@ -404,7 +411,7 @@ export default function SettingsScreen() {
   const bmr = mifflinBMR(sex, latestWeight ?? 70, Number(height) || 0, Number(age) || 0);
 
   // 1行メニュー（アイコン＋ラベル＋chevron）
-  function Row({ icon, label, sub, onPress, danger }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; danger?: boolean }) {
+  function Row({ icon, label, sub, onPress, danger, badge }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; danger?: boolean; badge?: number }) {
     return (
       <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]}
                  android_ripple={ripple()} onPress={onPress}>
@@ -413,6 +420,7 @@ export default function SettingsScreen() {
           <Text style={[s.rowLabel, danger && { color: C.coral }]}>{label}</Text>
           {sub != null && <Text style={s.rowSub}>{sub}</Text>}
         </View>
+        <TodoBadge count={badge ?? 0} style={{ marginRight: 6 }} />
         <ChevronRight color={C.faint} size={18} />
       </Pressable>
     );
@@ -485,7 +493,7 @@ export default function SettingsScreen() {
         {/* クーポン: プラン行の隣に置く（コード配布キャンペーンの入口。適用はサーバー直付与） */}
         <Row icon={<Ticket color={C.teal} size={19} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
         <View style={s.sep} />
-        <Row icon={<Award color={C.teal} size={19} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} onPress={() => router2.push('/achievements' as never)} />
+        <Row icon={<Award color={C.teal} size={19} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push('/achievements' as never)} />
         <View style={s.sep} />
         <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />

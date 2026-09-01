@@ -1634,4 +1634,11 @@ export const DE: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Du wirst von deinem aktuellen Konto abgemeldet und kehrst zum Login-Bildschirm zurück.",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Du wirst von deinem aktuellen Konto abgemeldet. Deine Daten gehen dabei nicht verloren. Auf dem nächsten Bildschirm kannst du ein auf deinem Gerät gespeichertes Konto auswählen.",
   "切り替える": "Wechseln",
+  "{n}つのバッジを獲得しました": "{n} Abzeichen erhalten",
+  "「{name}」バッジを獲得しました": "Abzeichen „{name}“ erhalten",
+  "過去の記録から獲得しました": "Aus früheren Aufzeichnungen erhalten",
+  "ほか{n}個": "und {n} weitere",
+  "獲得条件": "Bedingung für Erhalt",
+  "{d} に獲得": "Am {d} erhalten",
+  "まだ獲得していません": "Noch nicht erhalten",
 };

@@ -1634,4 +1634,11 @@ export const PT: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Sair da conta atual e voltar para a tela de login",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Você sairá da conta atual. Seus registros não serão apagados. Na próxima tela, você poderá escolher uma conta salva no seu dispositivo.",
   "切り替える": "Alternar",
+  "{n}つのバッジを獲得しました": "Você conquistou {n} medalhas",
+  "「{name}」バッジを獲得しました": "Você conquistou a medalha \"{name}\"",
+  "過去の記録から獲得しました": "Conquistada com base em registros anteriores",
+  "ほか{n}個": "e mais {n}",
+  "獲得条件": "Como conquistar",
+  "{d} に獲得": "Conquistada em {d}",
+  "まだ獲得していません": "Ainda não conquistada",
 };

@@ -1634,4 +1634,11 @@ export const VI: Record<string, string> = {
   "いまのアカウントからサインアウトして、ログイン画面に戻ります": "Đăng xuất khỏi tài khoản hiện tại và quay lại màn hình đăng nhập",
   "いまのアカウントからサインアウトします。記録は消えません。次の画面で、端末に保存済みのアカウントを選べます。": "Bạn sẽ đăng xuất khỏi tài khoản hiện tại. Lịch sử ghi chép sẽ không bị xóa. Ở màn hình tiếp theo, bạn có thể chọn tài khoản đã được lưu trên thiết bị.",
   "切り替える": "Chuyển đổi",
+  "{n}つのバッジを獲得しました": "Bạn đã nhận được {n} huy hiệu",
+  "「{name}」バッジを獲得しました": "Bạn đã nhận được huy hiệu \"{name}\"",
+  "過去の記録から獲得しました": "Nhận được từ lịch sử ghi chép",
+  "ほか{n}個": "và {n} cái khác",
+  "獲得条件": "Điều kiện nhận",
+  "{d} に獲得": "Đã nhận vào {d}",
+  "まだ獲得していません": "Chưa nhận được",
 };

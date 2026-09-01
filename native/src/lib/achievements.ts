@@ -13,16 +13,26 @@ import { t } from './i18n';
 
 const EARNED_KEY = 'bl-badges-earned';   // { [id]: 'YYYY-MM-DD' }
 const REST_COUNT_KEY = 'bl-rest-count';  // レストタイマー起動回数（端末ローカル）
+// 「この端末で一度でも評価したバッジidの集合」（JSON配列）。
+// あとから定義を増やしたバッジを遡って通知するために必要（planBadgeUnlocksのコメント参照）
+const SEEN_DEFS_KEY = 'bl-badges-seen-defs';
+const UNSEEN_KEY = 'bl-badges-unseen';   // 未読（実績ページでまだ見ていない）獲得id
+const BANNER_KEY = 'bl-badges-banner';   // 食事タブの帯がまだ未消化の獲得id
 // ソフト週目標（'7'|'5'|'4'|'3'・未設定=毎日）。「1日欠け→全崩壊」の完璧主義を
 // 週◯日でOKの自己契約に緩めるためのキー。設定画面と実績ページが共有する
 export const WEEK_GOAL_KEY = 'bl-week-goal';
+
+// バッジのカテゴリ。実績ページの見出しと、メダルの色相（lib/badgeArt）の両方に効く。
+// 4分割なのは「継続／記録／体重／運動」がユーザーの頭の中の分け方であり、
+// 色相を4つに割り当てられる最小単位でもあるため（旧'result'は体重と運動に分けた）
+export type BadgeCat = 'streak' | 'action' | 'body' | 'move';
 
 export type Badge = {
   id: string;
   emoji: string;
   name: string;
   desc: string;                 // 未獲得時に出す条件文
-  cat: 'streak' | 'action' | 'result';
+  cat: BadgeCat;
 };
 
 export type BadgeState = Badge & { earnedOn: string | null };
@@ -131,7 +141,7 @@ export function badgeDefs(): Badge[] {
     { id: 'weekend4', emoji: '📅', name: t('週末も欠かさず'), desc: t('土日を含む週を4週連続で記録する'), cat: 'streak' },
     { id: 'week_promise', emoji: '🤝', name: t('週の約束'), desc: t('自分で決めた週目標を4週連続で守った'), cat: 'streak' },
     { id: 'morning14', emoji: '🌅', name: t('朝型'), desc: t('朝（10時まで）の記録を累計14日'), cat: 'streak' },
-    // 行動
+    // 記録（アプリを使いこなす行動）
     { id: 'photo1', emoji: '📸', name: t('はじめての写真解析'), desc: t('写真から食事を解析する'), cat: 'action' },
     { id: 'photo30', emoji: '🎞️', name: t('カメラの達人'), desc: t('写真解析を累計30枚'), cat: 'action' },
     { id: 'coach10', emoji: '💬', name: t('相談上手'), desc: t('AI相談を累計10往復'), cat: 'action' },
@@ -141,19 +151,135 @@ export function badgeDefs(): Badge[] {
     { id: 'fullday', emoji: '💯', name: t('全部入りの一日'), desc: t('食事・運動・体重を同じ日に記録する'), cat: 'action' },
     { id: 'rest50', emoji: '⏱️', name: t('ジムの相棒'), desc: t('レストタイマーを累計50回使う'), cat: 'action' },
     { id: 'nolate7', emoji: '🌙', name: t('深夜ゼロ週間'), desc: t('21時以降の食事なしで7日間記録する'), cat: 'action' },
-    // 成果
-    { id: 'lost1', emoji: '⚖️', name: t('最初の1kg'), desc: t('開始時から体重-1kg'), cat: 'result' },
-    { id: 'lost3', emoji: '🏅', name: t('-3kg'), desc: t('開始時から体重-3kg'), cat: 'result' },
-    { id: 'lost5', emoji: '🏆', name: t('-5kg'), desc: t('開始時から体重-5kg'), cat: 'result' },
-    { id: 'goal50', emoji: '⛰️', name: t('五合目'), desc: t('目標体重までの道のりの半分を越える'), cat: 'result' },
-    { id: 'goal100', emoji: '🚩', name: t('登頂'), desc: t('目標体重に到達する'), cat: 'result' },
-    { id: 'vol10t', emoji: '🐘', name: t('月間10トン'), desc: t('挙上ボリューム（重量×回数）が月間10t'), cat: 'result' },
-    { id: 'vol20t', emoji: '🦏', name: t('月間20トン'), desc: t('挙上ボリュームが月間20t'), cat: 'result' },
-    { id: 'km50', emoji: '🏃', name: t('月間50km'), desc: t('有酸素の距離が月間50km'), cat: 'result' },
-    { id: 'km100', emoji: '🛣️', name: t('月間100km'), desc: t('有酸素の距離が月間100km'), cat: 'result' },
-    { id: 'burn5000', emoji: '🔋', name: t('週5,000kcal'), desc: t('運動の消費が週に5,000kcal'), cat: 'result' },
-    { id: 'pr5', emoji: '📈', name: t('記録更新×5'), desc: t('自己ベストを5回更新する'), cat: 'result' },
+    // 体重
+    { id: 'lost1', emoji: '⚖️', name: t('最初の1kg'), desc: t('開始時から体重-1kg'), cat: 'body' },
+    { id: 'lost3', emoji: '🏅', name: t('-3kg'), desc: t('開始時から体重-3kg'), cat: 'body' },
+    { id: 'lost5', emoji: '🏆', name: t('-5kg'), desc: t('開始時から体重-5kg'), cat: 'body' },
+    { id: 'goal50', emoji: '⛰️', name: t('五合目'), desc: t('目標体重までの道のりの半分を越える'), cat: 'body' },
+    { id: 'goal100', emoji: '🚩', name: t('登頂'), desc: t('目標体重に到達する'), cat: 'body' },
+    // 運動
+    { id: 'vol10t', emoji: '🐘', name: t('月間10トン'), desc: t('挙上ボリューム（重量×回数）が月間10t'), cat: 'move' },
+    { id: 'vol20t', emoji: '🦏', name: t('月間20トン'), desc: t('挙上ボリュームが月間20t'), cat: 'move' },
+    { id: 'km50', emoji: '🏃', name: t('月間50km'), desc: t('有酸素の距離が月間50km'), cat: 'move' },
+    { id: 'km100', emoji: '🛣️', name: t('月間100km'), desc: t('有酸素の距離が月間100km'), cat: 'move' },
+    { id: 'burn5000', emoji: '🔋', name: t('週5,000kcal'), desc: t('運動の消費が週に5,000kcal'), cat: 'move' },
+    { id: 'pr5', emoji: '📈', name: t('記録更新×5'), desc: t('自己ベストを5回更新する'), cat: 'move' },
   ];
+}
+
+// id→カテゴリの対応（メダルの色相に使う。翻訳を伴わないので一度作れば使い回せる）
+let catCache: Record<string, BadgeCat> | null = null;
+export function badgeCatOf(id: string): BadgeCat {
+  if (!catCache) {
+    catCache = {};
+    for (const b of badgeDefs()) catCache[b.id] = b.cat;
+  }
+  return catCache[id] ?? 'action';
+}
+
+/** id→定義（帯や通知で名前を引くため。表示のたびに現在の言語で組み直す） */
+export function badgeById(id: string): Badge | undefined {
+  return badgeDefs().find((b) => b.id === id);
+}
+
+// ===== 獲得の確定と「遡及通知」 =====
+
+export type BadgeUnlock = {
+  id: string;
+  retro: boolean;   // true=あとから定義が増えたバッジを、過去の記録で遡って獲得した
+};
+
+export type BadgeUnlockInput = {
+  defIds: string[];                    // 現在のバッジ定義id（定義順）
+  ok: Record<string, boolean>;         // 今回の判定結果
+  earned: Record<string, string>;      // 既存の獲得日（id→YYYY-MM-DD）
+  seen: string[] | null;               // 評価済みid集合。null=このキーがまだ無い
+  today: string;
+};
+
+export type BadgeUnlockPlan = {
+  earned: Record<string, string>;      // 保存すべき獲得日
+  seen: string[];                      // 保存すべき評価済みid集合
+  unlocks: BadgeUnlock[];              // 祝祭・帯・未読に出すもの
+  silent: string[];                    // 静かに獲得したもの（通知しない）
+  firstEver: boolean;                  // この端末で初めての評価だったか
+};
+
+/**
+ * 「いま条件を満たしたバッジ」のうち、どれを通知するかを決める純関数。
+ *
+ * 解きたい問題:
+ *  ①あとからバッジ定義を増やしたとき、既存ユーザーの過去の記録で条件を満たしているものは
+ *   「静かに獲得済みになる」だけで、獲得に気づけない（＝バッジが機能していない原因のひとつ）。
+ *  ②一方で、機種変更や再インストール直後は「1年ぶんの記録」に対して30個が一斉に成立する。
+ *   ここで全部を祝うと祝祭がノイズになり、体験としては何も祝っていないのと同じになる。
+ *
+ * 設計:
+ *  ・SEEN_DEFS_KEY に「この端末で一度でも評価したバッジidの集合」を持つ。
+ *  ・**この端末で初めて実績を評価した瞬間だけ**（seenキーが無く、かつ獲得履歴も空）、
+ *   条件を満たすものを silent として静かに確定する（＝再インストール時の暴発をここで止める）。
+ *  ・2回目以降は、条件成立を通常どおり通知する。そのうち
+ *   「seenに無いid＝このアップデートで増えた定義」は retro=true として区別し、
+ *   まとめ文（「3つのバッジを獲得しました」）で見せる。
+ *  ・seenは定義から消えたidも残す（消して再登場したときに遡及通知が再発しないため）。
+ *
+ * 注意: 既存ユーザーの初回移行（seen=null・earnedあり）はfirstEverにしない。
+ * 獲得履歴があるなら「この端末で評価済み」であり、そこで黙らせると本物の獲得を1回取り落とす。
+ */
+export function planBadgeUnlocks(input: BadgeUnlockInput): BadgeUnlockPlan {
+  const { defIds, ok, seen, today } = input;
+  const earned: Record<string, string> = { ...input.earned };
+  const firstEver = seen == null && Object.keys(earned).length === 0;
+  const seenSet = new Set(seen ?? []);
+  const unlocks: BadgeUnlock[] = [];
+  const silent: string[] = [];
+
+  for (const id of defIds) {
+    if (earned[id]) continue;          // 既に獲得済み（条件から外れても消さない）
+    if (!ok[id]) continue;             // まだ条件を満たしていない
+    earned[id] = today;                // 獲得日は初回のみ記録
+    if (firstEver) { silent.push(id); continue; }
+    // seenキーがある＝定義集合を記録済み。そこに無いidは「あとから増えた定義」＝遡及獲得
+    unlocks.push({ id, retro: seen != null && !seenSet.has(id) });
+  }
+
+  // 評価済み集合を更新（既知のid＋今回の定義id。順序は既知→定義順で安定させる）
+  const seenNext = [...(seen ?? [])];
+  for (const id of defIds) if (!seenSet.has(id)) seenNext.push(id);
+
+  return { earned, seen: seenNext, unlocks, silent, firstEver };
+}
+
+// ===== 未読バッジ（気づける導線） =====
+// unseen=実績ページを開くまで残る未読数（🔥チップと設定の実績行の赤ドット）
+// banner=食事タブの帯（一度きり。×またはタップで消化）
+
+async function readIds(key: string): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    const arr = JSON.parse(raw || '[]');
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
+/** 未読バッジ数（0なら何も出さない） */
+export async function unseenBadgeCount(): Promise<number> {
+  return (await readIds(UNSEEN_KEY)).length;
+}
+
+/** 実績ページを見たら未読を消す（帯も同時に消化する＝二重に知らせない） */
+export async function markBadgesSeen(): Promise<void> {
+  try { await AsyncStorage.multiRemove([UNSEEN_KEY, BANNER_KEY]); } catch { /* 次回また消す */ }
+}
+
+/** 食事タブの帯に出す獲得id（未消化のもの） */
+export async function peekBadgeBanner(): Promise<string[]> {
+  return readIds(BANNER_KEY);
+}
+
+/** 帯を消化する（タップ／×で呼ぶ。未読ドットは実績ページを開くまで残す） */
+export async function consumeBadgeBanner(): Promise<void> {
+  try { await AsyncStorage.removeItem(BANNER_KEY); } catch { /* 次回また消す */ }
 }
 
 export async function bumpRestCount(): Promise<void> {
@@ -170,7 +296,8 @@ export type AchievementReport = {
   // goal=自己契約の日数（未設定は7=毎日）、days=月〜日の記録有無
   week: { goal: number; count: number; days: boolean[]; todayIdx: number };
   badges: BadgeState[];
-  newIds: string[];   // 今回の評価で新たに獲得したもの
+  newIds: string[];    // 今回の評価で新たに獲得し、通知（祝祭）に出すもの
+  retroIds: string[];  // そのうち「あとから増えた定義」を過去の記録で獲得したもの
   // 「いつでも共有」用の素材（実績ページの共有ハブが使う）
   share: {
     today: { kcal: number; p: number; f: number; c: number } | null;
@@ -179,12 +306,38 @@ export type AchievementReport = {
   };
 };
 
-/** 全バッジを評価し、新規獲得を永続化して返す */
-export async function evaluateAchievements(): Promise<AchievementReport> {
+// 同時評価の抑止。実績ページ・🔥チップ・食事タブの帯が同じ瞬間に評価を始めても
+// クエリは1回で済ませる（未読・帯の二重登録も防ぐ）
+let evalInFlight: Promise<AchievementReport> | null = null;
+let lastEvalAt = 0;
+const EVAL_MIN_INTERVAL = 10 * 60_000;   // 画面に入るたびに数クエリ投げないための間隔
+
+/** 全バッジを評価し、新規獲得を永続化して返す（同時呼び出しは1回にまとめる） */
+export function evaluateAchievements(): Promise<AchievementReport> {
+  if (evalInFlight) return evalInFlight;
+  const p = runEvaluate();
+  evalInFlight = p;
+  p.then(() => { /* 成功時のみ間隔を更新（失敗は次の機会に再挑戦させる） */ lastEvalAt = Date.now(); })
+    .catch(() => {})
+    .finally(() => { if (evalInFlight === p) evalInFlight = null; });
+  return p;
+}
+
+/**
+ * 「気づける導線」用の軽い入口。評価が走っていればそれを待ち、
+ * 直近に評価済みなら何もしない（force=保存直後など、確実に見たいとき）。
+ */
+export async function maybeEvaluateBadges(force = false): Promise<void> {
+  if (evalInFlight) { await evalInFlight.catch(() => {}); return; }
+  if (!force && Date.now() - lastEvalAt < EVAL_MIN_INTERVAL) return;
+  try { await evaluateAchievements(); } catch { /* 導線が出ないだけ */ }
+}
+
+async function runEvaluate(): Promise<AchievementReport> {
   const today = todayJST();
   const from400 = shiftDate(today, -400);
 
-  const [entriesRes, logsRes, foodsRes, usageRes, goalRes, restRaw, earnedRaw, weekGoalRaw] = await Promise.all([
+  const [entriesRes, logsRes, foodsRes, usageRes, goalRes, restRaw, earnedRaw, weekGoalRaw, seenRaw] = await Promise.all([
     supabase.from('entries').select('date,intake,weight,p,f,c').gte('date', from400).order('date', { ascending: true }).limit(1000),
     supabase.from('logs').select('date,at,text,adj,ex_km,ex_minutes').gte('date', from400).order('date', { ascending: true }).limit(2000),
     supabase.from('my_foods').select('id').limit(50),
@@ -193,6 +346,7 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     AsyncStorage.getItem(REST_COUNT_KEY),
     AsyncStorage.getItem(EARNED_KEY),
     AsyncStorage.getItem(WEEK_GOAL_KEY),
+    AsyncStorage.getItem(SEEN_DEFS_KEY),
   ]);
   const entries = (entriesRes.data ?? []) as { date: string; intake: number | null; weight: number | null; p?: number | null; f?: number | null; c?: number | null }[];
   const logs = (logsRes.data ?? []) as { date: string; at: string | null; text: string; adj: number | null; ex_km: number | null; ex_minutes: number | null }[];
@@ -288,18 +442,36 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     burn5000: maxWeekKcal >= 5000, pr5: prCount >= 5,
   };
 
-  // 永続化（獲得日は初回のみ記録）
-  let earned: Record<string, string> = {};
-  try { earned = JSON.parse(earnedRaw || '{}'); } catch { /* 壊れていたら作り直す */ }
-  const newIds: string[] = [];
-  for (const b of badgeDefs()) {
-    if (ok[b.id] && !earned[b.id]) { earned[b.id] = today; newIds.push(b.id); }
+  // ===== 獲得の確定（通知するか静かに確定するかは planBadgeUnlocks が決める） =====
+  let earnedPrev: Record<string, string> = {};
+  try { earnedPrev = JSON.parse(earnedRaw || '{}'); } catch { /* 壊れていたら作り直す */ }
+  let seenPrev: string[] | null = null;
+  if (seenRaw != null) {
+    try {
+      const arr = JSON.parse(seenRaw);
+      seenPrev = Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+    } catch { seenPrev = []; }
   }
-  if (newIds.length > 0) {
-    try { await AsyncStorage.setItem(EARNED_KEY, JSON.stringify(earned)); } catch { /* 次回また拾う */ }
-  }
+  const defs = badgeDefs();
+  const plan = planBadgeUnlocks({ defIds: defs.map((b) => b.id), ok, earned: earnedPrev, seen: seenPrev, today });
+  const newIds = plan.unlocks.map((u) => u.id);
+  const retroIds = plan.unlocks.filter((u) => u.retro).map((u) => u.id);
 
-  const badges: BadgeState[] = badgeDefs().map((b) => ({ ...b, earnedOn: earned[b.id] ?? null }));
+  try {
+    const writes: [string, string][] = [];
+    if (plan.unlocks.length > 0 || plan.silent.length > 0) writes.push([EARNED_KEY, JSON.stringify(plan.earned)]);
+    if (seenRaw == null || plan.seen.length !== (seenPrev?.length ?? 0)) writes.push([SEEN_DEFS_KEY, JSON.stringify(plan.seen)]);
+    if (newIds.length > 0) {
+      // 未読・帯は積む（前回ぶんを見ていないうちに次を獲得しても取りこぼさない）
+      const unseen = [...new Set([...(await readIds(UNSEEN_KEY)), ...newIds])];
+      const banner = [...new Set([...(await readIds(BANNER_KEY)), ...newIds])];
+      writes.push([UNSEEN_KEY, JSON.stringify(unseen)], [BANNER_KEY, JSON.stringify(banner)]);
+    }
+    if (writes.length > 0) await AsyncStorage.multiSet(writes);
+  } catch { /* 次回また拾う */ }
+
+  const earned = plan.earned;
+  const badges: BadgeState[] = defs.map((b) => ({ ...b, earnedOn: earned[b.id] ?? null }));
 
   // ===== 「いつでも共有」用の素材 =====
   const todayEntry = entries.find((e) => e.date === today && e.intake != null);
@@ -326,7 +498,7 @@ export async function evaluateAchievements(): Promise<AchievementReport> {
     pr: prTop ? { name: prTop[0], kg: Math.round(prTop[1].kg), date: prTop[1].date } : null,
   };
 
-  return { streak, usedFreeze, week, badges, newIds, share };
+  return { streak, usedFreeze, week, badges, newIds, retroIds, share };
 }
 
 // ===== 軽量ストリーク（食事タブの🔥チップ用。日付列だけの2クエリ＋5分キャッシュ） =====
