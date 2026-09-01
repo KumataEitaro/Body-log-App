@@ -1240,4 +1240,8 @@ export const FR: Record<string, string> = {
   "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Et si vous notiez rapidement vos repas du {date} ?",
   "📝 {date}の食事記録がありません": "📝 Pas de repas enregistré pour le {date}",
   "くわしく記録する": "Enregistrer en détail",
+  "広告のない、静かな画面に": "Pour un écran calme et sans publicité",
+  "ライトプラン以上で広告が消えて、記録に集中できます。": "Masquez les publicités à partir du forfait Lite pour vous concentrer sur vos saisies.",
+  "広告": "Publicité",
+  "ライトプランで広告を消せます": "Masquez les publicités avec le forfait Lite",
 };

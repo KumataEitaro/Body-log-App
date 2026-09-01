@@ -77,7 +77,16 @@
       "@react-native-community/datetimepicker",
       "@kingstinct/react-native-healthkit",
       "expo-localization",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "_comment": "App IDはGoogle公式のテストID仮置き。AdMobで実ID取得後にここを差し替えて再ビルド（手順は docs/ADS.md）",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "delayAppMeasurementInit": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

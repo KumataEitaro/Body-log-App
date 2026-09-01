@@ -1340,4 +1340,8 @@ export const EN: Record<string, string> = {
   "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Why not do a quick log for {date}?",
   "📝 {date}の食事記録がありません": "📝 No meal logs for {date}",
   "くわしく記録する": "Log in detail",
+  "広告のない、静かな画面に": "Ad-free, distraction-free screen",
+  "ライトプラン以上で広告が消えて、記録に集中できます。": "Upgrade to Lite Plan or higher to remove ads and focus on your logs.",
+  "広告": "Ads",
+  "ライトプランで広告を消せます": "Remove ads with the Lite Plan",
 };

@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, ScanBarcode } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
+import AdBanner from '@/components/AdBanner';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import DateStrip from '@/components/DateStrip';
@@ -1125,6 +1126,9 @@ export default function LogScreen() {
           {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
         </Animated.View>
         )}
+
+        {/* 無料プラン向けバナー広告（課金有効ビルド×無料プランのときだけ高さが生まれる） */}
+        <AdBanner />
 
         {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
         {vis('recent') && recentMeals.length > 0 && (
