@@ -44,7 +44,6 @@ import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import { WEEK_GOAL_KEY } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
-import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
@@ -1028,10 +1027,7 @@ export default function SettingsScreen() {
         </Pressable>
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
-    </Modal>
-
-    <QuickLogFab />
-    <Modal visible={avatarOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAvatarOpen(false)}>
+    </Modal>    <Modal visible={avatarOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAvatarOpen(false)}>
       <View style={s.sheetBody}>
         <SheetHeader icon={<Smile size={18} color={C.teal} />} title={t("アイコンを選ぶ")} />
         <ScrollView>

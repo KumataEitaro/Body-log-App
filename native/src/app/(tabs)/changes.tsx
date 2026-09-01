@@ -42,7 +42,6 @@ import { Table2 } from 'lucide-react-native';
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
-import QuickLogFab from '@/components/QuickLogFab';
 import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import LiftHistoryCard from '@/components/LiftHistoryCard';
@@ -1163,9 +1162,7 @@ export default function ChangesScreen() {
             </ScrollView>
           </Animated.View>
         </GestureDetector>
-      )}
-      {!editing && <QuickLogFab />}
-      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
+      )}      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
       {undoBar.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
