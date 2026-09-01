@@ -1042,7 +1042,8 @@ export default function LogScreen() {
                           <View key={i} style={{
                             width: `${w * scale}%`, height: '100%',
                             backgroundColor: over ? (bulkP ? col : C.coral) : col,
-                            borderRightWidth: i < segs.length - 1 ? 1.5 : 0, borderRightColor: '#ffffff',
+                            // 区切り線はバーの下地（カード面）と同化させる。白固定だとダークで光る線になる
+                            borderRightWidth: i < segs.length - 1 ? 1.5 : 0, borderRightColor: C.panel,
                           }} />
                         )) : (
                           <View style={[s.pfcFill, { width: `${Math.min(100, (eat / Math.max(1, tgt)) * 100)}%`, backgroundColor: over ? (bulkP ? col : C.coral) : col }]} />
@@ -1324,7 +1325,7 @@ export default function LogScreen() {
               <View key={i} style={s.thumbWrap}>
                 <Image source={{ uri: p.uri }} style={s.thumb} />
                 <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>×</Text>
+                  <Text style={{ color: C.panel, fontSize: 13, fontWeight: '800' }}>×</Text>
                 </Pressable>
               </View>
             ))}
@@ -1694,7 +1695,7 @@ const s = StyleSheet.create({
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, marginBottom: 8,
   },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 1 },
+  btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従
   wRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   wInput: {
     width: 90, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12,
@@ -1706,7 +1707,7 @@ const s = StyleSheet.create({
   chipBtn: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9 },
   chipBtnT: { fontSize: 13, fontWeight: '700', color: C.sub },
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
-  reuseBtnT: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  reuseBtnT: { color: C.panel, fontSize: 17, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
   // 「いつの記録か」の常設表示。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
   dockDate: { fontSize: 11, fontWeight: '700', color: C.faint, paddingHorizontal: 6, marginBottom: 3, fontVariant: ['tabular-nums'] },

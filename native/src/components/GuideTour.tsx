@@ -560,16 +560,17 @@ const s = StyleSheet.create({
     backgroundColor: C.panel, borderRadius: 20, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
-  demoBar: { paddingVertical: 9, alignItems: 'center', backgroundColor: '#f7faf9', borderBottomWidth: 1, borderBottomColor: '#eef1f0' },
+  demoBar: { paddingVertical: 9, alignItems: 'center', backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.line },  // 生HEX淡色はダークで浮くためトークン化
   demoBarT: { fontSize: 13, fontWeight: '800', color: C.sub },
   demoNext: { backgroundColor: HILITE, borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 16, alignSelf: 'center', paddingHorizontal: 40 },
   demoUser: { alignSelf: 'flex-end', backgroundColor: C.ink, borderRadius: 14, borderBottomRightRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '90%' },
-  demoUserT: { color: '#fff', fontSize: 13, lineHeight: 18 },
-  demoAi: { alignSelf: 'flex-start', backgroundColor: '#f2f4f1', borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '92%' },
+  demoUserT: { color: C.panel, fontSize: 13, lineHeight: 18 },  // ink地（ダーク=明色）に追従
+  demoAi: { alignSelf: 'flex-start', backgroundColor: C.chipBg, borderRadius: 14, borderBottomLeftRadius: 4, paddingHorizontal: 12, paddingVertical: 8, maxWidth: '92%' },  // 生HEX淡色はダークで浮くためトークン化
   demoAiT: { color: C.ink, fontSize: 13, lineHeight: 19 },
   beak: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
-  beakUp: { top: -10, borderBottomWidth: 10, borderBottomColor: '#fff' },
-  beakDown: { bottom: -10, borderTopWidth: 10, borderTopColor: '#fff' },
+  // 吹き出しの矢羽根は本体（C.panel）と同色にする（白固定だとダークで矢だけ白く浮く）
+  beakUp: { top: -10, borderBottomWidth: 10, borderBottomColor: C.panel },
+  beakDown: { bottom: -10, borderTopWidth: 10, borderTopColor: C.panel },
   cardWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
     width: '100%', maxWidth: 380, backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'stretch',

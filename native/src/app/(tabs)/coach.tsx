@@ -334,7 +334,7 @@ export default function CoachScreen() {
                 <View style={[s.bubble, m.role === 'user' ? s.bUser : s.bAi]}>
                   {m.role === 'ai'
                     ? <RichText text={m.text} style={s.bubbleT} />
-                    : <Text style={[s.bubbleT, { color: '#fff' }]}>{m.text}</Text>}
+                    : <Text style={[s.bubbleT, { color: C.panel }]}>{m.text}</Text>}
                 </View>
                 {/* プラン上限（429 plan_limit）のときだけ、上限到達の文脈つきペイウォールへの導線 */}
                 {m.upgrade && (
@@ -460,7 +460,7 @@ export default function CoachScreen() {
                     <View key={i} style={[s.bubble, e.role === 'user' ? s.bUser : s.bAi]}>
                       {e.role === 'ai'
                         ? <RichText text={e.text} style={s.bubbleT} />
-                        : <Text style={[s.bubbleT, { color: '#fff' }]}>{e.text}</Text>}
+                        : <Text style={[s.bubbleT, { color: C.panel }]}>{e.text}</Text>}
                     </View>
                   ))}
                 </View>

@@ -210,7 +210,7 @@ export default function BodyPhotosCard() {
       ) : (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : t('今週の写真を撮る')}
-                        leading={<Camera size={16} color="#fff" strokeWidth={2.2} />} onPress={() => pick(true)} />
+                        leading={<Camera size={16} color={C.panel} strokeWidth={2.2} />} onPress={() => pick(true)} />
           <OptionButton variant="tonal" label={t('選ぶ')}
                         leading={<ImagePlus size={16} color={C.ink} strokeWidth={2.2} />} onPress={() => pick(false)} />
         </View>
@@ -269,7 +269,7 @@ const s = StyleSheet.create({
     flex: 1, flexDirection: 'row', gap: 6, backgroundColor: C.ink, borderRadius: 999,
     paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
   },
-  addBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  addBtnT: { color: C.panel, fontSize: 13, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   addGhost: {
     flexDirection: 'row', gap: 6, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line,
     borderRadius: 999, paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center',

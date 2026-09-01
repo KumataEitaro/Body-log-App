@@ -237,6 +237,6 @@ const s = StyleSheet.create({
   segT: { fontSize: 15, fontWeight: '800', color: C.sub },
   err: { color: C.coral, fontSize: 15, marginTop: 10 },
   primaryBtn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 18 },
-  primaryBtnT: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  primaryBtnT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   linkT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
 });

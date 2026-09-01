@@ -128,7 +128,8 @@ export function GhostPair({ eaten, others, focus, target, color, pulse }: {
       {focusing && (
         <Animated.View style={{
           width: pct(fW), height: '100%', backgroundColor: fill,
-          borderLeftWidth: 1.5, borderLeftColor: '#ffffff',
+          // 区切り線はバーの下地（カード面）と同化させる。白固定だとダークで光る線になる
+          borderLeftWidth: 1.5, borderLeftColor: C.panel,
         }} />
       )}
     </>

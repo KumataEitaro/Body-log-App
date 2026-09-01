@@ -96,8 +96,8 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
                 {/* チップは幅26px固定のため、文字サイズ拡大は上限1.3で頭打ちにする */}
                 <Text style={[s.chipW, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{WD()[cdt.getDay()]}</Text>
                 <Text style={[s.chipD, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{cdt.getDate()}</Text>
-                {/* 今日チップの小さなドット（選択中は白に反転） */}
-                {isT && <View style={[s.todayDot, on && { backgroundColor: '#fff' }]} />}
+                {/* 今日チップの小さなドット（選択中は地色に反転。ダークではink地が明色になるため白固定は不可） */}
+                {isT && <View style={[s.todayDot, on && { backgroundColor: C.panel }]} />}
               </Pressable>
             );
           })}
@@ -165,7 +165,9 @@ const s = StyleSheet.create({
   },
   chipW: { fontSize: 11, lineHeight: 13, fontWeight: '700', color: C.faint },
   chipD: { fontSize: 12, lineHeight: 15, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  chipTOn: { color: '#fff' },
+  // ink地の上の文字。ダークではC.inkが明色に反転するため、白固定ではなく背景トークンで吸収する
+  // （ライト=ink地に白文字 / ダーク=明色地に暗文字。βフィードバック 2026-09-02「選択チップが白く浮く」対応）
+  chipTOn: { color: C.panel },
   todayDot: { position: 'absolute', bottom: 3, width: 3, height: 3, borderRadius: 2, backgroundColor: C.teal },
   todayPill: {
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,

@@ -515,7 +515,7 @@ const s = StyleSheet.create({
   input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 17, color: C.ink },
   pfcToggle: { fontSize: 13, fontWeight: '800', color: C.sub },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
-  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
   note: { fontSize: 13, color: C.sub, lineHeight: 18, marginBottom: 6 },

@@ -462,7 +462,7 @@ const s = StyleSheet.create({
   pvChip: { paddingHorizontal: 11, paddingVertical: 6 },
   pvChipOn: { backgroundColor: C.ink, borderColor: C.ink },
   pvChipT: { fontSize: 13, fontWeight: '700', color: C.sub },
-  pvChipTOn: { color: '#fff' },
+  pvChipTOn: { color: C.panel },  // ink地の文字はダークで反転するため背景トークンで吸収
   pvHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 6 },
   pvNow: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   pvUnit: { fontSize: 13, color: C.sub, fontWeight: '700' },
