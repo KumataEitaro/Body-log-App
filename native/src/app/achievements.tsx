@@ -4,12 +4,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { Share2, Flame, PartyPopper } from 'lucide-react-native';
+import { Share2, Flame, PartyPopper, UserPlus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { C } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { evaluateAchievements, markBadgesSeen, type AchievementReport, type BadgeCat, type BadgeState } from '@/lib/achievements';
+import { shareInvite } from '@/lib/invite';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import BadgeIcon from '@/components/BadgeIcon';
 
@@ -213,6 +214,14 @@ export default function AchievementsScreen() {
                     <Text style={s.shareBtnT}>{o.label}</Text>
                   </Pressable>
                 ))}
+                {/* ステッカーと並べて「アプリ自体を渡す」導線を1つ置く（feat/invite）。
+                    ステッカーは自慢を見せるだけで、見た人が入れる線が無かった。
+                    塗りを変えて、ステッカー作成とは別種の操作だと分かるようにする */}
+                <Pressable style={[s.shareBtn, s.inviteBtn]}
+                  onPress={() => { shareInvite().catch(() => {}); }}>
+                  <UserPlus size={13} color={C.ink} />
+                  <Text style={[s.shareBtnT, { color: C.ink }]}>{t('アプリを紹介する')}</Text>
+                </Pressable>
               </View>
             </View>
 
@@ -285,6 +294,8 @@ const s = StyleSheet.create({
   shareRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   shareBtn: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
   shareBtnT: { fontSize: 13, fontWeight: '700', color: C.teal },
+  // 「アプリを紹介する」だけは無彩色。ステッカー作成（teal）と別種の操作だと色で分ける
+  inviteBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.chipBg, borderColor: C.line },
   count: { fontSize: 12.5, fontWeight: '700', color: C.sub, marginBottom: 4 },
   catT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

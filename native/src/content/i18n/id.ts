@@ -1646,4 +1646,8 @@ export const ID: Record<string, string> = {
   "※ 表示は推定です。安全確認には使えません。": "※ Angka ini adalah estimasi. Tidak dapat digunakan untuk memastikan keamanan medis.",
   "設定してみる": "Coba atur sekarang",
   "いまはしない": "Nanti saja",
+  "アプリを紹介する": "Rekomendasikan Aplikasi",
+  "友だちを誘う": "Undang Teman",
+  "紹介ページのリンクを共有します（Androidは準備中）": "Bagikan tautan halaman rekomendasi (Android sedang disiapkan)",
+  "BodyLogerで記録してます。「親子丼たべた」って書くだけでカロリーが出ます。一緒にやりませんか？": "Saya mencatat di BodyLoger. Cukup tulis \"makan oyakodon\" dan kalorinya langsung muncul. Mau coba bareng?",
 };

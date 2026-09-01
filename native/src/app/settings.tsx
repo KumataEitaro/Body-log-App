@@ -12,7 +12,7 @@ import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
@@ -44,6 +44,7 @@ const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const })
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
 import { WEEK_GOAL_KEY, unseenBadgeCount } from '@/lib/achievements';
+import { shareInvite } from '@/lib/invite';
 import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
@@ -683,6 +684,12 @@ export default function SettingsScreen() {
         <Row icon={<BookOpen color={C.teal} size={ICON.xl} />} label={t('読みもの')}
              sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}
              onPress={() => openSheet('columns')} />
+        <View style={s.sep} />
+        {/* 友だちを誘う（feat/invite）。共有シートに紹介文＋招待リンクを渡す。
+            リンク先は未ログインでも見える紹介ページ（/invite）で、名前は表示だけに使う */}
+        <Row icon={<UserPlus color={C.teal} size={ICON.xl} />} label={t('友だちを誘う')}
+             sub={t('紹介ページのリンクを共有します（Androidは準備中）')}
+             onPress={() => { shareInvite(name).catch(() => {}); }} />
       </View>
 
       {/* アカウント */}

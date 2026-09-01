@@ -29,6 +29,7 @@ export async function proxy(request: NextRequest) {
   const isAuthPage = path === '/login';
   const isPublicPage = path === '/terms' || path === '/privacy' || path === '/support' // 規約・サポートは未ログインでも閲覧可（審査要件）
     || path === '/sunset' // ブラウザ版クローズの案内ページ
+    || path === '/invite' // 招待ランディング（アプリの「友だちを誘う」の着地点。未ログインの初対面が見る）
     || path === '/delete-account' // アカウント削除案内（Google Play必須のアプリ外URL）
     || (path.startsWith('/dev-preview') && process.env.NODE_ENV !== 'production') // UI確認用（開発時のみ）
     || path.startsWith('/dev-preview/concept') // UIコンセプト比較モック（静的・データなし・実機確認用に公開）

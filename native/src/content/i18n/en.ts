@@ -1743,4 +1743,8 @@ export const EN: Record<string, string> = {
   "※ 表示は推定です。安全確認には使えません。": "*Estimates only. Do not use for safety verification.",
   "設定してみる": "Set up now",
   "いまはしない": "Not now",
+  "アプリを紹介する": "Share the app",
+  "友だちを誘う": "Invite friends",
+  "紹介ページのリンクを共有します（Androidは準備中）": "Share the referral link (Android coming soon)",
+  "BodyLogerで記録してます。「親子丼たべた」って書くだけでカロリーが出ます。一緒にやりませんか？": "I'm tracking with BodyLoger! Just typing \"had Oyakodon\" calculates the calories. Want to join me?",
 };

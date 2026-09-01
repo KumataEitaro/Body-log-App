@@ -112,13 +112,19 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
           <Text style={[st.tagline, { color: toneSub(tone) }]}>{data.sub}</Text>
         </>
       )}
-      {/* 小さなワードマーク＝ダウンロード導線（Strava式のブランド刷り込み） */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 }}>
-        <Svg width={12} height={12} viewBox="0 0 24 24">
+      {/* アプリ名の署名（feat/invite）。
+          ステッカーを見た人が辿り着ける唯一の手がかりなので必ず入れる。ただし主役は
+          数字と発見文なので、絵の右下に小さく落款のように置く（alignSelf:'flex-end'）。
+          QRコードは入れない — 写真の上に載せる透過画像に四角い黒塊が乗ると絵が汚れるうえ、
+          「BodyLoger」はApp Storeの検索で一意に当たるので名前だけで足りる。
+          色はトーン（白/黒）に追従（toneColor/toneSub）。中央寄せの本文には触らないため、
+          既存の各ステッカーのレイアウトは1pxも動かない。 */}
+      <View style={st.sign}>
+        <Svg width={11} height={11} viewBox="0 0 24 24">
           <Circle cx={12} cy={12} r={10} stroke={col} strokeWidth={2.5} fill="none" />
           <Path d="M7 13 L11 16 L17 8" stroke={col} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
-        <Text style={[st.brand, { color: toneSub(tone) }]}>BodyLoger</Text>
+        <Text style={[st.brand, { color: toneSub(tone) }]} maxFontSizeMultiplier={1.2}>BodyLoger</Text>
       </View>
     </View>
   );
@@ -223,5 +229,7 @@ const st = StyleSheet.create({
   lawTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', lineHeight: 24, maxWidth: 240, marginTop: 6 },
   newPill: { backgroundColor: '#ff4d42', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
   newPillT: { fontSize: 10.5, fontWeight: '900', color: '#fff', letterSpacing: 2.5 },
+  // 署名（右下の落款）。alignSelf:'flex-end' で本文の中央寄せを崩さずに右へ寄せる
+  sign: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-end' },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 });
