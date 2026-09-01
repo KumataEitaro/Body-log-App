@@ -197,8 +197,10 @@ workflows:
   # （サービスアカウント未作成のため）。作成後に publishing > google_play を足して自動化する。
   rn-android:
     name: BodyLog RN (native/) → Google Play (aab)
-    # Androidビルドにmacは不要。linuxインスタンスでコストを抑える
-    instance_type: linux_x2
+    # linux_x2は無料の個人プランでは使えない（"instance type is not available with the
+    # current billing plan"で失敗・2026-09-01実測）。iOS側と同じmacマシンならAndroidも
+    # ビルドできるため揃える。有料チーム化したらlinux_x2に戻すとコスト減
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       # iOS側（rn-testflight）とNodeメジャーを揃える。JavaはAGP要件の17
