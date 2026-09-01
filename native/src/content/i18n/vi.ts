@@ -1240,4 +1240,8 @@ export const VI: Record<string, string> = {
   "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Bạn có muốn ghi lại sơ qua cho {date} không?",
   "📝 {date}の食事記録がありません": "📝 Không có nhật ký ăn uống cho {date}",
   "くわしく記録する": "Ghi lại chi tiết",
+  "広告のない、静かな画面に": "Trải nghiệm màn hình yên tĩnh, không quảng cáo",
+  "ライトプラン以上で広告が消えて、記録に集中できます。": "Nâng cấp lên gói Lite trở lên để tắt quảng cáo và tập trung vào việc ghi chép.",
+  "広告": "Quảng cáo",
+  "ライトプランで広告を消せます": "Tắt quảng cáo với gói Lite",
 };

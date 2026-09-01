@@ -1324,4 +1324,8 @@ export const ES: Record<string, string> = {
   "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 ¿Quieres registrar {date} de forma rápida?",
   "📝 {date}の食事記録がありません": "📝 No hay registro de comidas para {date}",
   "くわしく記録する": "Registrar en detalle",
+  "広告のない、静かな画面に": "Una pantalla tranquila, sin anuncios",
+  "ライトプラン以上で広告が消えて、記録に集中できます。": "Con el Plan Lite o superior, los anuncios desaparecen para que puedas concentrarte en registrar.",
+  "広告": "Anuncio",
+  "ライトプランで広告を消せます": "Elimina los anuncios con el Plan Lite",
 };

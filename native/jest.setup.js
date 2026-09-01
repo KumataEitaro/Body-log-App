@@ -170,6 +170,16 @@ jest.mock('expo-linear-gradient', () => {
   const RN = require('react-native');
   return { LinearGradient: RN.View };
 });
+// --- AdMob（バナーは描画しない・importだけ解決させる。gate非activeのテスト環境では
+//     AdBanner自体がnullを返すため、実挙動には影響しない） ---
+jest.mock('react-native-google-mobile-ads', () => ({
+  __esModule: true,
+  default: () => ({ initialize: jest.fn(async () => []) }),
+  BannerAd: () => null,
+  BannerAdSize: { ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER', ADAPTIVE_BANNER: 'ADAPTIVE_BANNER', BANNER: 'BANNER' },
+  TestIds: { ADAPTIVE_BANNER: 'ca-app-pub-3940256099942544/9214589741', BANNER: 'ca-app-pub-3940256099942544/2934735716' },
+}));
+
 jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn(async () => 'file:///tmp/sticker.png') }));
 jest.mock('expo-clipboard', () => ({ setImageAsync: jest.fn(async () => {}) }));
 jest.mock('expo-media-library', () => ({

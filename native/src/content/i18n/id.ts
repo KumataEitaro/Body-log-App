@@ -1240,4 +1240,8 @@ export const ID: Record<string, string> = {
   "🍃 {date}の分、ざっくりだけ記録しませんか": "🍃 Mau catat singkat saja untuk tanggal {date}?",
   "📝 {date}の食事記録がありません": "📝 Tidak ada catatan makan untuk tanggal {date}",
   "くわしく記録する": "Catat detail",
+  "広告のない、静かな画面に": "Layar tenang tanpa iklan",
+  "ライトプラン以上で広告が消えて、記録に集中できます。": "Bebas iklan dengan Paket Lite atau lebih tinggi, agar Anda bisa fokus mencatat.",
+  "広告": "Iklan",
+  "ライトプランで広告を消せます": "Hapus iklan dengan Paket Lite",
 };

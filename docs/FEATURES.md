@@ -342,7 +342,12 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   隠さず行タイトルに👑（CrownBadge）を添え、タップで文脈見出しつきペイウォールへ誘導
   （moment of intent）。判定はuseGate（RCキー未設定ビルドはactive=false＝王冠非表示・
   通常遷移、profiles.planがnull/'free'のときだけゲート・free以外は全開放）。
-  src→見出しのマップ（onboarding/laws/digest）で文脈コピーを出し分け、未知のsrcは汎用文言
+  src→見出しのマップ（onboarding/laws/digest/ads）で文脈コピーを出し分け、未知のsrcは汎用文言
+- 無料プランのバナー広告（**課金有効ビルドのみ・NPA固定**）: 食事タブ「今日の記録」直下に
+  アンカー型アダプティブバナー1枚（AdBanner）。useGateがactiveかつplanがnull/'free'の
+  ときだけ描画＝RCキー未設定の現運用では誰にも出ない（ライト「広告なし」の実体と課金解放が
+  同時点灯）。ATTは出さず非パーソナライズ固定・読み込み失敗やExpo Goでは高さ0。
+  「ライトプランで広告を消せます」→/paywall?src=ads。実ID設定手順は docs/ADS.md
 
 ## 実績ページ（/achievements）
 - 🔥ストリークヒーロー＋お守りの説明（週1回の自動救済・使用日表示）
