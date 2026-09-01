@@ -9,8 +9,16 @@ import { t, apiLang } from './i18n';
 
 export type QuickImage = { data: string; mime: string };
 
-/** AIの会話的な返し（表示のみ。DBには書かない） */
-export type ParsedExtras = { reply: string; questions: string[]; assumptions: string[] };
+/**
+ * AIの会話的な返し（表示のみ。DBには書かない）
+ * dietFlags = 食事の制約（B-18）のAI判定。品目名→強さ。
+ * FoodItemには持たせない（logs.itemsに推定の判定が焼き付くのを避ける・
+ * 判定はあくまで解析したその場の警告で、記録の一部ではない）。
+ */
+export type ParsedExtras = {
+  reply: string; questions: string[]; assumptions: string[];
+  dietFlags: Record<string, 'high' | 'maybe'>;
+};
 export type ParseTurn = { role: 'user' | 'ai'; text: string };
 export type ParsedResult = {
   items: FoodItem[];
@@ -47,10 +55,20 @@ export async function analyzeFood(
   }
   const r = json.result;
   const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 4) : []);
+  // 食事の制約（B-18）: AIが品目に付けた dietFlag を items から外して extras に移す。
+  // high/maybe だけ拾い、none・未知値は落とす（「該当なし」を値として持たない・§6）
+  const dietFlags: Record<string, 'high' | 'maybe'> = {};
+  const items: FoodItem[] = (r.items || []).map((it) => {
+    const { dietFlag, ...rest } = it as FoodItem & { dietFlag?: unknown };
+    if ((dietFlag === 'high' || dietFlag === 'maybe') && typeof rest.name === 'string') {
+      dietFlags[rest.name] = dietFlag;
+    }
+    return rest as FoodItem;
+  });
   return {
     ok: true,
     result: {
-      items: r.items || [],
+      items,
       weight: r.weight ?? null,
       waist: r.waist ?? null,
       ex: (r.ex as ExLevel) ?? null,
@@ -61,6 +79,7 @@ export async function analyzeFood(
       reply: typeof r.reply === 'string' ? r.reply.slice(0, 300) : '',
       questions: strs(r.questions),
       assumptions: strs(r.assumptions),
+      dietFlags,
     },
   };
 }

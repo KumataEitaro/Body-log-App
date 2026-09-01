@@ -11,7 +11,7 @@ import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, e
 import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import ColumnReader from '@/components/ColumnReader';
@@ -31,6 +31,11 @@ import { supabase } from '@/lib/supabase';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { C, rgba, sheetTopPad } from '@/lib/ui';
+import { useGate } from '@/lib/gate';
+import CrownBadge from '@/components/CrownBadge';
+import { DIET_RULES } from '@/content/dietRules';
+import { fromRow as dietFromRow, saveDiet, EMPTY_DIET, type DietProfile } from '@/lib/diet';
+import { DietDisclaimerPanel, DietConsentCheck, dietModeLabel, dietModeSub } from '@/components/DietNotes';
 
 // Androidリップル（Material 3の作法）。テーマ色の微透明・行のborderRadius内にクリップ。
 // iOSはandroid_rippleを無視するため分岐不要
@@ -43,7 +48,7 @@ import QuickLogFab from '@/components/QuickLogFab';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns';
+type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns' | 'diet';
 
 // 記録のCSVエクスポート（データは本人のもの、を形にする）
 function ExportRow() {
@@ -104,6 +109,13 @@ export default function SettingsScreen() {
   // 制約プロフィール: AIに毎回伝える恒常的な前提（アレルギー・宗教・苦手・予算など）。
   // 自由記述1カラム（profiles.constraints_note・migration-22）＝構造化しないことで入力障壁を下げる
   const [constraintsNote, setConstraintsNote] = useState('');
+  // 食事の制約（B-18・migration-26）: 警告の判定基準。上のconstraints_noteとは役割が違う
+  // （あちらはAIへの好み、こちらは警告の基準＝誤検知のコストが桁違いなので混ぜない）
+  const [diet, setDiet] = useState<DietProfile>(EMPTY_DIET);
+  // 同意チェックボックスの状態。未同意（consentAt==null）のあいだONにできない鍵になる
+  const [dietAgree, setDietAgree] = useState(false);
+  const [dietBusy, setDietBusy] = useState(false);
+  const [dietMsg, setDietMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [foods, setFoods] = useState<MyFoodLite[]>([]);
   // マイミール（複数品目のセット）。migration-24未適用のDBでは常に空＝節ごと出ない
@@ -119,6 +131,7 @@ export default function SettingsScreen() {
   const [reportBusy, setReportBusy] = useState(false);
   const [reportErr, setReportErr] = useState('');
   const guide = useGuide();
+  const gate = useGate();
 
   // 相談タブ等からのディープリンク（/settings?open=goalW）で目的のシートを直接開く
   const { open, ts } = useLocalSearchParams<{ open?: string; ts?: string }>();
@@ -127,7 +140,8 @@ export default function SettingsScreen() {
     const stamp = `${open}-${ts ?? ''}`;  // tsを含めると同じシートへの2回目の遷移でも開く
     if (!open || consumedOpen.current === stamp) return;
     consumedOpen.current = stamp;
-    if (open === 'goalW' || open === 'goalT' || open === 'profile' || open === 'theme') openSheet(open);
+    // 'diet' は警告行の「詳しく」リンクからの遷移先（免責の全文が読める場所）
+    if (open === 'goalW' || open === 'goalT' || open === 'profile' || open === 'theme' || open === 'diet') openSheet(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ts]);
 
@@ -153,6 +167,10 @@ export default function SettingsScreen() {
       if (prof.life_factor != null) setLife(String(prof.life_factor));
       setMaternity(prof.maternity === true);   // 列が無い旧DBではundefined → false扱い
       setConstraintsNote(prof.constraints_note ?? '');  // 列が無い旧DBではundefined → 空欄
+      // migration-26未適用のDBでは3列ともundefined → 未設定のまま（節は出るが常にオフ）
+      const d = dietFromRow(prof as Record<string, unknown>);
+      setDiet(d);
+      setDietAgree(d.consentAt != null);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -258,6 +276,45 @@ export default function SettingsScreen() {
       }
       setMsg(error ? { ok: false, text: t('保存に失敗しました。もう一度お試しください。') } : { ok: true, text: t('保存しました。') });
     } finally { setBusy(false); }
+  }
+
+  // ===== 食事の制約（B-18・docs/DIET-MODES.md §3 / §4 / §6） =====
+  // AI判定・自由記述・メニュー判定だけが有料。端末内の辞書判定（黒）は無料でも動くので、
+  // 無料ユーザーもプリセットをONにできる（安全に関わる最低限を有料の壁の裏に置かない）
+  const dietGated = gate.gated('diet');
+
+  /** 同意ゲート: 未同意のあいだはONにできない。断るときは必ず理由を言う */
+  function requireDietConsent(): boolean {
+    if (diet.consentAt != null || dietAgree) return true;
+    setDietMsg({ ok: false, text: t('上の内容を読んで、同意のチェックを入れてからONにしてください。') });
+    return false;
+  }
+
+  function toggleDietMode(key: string) {
+    if (!requireDietConsent()) return;
+    setDietMsg(null);
+    setDiet((p) => ({
+      ...p,
+      modes: p.modes.includes(key) ? p.modes.filter((k) => k !== key) : [...p.modes, key],
+    }));
+  }
+
+  async function saveDietSettings() {
+    if (!requireDietConsent()) return;
+    setDietBusy(true); setDietMsg(null);
+    try {
+      // 同意日時は初回だけ刻む（後日「いつ何に同意したか」を再現できるように・§6-7）
+      const next: DietProfile = { ...diet, consentAt: diet.consentAt ?? new Date().toISOString() };
+      const r = await saveDiet(next);
+      if (r.ok) {
+        setDiet(next);
+        setDietMsg({ ok: true, text: t('保存しました。') });
+      } else if (r.reason === 'no_column') {
+        setDietMsg({ ok: false, text: t('この機能はまだ使えません（データベースの更新待ちです）。') });
+      } else {
+        setDietMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') });
+      }
+    } finally { setDietBusy(false); }
   }
 
   async function healthImportWeights() {
@@ -416,6 +473,16 @@ export default function SettingsScreen() {
         <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
         <Row icon={<Salad color={C.teal} size={19} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
+      </View>
+
+      {/* 食事の制約（B-18）。オンボーディングには入れない（同意を流し読みさせたくないため） */}
+      <Text style={s.groupLabel}>{t('食事の制約')}</Text>
+      <View style={s.group}>
+        <Row icon={<Ban color={C.teal} size={19} />} label={t('食べないものを登録する')}
+             sub={diet.modes.length > 0 || diet.custom.trim()
+               ? t('{n}件を設定中。解析結果に該当の可能性を表示します', { n: diet.modes.length + (diet.custom.trim() ? 1 : 0) })
+               : t('ビーガン・グルテンフリーなど。該当の可能性を警告します（推定）')}
+             onPress={() => openSheet('diet')} />
       </View>
 
       {/* 目標 */}
@@ -635,6 +702,88 @@ export default function SettingsScreen() {
           />
           <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+
+    {/* ===== 食事の制約モーダル（B-18・docs/DIET-MODES.md §3） =====
+        構成の順番そのものが防御になっている: ①免責 → ②同意 → ③トグル。
+        免責より先にトグルを置く並べ替えをしないこと */}
+    <Modal visible={sheet === 'diet'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+        <SheetHeader icon={<Ban size={18} color={C.teal} />} title={t('食事の制約')} />
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          {/* §6-2: 免責は最上部。同意済みでも消さない（同意は薄れるので設定を触るたび読める場所に残す） */}
+          <DietDisclaimerPanel />
+          {diet.consentAt == null ? (
+            <DietConsentCheck checked={dietAgree} onToggle={() => { setDietAgree((v) => !v); setDietMsg(null); }} />
+          ) : (
+            <Text style={s.note}>{t('{d} に上記を確認済みです。', { d: diet.consentAt.slice(0, 10) })}</Text>
+          )}
+
+          <Text style={[s.label, { marginTop: 16 }]}>{t('食べないもの')}</Text>
+          <Text style={s.note}>{t('ONにすると、解析結果の品目に該当の可能性を表示します。記録そのものは止めません。')}</Text>
+          {DIET_RULES.map((r) => (
+            <View key={r.key} style={s.dietRow}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.dietName}>{dietModeLabel(r.key)}</Text>
+                  {/* 王冠は行から機能を隠さない目印（無料でも内容は読めてONにできる） */}
+                  {dietGated && (
+                    <Pressable hitSlop={8} onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+                      <CrownBadge size={13} />
+                    </Pressable>
+                  )}
+                </View>
+                <Text style={s.dietSub}>{dietModeSub(r.key)}</Text>
+              </View>
+              <Switch value={diet.modes.includes(r.key)} onValueChange={() => toggleDietMode(r.key)}
+                      trackColor={{ true: C.teal }} />
+            </View>
+          ))}
+
+          {/* §4: 無料でONにしたときの1行。何が動いていて何が有料かを隠さない */}
+          {dietGated && diet.modes.length > 0 && (
+            <Pressable style={s.dietUpsell} onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+              <CrownBadge size={14} />
+              <Text style={s.dietUpsellT}>
+                {t('かんたん判定（辞書のみ）で動いています。AIによる読み取りとメニューの判定はスタンダード以上です。')}
+              </Text>
+            </Pressable>
+          )}
+
+          {/* その他（自由記述）: AIにそのまま渡す指定なのでスタンダード以上 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18 }}>
+            <Text style={[s.label, { marginTop: 0 }]}>{t('その他（自由記述）')}</Text>
+            {dietGated && <CrownBadge size={13} />}
+          </View>
+          <Text style={[s.note, { marginBottom: 4 }]}>{t('自分の言葉で書けます。AIが解析のときに読みます（スタンダード以上）。')}</Text>
+          {dietGated ? (
+            <Pressable onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+              <View style={[s.input, s.dietInputLocked]}>
+                <Text style={s.dietLockedT}>{t('例: えび・かにを避けています。パクチーも無理です。')}</Text>
+              </View>
+            </Pressable>
+          ) : (
+            <TextInput
+              style={[s.input, { minHeight: 88, textAlignVertical: 'top' }]} multiline
+              value={diet.custom}
+              onChangeText={(v) => { setDiet((p) => ({ ...p, custom: v })); setDietMsg(null); }}
+              placeholder={t('例: えび・かにを避けています。パクチーも無理です。')}
+              placeholderTextColor={C.faint}
+            />
+          )}
+
+          <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveDietSettings} busy={dietBusy} />
+          {dietMsg && <Text style={[s.msg, { color: dietMsg.ok ? C.teal : C.coral }]}>{dietMsg.text}</Text>}
+          {/* §6-4の常設表記と同じ趣旨を、設定側にも置く */}
+          <Text style={[s.note, { marginTop: 16 }]}>
+            {t('表示のない品目も、対象を含む可能性があります。この機能は安全確認の代わりにはなりません。')}
+          </Text>
+          <Text style={[s.note, { marginTop: 8 }]}>
+            {t('AI相談・献立提案への「前提」は、プロフィール編集の入力欄で別に設定できます。')}
+          </Text>
+          <View style={{ height: 32 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -1018,6 +1167,22 @@ const s = StyleSheet.create({
   btnDanger: { backgroundColor: C.coral, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
   note: { fontSize: 13, color: C.sub, lineHeight: 19 },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 10 },
+
+  // ===== 食事の制約（B-18） =====
+  dietRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line,
+  },
+  dietName: { fontSize: 15, fontWeight: '700', color: C.ink },
+  dietSub: { fontSize: 12, color: C.sub, lineHeight: 17, marginTop: 2 },
+  dietUpsell: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
+    backgroundColor: C.chipBg, borderRadius: 12, padding: 10,
+  },
+  dietUpsellT: { flex: 1, fontSize: 12, lineHeight: 17, color: C.sub },
+  // 自由記述の有料ロック時: 入力できないことが見て分かる面（プレースホルダだけ見せる）
+  dietInputLocked: { minHeight: 88, backgroundColor: C.chipBg, justifyContent: 'flex-start' },
+  dietLockedT: { fontSize: 15, color: C.faint, lineHeight: 21 },
   foodRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line },
   // マイミール節の小見出し（マイ食品一覧の下に区切って置く）
   mealHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, marginBottom: 4 },

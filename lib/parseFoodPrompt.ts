@@ -14,8 +14,10 @@ export function buildParseFoodPrompt(input: {
   outLang: string;
   /** 直前のやりとり（聞き返しへの返答を文脈として繋ぐ。無ければ空文字） */
   historyBlock: string;
+  /** 食事の制約（B-18）の注入ブロック。未設定・無料プランでは空文字＝従来と同一の文面 */
+  dietBlock?: string;
 }): string {
-  const { text, dictBlock, outLang, historyBlock } = input;
+  const { text, dictBlock, outLang, historyBlock, dietBlock } = input;
   return (
     'あなたは日本の管理栄養士 兼 トレーニング記録係です。ユーザーの1日の記録メモ（と食事写真）を解析してください。\n' +
     '\n【タスク1: 食事】メモと写真に写っている食事の各品目と合計の kcal・たんぱく質P(g)・脂質F(g)・炭水化物C(g) を推定する。\n' +
@@ -39,10 +41,12 @@ export function buildParseFoodPrompt(input: {
     '- adj: 補正kcal。基本は0。本人が消費kcalを明記している場合のみ、上記レベル値との差分を入れる\n' +
     '- mood: 気分・メンタルに関する記述の要約(20字以内)\n' +
     dictBlock +
+    (dietBlock || '') +
     (outLang ? `\n出力言語: items[].name・qty・mood・questions・reply・assumptionsの文字列は${outLang}で書くこと。\n` : '') +
     '\n【禁止事項】疾病名の指摘・医療的な診断・治療の提案は行わないこと（本サービスは医療機器ではない）。\n' +
     '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
-    '{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,"salt":0,"fib":0,"sug":0,"k":0,"ca":0,"mg":0,"fe":0,"zn":0,"vd":0,"vc":0}],' +
+    // 制約が設定されている人だけ items に dietFlag を足す（未設定の人の応答形は従来どおり）
+    `{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,"salt":0,"fib":0,"sug":0,"k":0,"ca":0,"mg":0,"fe":0,"zn":0,"vd":0,"vc":0${dietBlock ? ',"dietFlag":"none"' : ''}}],` +
     '"total":{"kcal":0,"p":0,"f":0,"c":0},' +
     '"weight":null,"waist":null,"ex":null,"adj":0,"mood":null,' +
     '"reply":"AIの一言(必須)","assumptions":[],"questions":[]}\n' +

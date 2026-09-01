@@ -6,6 +6,7 @@ import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { buildMenuAdvicePrompt } from '@/lib/menuAdvicePrompt';
+import { buildDietBlock, dietAiPlan } from '@/lib/dietPrompt';
 
 // 外食メニューおすすめ（B-11）: メニュー表の写真＋今日の残量＋目的から
 // 「この中ならどれを選ぶべきか」を注文前に答える事前意思決定支援。
@@ -16,15 +17,21 @@ export const preferredRegion = 'hnd1';
 
 const MAX_IMAGE_BYTES = 1_500_000; // base64後~2MB（parse-foodと同じ上限）
 
+/** 1候補。dietFlag は食事の制約（B-18）に該当した可能性の強さ（該当なしはキーごと無し） */
+type MenuPick = { name: string; estKcal: number; reason: string; dietFlag?: 'high' | 'maybe' };
+
 /** AI応答のpicksを想定形だけに整える（プロンプトインジェクション等での型崩れを通さない） */
-function sanitizePicks(v: unknown): { name: string; estKcal: number; reason: string }[] {
+function sanitizePicks(v: unknown): MenuPick[] {
   if (!Array.isArray(v)) return [];
   return v
-    .filter((p): p is { name?: unknown; estKcal?: unknown; reason?: unknown } => p != null && typeof p === 'object')
+    .filter((p): p is { name?: unknown; estKcal?: unknown; reason?: unknown; dietFlag?: unknown } => p != null && typeof p === 'object')
     .map((p) => ({
       name: String(p.name ?? '').slice(0, 80).trim(),
       estKcal: Math.round(Number(p.estKcal)) || 0,
       reason: String(p.reason ?? '').slice(0, 200).trim(),
+      // 食事の制約（B-18）: high/maybe だけ通す。none・未知値はキーごと落として「該当なし」にする。
+      // 安全を意味する値をクライアントへ渡さないため（docs/DIET-MODES.md §6）
+      ...(p.dietFlag === 'high' || p.dietFlag === 'maybe' ? { dietFlag: p.dietFlag as 'high' | 'maybe' } : {}),
     }))
     .filter((p) => p.name)
     .slice(0, 3);
@@ -65,10 +72,13 @@ export async function POST(req: Request) {
 
   // ===== 使用回数・全体上限（parse-foodの写真解析と同じゲート） =====
   const today = todayJST();
-  const [usageRes, capReached, profRes] = await Promise.all([
+  const [usageRes, capReached, profRes, dietRes] = await Promise.all([
     supabase.from('ai_usage').select('count,text_count,photo_count,coach_count').eq('user_id', user.id).eq('date', today).maybeSingle(),
     globalCapReached(),
     supabase.from('profiles').select('plan,plan_until,premium_until,photo_trial_used').eq('id', user.id).maybeSingle(),
+    // 食事の制約（B-18・migration-26）。プラン取得とは別クエリにする＝列が無い環境でこの
+    // selectが失敗しても、プラン判定まで巻き込んで無料に落ちない（parse-foodと同じ流儀）
+    supabase.from('profiles').select('diet_modes,diet_custom,diet_consent_at').eq('id', user.id).maybeSingle(),
   ]);
   const used = usageRes.data?.count ?? 0;
   const photoTrialUsed = Number((profRes.data as { photo_trial_used?: number } | null)?.photo_trial_used ?? 0);
@@ -88,7 +98,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: '本日はサービス全体のAI利用上限に達しました。明日また使えます。' }, { status: 429 });
   }
 
-  const prompt = buildMenuAdvicePrompt({ remainingKcal, purposeKey, pRemain, outLang });
+  // 食事の制約（B-18）: メニュー判定はスタンダード以上＋免責同意済みのときだけ注入する。
+  // 候補は消さずに判定だけ付けさせる（消すと「安全な物だけ出た」と誤解させるため・§5）
+  const diet = dietRes.data as { diet_modes?: unknown; diet_custom?: unknown; diet_consent_at?: string | null } | null;
+  const dietBlock = (dietAiPlan(plan) || isUnlimited(user.email)) && diet?.diet_consent_at
+    ? buildDietBlock({ modes: diet.diet_modes, custom: diet.diet_custom, noun: '候補', field: 'picks' })
+    : '';
+
+  const prompt = buildMenuAdvicePrompt({ remainingKcal, purposeKey, pRemain, outLang, dietBlock });
   const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [
     { text: prompt },
     { inline_data: { mime_type: 'image/jpeg', data: image } },
@@ -99,7 +116,7 @@ export async function POST(req: Request) {
     const r = await callGemini(key, parts, 0.2);
     const tAi = Date.now() - t0 - tSetup;
     if (!r.ok) return NextResponse.json({ ok: false, error: r.error, detail: r.detail }, { status: r.status });
-    let picks: { name: string; estKcal: number; reason: string }[] = [];
+    let picks: MenuPick[] = [];
     let note = '';
     try {
       const j = parseJsonLoose(r.text) as { picks?: unknown; note?: unknown };

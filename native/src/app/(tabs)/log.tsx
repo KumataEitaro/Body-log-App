@@ -1,6 +1,6 @@
 // 食事タブ（Phase 1コア）: ヒーロー・今日のフィード・AI解析コンポーザー・マイ食品チップ・体重クイック入力
 // ロジックはWeb版のlib/*をそのまま移植して使用（データ・計算式は完全互換）
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
@@ -65,6 +65,11 @@ import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
 import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
+// 食事の制約（B-18・docs/DIET-MODES.md）。警告は情報提供だけで、保存は絶対にブロックしない
+import { useDiet, isDietOff } from '@/lib/diet';
+import { mergeAlerts, rulesFor, type DietAlert, type DietLevel } from '@/lib/dietCheck';
+import { DietWarnRow, DietMark, DietSilenceNote } from '@/components/DietNotes';
+import { useGate } from '@/lib/gate';
 import MoodFace, { MoodInline } from '@/components/MoodFace';
 import ComebackSheet from '@/components/ComebackSheet';
 import StartChecklist from '@/components/StartChecklist';
@@ -137,6 +142,9 @@ export default function LogScreen() {
   const [nowMs, setNowMs] = useState(() => Date.now());   // 「混み合っています」の判定用（解析中だけ1秒刻み）
   // AIの会話的な返し（一言・仮定・聞き返し）。表示のみでDBには書かない
   const [aiNote, setAiNote] = useState<{ reply: string; questions: string[]; assumptions: string[] } | null>(null);
+  // 食事の制約（B-18）: AIが品目に付けた判定（品目名→強さ）。トレイを破棄するまで保持する。
+  // FoodItemには入れない＝logs.itemsに推定の判定を焼き付けない（記録は事実だけを残す）
+  const [aiDietFlags, setAiDietFlags] = useState<Record<string, DietLevel>>({});
   // 聞き返しに「1/4玉」とだけ返しても文脈が繋がるように、直前のやりとりを覚えておく
   const parseHistory = useRef<{ role: 'user' | 'ai'; text: string }[]>([]);
   const pendingSeq = useRef(0);
@@ -436,6 +444,8 @@ export default function LogScreen() {
       ];
       // AIの一言。何も抽出できなかったときも、ここが必ず何か言う（無言の禁止）
       setAiNote(ex2.reply || ex2.questions.length || ex2.assumptions.length ? ex2 : null);
+      // 食事の制約（B-18）のAI判定を溜める（複数回の解析ぶんが1つのトレイに合流するため）
+      if (Object.keys(ex2.dietFlags).length > 0) setAiDietFlags((m) => ({ ...m, ...ex2.dietFlags }));
       const gotNothing = r.items.length === 0 && r.weight == null && r.waist == null && !r.ex && !r.mood;
       if (gotNothing && !ex2.reply) {
         setMsg({ ok: false, text: t('食事として読み取れませんでした。品目と量（例: キャベツ1/4玉）で書くか、相談は相談タブへどうぞ。') });
@@ -603,6 +613,7 @@ export default function LogScreen() {
   function clearTray() {
     setParsed(null); setStagedNote(''); setFocusItem(null);
     setAiNote(null); parseHistory.current = [];
+    setAiDietFlags({});   // 制約の判定はこのトレイ限りのもの（次の解析に持ち越さない）
   }
 
   // 量調整ポップ: 注目中の1品に倍率を適用してkcal/PFCを再計算する
@@ -973,6 +984,30 @@ export default function LogScreen() {
 
 
   const parsedTotal = parsed ? sumItems(parsed.items) : null;
+
+  // ===== 食事の制約（B-18・docs/DIET-MODES.md §2 / §4 / §5） =====
+  // 端末内の辞書判定（無料・オフラインでも動く）とAIのdietFlag（スタンダード以上）を合成する。
+  // 警告は情報提供だけ: 保存はブロックしない・触覚も音も鳴らさない（不安を煽らないため）
+  const dietProfile = useDiet();
+  const dietGate = useGate();
+  const dietPremium = !dietGate.gated('diet');
+  const dietRules = useMemo(() => rulesFor(dietProfile.modes), [dietProfile.modes]);
+  const dietAlerts: DietAlert[] = useMemo(() => {
+    if (parsed == null || isDietOff(dietProfile)) return [];
+    return mergeAlerts({
+      // 分量文字列も判定に混ぜる（「(小麦粉入り)」のような但し書きを拾えるように）
+      items: parsed.items.map((it) => ({ name: it.name, text: it.qty })),
+      rules: dietRules, aiFlags: aiDietFlags, premium: dietPremium,
+    });
+  }, [parsed, dietProfile, dietRules, aiDietFlags, dietPremium]);
+  // 品目チップの印を引くための索引（品目名→強さ）
+  const dietLevelByName = useMemo(() => {
+    const m = new Map<string, DietLevel>();
+    for (const a of dietAlerts) if (!(m.get(a.name) === 'high')) m.set(a.name, a.level);
+    return m;
+  }, [dietAlerts]);
+  // 制約を設定している人には、警告が無いときでも常設表記を出す（沈黙を保証と誤読させない・§6-4）
+  const dietOn = !isDietOff(dietProfile);
 
   // 保存前ライブプレビュー: トレイ（未保存）の合計。バーのゴースト表示に使う
   const pulse = usePulse(parsed != null);
@@ -1519,12 +1554,17 @@ export default function LogScreen() {
                 <Pressable hitSlop={8} onPress={() => setAiNote(null)}><Text style={s.trayX}>×</Text></Pressable>
               </View>
             )}
+            {/* 食事の制約の警告行（§5）。トレイ上部・保存は止めない・免責を毎回添える */}
+            <DietWarnRow alerts={dietAlerts} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {parsed?.items.map((it, i) => {
                 const on = focusItem === i;
+                const dlv = dietLevelByName.get(it.name) ?? null;
                 return (
-                  <Pressable key={i} style={[s.trayChip, on && s.trayChipOn]}
+                  <Pressable key={i} style={[s.trayChip, on && s.trayChipOn,
+                                             dlv === 'high' && s.trayChipDietHigh, dlv === 'maybe' && s.trayChipDietMaybe]}
                              onPress={() => setFocusItem(on ? null : i)}>
+                    {dlv && <View style={{ marginRight: 4 }}><DietMark level={dlv} /></View>}
                     <View style={{ flexShrink: 1 }}>
                       <Text style={s.trayChipT} numberOfLines={1}>
                         {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 11 }}>{Math.round(it.kcal)}kcal</Text>
@@ -1606,6 +1646,9 @@ export default function LogScreen() {
             )}
           </View>
         )}
+        {/* 食事の制約（§6-4）: 警告が出ていないときも必ず出す常設表記。
+            沈黙を「対象なし」と誤読させないための最後の砦なので、条件を足して隠さない */}
+        {dietOn && parsed != null && <DietSilenceNote />}
         {/* 量調整ポップ（トレイ直下にインライン展開・Modal不使用）: 品目チップのタップで開き、
             倍率チップ1タップでその品のkcal/PFCを再計算する。もう一度チップを押すと閉じる */}
         {parsed != null && focusItem != null && parsed.items[focusItem] != null && (
@@ -1880,6 +1923,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
+  // 食事の制約（B-18・§5）: high=赤縁＋⚠️ / maybe=アンバーの点。塗りは変えず縁だけ（責め色で埋めない）
+  trayChipDietHigh: { borderColor: C.coral, borderWidth: 1.5 },
+  trayChipDietMaybe: { borderColor: C.amber },
   // 混雑時の待ち文言（解析中チップの中に添える）。文言のぶんチップを広げる
   trayChipWide: { maxWidth: 260 },
   trayWaitT: { fontSize: 12, fontWeight: '600', color: C.sub, marginTop: 1 },

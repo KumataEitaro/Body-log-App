@@ -33,8 +33,10 @@ export function buildMenuAdvicePrompt(input: {
   pRemain?: number | null;
   /** 出力言語の表示名（日本語なら空文字） */
   outLang: string;
+  /** 食事の制約（B-18）の注入ブロック。未設定・無料プランでは空文字＝従来と同一の文面 */
+  dietBlock?: string;
 }): string {
-  const { remainingKcal, purposeKey, pRemain, outLang } = input;
+  const { remainingKcal, purposeKey, pRemain, outLang, dietBlock } = input;
   const rk = Math.round(remainingKcal);
   return (
     'あなたは日本の管理栄養士です。ユーザーは外食先でメニュー表の写真を撮り、「この中ならどれを選ぶべきか」を注文前に相談しています。\n' +
@@ -50,8 +52,10 @@ export function buildMenuAdvicePrompt(input: {
     '- 残りカロリーがマイナスや極端に少ない場合も品は選ぶ。その事情への配慮（軽めの品・単品など）をreasonやnoteに1文で添える。食べること自体を止めない\n' +
     '- メニュー表が読み取れない・料理の品名が写っていない写真の場合は picks を空配列にし、note にその旨を短く書く\n' +
     '- 医療的な診断・疾患名の指摘はしない\n' +
+    (dietBlock || '') +
     (outLang ? `\n出力言語: picks[].name・reason・noteの文字列は${outLang}で書くこと。\n` : '') +
     '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
-    '{"picks":[{"name":"品名","estKcal":0,"reason":"選ぶ理由(1文)"}],"note":"補足があれば1文(無ければ空文字)"}'
+    // 制約が設定されている人だけ picks に dietFlag を足す（未設定の人の応答形は従来どおり）
+    `{"picks":[{"name":"品名","estKcal":0,"reason":"選ぶ理由(1文)"${dietBlock ? ',"dietFlag":"none"' : ''}}],"note":"補足があれば1文(無ければ空文字)"}`
   );
 }

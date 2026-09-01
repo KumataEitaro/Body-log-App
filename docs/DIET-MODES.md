@@ -1,6 +1,16 @@
 # 食事制約モード（除外アラート）設計案 — 2026-09-02
 
-**未実装・設計のみ。** ビーガン/グルテンフリー等の「食べない物」を登録すると、
+> **実装済み（2026-09-01・ブランチ `feat/diet-modes`）。** この設計書のとおりに実装した。
+> 実装の所在は docs/FEATURES.md「食事の制約（除外アラート・B-18）」。
+> `supabase/migration-26.sql` は**ユーザー実行待ち**（3列が無いあいだ機能はONにできない）。
+> 実装の主要ファイル: `native/src/content/dietRules.ts`（辞書）/
+> `native/src/lib/dietCheck.ts`（判定・純関数）/ `native/src/lib/diet.ts`（設定の読み書き）/
+> `native/src/components/DietNotes.tsx`（**免責文の正本**）/ `lib/dietPrompt.ts`（AI注入）/
+> `native/src/app/settings.tsx`（設定UI・同意ゲート）/ `native/src/app/(tabs)/log.tsx`（トレイ警告）/
+> `native/src/components/MenuAdvisor.tsx`（メニュー）/ `app/terms/page.tsx` 第4条の2。
+> §6の免責は**弱めない**こと（弱める変更は単独で行わず、必ずこの節ごと見直す）。
+
+ビーガン/グルテンフリー等の「食べない物」を登録すると、
 写真解析・メニュー解析の結果に対して該当の可能性を警告する機能。
 
 熊田さんの指摘どおり **モードを個別実装しない**。「除外リスト＋自由記述の排除プロンプト」
