@@ -19,7 +19,8 @@ import { exportAllCsv } from '@/lib/exportCsv';
 import MyFoodForm from '@/components/MyFoodForm';
 import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
-import { BellRing } from 'lucide-react-native';
+import { BellRing, FileText } from 'lucide-react-native';
+import { shareMedicalReport } from '@/lib/medicalReport';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
 import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, BG_TINTS, paletteFor, darkPaletteFor } from '@/lib/theme';
@@ -114,6 +115,9 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delConfirm, setDelConfirm] = useState('');
+  // 受診用レポート（PDF）の作成中フラグと失敗理由（行のsubに出す）
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportErr, setReportErr] = useState('');
   const guide = useGuide();
 
   // 相談タブ等からのディープリンク（/settings?open=goalW）で目的のシートを直接開く
@@ -550,6 +554,19 @@ export default function SettingsScreen() {
         <Row icon={<HeartPulse color={C.teal} size={19} />} label={t('ヘルスケア連携')}
              sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
              onPress={() => openSheet('health')} />
+        <View style={s.sep} />
+        {/* 受診用レポート（1500人監査Later群・中高年層の本丸）。
+            診察室で見せるのはアプリ画面ではなくPDF。作成中は行が待ち状態になる */}
+        <Row icon={reportBusy ? <ActivityIndicator color={C.teal} /> : <FileText color={C.teal} size={19} />}
+             label={t('受診用のレポートを作る（PDF）')}
+             sub={reportErr || t('直近30日の体重・食事・血圧などを1枚にまとめて共有します')}
+             onPress={async () => {
+               if (reportBusy) return;
+               setReportBusy(true); setReportErr('');
+               const r = await shareMedicalReport();
+               if (!r.ok) setReportErr(r.error);
+               setReportBusy(false);
+             }} />
       </View>
 
       {/* サポート */}

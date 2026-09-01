@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { C, sheetTopPad } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
+import VoiceHintButton from '@/components/VoiceHintButton';
 import HeaderGear from '@/components/HeaderGear';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
@@ -90,6 +91,7 @@ export default function CoachScreen() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);   // 音声ボタンからのフォーカス先
   const insets = useSafeAreaInsets();
   const welcomeTarget = useGuideTarget('welcome');
   const kbVisible = useKeyboardVisible();
@@ -405,8 +407,13 @@ export default function CoachScreen() {
               <MessageCircle color={C.teal} size={17} strokeWidth={2.5} />
             </View>
           )}
-          <TextInput style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
+          <TextInput ref={inputRef} style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
                      value={input} onChangeText={setInput} multiline />
+          {/* 音声入力の道しるべ（食事タブの入力ドックと同じ流儀）。文字を打ち始めたら畳んで
+              テキストに幅を渡す */}
+          {!(kbVisible && input.trim().length > 0) && (
+            <VoiceHintButton mode="coach" onFocusInput={() => inputRef.current?.focus()} />
+          )}
           <Pressable
             style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
             onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>

@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, UtensilsCrossed } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
+import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
@@ -1649,6 +1650,9 @@ export default function LogScreen() {
               5個のアイコンが同じ行にいると入力幅が半分になり、10文字弱で不自然に
               改行していた（βフィードバック 2026-09-02）。キーボードを閉じれば全部戻る */}
           {!(kbVisible && chat.trim().length > 0) && (<>
+          {/* 音声入力（1500人監査Later群「入力が遅い層への救済」）: キーボードのマイクへの
+              道しるべ。初回だけ使い方を案内し、以後は入力欄にフォーカスするだけ */}
+          <VoiceHintButton onFocusInput={() => inputRef.current?.focus()} />
           {/* カメラ1本に統合（βフィードバック 2026-09-02: 成分表示ボタンも結局カメラが
               開くだけで体験が同一＝ややこしい）。料理も成分表示も同じ撮影でAIが読み分ける。
               長押し＝バーコードスキャン（旧・成分表示ボタンから引き継ぎ） */}
