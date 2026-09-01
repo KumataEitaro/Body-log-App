@@ -1,18 +1,29 @@
 // プラン選択（ペイウォール）。価格はApp Store Connect側の設定がRevenueCat経由で
 // 自動反映されるため、このファイルに金額は書かない（金額変更＝再ビルド不要）。
 //
-// レイアウト（2026-09改定）: 月/年の期間セグメントをやめ、各プランカードの中に
-// 「月額」と「年額（月あたり換算・N%お得）」を両方見せてタップで選ぶ方式にする。
-// 期間を切り替えないと年額の存在に気づけない問題（価格比較の分断）への対応。
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
+// レイアウト（2026-09改定・2プラン構成）:
+//  ・選択は「画面全体でただ1つ」（plan×periodの組が1つだけ）。以前はカードごとに独立した
+//    periodを持っていたため、3枚のカードが同時に選択済みに見えてどれを買うのか分からない
+//    状態だった（βフィードバック 2026-09-01）。選択状態は sel（Selection）1つに統一。
+//  ・ライトを廃止（PAYWALL_PLANS）。主役はプレミアム＝おすすめバッジ・グラデ縁・年額既定。
+//    スタンダードは「まずは試したい人へ」の控えめな枠線カード。
+//  ・各カードの中に「月額」と「年額（月あたり換算・N%お得）」を両方見せる方式は維持
+//    （期間を切り替えないと年額の存在に気づけない＝価格比較の分断を避ける）。
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, Platform, Animated } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Sparkles } from 'lucide-react-native';
 import { C, rgba } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useReduceMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import CouponSheet from '@/components/CouponSheet';
-import { purchasesAvailable, fetchOffers, purchase, restore, currentPlan, type Offer, type Plan } from '@/lib/purchases';
+import {
+  purchasesAvailable, fetchOffers, purchase, restore, currentPlan,
+  PAYWALL_PLANS, defaultSelection, preferredPeriod,
+  type Offer, type Plan, type Selection,
+} from '@/lib/purchases';
 
 // 金額の簡易フォーマット（月換算表示用）。主要通貨だけ整形し、他はそのまま
 function fmtMoney(v: number, currency: string): string {
@@ -38,7 +49,7 @@ const SRC_COPY = (): Record<string, { h: string; lead: string }> => ({
   },
   laws: {
     h: t('あなたの法則を、ぜんぶ手に入れる'),
-    lead: t('無料・ライトは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。'),
+    lead: t('無料プランは最新3枚まで。スタンダード以上で図鑑のすべてが開きます。'),
   },
   digest: {
     h: t('食べ方のクセまで見える、週のふりかえり'),
@@ -60,7 +71,7 @@ const SRC_COPY = (): Record<string, { h: string; lead: string }> => ({
   },
   ads: {
     h: t('広告のない、静かな画面に'),
-    lead: t('ライトプラン以上で広告が消えて、記録に集中できます。'),
+    lead: t('スタンダード以上で広告が消えて、記録に集中できます。'),
   },
   // ===== 上限到達（429 plan_limit）からの遷移。kind別に「何を使い切ったか」を言う =====
   limit_text: {
@@ -77,13 +88,38 @@ const SRC_COPY = (): Record<string, { h: string; lead: string }> => ({
   },
 });
 
-// 各プランの訴求（機能差はサーバーのplan_limitsが正本。ここは表示のみ。新ティア2026-09）。
-// featuresは関数にして呼び出し時にt()する（リテラルt('...')でi18n収集スクリプトに拾わせるため）
-const PLAN_INFO: { plan: Plan; name: string; features: () => string[] }[] = [
-  { plan: 'lite', name: 'ライト', features: () => [t('広告なし'), t('AIテキスト解析 5回/日'), t('AI写真解析 2枚/日')] },
-  { plan: 'standard', name: 'スタンダード', features: () => [t('広告なし'), t('AIテキスト解析 50回/日'), t('AI写真解析 5枚/日'), t('AI相談 10セッション/日（往復無制限）'), t('食べ方の分析・週のふりかえり・法則図鑑のすべて')] },
-  { plan: 'premium', name: 'プレミアム', features: () => [t('スタンダードの全機能'), t('AI解析・写真・相談が実質無制限')] },
+// 各プランの訴求。機能差の正本はサーバーのplan_limits（lib/plan.tsのFALLBACKと同値）で、
+// ここは表示のみ。数字を変えるときは必ずFALLBACKと突き合わせる。
+// leadは「誰のためのプランか」の1行（「いちばん選ばれています」式の社会的証明ではなく
+// 価値の言語化）。lead/featuresは関数にして呼び出し時にt()する
+// （リテラルt('...')でi18n収集スクリプトに拾わせるため）
+const PLAN_INFO: { plan: Plan; name: string; lead: () => string; features: () => string[] }[] = [
+  {
+    plan: 'standard', name: 'スタンダード', lead: () => t('まずは試したい人へ'),
+    features: () => [
+      t('広告なし'),
+      t('AIテキスト解析 50回/日'),
+      t('AI写真解析 5枚/日'),
+      t('AI相談 10セッション/日（往復無制限）'),
+      t('食べ方の分析・週のふりかえり・法則図鑑のすべて'),
+      t('食べないものの検知（AI）'),
+    ],
+  },
+  {
+    plan: 'premium', name: 'プレミアム', lead: () => t('制限を気にせず使いたい人へ'),
+    features: () => [
+      t('スタンダードの全機能'),
+      t('AIテキスト解析 100回/日'),
+      t('AI写真解析 30枚/日'),
+      t('AI相談 50セッション/日（往復無制限）'),
+      t('食べないものの検知（AI）'),
+    ],
+  },
 ];
+// ペイウォールに出すカード（PLAN_INFOの並び＝安い順に上から）
+const CARDS = PLAN_INFO.filter((i) => PAYWALL_PLANS.includes(i.plan));
+// 主役のプラン（おすすめバッジ・グラデ縁・既定選択の第一候補）
+const HERO: Plan = 'premium';
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -91,26 +127,33 @@ export default function PaywallScreen() {
   const fromOnboarding = src === 'onboarding';
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const [plan, setPlan] = useState<Plan>('free');
-  // プランごとに選択中の期間（既定=年額があれば年額。年額プラン比率が最も高いカテゴリのため）
-  const [sel, setSel] = useState<Partial<Record<Plan, Period>>>({});
+  // 選択中の plan×period（画面全体でただ1つ）。既定=プレミアムの年額
+  const [sel, setSel] = useState<Selection | null>(null);
   const [busy, setBusy] = useState(false);
   const [goalLine, setGoalLine] = useState('');
   const [couponOpen, setCouponOpen] = useState(false);
+
+  // プレミアムカードの縁を「1本だけ」ゆっくり明滅させる（主役への視線誘導）。
+  // 相談タブの入力ドックと同じ流儀＝全開の縁を重ねてopacityだけネイティブ側で往復。
+  // 視差効果を減らす設定がONなら固定値で止める（酔い・集中の妨げにしない）
+  const glow = useRef(new Animated.Value(0.3)).current;
+  const reduceMotion = useReduceMotion();
+  useEffect(() => {
+    if (reduceMotion) { glow.setValue(0.3); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 0.5, duration: 1600, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0.12, duration: 1600, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [glow, reduceMotion]);
 
   useEffect(() => {
     (async () => {
       const [o, p] = await Promise.all([fetchOffers(), currentPlan()]);
       setOffers(o); setPlan(p);
-      // 既定選択: 年額 > 月額 > その他（プラン単位で決める）
-      const next: Partial<Record<Plan, Period>> = {};
-      for (const info of PLAN_INFO) {
-        const mine = o.filter((x) => x.plan === info.plan);
-        if (!mine.length) continue;
-        next[info.plan] = mine.some((x) => x.period === 'annual') ? 'annual'
-          : mine.some((x) => x.period === 'monthly') ? 'monthly'
-          : mine[0].period;
-      }
-      setSel(next);
+      // 既定選択はプレミアムの年額（買える期間から自動で決まる）
+      setSel(defaultSelection(o));
     })();
   }, []);
 
@@ -141,6 +184,13 @@ export default function PaywallScreen() {
     return map;
   }, [offers]);
 
+  // 選択をこのカードへ移す（他カードの選択は必ず外れる＝ラジオの意味を守る）。
+  // 期間の指定が無いときはそのプランの既定期間（年額優先）
+  function selectPlan(p: Plan, period?: Period) {
+    const next = period ?? preferredPeriod(offers ?? [], p);
+    if (next) setSel({ plan: p, period: next });
+  }
+
   async function buy(offer: Offer) {
     if (busy) return;
     setBusy(true);
@@ -164,6 +214,109 @@ export default function PaywallScreen() {
       setPlan(p);
       Alert.alert(p === 'free' ? t('復元できる購入が見つかりませんでした') : t('購入を復元しました'));
     } finally { setBusy(false); }
+  }
+
+  // 1枚のプランカード。isHero=プレミアム（グラデ縁＋バッジ＋大きめCTA）、
+  // それ以外は枠線だけの控えめなカード
+  function renderCard(info: (typeof CARDS)[number]) {
+    const opts = offersByPlan.get(info.plan) ?? [];
+    const monthly = opts.find((o) => o.period === 'monthly') ?? null;
+    const isHero = info.plan === HERO;
+    const isCurrent = plan === info.plan;
+    // このカードが選択中か。選択中でなければ価格ラジオは全部「未選択」で描く（バグ修正の要）
+    const picked = sel?.plan === info.plan;
+    const selected = picked ? opts.find((o) => o.period === sel?.period) ?? null : null;
+    // 未選択カードのCTAは「選ぶ」（購入はしない）。押した瞬間に選択がこちらへ移る
+    const ctaBuy = picked && selected != null && !isCurrent;
+
+    const body = (
+      <>
+        <Text style={s.planName}>{t(info.name)}</Text>
+        <Text style={[s.planLead, isHero && s.planLeadHero]}>{info.lead()}</Text>
+        {info.features().map((f) => (
+          <View key={f} style={s.featRow}>
+            <Check size={15} color={C.teal} />
+            <Text style={s.featT}>{f}</Text>
+          </View>
+        ))}
+
+        {/* ===== 価格オプション（月額と年額を同時に見せる。タップで選択→CTAに反映） ===== */}
+        {opts.map((o) => {
+          const on = picked && sel?.period === o.period;
+          const months = monthsOf(o.period);
+          // 月あたり換算と「月額に対して何%お得か」（月額が無い・0円のプランでは出さない）
+          const perMonth = months > 1 && o.price > 0 ? o.price / months : null;
+          const savePct = perMonth != null && monthly && monthly.price > 0
+            ? Math.round((1 - perMonth / monthly.price) * 100) : 0;
+          return (
+            <Pressable key={o.period} onPress={() => selectPlan(info.plan, o.period)}
+                       accessibilityRole="radio" accessibilityState={{ selected: !!on }}
+                       style={({ pressed }) => [s.priceOpt, on && s.priceOptOn, pressed && { opacity: 0.85 }]}>
+              {/* ラジオ風の選択マーク（どれが買われるかを曖昧にしない） */}
+              <View style={[s.radio, on && s.radioOn]}>{on && <View style={s.radioDot} />}</View>
+              <Text style={[s.priceOptLabel, on && { color: C.ink }]}>{periodLabel(o.period)}</Text>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={s.priceOptPrice}>{o.priceString}</Text>
+                {perMonth != null && (
+                  <Text style={s.priceOptSub}>
+                    {t('月あたり{p}相当', { p: fmtMoney(perMonth, o.currency) })}
+                    {savePct > 0 ? t('・{n}%お得', { n: savePct }) : ''}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          );
+        })}
+
+        <Pressable
+          disabled={busy || isCurrent || opts.length === 0}
+          onPress={() => (ctaBuy && selected ? buy(selected) : selectPlan(info.plan))}
+          style={({ pressed }) => [
+            s.cta,
+            ctaBuy && s.ctaOn,
+            ctaBuy && isHero && s.ctaHero,
+            (isCurrent || opts.length === 0) && s.ctaOff,
+            pressed && { opacity: 0.85 },
+          ]}>
+          <Text style={[s.ctaT, ctaBuy && s.ctaTOn, ctaBuy && isHero && s.ctaTHero]}>
+            {isCurrent ? t('現在のプラン')
+              : opts.length === 0 ? t('このプランの設定なし')
+              : !ctaBuy ? t('このプランを選ぶ')
+              : selected && selected.trialDays > 0 ? t('{n}日間無料で始める', { n: selected.trialDays })
+              : t('このプランにする')}
+          </Text>
+        </Pressable>
+        {ctaBuy && selected && selected.trialDays > 0 && (
+          <Text style={s.trialNote}>
+            {t('無料期間の終了後は{p}。期間中の解約なら料金はかかりません。', {
+              p: selected.priceString + periodSuffix(selected.period),
+            })}
+          </Text>
+        )}
+      </>
+    );
+
+    if (!isHero) return <View key={info.plan} style={s.card}>{body}</View>;
+
+    // 主役カード: アクセント色から作ったグラデ縁（2pxのリング）＋その上でopacityだけ明滅。
+    // バッジは外側のViewに置く（リングの外へはみ出す位置なのでクリップを避ける）
+    return (
+      <View key={info.plan} style={s.heroWrap}>
+        <LinearGradient
+          colors={[rgba(C.teal, 0.95), rgba(C.teal, 0.35), rgba(C.teal, 0.8)]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s.heroRing}>
+          <Animated.View pointerEvents="none" style={[s.heroGlow, { opacity: glow }]} />
+          <View style={s.cardHero}>{body}</View>
+        </LinearGradient>
+        <View style={s.badge}>
+          {/* アクセント塗りの上の文字・線画は白固定（全画面共通の約束）。ダークパレットの
+              tealは明るく持ち上げてあるので、暗所でも白のほうがコントラストが立つ */}
+          <Sparkles size={12} color="#fff" />
+          <Text style={s.badgeT}>{t('おすすめ')}</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -195,73 +348,11 @@ export default function PaywallScreen() {
           <ActivityIndicator style={{ marginTop: 32 }} color={C.teal} />
         ) : (
           <>
-            {PLAN_INFO.map((info) => {
-              const opts = offersByPlan.get(info.plan) ?? [];
-              const monthly = opts.find((o) => o.period === 'monthly') ?? null;
-              const selected = opts.find((o) => o.period === sel[info.plan]) ?? opts[0] ?? null;
-              const isCurrent = plan === info.plan;
-              const highlight = info.plan === 'standard';
-              return (
-                <View key={info.plan} style={[s.card, highlight && s.cardHi]}>
-                  {highlight && (
-                    <View style={s.badge}><Sparkles size={12} color="#fff" /><Text style={s.badgeT}>{t('おすすめ')}</Text></View>
-                  )}
-                  <Text style={s.planName}>{t(info.name)}</Text>
-                  {info.features().map((f) => (
-                    <View key={f} style={s.featRow}>
-                      <Check size={15} color={C.teal} />
-                      <Text style={s.featT}>{f}</Text>
-                    </View>
-                  ))}
-
-                  {/* ===== 価格オプション（月額と年額を同時に見せる。タップで選択→CTAに反映） ===== */}
-                  {opts.map((o) => {
-                    const on = selected != null && o.period === selected.period;
-                    const months = monthsOf(o.period);
-                    // 月あたり換算と「月額に対して何%お得か」（月額が無い・0円のプランでは出さない）
-                    const perMonth = months > 1 && o.price > 0 ? o.price / months : null;
-                    const savePct = perMonth != null && monthly && monthly.price > 0
-                      ? Math.round((1 - perMonth / monthly.price) * 100) : 0;
-                    return (
-                      <Pressable key={o.period} onPress={() => setSel((prev) => ({ ...prev, [info.plan]: o.period }))}
-                                 style={({ pressed }) => [s.priceOpt, on && s.priceOptOn, pressed && { opacity: 0.85 }]}>
-                        {/* ラジオ風の選択マーク（どれが買われるかを曖昧にしない） */}
-                        <View style={[s.radio, on && s.radioOn]}>{on && <View style={s.radioDot} />}</View>
-                        <Text style={[s.priceOptLabel, on && { color: C.ink }]}>{periodLabel(o.period)}</Text>
-                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                          <Text style={s.priceOptPrice}>{o.priceString}</Text>
-                          {perMonth != null && (
-                            <Text style={s.priceOptSub}>
-                              {t('月あたり{p}相当', { p: fmtMoney(perMonth, o.currency) })}
-                              {savePct > 0 ? t('・{n}%お得', { n: savePct }) : ''}
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-
-                  <Pressable
-                    disabled={busy || isCurrent || !selected}
-                    onPress={() => selected && buy(selected)}
-                    style={({ pressed }) => [s.cta, highlight && s.ctaHi, (isCurrent || !selected) && s.ctaOff, pressed && { opacity: 0.85 }]}>
-                    <Text style={[s.ctaT, highlight && s.ctaTHi]}>
-                      {isCurrent ? t('現在のプラン')
-                        : !selected ? t('このプランの設定なし')
-                        : selected.trialDays > 0 ? t('{n}日間無料で始める', { n: selected.trialDays })
-                        : t('このプランにする')}
-                    </Text>
-                  </Pressable>
-                  {selected && selected.trialDays > 0 && !isCurrent && (
-                    <Text style={s.trialNote}>
-                      {t('無料期間の終了後は{p}。期間中の解約なら料金はかかりません。', {
-                        p: selected.priceString + periodSuffix(selected.period),
-                      })}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
+            {CARDS.map(renderCard)}
+            {/* ライトは新規販売終了。すでに買っている人には「取り上げられていない」ことを明示する */}
+            {plan === 'lite' && (
+              <Text style={s.liteNote}>{t('ご利用中のライトプランはそのまま使えます。新しくお申し込みできるのは上の2プランです。')}</Text>
+            )}
             <Pressable onPress={doRestore} disabled={busy} hitSlop={8} style={{ alignSelf: 'center', marginTop: 14 }}>
               <Text style={s.link}>{t('購入を復元する')}</Text>
             </Pressable>
@@ -303,16 +394,25 @@ const s = StyleSheet.create({
   lead: { fontSize: 14, color: C.sub, marginTop: 4, marginBottom: 14 },
   pending: { backgroundColor: C.panel, borderRadius: 14, padding: 24, alignItems: 'center', marginTop: 12 },
   pendingT: { color: C.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 },
-  card: { backgroundColor: C.panel, borderRadius: 16, padding: 16, marginBottom: 12 },
-  cardHi: { borderWidth: 2, borderColor: C.teal },
+  // 控えめなカード（スタンダード）: 面は素・枠線のみ
+  card: { backgroundColor: C.panel, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: C.line },
+  // 主役カード（プレミアム）: グラデ縁のリング（2px）の中に、アクセントをごく薄く敷いた面
+  heroWrap: { marginTop: 10, marginBottom: 12 },
+  heroRing: { borderRadius: 18, padding: 2 },
+  heroGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: C.teal },
+  cardHero: { backgroundColor: C.accentSoft, borderRadius: 16, padding: 16 },
   badge: { position: 'absolute', top: -10, left: 14, backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeT: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  planName: { fontSize: 18, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  planName: { fontSize: 18, fontWeight: '800', color: C.ink },
+  // 「誰のためのプランか」の1行（社会的証明ではなく価値の言語化）
+  planLead: { fontSize: 12.5, color: C.sub, marginTop: 2, marginBottom: 8 },
+  planLeadHero: { color: C.teal, fontWeight: '700' },
   // 価格オプション行（月額/年額の同時提示。選択中はアクセント縁）
   priceOpt: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
     borderWidth: 1.5, borderColor: C.line, borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10, marginTop: 8,
+    backgroundColor: C.panel,
   },
   priceOptOn: { borderColor: C.teal, backgroundColor: rgba(C.teal, 0.06) },
   radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
@@ -324,11 +424,15 @@ const s = StyleSheet.create({
   trialNote: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 16 },
   featRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
   featT: { fontSize: 13.5, color: C.ink, flex: 1 },
-  cta: { marginTop: 12, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: C.bg },
-  ctaHi: { backgroundColor: C.teal },
+  // CTA: 未選択カードは輪郭だけ（控えめ）、選択中だけアクセント塗り。主役はさらに一段大きく
+  cta: { marginTop: 12, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
+  ctaOn: { backgroundColor: C.teal, borderColor: C.teal },
+  ctaHero: { paddingVertical: 14, borderRadius: 14 },
   ctaOff: { opacity: 0.5 },
   ctaT: { fontSize: 15, fontWeight: '700', color: C.teal },
-  ctaTHi: { color: '#fff' },
+  ctaTOn: { color: '#fff' },
+  ctaTHero: { fontSize: 16, fontWeight: '800' },
+  liteNote: { fontSize: 12, color: C.sub, lineHeight: 18, marginTop: 2, marginBottom: 4 },
   link: { fontSize: 13, color: C.teal, fontWeight: '600' },
   legal: { fontSize: 11.5, color: C.sub, lineHeight: 17, marginTop: 20 },
 });

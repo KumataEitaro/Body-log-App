@@ -3,7 +3,8 @@
 // 方針:
 // - 表示条件は useGate(): active（=RCキー設定済みの課金有効ビルド）かつ plan が null/'free' の
 //   ときだけ描画する。現在の運用（RCキー未設定）では誰にも表示されない＝
-//   「広告あり無料 ↔ 広告なしライトプラン」の差は課金列車と同時にしか点灯しない（仕組みで保証）
+//   「広告あり無料 ↔ 広告なしの有料プラン」の差は課金列車と同時にしか点灯しない（仕組みで保証）
+//   （2026-09: ライト廃止で「広告なし」の最安はスタンダードになったため導線の文言も変更）
 // - ATTダイアログは出さない。初回リリースは非パーソナライズ広告（NPA）固定
 //   （requestNonPersonalizedAdsOnly: true）。パーソナライズ化は将来の改善
 // - インタースティシャル・リワード等は使わない。広告は静かに（触覚・アニメなし）
@@ -73,7 +74,7 @@ export default function AdBanner() {
         <View style={s.head}>
           <Text style={s.label}>{t('広告')}</Text>
           <Pressable onPress={() => router.push('/paywall?src=ads' as never)} hitSlop={8}>
-            <Text style={s.removeLink}>{t('ライトプランで広告を消せます')}</Text>
+            <Text style={s.removeLink}>{t('スタンダードプランで広告を消せます')}</Text>
           </Pressable>
         </View>
       )}
