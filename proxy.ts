@@ -49,5 +49,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // sw.js・manifest・アイコン等の静的公開ファイルは認証チェックを通さない
   // （sw.jsがリダイレクトされるとService Workerの登録自体が失敗する）
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|apple-touch-icon|api/).*)'],
+  // app-ads.txt はAdMobのクローラが匿名で取りに来る（リダイレクトすると
+  // アプリ確認が永遠に通らない）ため必ず素通しする
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|apple-touch-icon|app-ads\\.txt|api/).*)'],
 };
