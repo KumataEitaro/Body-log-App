@@ -5,7 +5,7 @@
 // 「月額」と「年額（月あたり換算・N%お得）」を両方見せてタップで選ぶ方式にする。
 // 期間を切り替えないと年額の存在に気づけない問題（価格比較の分断）への対応。
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, Platform } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Check, Sparkles } from 'lucide-react-native';
 import { C, rgba } from '@/lib/ui';
@@ -162,8 +162,8 @@ export default function PaywallScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         {(() => {
           // 文脈見出し（srcが未知・未指定なら従来の汎用文言）
           const copy = SRC_COPY()[String(src ?? '')] ?? {

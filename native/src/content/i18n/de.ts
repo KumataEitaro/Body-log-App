@@ -1451,4 +1451,8 @@ export const DE: Record<string, string> = {
   "初めての方はこちら → 新規登録に切り替える": "Neu hier? → Zur Registrierung wechseln",
   "削除しました": "Gelöscht",
   "元に戻せませんでした。通信環境を確認してください。": "Konnte nicht rückgängig gemacht werden. Bitte überprüfe deine Internetverbindung.",
+  "文字だけで、カロリーとPFCが出る": "Einfach tippen, Kalorien und P/F/C erhalten",
+  "「バナナと卵2個」と打って↑。写真がなくても、この一言だけでAIがカロリー・たんぱく質・脂質・炭水化物まで計算します。これがこのアプリのいちばんの発明です。量があいまいなら、AIのほうから聞き返してくれます。": "Tippe einfach „Banane und 2 Eier“ und sende es ab ↑. Auch ohne Foto berechnet die KI Kalorien, Proteine, Fette und Kohlenhydrate für dich. Das ist die größte Innovation dieser App! Wenn die Menge unklar ist, fragt die KI einfach nach.",
+  "カメラは1つで2役": "Eine Kamera, zwei Funktionen",
+  "料理を撮れば見た目から推定、パッケージ裏の栄養成分表示を撮れば表記どおりの正確な数値。同じカメラボタンでAIが読み分けます。長押しでバーコード読み取りも。": "Fotografiere dein Gericht für eine Schätzung oder die Nährwerttabelle auf der Rückseite für exakte Werte. Die KI erkennt den Unterschied automatisch über denselben Kamera-Button. Halte ihn gedrückt, um Barcodes zu scannen.",
 };

@@ -5,7 +5,7 @@
 //  ・スタンダード未満（無料・ライト。課金ゲート有効時）は最新3枚だけ通常表示、4枚目以降は半透明＋王冠
 //  ・分析は全て端末内ローカル（lib/laws.ts）。サーバへは何も送らない
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Share2, PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BookOpen } from 'lucide-react-native';
@@ -141,8 +141,8 @@ export default function LawsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg } }} />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         <View style={s.headRow}>
           <Text style={s.h}>{t('あなたの法則')}</Text>
           {laws != null && <Text style={s.progress}>{found.length}/{total}</Text>}

@@ -1451,4 +1451,8 @@ export const ID: Record<string, string> = {
   "初めての方はこちら → 新規登録に切り替える": "Baru di sini? → Beralih ke Daftar Baru",
   "削除しました": "Berhasil dihapus",
   "元に戻せませんでした。通信環境を確認してください。": "Gagal memulihkan. Silakan periksa koneksi internet Anda.",
+  "文字だけで、カロリーとPFCが出る": "Cukup ketik teks, kalori dan P/F/C langsung keluar",
+  "「バナナと卵2個」と打って↑。写真がなくても、この一言だけでAIがカロリー・たんぱく質・脂質・炭水化物まで計算します。これがこのアプリのいちばんの発明です。量があいまいなら、AIのほうから聞き返してくれます。": "Ketik \"pisang dan 2 telur\" lalu ketuk ↑. Tanpa foto pun, AI akan menghitung kalori, protein, lemak, hingga karbohidrat hanya dari satu kalimat ini. Ini adalah inovasi terbaik dari aplikasi ini. Jika porsinya kurang jelas, AI akan bertanya balik kepadamu.",
+  "カメラは1つで2役": "Satu kamera dengan 2 fungsi",
+  "料理を撮れば見た目から推定、パッケージ裏の栄養成分表示を撮れば表記どおりの正確な数値。同じカメラボタンでAIが読み分けます。長押しでバーコード読み取りも。": "Foto makanan untuk estimasi visual, atau foto tabel informasi nilai gizi di belakang kemasan untuk angka yang akurat. AI akan otomatis membedakannya dengan tombol kamera yang sama. Tekan lama untuk memindai kode batang.",
 };
