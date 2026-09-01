@@ -1641,4 +1641,9 @@ export const ID: Record<string, string> = {
   "獲得条件": "Syarat mendapatkan",
   "{d} に獲得": "Didapatkan pada {d}",
   "まだ獲得していません": "Belum didapatkan",
+  "苦手なもの・食べないものはありますか？": "Ada makanan yang tidak Anda sukai atau hindari?",
+  "登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。": "Jika didaftarkan, AI akan memberi tahu Anda \"Mungkin ini mengandung bahan tersebut\" saat memindai foto atau menu. Cocok untuk vegan, bebas gluten, atau alergi makanan tertentu.",
+  "※ 表示は推定です。安全確認には使えません。": "※ Angka ini adalah estimasi. Tidak dapat digunakan untuk memastikan keamanan medis.",
+  "設定してみる": "Coba atur sekarang",
+  "いまはしない": "Nanti saja",
 };

@@ -5,18 +5,20 @@
 // 見た目だけ合わせた軽量版を別に用意した。進行管理は持たない。
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions, Animated, Easing } from 'react-native';
-import { C } from '@/lib/ui';
+import { C, RADIUS, SPACE } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
 export default function SpotlightTip({
-  visible, targetRef, title, text, primaryLabel, onPrimary, secondaryLabel, onSecondary,
+  visible, targetRef, title, text, note, primaryLabel, onPrimary, secondaryLabel, onSecondary,
 }: {
   visible: boolean;
   targetRef?: RefObject<View | null>;   // ハイライトする要素。無ければ中央カードで出す
   title: string;
   text: string;
+  /** 本文の下に小さく添える注記（食事の制約の案内では免責を必ずここに置く） */
+  note?: string;
   primaryLabel: string;
   onPrimary: () => void;
   secondaryLabel: string;
@@ -82,6 +84,7 @@ export default function SpotlightTip({
         ]}>
           <Text style={s.title}>{title}</Text>
           <Text style={s.text}>{text}</Text>
+          {note ? <Text style={s.note}>{note}</Text> : null}
           <View style={s.btns}>
             <Pressable style={({ pressed }) => [s.later, pressed && { opacity: 0.7 }]} onPress={onSecondary}>
               <Text style={s.laterT}>{secondaryLabel}</Text>
@@ -102,19 +105,22 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.62)',
   },
   ring: {
-    position: 'absolute', borderRadius: 14,
+    position: 'absolute', borderRadius: RADIUS.tile,
     borderWidth: 2.5, borderColor: C.teal,
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   bubble: {
-    position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: 18, padding: 16,
+    position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: RADIUS.card, padding: SPACE.card,
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   text: { fontSize: 15, color: C.sub, lineHeight: 21, marginTop: 7 },
+  // 免責の注記。本文より小さく・薄くするが、11px未満にはしない（読めない文字で
+  // 免責を出したことにはしない・DietNotes.tsx の noteT と同じ寸法）
+  note: { fontSize: 11, lineHeight: 16, color: C.faint, marginTop: 8 },
   btns: { flexDirection: 'row', gap: 8, marginTop: 14, alignItems: 'center' },
-  later: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999 },
+  later: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: RADIUS.chip },
   laterT: { fontSize: 15, fontWeight: '700', color: C.sub },
-  go: { flex: 1, backgroundColor: C.teal, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  go: { flex: 1, backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center' },
   goT: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

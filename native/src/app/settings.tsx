@@ -31,7 +31,7 @@ import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
-import { C, rgba, sheetTopPad } from '@/lib/ui';
+import { C, rgba, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import { DIET_RULES } from '@/content/dietRules';
@@ -86,7 +86,7 @@ function BriefToggle() {
 const bt = StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: C.panel, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+    backgroundColor: C.panel, borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
   },
   label: { fontSize: 15, fontWeight: '600', color: C.ink },
@@ -421,7 +421,7 @@ export default function SettingsScreen() {
           {sub != null && <Text style={s.rowSub}>{sub}</Text>}
         </View>
         <TodoBadge count={badge ?? 0} style={{ marginRight: 6 }} />
-        <ChevronRight color={C.faint} size={18} />
+        <ChevronRight color={C.faint} size={ICON.lg} />
       </Pressable>
     );
   }
@@ -473,7 +473,7 @@ export default function SettingsScreen() {
       <View style={[s.group, { marginBottom: 18 }]}>
         <Pressable style={({ pressed }) => [s.row, pressed && { backgroundColor: C.pressed }]}
                    android_ripple={ripple()} onPress={() => { todo.refresh(); setNoticeOpen(true); }}>
-          <View style={s.rowIcon}><BellRing color={C.teal} size={19} /></View>
+          <View style={s.rowIcon}><BellRing color={C.teal} size={ICON.xl} /></View>
           <View style={{ flex: 1 }}>
             <Text style={s.rowLabel}>{t('通知センター')}</Text>
             <Text style={s.rowSub}>
@@ -481,29 +481,29 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <TodoBadge count={todo.count} style={{ marginRight: 6 }} />
-          <ChevronRight color={C.faint} size={18} />
+          <ChevronRight color={C.faint} size={ICON.lg} />
         </Pressable>
       </View>
 
       {/* アカウント設定 */}
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
-        <Row icon={<Crown color={C.teal} size={19} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
+        <Row icon={<Crown color={C.teal} size={ICON.xl} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
         <View style={s.sep} />
         {/* クーポン: プラン行の隣に置く（コード配布キャンペーンの入口。適用はサーバー直付与） */}
-        <Row icon={<Ticket color={C.teal} size={19} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
+        <Row icon={<Ticket color={C.teal} size={ICON.xl} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
         <View style={s.sep} />
-        <Row icon={<Award color={C.teal} size={19} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push('/achievements' as never)} />
+        <Row icon={<Award color={C.teal} size={ICON.xl} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push('/achievements' as never)} />
         <View style={s.sep} />
-        <Row icon={<UserRound color={C.teal} size={19} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
+        <Row icon={<UserRound color={C.teal} size={ICON.xl} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
-        <Row icon={<Salad color={C.teal} size={19} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
+        <Row icon={<Salad color={C.teal} size={ICON.xl} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length })} onPress={() => openSheet('foods')} />
       </View>
 
       {/* 食事の制約（B-18）。オンボーディングには入れない（同意を流し読みさせたくないため） */}
       <Text style={s.groupLabel}>{t('食事の制約')}</Text>
       <View style={s.group}>
-        <Row icon={<Ban color={C.teal} size={19} />} label={t('食べないものを登録する')}
+        <Row icon={<Ban color={C.teal} size={ICON.xl} />} label={t('食べないものを登録する')}
              sub={diet.modes.length > 0 || diet.custom.trim()
                ? t('{n}件を設定中。解析結果に該当の可能性を表示します', { n: diet.modes.length + (diet.custom.trim() ? 1 : 0) })
                : t('ビーガン・グルテンフリーなど。該当の可能性を警告します（推定）')}
@@ -513,9 +513,9 @@ export default function SettingsScreen() {
       {/* 目標 */}
       <Text style={s.groupLabel}>{t('目標')}</Text>
       <View style={s.group}>
-        <Row icon={<Target color={C.teal} size={19} />} label={t('体重の目標')} sub={t('目標日・目標体重・PFC詳細')} onPress={() => openSheet('goalW')} />
+        <Row icon={<Target color={C.teal} size={ICON.xl} />} label={t('体重の目標')} sub={t('目標日・目標体重・PFC詳細')} onPress={() => openSheet('goalW')} />
         <View style={s.sep} />
-        <Row icon={<Dumbbell color={C.teal} size={19} />} label={t('運動の目標')} sub={t('週の運動習慣・種目ごとの目標重量（RM換算）')} onPress={() => openSheet('goalT')} />
+        <Row icon={<Dumbbell color={C.teal} size={ICON.xl} />} label={t('運動の目標')} sub={t('週の運動習慣・種目ごとの目標重量（RM換算）')} onPress={() => openSheet('goalT')} />
         <View style={s.sep} />
         {/* ソフト週目標: 「毎日」を強いない自己契約。達成の表示は実績ページの「今週」ブロック */}
         <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
@@ -549,7 +549,7 @@ export default function SettingsScreen() {
       {/* 見た目（テーマカラー・PFCの色） */}
       <Text style={s.groupLabel}>{t('見た目')}</Text>
       <View style={s.group}>
-        <Row icon={<Palette color={C.teal} size={19} />} label={t('テーマカラー')}
+        <Row icon={<Palette color={C.teal} size={ICON.xl} />} label={t('テーマカラー')}
              sub={t(ACCENTS.find((a) => a.key === theme.accent)?.label ?? '')}
              onPress={() => openSheet('theme')} />
       </View>
@@ -557,7 +557,7 @@ export default function SettingsScreen() {
       {/* 表示（言語・単位） */}
       <Text style={s.groupLabel}>{t('言語')} ・ {t('単位')}</Text>
       <View style={s.group}>
-        <Row icon={<Languages color={C.teal} size={19} />} label={t('言語')}
+        <Row icon={<Languages color={C.teal} size={ICON.xl} />} label={t('言語')}
              sub={LOCALES.find((l) => l.code === locale)?.label ?? 'Japanese'}
              onPress={() => openSheet('lang')} />
         <View style={s.sep} />
@@ -643,7 +643,7 @@ export default function SettingsScreen() {
       {/* データ・連携 */}
       <Text style={s.groupLabel}>{t('データ・連携')}</Text>
       <View style={s.group}>
-        <Row icon={<HeartPulse color={C.teal} size={19} />} label={t('ヘルスケア連携')}
+        <Row icon={<HeartPulse color={C.teal} size={ICON.xl} />} label={t('ヘルスケア連携')}
              sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
              onPress={() => openSheet('health')} />
         <View style={s.sep} />
@@ -661,7 +661,7 @@ export default function SettingsScreen() {
         <View style={s.sep} />
         {/* 受診用レポート（1500人監査Later群・中高年層の本丸）。
             診察室で見せるのはアプリ画面ではなくPDF。作成中は行が待ち状態になる */}
-        <Row icon={reportBusy ? <ActivityIndicator color={C.teal} /> : <FileText color={C.teal} size={19} />}
+        <Row icon={reportBusy ? <ActivityIndicator color={C.teal} /> : <FileText color={C.teal} size={ICON.xl} />}
              label={t('受診用のレポートを作る（PDF）')}
              sub={reportErr || t('直近30日の体重・食事・血圧などを1枚にまとめて共有します')}
              onPress={async () => {
@@ -676,11 +676,11 @@ export default function SettingsScreen() {
       {/* サポート */}
       <Text style={s.groupLabel}>{t('サポート')}</Text>
       <View style={s.group}>
-        <Row icon={<CircleHelp color={C.teal} size={19} />} label={t('使い方ガイド')}
+        <Row icon={<CircleHelp color={C.teal} size={ICON.xl} />} label={t('使い方ガイド')}
              sub={t('5つの章に分かれています。見たい章だけどうぞ')}
              onPress={() => guide.start('menu')} />
         <View style={s.sep} />
-        <Row icon={<BookOpen color={C.teal} size={19} />} label={t('読みもの')}
+        <Row icon={<BookOpen color={C.teal} size={ICON.xl} />} label={t('読みもの')}
              sub={t('PFCバランス・カロリー収支・過食の心理などのコラム')}
              onPress={() => openSheet('columns')} />
       </View>
@@ -688,7 +688,7 @@ export default function SettingsScreen() {
       {/* アカウント */}
       <Text style={s.groupLabel}>{t('アカウント')}</Text>
       <View style={s.group}>
-        <Row icon={<Users color={C.teal} size={19} />} label={t('アカウントを切り替える')}
+        <Row icon={<Users color={C.teal} size={ICON.xl} />} label={t('アカウントを切り替える')}
              sub={t('いまのアカウントからサインアウトして、ログイン画面に戻ります')}
              onPress={() => Alert.alert(
                t('アカウントを切り替える'),
@@ -704,7 +704,7 @@ export default function SettingsScreen() {
       {/* アクション */}
       <View style={{ height: 16 }} />
       <Pressable style={s.logoutBtn} onPress={() => supabase.auth.signOut()}>
-        <LogOut color={C.sub} size={16} />
+        <LogOut color={C.sub} size={ICON.md} />
         <Text style={s.logoutT}>{t('ログアウト')}</Text>
       </Pressable>
       <Pressable style={s.deleteLink} onPress={() => openSheet('delete')} hitSlop={6}>
@@ -715,7 +715,7 @@ export default function SettingsScreen() {
     {/* ===== プロフィール編集モーダル ===== */}
     <Modal visible={sheet === 'profile'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<UserRound size={18} color={C.teal} />} title={t("プロフィール編集")} />
+        <SheetHeader icon={<UserRound size={ICON.lg} color={C.teal} />} title={t("プロフィール編集")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={s.label}>{t('表示名')}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder={t('表示名')} placeholderTextColor={C.faint} />
@@ -764,7 +764,7 @@ export default function SettingsScreen() {
         免責より先にトグルを置く並べ替えをしないこと */}
     <Modal visible={sheet === 'diet'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<Ban size={18} color={C.teal} />} title={t('食事の制約')} />
+        <SheetHeader icon={<Ban size={ICON.lg} color={C.teal} />} title={t('食事の制約')} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           {/* §6-2: 免責は最上部。同意済みでも消さない（同意は薄れるので設定を触るたび読める場所に残す） */}
           <DietDisclaimerPanel />
@@ -784,7 +784,7 @@ export default function SettingsScreen() {
                   {/* 王冠は行から機能を隠さない目印（無料でも内容は読めてONにできる） */}
                   {dietGated && (
                     <Pressable hitSlop={8} onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
-                      <CrownBadge size={13} />
+                      <CrownBadge size={14} />
                     </Pressable>
                   )}
                 </View>
@@ -808,7 +808,7 @@ export default function SettingsScreen() {
           {/* その他（自由記述）: AIにそのまま渡す指定なのでスタンダード以上 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18 }}>
             <Text style={[s.label, { marginTop: 0 }]}>{t('その他（自由記述）')}</Text>
-            {dietGated && <CrownBadge size={13} />}
+            {dietGated && <CrownBadge size={14} />}
           </View>
           <Text style={[s.note, { marginBottom: 4 }]}>{t('自分の言葉で書けます。AIが解析のときに読みます（スタンダード以上）。')}</Text>
           {dietGated ? (
@@ -844,7 +844,7 @@ export default function SettingsScreen() {
     {/* ===== テーマ選択モーダル ===== */}
     <Modal visible={sheet === 'theme'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader icon={<Palette size={18} color={C.teal} />} title={t('テーマカラー')} />
+        <SheetHeader icon={<Palette size={ICON.lg} color={C.teal} />} title={t('テーマカラー')} />
         <ScrollView>
           <Text style={s.label}>{t('外観')}</Text>
           <Text style={s.note}>{t('「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。')}</Text>
@@ -944,7 +944,7 @@ export default function SettingsScreen() {
     {/* ===== 言語選択モーダル ===== */}
     <Modal visible={sheet === 'lang'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader icon={<Languages size={18} color={C.teal} />} title={t("言語")} />
+        <SheetHeader icon={<Languages size={ICON.lg} color={C.teal} />} title={t("言語")} />
         <ScrollView>
           {LOCALES.map((l) => (
             <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}>
@@ -972,7 +972,7 @@ export default function SettingsScreen() {
     {/* ===== マイ食品管理モーダル ===== */}
     <Modal visible={sheet === 'foods'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader icon={<Salad size={18} color={C.teal} />} title={t("マイ食品の管理")} />
+        <SheetHeader icon={<Salad size={ICON.lg} color={C.teal} />} title={t("マイ食品の管理")} />
         <ScrollView>
           {foods.length === 0 && <Text style={s.note}>{t('まだ登録がありません。食事タブでAI解析した品目が候補になります。')}</Text>}
           <OptionButton style={{ marginBottom: 12 }} label={t('＋ 食品を追加')} onPress={() => setFoodFormOpen(true)} />
@@ -981,7 +981,7 @@ export default function SettingsScreen() {
               <Text style={s.foodName} numberOfLines={1}>{f.name}</Text>
               <Text style={s.foodKcal}>{Math.round(Number(f.kcal))}kcal</Text>
               <Pressable onPress={() => removeFood(f.id, f.name)} hitSlop={8}>
-                <Trash2 color={C.coral} size={17} />
+                <Trash2 color={C.coral} size={ICON.md} />
               </Pressable>
             </View>
           ))}
@@ -990,7 +990,7 @@ export default function SettingsScreen() {
           {meals.length > 0 && (
             <>
               <View style={s.mealHead}>
-                <UtensilsCrossed size={15} color={C.teal} />
+                <UtensilsCrossed size={ICON.sm} color={C.teal} />
                 <Text style={s.mealHeadT}>{t('マイミール')}</Text>
               </View>
               <Text style={s.note}>{t('複数品目のセットです。食事タブで「今日の記録」の行を長押しすると保存できます。')}</Text>
@@ -1016,10 +1016,10 @@ export default function SettingsScreen() {
                     <Text style={s.foodKcal}>{t('{n}品・約{k}kcal', { n: m.items.length, k: mealKcal(m.items).toLocaleString() })}</Text>
                   </View>
                   <Pressable onPress={() => setMealEdit({ id: m.id, name: m.name })} hitSlop={8}>
-                    <Pencil color={C.sub} size={16} />
+                    <Pencil color={C.sub} size={ICON.md} />
                   </Pressable>
                   <Pressable onPress={() => removeMeal(m)} hitSlop={8}>
-                    <Trash2 color={C.coral} size={17} />
+                    <Trash2 color={C.coral} size={ICON.md} />
                   </Pressable>
                 </View>
               ))}
@@ -1050,7 +1050,7 @@ export default function SettingsScreen() {
     {/* ===== 体重目標モーダル ===== */}
     <Modal visible={sheet === 'goalW'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<Target size={18} color={C.teal} />} title={t("体重の目標")} />
+        <SheetHeader icon={<Target size={ICON.lg} color={C.teal} />} title={t("体重の目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="weight" weightSections="goal" />
           <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
@@ -1061,7 +1061,7 @@ export default function SettingsScreen() {
     {/* ===== 筋トレ目標モーダル ===== */}
     <Modal visible={sheet === 'goalT'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<Dumbbell size={18} color={C.teal} />} title={t("筋トレの目標")} />
+        <SheetHeader icon={<Dumbbell size={ICON.lg} color={C.teal} />} title={t("筋トレの目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GoalPanel mode="training" />
         </ScrollView>
@@ -1071,7 +1071,7 @@ export default function SettingsScreen() {
     {/* ===== アカウント削除モーダル ===== */}
     <Modal visible={sheet === 'delete'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
-        <SheetHeader icon={<Trash2 size={18} color={C.coral} />} title={t("アカウント削除")} />
+        <SheetHeader icon={<Trash2 size={ICON.lg} color={C.coral} />} title={t("アカウント削除")} />
         <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
         <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder={t('削除')} placeholderTextColor={C.faint} />
@@ -1083,7 +1083,7 @@ export default function SettingsScreen() {
       </View>
     </Modal>    <Modal visible={avatarOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAvatarOpen(false)}>
       <View style={s.sheetBody}>
-        <SheetHeader icon={<Smile size={18} color={C.teal} />} title={t("アイコンを選ぶ")} />
+        <SheetHeader icon={<Smile size={ICON.lg} color={C.teal} />} title={t("アイコンを選ぶ")} />
         <ScrollView>
           {AVATAR_GROUPS.map((g) => (
             <View key={g.key}>
@@ -1115,12 +1115,12 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 12, paddingBottom: 40 },  // ネイティブヘッダーが上を確保するため控えめに
-  h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  scroll: { padding: SPACE.screen, paddingTop: 12, paddingBottom: 40 },  // ネイティブヘッダーが上を確保するため控えめに
+  h: { ...HEAD.page, color: C.ink, marginBottom: 12 },
   // サマリー
   summary: {
     flexDirection: 'row', gap: 12, alignItems: 'center',
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 18,
   },
   avatarEdit: {
     position: 'absolute', bottom: -2, right: -2,
@@ -1145,7 +1145,7 @@ const s = StyleSheet.create({
   groupLabel: { fontSize: 13, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
   bgRow: { flexDirection: 'row', gap: 7 },
   bgCard: {
-    flex: 1, borderRadius: 12, borderWidth: 1.5, borderColor: C.line,
+    flex: 1, borderRadius: RADIUS.input, borderWidth: 1.5, borderColor: C.line,
     padding: 8, alignItems: 'stretch',
   },
   bgCardOn: { borderColor: C.teal, borderWidth: 2.5 },
@@ -1169,7 +1169,7 @@ const s = StyleSheet.create({
   swatchT: { fontSize: 11, color: C.sub, marginTop: 5, fontWeight: '600', textAlign: 'center' },
   pfcRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12,
-    borderWidth: 1.5, borderColor: C.line, borderRadius: 14, marginTop: 8, backgroundColor: C.bg,
+    borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.tile, marginTop: 8, backgroundColor: C.bg,
   },
   pfcRowOn: { borderColor: C.teal, backgroundColor: C.tealWeak },
   pfcName: { fontSize: 15, fontWeight: '800', color: C.ink },
@@ -1180,14 +1180,14 @@ const s = StyleSheet.create({
   langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: C.line },
   langT: { fontSize: 17, color: C.ink, fontWeight: '600' },
   notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 },
-  hourChip: { borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7 },
+  hourChip: { borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: RADIUS.chip, paddingHorizontal: 13, paddingVertical: 7 },
   hourChipOn: { backgroundColor: C.ink, borderColor: C.ink },
   hourChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
   hourChipTOn: { color: C.panel },  // ink地の文字はダークで反転するため背景トークンで吸収
   notifLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   notifSub: { fontSize: 13, color: C.sub, marginTop: 2 },
   notifNote: { fontSize: 11, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
-  group: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
+  group: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.panel, overflow: 'hidden', marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
   rowIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 15, fontWeight: '600', color: C.ink },
@@ -1196,7 +1196,7 @@ const s = StyleSheet.create({
   // アクション
   logoutBtn: {
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 13,
+    backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 13,
   },
   logoutT: { color: C.sub, fontSize: 15, fontWeight: '800' },
   deleteLink: { alignItems: 'center', marginTop: 18 },
@@ -1204,17 +1204,17 @@ const s = StyleSheet.create({
   // モーダル
   sheetBody: { flex: 1, backgroundColor: C.bg, padding: 18, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
+  sheetTitle: { ...HEAD.card, color: C.ink },
   sheetClose: { fontSize: 15, fontWeight: '700', color: C.teal },
   // フォーム
   label: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 12, marginBottom: 4 },
-  input: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 17, color: C.ink },
-  segMini: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 10, alignItems: 'center' },
+  input: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input, padding: 12, fontSize: 17, color: C.ink },
+  segMini: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 10, alignItems: 'center' },
   segMiniOn: { backgroundColor: C.ink, borderColor: C.ink },
   segMiniT: { fontSize: 15, fontWeight: '700', color: C.sub },
-  btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  btnPrimary: { backgroundColor: C.ink, borderRadius: RADIUS.chip, paddingVertical: 14, alignItems: 'center' },
   btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
-  btnDanger: { backgroundColor: C.coral, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
+  btnDanger: { backgroundColor: C.coral, borderRadius: RADIUS.chip, paddingVertical: 14, alignItems: 'center' },
   note: { fontSize: 13, color: C.sub, lineHeight: 19 },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 10 },
 
@@ -1227,7 +1227,7 @@ const s = StyleSheet.create({
   dietSub: { fontSize: 12, color: C.sub, lineHeight: 17, marginTop: 2 },
   dietUpsell: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
-    backgroundColor: C.chipBg, borderRadius: 12, padding: 10,
+    backgroundColor: C.chipBg, borderRadius: RADIUS.input, padding: 10,
   },
   dietUpsellT: { flex: 1, fontSize: 12, lineHeight: 17, color: C.sub },
   // 自由記述の有料ロック時: 入力できないことが見て分かる面（プレースホルダだけ見せる）

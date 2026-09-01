@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1090,7 +1090,7 @@ export default function ChangesScreen() {
           {editing ? (
             <>
               <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-                <Plus size={16} color="#fff" strokeWidth={3} />
+                <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
               </Pressable>
               <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
               <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>{t('完了')}</Text></Pressable>
@@ -1160,7 +1160,7 @@ export default function ChangesScreen() {
             >
               <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
                 <Pressable style={s.backRow} onPress={() => { Haptics.selectionAsync().catch(() => {}); setDetailKey(null); }} hitSlop={8}>
-                  <ChevronLeft size={20} color={C.teal} />
+                  <ChevronLeft size={ICON.xl} color={C.teal} />
                   <Text style={s.backT}>{t('概要')}</Text>
                 </Pressable>
                 <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
@@ -1185,11 +1185,11 @@ export default function ChangesScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
-  h: { fontSize: 21, fontWeight: '800', color: C.ink, marginBottom: 12 },
-  pageTitle: { fontSize: 26, fontWeight: '600', color: C.ink },
+  scroll: { padding: SPACE.screen, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
+  h: { ...HEAD.section, color: C.ink, marginBottom: 12 },
+  pageTitle: { ...HEAD.page, color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   gearBtn: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center' },
   topSegOn: { backgroundColor: C.teal, borderColor: C.teal },
@@ -1199,42 +1199,42 @@ const s = StyleSheet.create({
   chipsFlex: { flex: 1, marginRight: 0 },
   toTable: {
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12,
-    backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+    backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 4,
   },
   toTableT: { fontSize: 11, fontWeight: '800', color: C.teal },
   addBtn: {
     width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
   },
-  editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
+  editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
   editBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
-  doneBtn: { backgroundColor: C.teal, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
+  doneBtn: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 16, paddingVertical: 7 },
   doneBtnT: { fontSize: 13, fontWeight: '800', color: '#fff' },
   editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
   lifted: {
     shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 },
-    elevation: 12, borderRadius: 20, backgroundColor: C.bg,
+    elevation: 12, borderRadius: RADIUS.card, backgroundColor: C.bg,
   },
   ghostCard: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
-    borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
+    borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12, alignItems: 'center',
   },
   ghostT: { fontSize: 13, color: C.sub, fontWeight: '600' },
   // 詳細ページの空状態（データが揃う前の説明。ghostCardより読ませる文章向けに左寄せ・行間広め）
   emptyCard: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
-    borderRadius: 20, padding: 18, marginBottom: 12,
+    borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12,
   },
   emptyCardT: { fontSize: 13.5, color: C.sub, fontWeight: '600', lineHeight: 21 },
   moveCard: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.panel,
     paddingHorizontal: 16, paddingVertical: 14, marginBottom: 10,
   },
   moveLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   moveBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   moveBtnT: { fontSize: 17, fontWeight: '800', color: C.teal },
-  actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
+  actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   actBtnT: { fontSize: 13, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
   // 昨夜の睡眠（B-14a）: 合計の大表示＋ステージ横帯＋凡例
@@ -1249,26 +1249,26 @@ const s = StyleSheet.create({
   actDate: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
   actVal: { fontSize: 13, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  kpi: { flex: 1, backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 16, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 12 },
+  kpi: { flex: 1, backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.panel, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 12 },
   kpiL: { fontSize: 11, fontWeight: '700', color: C.sub },
   kpiV: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
   kpiU: { fontSize: 13, color: C.sub, fontWeight: '600' },
   kpiD: { fontSize: 11, color: C.sub, marginTop: 2 },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
-  h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
+  h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   h2sub: { fontSize: 12, fontWeight: '700', color: C.faint },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
   dayHead: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
   dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   dayText: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
-  kcalBadge: { backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },  // 生HEX淡緑はダークで浮くためトークン化
+  kcalBadge: { backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 3 },  // 生HEX淡緑はダークで浮くためトークン化
   kcalBadgeT: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   fxHead: { fontSize: 13, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   fxName: { fontSize: 15, fontWeight: '700', color: C.ink },
   fxVal: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
-  chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chip: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 12, paddingVertical: 7 },
   chipOn: { backgroundColor: C.ink, borderColor: C.ink },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
   dgRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
@@ -1282,12 +1282,12 @@ const s = StyleSheet.create({
   note: { fontSize: 13, color: C.faint, lineHeight: 18 },
   // セクション小見出し（ヘルスケアの「トレンド」「ハイライト」風。上余白を大きめに取り
   // グループの切れ目を作る。先頭セクションにも同じ余白でリズムを揃える）
-  sectionH: { fontSize: 18.5, fontWeight: '800', color: C.ink, marginTop: 14, marginBottom: 10, marginLeft: 2 },
+  sectionH: { ...HEAD.sub, color: C.ink, marginTop: 14, marginBottom: 10, marginLeft: 2 },
   // マスタメニュー（ヘルスケア式）
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
-    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 9,
+    borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 9,
     shadowColor: '#0e1116', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
   },
   menuIcon: {
@@ -1298,7 +1298,7 @@ const s = StyleSheet.create({
   skelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
-    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 15, marginBottom: 9,
+    borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 15, marginBottom: 9,
   },
   menuT: { fontSize: 15.5, fontWeight: '800', color: C.ink },
   menuSub: { fontSize: 12.5, color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },

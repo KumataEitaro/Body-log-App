@@ -10,7 +10,7 @@ import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Share2, PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BookOpen } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
@@ -113,7 +113,7 @@ export default function LawsScreen() {
             <CrownBadge size={14} />
           ) : (
             <Pressable hitSlop={10} onPress={() => setSticker({ kind: 'law', title: l.title, sub: l.sub })}>
-              <Share2 size={17} color={C.faint} />
+              <Share2 size={ICON.md} color={C.faint} />
             </Pressable>
           )}
         </View>
@@ -188,16 +188,16 @@ export default function LawsScreen() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingTop: 8, paddingBottom: 48 },
+  scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 48 },
   headRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
-  h: { fontSize: 26, fontWeight: '800', color: C.ink },
+  h: { ...HEAD.page, color: C.ink },
   progress: { fontSize: 15, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   lead: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginBottom: 14 },
-  emptyBox: { alignItems: 'center', gap: 8, backgroundColor: C.panel, borderRadius: 18, padding: 22, marginBottom: 12 },
+  emptyBox: { alignItems: 'center', gap: 8, backgroundColor: C.panel, borderRadius: RADIUS.card, padding: 22, marginBottom: 12 },
   emptyT: { fontSize: 13, color: C.sub, lineHeight: 19, textAlign: 'center' },
   card: {
     backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
-    borderRadius: 18, padding: 14, marginBottom: 10,
+    borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 10,
     shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
   },
   // ぼかし表現はカード全体の半透明で（内容を隠すのではなく「うっすら読める」お楽しみ側に倒す）
@@ -212,7 +212,7 @@ const s = StyleSheet.create({
   silhouette: {
     flexDirection: 'row', gap: 10, alignItems: 'center',
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',
-    borderRadius: 18, padding: 14, marginBottom: 8,
+    borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 8,
   },
   silhouetteQ: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.track, alignItems: 'center', justifyContent: 'center' },
   silhouetteQT: { fontSize: 16, fontWeight: '900', color: C.faint },
@@ -223,9 +223,9 @@ const s = StyleSheet.create({
   celebCard: { backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'center' },
   celebIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
   celebT: { fontSize: 18, fontWeight: '900', color: C.ink, marginTop: 4, marginBottom: 10 },
-  celebRow: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch', backgroundColor: C.accentSoft, borderRadius: 14, padding: 12, marginTop: 6 },
+  celebRow: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch', backgroundColor: C.accentSoft, borderRadius: RADIUS.tile, padding: 12, marginTop: 6 },
   celebName: { flex: 1, fontSize: 13.5, fontWeight: '800', color: C.ink, lineHeight: 19 },
   celebMore: { fontSize: 12, color: C.sub, marginTop: 8 },
-  celebCta: { backgroundColor: C.teal, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
+  celebCta: { backgroundColor: C.teal, borderRadius: RADIUS.input, paddingVertical: 12, paddingHorizontal: 26, marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
   celebCtaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });

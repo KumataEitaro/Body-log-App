@@ -1641,4 +1641,9 @@ export const VI: Record<string, string> = {
   "獲得条件": "Điều kiện nhận",
   "{d} に獲得": "Đã nhận vào {d}",
   "まだ獲得していません": "Chưa nhận được",
+  "苦手なもの・食べないものはありますか？": "Bạn có món ăn hay nguyên liệu nào không thích hoặc không ăn không?",
+  "登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。": "Khi bạn đăng ký, AI sẽ nhắc nhở \"Có thể có nguyên liệu cần chú ý\" khi quét ảnh hoặc thực đơn. Ví dụ như thuần chay, không gluten hoặc các chất dễ gây dị ứng.",
+  "※ 表示は推定です。安全確認には使えません。": "※ Hiển thị chỉ mang tính chất ước tính. Không dùng để xác nhận an toàn.",
+  "設定してみる": "Thiết lập ngay",
+  "いまはしない": "Để sau",
 };

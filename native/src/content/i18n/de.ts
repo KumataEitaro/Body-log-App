@@ -1641,4 +1641,9 @@ export const DE: Record<string, string> = {
   "獲得条件": "Bedingung für Erhalt",
   "{d} に獲得": "Am {d} erhalten",
   "まだ獲得していません": "Noch nicht erhalten",
+  "苦手なもの・食べないものはありますか？": "Gibt es Dinge, die du nicht magst oder nicht isst?",
+  "登録しておくと、写真やメニューを読み取ったときに「これは対象かも」とAIが教えてくれます。ビーガン・グルテンフリー・アレルギーの気になる食材など。": "Wenn du sie einträgst, sagt dir die KI beim Scannen von Fotos oder Menüs: „Das könnte relevant sein“. Z. B. für vegane Ernährung, glutenfreie Produkte oder Allergene.",
+  "※ 表示は推定です。安全確認には使えません。": "※ Die Anzeige ist eine Schätzung. Nicht zur Sicherheitsprüfung verwenden.",
+  "設定してみる": "Jetzt einrichten",
+  "いまはしない": "Jetzt nicht",
 };
