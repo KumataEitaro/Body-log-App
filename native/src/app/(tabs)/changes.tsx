@@ -10,13 +10,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReorderableCards from '@/components/ReorderableCards';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { AddCardSheet } from '@/components/CardLayout';
-import { Plus, Moon, Sparkles, TrendingUp, Target, Utensils, Camera, Tornado, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
+import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppState } from 'react-native';
-import { CalendarDays, CalendarRange, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
+import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
 import LeanBulkCard from '@/components/LeanBulkCard';
 import CycleCard from '@/components/CycleCard';
 import { usePurpose, fetchPurposePeriods, cycleLabel, type PurposePeriod } from '@/lib/purpose';
@@ -27,7 +27,7 @@ import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
-import WeekdayHeatmapCard, { weekdayRhythmSummary } from '@/components/WeekdayHeatmapCard';
+import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2 } from 'lucide-react-native';
@@ -70,13 +70,40 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // bulkguardは増量目的（purpose==='bulk'）のときだけメニューに現れる（下のvisibleOrderで絞る）
 // lawsは詳細ページではなく /laws（法則図鑑）への外部遷移行（menuRowで分岐する）
 // cyclesは目的の切替履歴（purpose_periods）が2サイクル以上あるときだけ現れる（下のunavailableで絞る）
-const BODY_ORDER_DEFAULT = ['digest', 'laws', 'bulkguard', 'cycles', 'kpi', 'calendar', 'chart', 'goal', 'slots', 'table', 'photos', 'binge', 'weekmap', 'trends', 'health'];
-const TRAIN_ORDER_DEFAULT = ['tkpi', 'tcal', 'tchart', 'tpr', 'tgoal', 'tbal', 'tpart', 'ttable'];
-// マスタメニュー化で身体/筋トレのセグメントを廃止し、1本のリストに統合（ヘルスケア式）
-const ALL_ORDER_DEFAULT = [...BODY_ORDER_DEFAULT, ...TRAIN_ORDER_DEFAULT];
+//
+// 統合カード（項目が多すぎ・概念かぶりのβ指摘対応）: 旧23行を10行前後に統合し、
+// 詳細ページで統合元カードを縦に積む（各カード自体は無改造）
+const ALL_ORDER_DEFAULT = ['body', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
+// 統合行→詳細で縦に積む旧カードの並び
+const DETAIL_STACKS: Record<string, string[]> = {
+  body: ['goal', 'kpi', 'chart', 'table'],
+  eating: ['slots', 'weekmap', 'trends', 'binge'],
+  week: ['digest', 'calendar'],
+  volume: ['tkpi', 'tcal', 'tbal', 'tpart', 'ttable'],
+  strength: ['tchart', 'tpr', 'tgoal'],
+};
+// メニューのセクション小見出し（Appleヘルスケアの「トレンド」「ハイライト」式）。
+// キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
+// ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
+const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
+  { title: () => t('からだ'), keys: ['body', 'photos', 'laws', 'bulkguard', 'cycles'] },
+  { title: () => t('食事'), keys: ['eating', 'week'] },
+  { title: () => t('運動'), keys: ['volume', 'strength', 'health'] },
+];
+// セクション順→セクション内は引数の相対順。未知キーは末尾へ（防御・落とさない）
+function normalizeOrder(order: string[]): string[] {
+  const out: string[] = [];
+  for (const sec of SECTION_DEFS) out.push(...order.filter((k) => sec.keys.includes(k)));
+  out.push(...order.filter((k) => !out.includes(k)));
+  return out;
+}
 const CARD_LABELS = (): Record<string, string> => ({
-  digest: t('週間ダイジェスト'), laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), photos: t('体の写真'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
-  table: t('数字で見る'), trends: t('食材の傾向'), health: t('歩数・睡眠'), ttable: t('挙上重量の表'),
+  // 統合行（メニュー・詳細タイトル・⊕シートで使う）
+  body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
+  laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), photos: t('体の写真'), health: t('歩数・睡眠'),
+  // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
+  digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
+  table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'),
 });
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
@@ -157,28 +184,16 @@ export default function ChangesScreen() {
     setBodyTableOpen(true);
   }
 
-  // 並び順の復元（統合キーが無ければ旧・身体/筋トレ別キーから移行する）
+  // 並び順の復元。カード統合でキー体系が変わったため保存キーをv2に更新。
+  // 旧キー（bl-order-all等）は読まない＝全員新既定から再スタート
+  // （旧構成のキーが混ざる事故を避ける最も安全な方法。フィルタで消えるだけだが読む意味もない）
   useEffect(() => {
     (async () => {
       try {
-        const all = JSON.parse((await AsyncStorage.getItem('bl-order-all')) || 'null');
-        if (Array.isArray(all)) {
-          setOrderAll(mergeOrder(all, ALL_ORDER_DEFAULT));
-        } else {
-          const b = JSON.parse((await AsyncStorage.getItem('bl-order-body')) || 'null');
-          const t = JSON.parse((await AsyncStorage.getItem('bl-order-train')) || 'null');
-          const legacy = [...(Array.isArray(b) ? b : BODY_ORDER_DEFAULT), ...(Array.isArray(t) ? t : TRAIN_ORDER_DEFAULT)];
-          setOrderAll(mergeOrder(legacy, ALL_ORDER_DEFAULT));
-        }
-        const hAll = JSON.parse((await AsyncStorage.getItem('bl-hidden-all')) || 'null');
-        if (Array.isArray(hAll)) {
-          setHiddenAll(hAll.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
-        } else {
-          const hb = JSON.parse((await AsyncStorage.getItem('bl-hidden-body')) || 'null');
-          const ht = JSON.parse((await AsyncStorage.getItem('bl-hidden-train')) || 'null');
-          const legacy = [...(Array.isArray(hb) ? hb : []), ...(Array.isArray(ht) ? ht : [])];
-          if (legacy.length) setHiddenAll(legacy.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
-        }
+        const all = JSON.parse((await AsyncStorage.getItem('bl-order-all2')) || 'null');
+        if (Array.isArray(all)) setOrderAll(mergeOrder(all, ALL_ORDER_DEFAULT));
+        const hAll = JSON.parse((await AsyncStorage.getItem('bl-hidden-all2')) || 'null');
+        if (Array.isArray(hAll)) setHiddenAll(hAll.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
       } catch { /* 初回など */ }
     })();
   }, []);
@@ -190,7 +205,7 @@ export default function ChangesScreen() {
   const finishEditing = useCallback(async () => {
     setEditing(false);
     try {
-      await AsyncStorage.setItem('bl-order-all', JSON.stringify(editStateRef.current.all));
+      await AsyncStorage.setItem('bl-order-all2', JSON.stringify(editStateRef.current.all));
     } catch { /* 保存失敗はレイアウトが戻るだけ */ }
   }, []);
 
@@ -599,9 +614,16 @@ export default function ChangesScreen() {
         </View>
   ) : emptyDetail(t('ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。'));
 
-  // カード1枚の例外で概要タブ全体が落ちないよう、1枚ずつ境界で包む。
+  // 統合行は詳細ページで旧カードを縦に積む（各カードのmarginBottom:12がそのまま余白になる）。
+  // カード1枚の例外でページ全体が落ちないよう、旧カード単位で境界を保つ。
   // どのカードで起きたかを名前で出せるので、原因の切り分けにもなる
   function card(key: string): ReactNode {
+    const stack = DETAIL_STACKS[key];
+    if (stack) return <View>{stack.map((k) => <View key={k}>{subCard(k)}</View>)}</View>;
+    return subCard(key);
+  }
+
+  function subCard(key: string): ReactNode {
     return (
       <ErrorBoundary compact name={CARD_LABELS()[key] ?? key}>
         {cardBody(key)}
@@ -646,30 +668,36 @@ export default function ChangesScreen() {
     ...((periods?.length ?? 0) >= 2 ? [] : ['cycles']),
   ];
   const hidden = hiddenAll;
-  const visibleOrder = orderAll.filter((k) => !hidden.includes(k) && !unavailable.includes(k));
+  // 描画は常にセクション正規化した並びを使う（保存値がセクションを跨いでいても壊れない）
+  const orderNorm = normalizeOrder(orderAll);
+  const visibleOrder = orderNorm.filter((k) => !hidden.includes(k) && !unavailable.includes(k));
 
-  // 表示中カードの並べ替え結果を、非表示・非対象カードの位置を保ったまま全体の順序へ戻す
+  // 表示中カードの並べ替え結果を、非表示・非対象カードの位置を保ったまま全体の順序へ戻す。
+  // ドラッグ確定はそのまま保存してよい（描画側で毎回正規化するので、セクションを跨いだ
+  // 落下も自セクション内の相対位置だけが反映される＝跨ぎは実質無効）
   const setOrder = (nextVisible: string[]) => {
     let i = 0;
-    setOrderAll(orderAll.map((k) => (hidden.includes(k) || unavailable.includes(k) ? k : nextVisible[i++])));
+    setOrderAll(orderNorm.map((k) => (hidden.includes(k) || unavailable.includes(k) ? k : nextVisible[i++])));
   };
 
   function hideCard(key: string) {
     const next = [...hidden, key];
     setHiddenAll(next);
-    AsyncStorage.setItem('bl-hidden-all', JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem('bl-hidden-all2', JSON.stringify(next)).catch(() => {});
   }
   function showCard(key: string) {
     const next = hidden.filter((k) => k !== key);
     setHiddenAll(next);
-    AsyncStorage.setItem('bl-hidden-all', JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem('bl-hidden-all2', JSON.stringify(next)).catch(() => {});
   }
 
-  // 最初の並びに戻す
+  // 最初の並びに戻す（旧世代の保存キーもここで掃除する）
   async function resetOrder() {
     setOrderAll(ALL_ORDER_DEFAULT);
     setHiddenAll([]);
     try {
+      await AsyncStorage.removeItem('bl-order-all2');
+      await AsyncStorage.removeItem('bl-hidden-all2');
       await AsyncStorage.removeItem('bl-order-all');
       await AsyncStorage.removeItem('bl-hidden-all');
       await AsyncStorage.removeItem('bl-order-body');
@@ -696,8 +724,28 @@ export default function ChangesScreen() {
 
   function summaryOf(key: string): string {
     switch (key) {
-      case 'digest': {
-        // 今週の記録日数＋先週比の体重変化（digestCardと同じ集計を要約1行に）
+      case 'body': {
+        // 旧kpi行の要約: 現在体重＋1週間の変化（30日の流れは詳細のヘッダー・グラフで見せる）
+        if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
+        const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
+        return `${latestW2.toFixed(1)}kg${d}`;
+      }
+      case 'eating': {
+        // 旧slotsの要約（最多時間帯）を優先。データが無いうちは旧bingeの誘い文
+        const from14 = addDays(today, -14);
+        const share: Record<string, number> = { morning: 0, noon: 0, evening: 0, night: 0 };
+        for (const it of toItemEntries(logRows.filter((r) => r.date >= from14))) {
+          if (it.hour == null) continue;
+          share[slotOf(it.hour)] += it.kcal;
+        }
+        const total = share.morning + share.noon + share.evening + share.night;
+        if (total <= 0) return t('食べすぎの引き金を分析');
+        const names: Record<string, string> = { morning: t('朝'), noon: t('昼'), evening: t('夕'), night: t('夜') };
+        const top = Object.keys(share).reduce((a, b) => (share[a] >= share[b] ? a : b));
+        return t('{slot}が最多（{p}%）', { slot: names[top], p: Math.round((share[top] / total) * 100) });
+      }
+      case 'week': {
+        // 旧digestの要約: 今週の記録日数＋先週比の体重変化（digestCardと同じ集計を1行に）
         const ws = weekStartOf2(today);
         const rec = rows.filter((r) => r.date >= ws && r.date <= today && r.intake != null).length;
         if (rec === 0) return t('今週のふりかえり');
@@ -724,89 +772,30 @@ export default function ChangesScreen() {
         const wk = t('{n}週目', { n: Math.floor(days / 7) + 1 });
         return `${cycleLabel(open.purpose)} ${wk}${d != null ? `・${d > 0 ? '+' : ''}${d.toFixed(1)}kg` : ''}`;
       }
-      case 'kpi': {
-        if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
-        const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
-        return `${latestW2.toFixed(1)}kg${d}`;
-      }
-      case 'calendar': {
-        const mon = today.slice(0, 7);
-        const n = rows.filter((r) => r.date.startsWith(mon) && (r.intake != null || r.weight != null)).length;
-        return t('今月{n}日記録', { n });
-      }
-      case 'chart': {
-        // 体重の直近30日の変化を言語化（kpi行の1週間と対で「30日の流れ」を見せる）
-        if (latestW != null && firstW != null) {
-          const d = Math.round((latestW - firstW) * 10) / 10;
-          return `${t('体重')} ${t('30日で')}${d <= 0 ? '▼' : '▲'}${Math.abs(d).toFixed(1)}kg`;
-        }
-        return t('体重・摂取・消費の推移');
-      }
-      case 'goal': {
-        if (goal?.target_weight == null) return t('目標を決めると逆算が始まります');
-        if (latestW2 == null) return `→ ${Number(goal.target_weight).toFixed(1)}kg`;
-        // 「あと{n}kg・{date}まで」（減量も増量も残り幅の絶対値。目標日が過去なら日付は出さない）
-        const n = Math.abs(Math.round((latestW2 - Number(goal.target_weight)) * 10) / 10).toFixed(1);
-        if (goal.target_date && goal.target_date >= today) {
-          const [, m, d] = goal.target_date.split('-').map(Number);
-          return t('あと{n}kg・{date}まで', { n, date: t('{m}/{d}', { m, d }) });
-        }
-        return t('あと{n}kg', { n });
-      }
-      case 'slots': {
-        // 直近14日のkcalの最多時間帯（slotsCardと同じ集計の要約）
-        const from14 = addDays(today, -14);
-        const share: Record<string, number> = { morning: 0, noon: 0, evening: 0, night: 0 };
-        for (const it of toItemEntries(logRows.filter((r) => r.date >= from14))) {
-          if (it.hour == null) continue;
-          share[slotOf(it.hour)] += it.kcal;
-        }
-        const total = share.morning + share.noon + share.evening + share.night;
-        if (total <= 0) return t('直近14日のkcal内訳');
-        const names: Record<string, string> = { morning: t('朝'), noon: t('昼'), evening: t('夕'), night: t('夜') };
-        const top = Object.keys(share).reduce((a, b) => (share[a] >= share[b] ? a : b));
-        return t('{slot}が最多（{p}%）', { slot: names[top], p: Math.round((share[top] / total) * 100) });
-      }
-      case 'table': return t('体重・ウエスト・体脂肪率の一覧');
       case 'photos': return t('見た目の変化を並べて見る');
-      case 'binge': return t('食べすぎの引き金を分析');
-      case 'weekmap': return weekdayRhythmSummary(rows, today); // 例:「金曜日に崩れやすい」
-      case 'trends': return foodFx.length > 0 ? t('{n}件の食材傾向が見つかっています', { n: foodFx.length }) : t('食材×翌日体重の傾向');
+      // 旧tkpi/tprの誘い文（週次集計はカード側が持つデータなのでここでは静的に）
+      case 'volume': return t('今週のセット数・ボリューム');
+      case 'strength': return t('自己ベストと共有ステッカー');
       case 'health': {
         const st = activity?.find((d) => d.date === today)?.steps;
         return st != null ? t('きょう{n}歩', { n: st.toLocaleString() }) : t('歩数・睡眠をヘルスケアから');
       }
-      case 'tkpi': return t('今週のセット数・ボリューム');
-      case 'tcal': return t('トレーニングした日をひと目で');
-      case 'tchart': return t('種目ごとの重量の伸び');
-      case 'tpr': return t('自己ベストと共有ステッカー');
-      case 'tgoal': return t('目標線をグラフに引く');
-      case 'tbal': return t('週ごとの部位バランス');
-      case 'tpart': return t('部位別ボリューム');
-      case 'ttable': return t('挙上重量の一覧');
       default: return '';
     }
   }
   function menuIconOf(key: string) {
     const p = { size: 17, color: C.teal } as const;
     switch (key) {
-      case 'digest': return <Sparkles {...p} />;
+      case 'body': return <PersonStanding {...p} />;
+      case 'eating': return <Salad {...p} />;
+      case 'week': return <CalendarDays {...p} />;
+      case 'volume': return <Dumbbell {...p} />;
+      case 'strength': return <Trophy {...p} />;
       case 'laws': return <BookOpen {...p} />;
       case 'bulkguard': return <Gauge {...p} />;
       case 'cycles': return <Repeat {...p} />;
-      case 'kpi': return <PersonStanding {...p} />;
-      case 'calendar': case 'tcal': return <CalendarDays {...p} />;
-      case 'chart': case 'tchart': return <TrendingUp {...p} />;
-      case 'goal': case 'tgoal': return <Target {...p} />;
-      case 'slots': return <Utensils {...p} />;
-      case 'table': case 'ttable': return <Table2 {...p} />;
       case 'photos': return <Camera {...p} />;
-      case 'binge': return <Tornado {...p} />;
-      case 'weekmap': return <CalendarRange {...p} />;
-      case 'trends': return <Salad {...p} />;
       case 'health': return <Footprints {...p} />;
-      case 'tkpi': case 'tbal': case 'tpart': return <Dumbbell {...p} />;
-      case 'tpr': return <Trophy {...p} />;
       default: return <FlaskConical {...p} />;
     }
   }
@@ -818,23 +807,18 @@ export default function ChangesScreen() {
   }
 
   // ===== 詳細ページのヘルスケア式ヘッダー（A-8残） =====
-  // 数値系の主要カード（kpi=体重・chart=選択中の系列・health=歩数）だけ、
-  // タイトル直下に「大きな現在値＋トレンド文章（{n}週間で下向き等）」を1段足す。
-  // 中身のカードは不変。トレンドはlib/trend.tsのtrendPhrase（週平均の平滑変化）
+  // 数値系の主要ページ（body=体重・health=歩数）だけ、タイトル直下に
+  // 「大きな現在値＋トレンド文章（{n}週間で下向き等）」を1段足す。
+  // 中身のカードは不変。トレンドはlib/trend.tsのtrendPhrase（週平均の平滑変化）。
+  // bodyは体重ヘッダーのみ（系列別のヘッダーはページ内のグラフカードのチップに任せる）
   function detailHeader(key: string): ReactNode {
     let val: string | null = null;
     let unit = '';
     let src: { date: string; value: number }[] = [];
-    if (key === 'kpi') {
+    if (key === 'body') {
       if (latestW2 == null) return null;
       val = latestW2.toFixed(1); unit = 'kg';
       src = wRows.map((r) => ({ date: r.date, value: Number(r.weight) }));
-    } else if (key === 'chart') {
-      // 選択中の系列に追従（カード内のチップを切り替えるとヘッダーも変わる）
-      if (points.length === 0) return null;
-      val = points[points.length - 1].value.toFixed(conf.decimals);
-      unit = conf.unit || 'kcal';
-      src = points;
     } else if (key === 'health') {
       const st = activity?.find((d) => d.date === today)?.steps;
       if (st == null) return null; // 未読込・未連携ならヘッダーなし（カードの読込ボタンに任せる）
@@ -853,15 +837,24 @@ export default function ChangesScreen() {
       </View>
     );
   }
+  // セクション先頭キー→見出し（正規化済みvisibleOrderで先頭判定。非表示/unavailableで
+  // 先頭が変われば自動で次の行に付く。編集中も表示されるがドラッグの対象にはならない）
+  const sectionHeadOf = new Map<string, string>();
+  for (const sec of SECTION_DEFS) {
+    const first = visibleOrder.find((k) => sec.keys.includes(k));
+    if (first) sectionHeadOf.set(first, sec.title());
+  }
   function menuRow(key: string) {
-    const withSpark = (key === 'kpi' || key === 'chart') && sparkVals.length >= 2;
+    const withSpark = key === 'body' && sparkVals.length >= 2;
     // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
-    // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり
-    const crowned = key === 'digest' && gate.gated('digest');
-    return (
+    // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり。
+    // 旧digest行の王冠は統合先のweek行へ付け替え（ペイウォールsrcはdigestのまま）
+    const crowned = key === 'week' && gate.gated('digest');
+    const secTitle = sectionHeadOf.get(key);
+    const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
-                 // ガイドツアーの「グラフ」ハイライトはメニュー行に当てる（詳細はタップ先）
-                 ref={key === 'chart' ? chartTarget : undefined} collapsable={false}
+                 // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
+                 ref={key === 'body' ? chartTarget : undefined} collapsable={false}
                  onPress={() => {
                    if (crowned) {
                      Haptics.selectionAsync().catch(() => {});
@@ -888,6 +881,15 @@ export default function ChangesScreen() {
         {withSpark && <MiniSpark vals={sparkVals} color={C.teal} />}
         <Text style={s.menuGo}>›</Text>
       </Pressable>
+    );
+    // セクション先頭ならヘルスケア風の小見出し＋余白を上に足す（見出しは行と一体で描くため、
+    // ReorderableCards側に見出し行を挿入する改造が不要＝並べ替えの座標計算も従来のまま）
+    if (secTitle == null) return row;
+    return (
+      <View>
+        <Text style={s.sectionH}>{secTitle}</Text>
+        {row}
+      </View>
     );
   }
 
@@ -1049,6 +1051,9 @@ const s = StyleSheet.create({
   slotDot: { width: 8, height: 8, borderRadius: 4 },
   slotT: { fontSize: 11, color: C.sub, fontWeight: '700' },
   note: { fontSize: 13, color: C.faint, lineHeight: 18 },
+  // セクション小見出し（ヘルスケアの「トレンド」「ハイライト」風。上余白を大きめに取り
+  // グループの切れ目を作る。先頭セクションにも同じ余白でリズムを揃える）
+  sectionH: { fontSize: 18.5, fontWeight: '800', color: C.ink, marginTop: 14, marginBottom: 10, marginLeft: 2 },
   // マスタメニュー（ヘルスケア式）
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

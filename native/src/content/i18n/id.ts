@@ -1250,4 +1250,9 @@ export const ID: Record<string, string> = {
   "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Gagal memuat analisis. Periksa koneksi internetmu dan buka kembali untuk mencoba lagi.",
   "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Belum ada catatan latihan. Catat set pertamamu di tab Latihan, dan {what} akan mulai tumbuh di sini.",
   "今週のサマリー": "Ringkasan minggu ini",
+  "からだ": "Tubuh",
+  "体の記録": "Catatan tubuh",
+  "食べ方の分析": "Analisis makan",
+  "週のふりかえり": "Ulasan mingguan",
+  "運動の量": "Volume latihan",
 };

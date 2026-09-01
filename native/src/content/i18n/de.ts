@@ -1250,4 +1250,9 @@ export const DE: Record<string, string> = {
   "分析を読み込めませんでした。通信状態を確認して、開き直すと再試行します。": "Analyse konnte nicht geladen werden. Bitte prüfe deine Verbindung und öffne sie erneut, um es noch einmal zu versuchen.",
   "まだ運動の記録がありません。運動タブで最初の1セットを記録すると、ここに{what}が育ちはじめます。": "Noch keine Trainings aufgezeichnet. Erfasse deinen 1. Satz im Workout-Tab, und {what} beginnt hier zu wachsen.",
   "今週のサマリー": "Wochenzusammenfassung",
+  "からだ": "Körper",
+  "体の記録": "Körperdaten",
+  "食べ方の分析": "Ernährungsanalyse",
+  "週のふりかえり": "Wochenrückblick",
+  "運動の量": "Aktivitätslevel",
 };
