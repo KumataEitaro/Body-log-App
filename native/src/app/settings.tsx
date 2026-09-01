@@ -820,7 +820,7 @@ export default function SettingsScreen() {
           <>
             <Text style={s.note}>{t('Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。')}</Text>
             <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={healthImportWeights} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('体重を取り込む（過去90日）')}</Text>}
+              {busy ? <ActivityIndicator color={C.panel} /> : <Text style={s.btnPrimaryT}>{t('体重を取り込む（過去90日）')}</Text>}
             </Pressable>
           </>
         )}
@@ -858,7 +858,7 @@ export default function SettingsScreen() {
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder={t('削除')} placeholderTextColor={C.faint} />
         <Pressable style={[s.btnDanger, { marginTop: 14 }, delConfirm !== '削除' && { opacity: 0.4 }]}
                    onPress={confirmDelete} disabled={busy || delConfirm !== '削除'}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>{t('アカウントを完全に削除する')}</Text>}
+          {busy ? <ActivityIndicator color={C.panel} /> : <Text style={s.btnPrimaryT}>{t('アカウントを完全に削除する')}</Text>}
         </Pressable>
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
       </View>
@@ -967,7 +967,7 @@ const s = StyleSheet.create({
   hourChip: { borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 7 },
   hourChipOn: { backgroundColor: C.ink, borderColor: C.ink },
   hourChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  hourChipTOn: { color: '#fff' },
+  hourChipTOn: { color: C.panel },  // ink地の文字はダークで反転するため背景トークンで吸収
   notifLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   notifSub: { fontSize: 13, color: C.sub, marginTop: 2 },
   notifNote: { fontSize: 11, color: C.faint, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 },
@@ -997,7 +997,7 @@ const s = StyleSheet.create({
   segMiniOn: { backgroundColor: C.ink, borderColor: C.ink },
   segMiniT: { fontSize: 15, fontWeight: '700', color: C.sub },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
-  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   btnDanger: { backgroundColor: C.coral, borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
   note: { fontSize: 13, color: C.sub, lineHeight: 19 },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 10 },

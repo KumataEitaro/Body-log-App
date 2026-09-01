@@ -8,6 +8,7 @@ import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import { parseAuthCallback } from '@/lib/authCallback';
 import { C, sheetTopPad } from '@/lib/ui';
+import { useTheme } from '@/lib/theme';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
 import { Languages, Check } from 'lucide-react-native';
 
@@ -21,6 +22,8 @@ const SHOW_GOOGLE_SSO = true;
 const SHOW_APPLE_SSO = true;
 
 export default function LoginScreen() {
+  // Appleサインインボタンの白黒切替に使う（ブランド規定: ライト=黒ボタン/ダーク=白ボタン）
+  const { scheme } = useTheme();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -215,12 +218,14 @@ export default function LoginScreen() {
             <View style={s.orRow}>
               <View style={s.orLine} /><Text style={s.orT}>{t('または')}</Text><View style={s.orLine} />
             </View>
-            <Pressable style={({ pressed }) => [s.ssoBtn, s.appleBtn, pressed && { opacity: 0.8 }]}
+            {/* Appleブランドガイドライン準拠: ライト=黒ボタン白文字 / ダーク=白ボタン黒文字。
+                ここは意図的な白黒固定（テーマトークンにしない）。ダークで黒ボタンだと背景に沈むため切替する */}
+            <Pressable style={({ pressed }) => [s.ssoBtn, scheme === 'dark' ? s.appleBtnDark : s.appleBtn, pressed && { opacity: 0.8 }]}
                        onPress={appleLogin} disabled={aBusy}>
-              {aBusy ? <ActivityIndicator color="#fff" /> : (
+              {aBusy ? <ActivityIndicator color={scheme === 'dark' ? '#000' : '#fff'} /> : (
                 <>
-                  <Text style={s.appleMark}></Text>
-                  <Text style={[s.ssoT, { color: '#fff' }]}>{t('Appleでサインイン')}</Text>
+                  <Text style={[s.appleMark, scheme === 'dark' && { color: '#000' }]}></Text>
+                  <Text style={[s.ssoT, { color: scheme === 'dark' ? '#000' : '#fff' }]}>{t('Appleでサインイン')}</Text>
                 </>
               )}
             </Pressable>
@@ -272,7 +277,9 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
+  // Appleサインインの白黒はブランド規定の固定色（テーマ非依存）。明暗はscheme分岐で切替
   appleBtn: { backgroundColor: '#000', borderColor: '#000' },
+  appleBtnDark: { backgroundColor: '#fff', borderColor: '#fff' },
   appleMark: { color: '#fff', fontSize: 17, fontWeight: '700', marginRight: 6 },
   wrap: { flexGrow: 1, backgroundColor: C.bg, justifyContent: 'center', paddingVertical: 40 },
   inner: { paddingHorizontal: 28 },
@@ -304,7 +311,7 @@ const s = StyleSheet.create({
   err: { color: C.coral, fontSize: 15, marginBottom: 6 },
   info: { color: C.teal, fontSize: 15, marginBottom: 6, lineHeight: 21 },
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
-  btnT: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 1 },
+  btnT: { color: C.panel, fontSize: 17, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従（現状未使用スタイル）
   terms: { fontSize: 13, color: C.faint, marginTop: 12, lineHeight: 18, textAlign: 'center' },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
   orLine: { flex: 1, height: 0.5, backgroundColor: C.line },

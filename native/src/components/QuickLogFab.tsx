@@ -219,7 +219,7 @@ const s = StyleSheet.create({
     backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', zIndex: 20,
     shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6,
   },
-  fabT: { color: '#fff', fontSize: 26, fontWeight: '600', marginTop: -2 },
+  fabT: { color: C.panel, fontSize: 26, fontWeight: '600', marginTop: -2 },  // ink地（ダーク=明色）に追従
   backdrop: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)' },
   sheet: { backgroundColor: C.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 14 },
   grip: { alignSelf: 'center', width: 38, height: 5, borderRadius: 3, backgroundColor: C.line, marginBottom: 10 },

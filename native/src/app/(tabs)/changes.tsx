@@ -604,7 +604,7 @@ export default function ChangesScreen() {
           <View style={[s.chips, s.chipsFlex]}>
             {series().map((x) => (
               <Pressable key={x.key} style={[s.chip, serie === x.key && s.chipOn]} onPress={() => setSerie(x.key)}>
-                <Text style={[s.chipT, serie === x.key && { color: '#fff' }]}>{x.label}</Text>
+                <Text style={[s.chipT, serie === x.key && { color: C.panel }]}>{x.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -639,12 +639,12 @@ export default function ChangesScreen() {
                 {ranges().map((r) => (
                   <Pressable key={r.label} style={[s.chip, isActive(r.d) && s.chipOn]}
                              onPress={() => { setRange(r.d); setLiveDays(null); setChartNonce((n) => n + 1); }}>
-                    <Text style={[s.chipT, isActive(r.d) && { color: '#fff' }]}>{r.label}</Text>
+                    <Text style={[s.chipT, isActive(r.d) && { color: C.panel }]}>{r.label}</Text>
                   </Pressable>
                 ))}
                 {noneActive && (
                   <View style={[s.chip, s.chipOn, { borderStyle: 'dashed' }]}>
-                    <Text style={[s.chipT, { color: '#fff' }]}>{t('{n}日', { n: liveDays })}</Text>
+                    <Text style={[s.chipT, { color: C.panel }]}>{t('{n}日', { n: liveDays })}</Text>
                   </View>
                 )}
               </>
@@ -1243,7 +1243,7 @@ const s = StyleSheet.create({
   dayHead: { fontSize: 13, fontWeight: '800', color: C.ink, marginBottom: 4, fontVariant: ['tabular-nums'] },
   dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   dayText: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
-  kcalBadge: { backgroundColor: '#eef4f0', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  kcalBadge: { backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },  // 生HEX淡緑はダークで浮くためトークン化
   kcalBadgeT: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   fxHead: { fontSize: 13, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },

@@ -1113,7 +1113,7 @@ const s = StyleSheet.create({
   tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 10, padding: 10, fontSize: 17, color: C.ink },
   tNum: { width: 56, textAlign: 'center' },
   btnPrimary: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
-  btnPrimaryT: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnPrimaryT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   btnGhost: { backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   btnGhostT: { color: C.ink, fontSize: 15, fontWeight: '800' },
   msg: { fontSize: 15, fontWeight: '600', marginTop: 8 },

@@ -70,7 +70,8 @@ export function Chip({ label, selected, onPress, onLongPress, tone = 'teal', lea
     : s.chipOnTeal;
   const onText = !selected ? null
     : tone === 'outline' ? { color: C.teal }
-    : { color: '#fff' };
+    : tone === 'ink' ? { color: C.panel }  // ink地はダークで明色になるため背景トークンで反転吸収
+    : { color: '#fff' };                    // teal地はダークでも十分濃い（darkPaletteForで+12%明るいだけ）ので白のまま
   return (
     <Pressable onPressIn={() => press(0.96)} onPressOut={() => press(1)} disabled={disabled}
                style={{ borderRadius: 999 }} android_ripple={ripple()}
@@ -96,13 +97,14 @@ export function OptionButton({ label, onPress, variant = 'filled', busy, disable
   const sc = useRef(new Animated.Value(1)).current;
   const press = (v: number) => Animated.spring(sc, { toValue: v, useNativeDriver: true, speed: 42, bounciness: 0 }).start();
   const box = variant === 'filled' ? s.optFilled : variant === 'teal' ? s.optTeal : s.optTonal;
-  const txt = variant === 'tonal' ? { color: C.ink } : { color: '#fff' };
+  // filled(=ink地)はダークで明色になるため背景トークンへ。teal地は白のままで成立する
+  const txt = variant === 'tonal' ? { color: C.ink } : variant === 'filled' ? { color: C.panel } : { color: '#fff' };
   return (
     <Pressable onPressIn={() => press(0.95)} onPressOut={() => press(1)}
                onPress={() => { hapt(); onPress(); }} disabled={disabled || busy}
                style={[{ borderRadius: 999 }, style]} android_ripple={ripple()}>
       <Animated.View style={[s.opt, box, (disabled && !busy) && { opacity: 0.4 }, { transform: [{ scale: sc }] }]}>
-        {busy ? <ActivityIndicator color={variant === 'tonal' ? C.ink : '#fff'} /> : (
+        {busy ? <ActivityIndicator color={variant === 'tonal' ? C.ink : variant === 'filled' ? C.panel : '#fff'} /> : (
           <>
             {leading}
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={FONT_CAP} style={[s.optT, txt]}>{label}</Text>
