@@ -1,7 +1,7 @@
 // トレンド文章（ヘルスケアの「14週間で下向き」相当）。
 // 詳細ページのヘッダーに毎回出る一文なので、方向・週数・横ばい判定を固定する。
 // テストはロケール未設定（=日本語キーがそのまま返る）前提で日本語文字列を比較する。
-import { trendPhrase } from '../trend';
+import { trendPhrase, trendBands, trendDirection } from '../trend';
 
 // 週の並びから日別データを作るヘルパー。2026-06-01は月曜（週の起点）
 // weeklyVals[i] がそのままi週目の週平均になるよう、各週は月・木の2点で同じ値を入れる
@@ -42,5 +42,39 @@ describe('trendPhrase（週平均の平滑変化を言語化）', () => {
   it('データが1週ぶんしかない（比べる相手がない） → 「横ばいです」', () => {
     expect(trendPhrase(weeks([87.0]))).toBe('横ばいです');
     expect(trendPhrase([])).toBe('横ばいです');
+  });
+});
+
+describe('trendDirection（ハイライトのトレンド転換検知用の方向値）', () => {
+  it('trendPhraseと同じ判定で up / down / flat を返す', () => {
+    expect(trendDirection(weeks([87.0, 86.6, 86.2]))).toBe('down');
+    expect(trendDirection(weeks([70.0, 69.5, 70.3]))).toBe('up');
+    expect(trendDirection(weeks([86.5, 87.0, 87.01]))).toBe('flat');   // 週平均の0.1%以下は動きとみなさない
+    expect(trendDirection(weeks([87.0]))).toBe('flat');                // 比べる相手がない
+  });
+});
+
+describe('trendBands（B-17: 直近4週平均 vs その前8週平均）', () => {
+  it('12週: older=前8週の平均・recent=直近4週の平均', () => {
+    // 前8週=72.0固定、直近4週=71.0固定
+    const vals = weeks([72, 72, 72, 72, 72, 72, 72, 72, 71, 71, 71, 71]);
+    expect(trendBands(vals)).toEqual({ older: 72, recent: 71 });
+  });
+
+  it('5週（最小構成）: olderは残り1週だけで計算する', () => {
+    const b = trendBands(weeks([73, 72, 72, 72, 72]))!;
+    expect(b.older).toBeCloseTo(73, 5);
+    expect(b.recent).toBeCloseTo(72, 5);
+  });
+
+  it('4週以下はデータ不足でnull（比較相手の週が無い）', () => {
+    expect(trendBands(weeks([72, 72, 72, 72]))).toBeNull();
+    expect(trendBands([])).toBeNull();
+  });
+
+  it('12週を超えるぶんの古いデータは無視する（窓は直近12週）', () => {
+    // 先頭の90kg（13週前）は窓の外。older=前8週(72)・recent=直近4週(71)
+    const vals = weeks([90, 72, 72, 72, 72, 72, 72, 72, 72, 71, 71, 71, 71]);
+    expect(trendBands(vals)).toEqual({ older: 72, recent: 71 });
   });
 });

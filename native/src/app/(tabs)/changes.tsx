@@ -17,7 +17,7 @@ import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { AddCardSheet } from '@/components/CardLayout';
 import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Svg, { Polyline } from 'react-native-svg';
+import Svg, { Polyline, Line } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { BackHandler } from 'react-native';
@@ -55,8 +55,10 @@ import { latestLawSummary } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { bigKcalParts } from '@/lib/format';
-import { trendPhrase } from '@/lib/trend';
+import { trendPhrase, trendBands } from '@/lib/trend';
 import { MoodInline } from '@/components/MoodFace';
+import HighlightCard from '@/components/HighlightCard';
+import { type HighlightTarget } from '@/lib/highlight';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
@@ -135,6 +137,41 @@ function MiniSpark({ vals, color }: { vals: number[]; color: string }) {
     <Svg width={w} height={h}>
       <Polyline points={pts} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
+  );
+}
+
+// トレンドの2期間平均線（B-17・ヘルスケアの「12週間平均 vs 直近の平均」風）。
+// 前8週の平均を左にグレー、直近4週の平均を右にアクセントの水平線で描き、差分を一言添える。
+// 体重4週分未満（trendBandsがnull）なら呼び出し側で出さない
+function TrendBands({ older, recent, width }: { older: number; recent: number; width: number }) {
+  const h = 44;                        // 帯グラフ本体。ラベル行と合わせて全体で60px程度
+  const diff = Math.round((recent - older) * 10) / 10;
+  // 2値を[12, h-12]に割り付ける（差がごく小さい時は中央に寄せて重なりを許す）
+  const top = Math.max(older, recent);
+  const span = Math.abs(older - recent);
+  const y = (v: number) => (span < 1e-9 ? h / 2 : 12 + ((top - v) / span) * (h - 24));
+  return (
+    <View style={s.bandBox}>
+      <View style={s.bandHead}>
+        <Text style={s.bandTitle}>{t('2期間の平均')}</Text>
+        <Text style={s.bandDiff}>{t('平均 {d}kg', { d: `${diff > 0 ? '+' : ''}${diff.toFixed(1)}` })}</Text>
+      </View>
+      <Svg width={width} height={h}>
+        {/* 古い方（前8週）はグレー・新しい方（直近4週）はアクセント */}
+        <Line x1={4} y1={y(older)} x2={width * 0.46} y2={y(older)} stroke={C.faint} strokeWidth={3} strokeLinecap="round" />
+        <Line x1={width * 0.54} y1={y(recent)} x2={width - 4} y2={y(recent)} stroke={C.teal} strokeWidth={3} strokeLinecap="round" />
+      </Svg>
+      <View style={s.bandLegend}>
+        <View style={s.bandLegendItem}>
+          <View style={[s.bandDot, { backgroundColor: C.faint }]} />
+          <Text style={s.bandLegendT}>{t('前8週')} {older.toFixed(1)}kg</Text>
+        </View>
+        <View style={s.bandLegendItem}>
+          <View style={[s.bandDot, { backgroundColor: C.teal }]} />
+          <Text style={s.bandLegendT}>{t('直近4週')} {recent.toFixed(1)}kg</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -893,6 +930,8 @@ export default function ChangesScreen() {
     } else {
       return null;
     }
+    // 体重ヘッダーだけ2期間平均線（B-17）を足す。体重4週分未満はtrendBandsがnull＝出さない
+    const bands = key === 'body' ? trendBands(src) : null;
     return (
       <View style={s.detailHead}>
         {/* 大数字は文字サイズ拡大でレイアウトが崩れやすいため上限1.3（本文系は制限しない） */}
@@ -901,6 +940,7 @@ export default function ChangesScreen() {
           <Text style={s.detailUnit}> {unit}</Text>
         </Text>
         <Text style={s.detailTrend}>{trendPhrase(src)}</Text>
+        {bands && <TrendBands older={bands.older} recent={bands.recent} width={winW - 32} />}
       </View>
     );
   }
@@ -983,6 +1023,17 @@ export default function ChangesScreen() {
         </View>
       </View>
       {editing && <Text style={s.editHint}>{t('行を長押し→そのままドラッグで並び替え。「完了」で保存します')}</Text>}
+      {/* きょうのハイライト（B-16）: セクション見出しより上の最上部に1枚だけ。
+          並び替え中は非表示（ドラッグの視界を邪魔しない）。lawsは図鑑へ、他は詳細ページへ */}
+      {!editing && (
+        <HighlightCard
+          rows={rows} today={today} ready={menuLoaded}
+          onOpen={(target: HighlightTarget) => {
+            if (target === 'laws') { router.push('/laws' as never); return; }
+            openDetail(target);
+          }}
+        />
+      )}
     </>
   );
 
@@ -1175,4 +1226,13 @@ const s = StyleSheet.create({
   detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   detailUnit: { fontSize: 16, fontWeight: '700', color: C.sub },
   detailTrend: { fontSize: 13.5, fontWeight: '700', color: C.sub, marginTop: 2 },
+  // トレンドの2期間平均線（B-17）
+  bandBox: { marginTop: 10 },
+  bandHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  bandTitle: { fontSize: 11, fontWeight: '800', color: C.sub, letterSpacing: 0.2 },
+  bandDiff: { fontSize: 12.5, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  bandLegend: { flexDirection: 'row', gap: 14, marginTop: 2 },
+  bandLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bandDot: { width: 8, height: 8, borderRadius: 4 },
+  bandLegendT: { fontSize: 11, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });
