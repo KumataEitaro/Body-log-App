@@ -5,9 +5,9 @@
 // - ⤢で全画面モーダル展開
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
-import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop, G } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Rect, Text as SvgText, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { C } from '@/lib/ui';
+import { C, rgba } from '@/lib/ui';
 import {
   type RawPoint, dateToIdx, idxToDate, unitForDays,
   binPoints, smoothTrend, niceTicks, xTicks, smoothPath, linePath,
@@ -27,11 +27,14 @@ type Props = {
   fullscreenEnabled?: boolean; // 全画面内での再帰を防ぐ
   onDaysChange?: (days: number, isFull: boolean) => void; // ピンチ/パン後に実際の表示日数を親へ通知（期間チップの追従用）
   markers?: { date: string; label: string }[]; // サイクル境界（B-5）等の薄い縦線＋小ラベル。省略時は描画コストゼロ
+  // 期間の帯（生理周期モードの月経期間など）。データ・目盛り・ジェスチャーには一切触れず、
+  // グリッドの下に極薄の矩形を敷くだけ。省略時は描画コストゼロ（markersと同じ流儀）
+  bands?: { from: string; to: string }[];
 };
 
 const PAD_L = 8, PAD_R = 44, PAD_T = 10, PAD_B = 22;
 
-function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange, markers }: Props) {
+function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange, markers, bands }: Props) {
   const [width, setWidth] = useState(0);
   const [fs, setFs] = useState(false);
 
@@ -104,6 +107,15 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
     ? markers
         .map((m) => ({ idx: dateToIdx(m.date), label: m.label }))
         .filter((m) => m.idx >= startF && m.idx <= win.end)
+    : null;
+
+  // 期間の帯（bands未指定なら早期にnull＝計算・描画コストゼロ）。
+  // 帯は「その日いっぱい」を覆うので終端は+1日ぶん広げ、表示窓の外にはみ出すぶんは切り詰める
+  const visBands = bands && bands.length > 0
+    ? bands
+        .map((b) => ({ a: dateToIdx(b.from), b: dateToIdx(b.to) + 1 }))
+        .filter((r) => r.b > startF && r.a < win.end)
+        .map((r) => ({ a: Math.max(r.a, startF), b: Math.min(r.b, win.end) }))
     : null;
 
   // ===== ジェスチャー =====
@@ -217,6 +229,12 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
           <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} collapsable={false}>
             {width > 0 && (
               <Svg width={width} height={height}>
+                {/* 期間の帯（生理周期モードの月経期間など）。最背面に極薄で敷き、
+                    グラフ本体の見え方（色・目盛り・曲線）は一切変えない */}
+                {visBands?.map((b, i) => (
+                  <Rect key={`bd${i}`} x={x(b.a)} y={PAD_T} width={Math.max(0.5, x(b.b) - x(b.a))} height={plotH}
+                        fill={rgba(C.coral, 0.08)} />
+                ))}
                 {/* 横グリッド＋右側Yラベル */}
                 {ticks.map((t) => (
                   <Line key={`h${t}`} x1={PAD_L} y1={y(t)} x2={PAD_L + plotW} y2={y(t)} stroke={C.line} strokeWidth={0.5} />
@@ -294,7 +312,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
             </View>
             <Inner
               points={points} unit={unit} decimals={decimals} planValue={planValue}
-              presetDays={presetDays} color={color} fullscreenEnabled={false} markers={markers}
+              presetDays={presetDays} color={color} fullscreenEnabled={false} markers={markers} bands={bands}
               height={Math.round(Dimensions.get('window').height * 0.66)}
             />
           </View>

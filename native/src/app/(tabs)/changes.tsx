@@ -61,7 +61,12 @@ import HighlightCard from '@/components/HighlightCard';
 import { type HighlightTarget } from '@/lib/highlight';
 import VitalsCard from '@/components/VitalsCard';
 import { listVitals, vitalsSummary, type Vital } from '@/lib/vitals';
-import { HeartPulse } from 'lucide-react-native';
+import { HeartPulse, Droplet } from 'lucide-react-native';
+import MenstrualCycleCard from '@/components/MenstrualCycleCard';
+import {
+  useCycleEnabled, listCycleStarts, cycleSummary, cycleDay,
+  isWaterRetentionWindow, menstrualBands, PERIOD_BAND_DAYS,
+} from '@/lib/cycle';
 
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
@@ -85,7 +90,9 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 //
 // 統合カード（項目が多すぎ・概念かぶりのβ指摘対応）: 旧23行を10行前後に統合し、
 // 詳細ページで統合元カードを縦に積む（各カード自体は無改造）
-const ALL_ORDER_DEFAULT = ['body', 'vitals', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
+// cycle（生理周期モード）は設定「生理周期を記録する」をONにした人にだけ現れる（既定OFF）。
+// 既存のcycles（増量/減量サイクル比較）とは別物なので、キー名を混同しないこと
+const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
 // 統合行→詳細で縦に積む旧カードの並び
 const DETAIL_STACKS: Record<string, string[]> = {
   body: ['goal', 'kpi', 'chart', 'table'],
@@ -99,7 +106,7 @@ const DETAIL_STACKS: Record<string, string[]> = {
 // キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
 // ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
-  { title: () => t('からだ'), keys: ['body', 'vitals', 'photos', 'laws', 'bulkguard', 'cycles'] },
+  { title: () => t('からだ'), keys: ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles'] },
   { title: () => t('食事'), keys: ['eating', 'week'] },
   { title: () => t('運動'), keys: ['volume', 'strength', 'health'] },
 ];
@@ -114,7 +121,7 @@ const CARD_LABELS = (): Record<string, string> => ({
   // 統合行（メニュー・詳細タイトル・⊕シートで使う）
   body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
   laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), photos: t('体の写真'), health: t('歩数・睡眠'),
-  vitals: t('バイタル'),
+  vitals: t('バイタル'), cycle: t('生理周期'),
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
@@ -210,6 +217,10 @@ export default function ChangesScreen() {
   const [periods, setPeriods] = useState<PurposePeriod[] | null>(null);
   // バイタル（血圧・脈拍・血糖）のメニュー要約用。migration-25未適用なら空配列＝誘い文
   const [vitals, setVitals] = useState<Vital[]>([]);
+  // 生理周期モード（既定OFF）。ONの人だけカード・グラフの帯・水分の説明が現れる。
+  // OFFの間はcycle_logsへの読み書きが一度も起きない（最も機微なデータなので触れない）
+  const cycleOn = useCycleEnabled();
+  const [cycleStarts, setCycleStarts] = useState<string[]>([]);
   const [daySel, setDaySel] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const router = useRouter();
@@ -381,6 +392,21 @@ export default function ChangesScreen() {
     try { setVitals(await listVitals(30)); } catch { /* 要約は飾り */ }
   };
   useEffect(() => { load(); }, [load]);
+
+  // 月経開始日の読み込み。ONにした瞬間・設定から戻った瞬間に反映する。
+  // OFFのときは問い合わせもせず、持っていた値も捨てる（画面に残骸を残さない）
+  const loadCycle = useCallback(async () => {
+    if (!cycleOn) { setCycleStarts([]); return; }
+    try { setCycleStarts((await listCycleStarts()).map((c) => c.start_date)); }
+    catch { setCycleStarts([]); /* migration-28未適用は空扱い＝静かに非表示 */ }
+  }, [cycleOn]);
+  useEffect(() => { loadCycle(); }, [loadCycle]);
+
+  // 設定で生理周期をOFFにしたら、開きっぱなしの詳細ページも閉じる
+  // （「消したはずの画面」が残っていると、見せない約束を破ったことになる）
+  useEffect(() => {
+    if (!cycleOn) setDetailKey((k) => (k === 'cycle' ? null : k));
+  }, [cycleOn]);
 
   // カレンダーの日タップ → その日の記録を取得して下に表示
   async function openDay(dateKey: string) {
@@ -632,6 +658,11 @@ export default function ChangesScreen() {
           markers={serie === 'weight' && periods != null && periods.length >= 2
             ? periods.slice(1).map((p) => ({ date: p.started_at, label: t('{name}開始', { name: cycleLabel(p.purpose) }) }))
             : undefined}
+          // 生理周期モード: 月経期間の薄い帯を体重グラフにだけ重ねる。
+          // 「増えた」と見える山が周期と重なっているかを、本人の目で確かめられるようにする
+          bands={serie === 'weight' && cycleOn && cycleStarts.length > 0
+            ? menstrualBands(cycleStarts)
+            : undefined}
         />
         {/* 期間チップ＝状態表示兼ショートカット。ピンチ後は実表示日数に追従し、どれにも該当しなければ実日数チップが出る */}
         <View style={s.chips}>
@@ -660,6 +691,10 @@ export default function ChangesScreen() {
         </View>
         {serie === 'weight' && goal?.target_weight != null && (
           <Text style={s.note}>{t('点線＝目標')} {Number(goal.target_weight).toFixed(1)}kg</Text>
+        )}
+        {/* 帯の凡例。5日間はあくまで目安であることを断り、期間を断定しない */}
+        {serie === 'weight' && cycleOn && cycleStarts.length > 0 && (
+          <Text style={s.note}>{t('薄い帯＝記録した月経期間（開始日から{n}日間の目安・長さには個人差があります）', { n: PERIOD_BAND_DAYS })}</Text>
         )}
       </View>
   );
@@ -818,6 +853,8 @@ export default function ChangesScreen() {
       case 'photos': return <BodyPhotosCard />;
       // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
       case 'vitals': return <VitalsCard width={winW - 60} />;
+      // 生理周期（migration-28未適用でも空状態で成立する）。保存・削除のたびに帯を貼り直す
+      case 'cycle': return <MenstrualCycleCard onChanged={loadCycle} />;
       case 'binge': return <BingeTriggerCard />;
       // 画面が既に持っているrows（date/intake/target）をそのまま渡す（再取得しない最小構成）
       case 'weekmap': return <WeekdayHeatmapCard rows={rows} />;
@@ -840,9 +877,11 @@ export default function ChangesScreen() {
 
   // 増量目的でないときはbulkguardをメニューにも⊕シートにも出さない（並び順は保持）。
   // cyclesも同様: 切替経験なし（サイクル1つ以下）またはテーブル未作成（periods=null）なら出さない
+  // 生理周期は設定でONにした人にだけ出す（既定OFF＝記録しない人の画面には現れない）
   const unavailable = [
     ...(purpose === 'bulk' ? [] : ['bulkguard']),
     ...((periods?.length ?? 0) >= 2 ? [] : ['cycles']),
+    ...(cycleOn ? [] : ['cycle']),
   ];
   const hidden = hiddenAll;
   // 描画は常にセクション正規化した並びを使う（保存値がセクションを跨いでいても壊れない）
@@ -950,6 +989,8 @@ export default function ChangesScreen() {
         return `${cycleLabel(open.purpose)} ${wk}${d != null ? `・${d > 0 ? '+' : ''}${d.toFixed(1)}kg` : ''}`;
       }
       case 'photos': return t('見た目の変化を並べて見る');
+      // 「周期14日目・これまでの平均29日」式（未記録なら記録への誘い）。予測は含まない
+      case 'cycle': return cycleSummary(cycleStarts, today);
       // 最新の血圧（無ければ誘い文）。取得は画面ロードのベストエフォート
       case 'vitals': return vitalsSummary(vitals);
       // 旧tkpi/tprの誘い文（週次集計はカード側が持つデータなのでここでは静的に）
@@ -975,6 +1016,7 @@ export default function ChangesScreen() {
       case 'cycles': return <Repeat {...p} />;
       case 'photos': return <Camera {...p} />;
       case 'vitals': return <HeartPulse {...p} />;
+      case 'cycle': return <Droplet {...p} />;
       case 'health': return <Footprints {...p} />;
       default: return <FlaskConical {...p} />;
     }
@@ -1010,6 +1052,14 @@ export default function ChangesScreen() {
     }
     // 体重ヘッダーだけ2期間平均線（B-17）を足す。体重4週分未満はtrendBandsがnull＝出さない
     const bands = key === 'body' ? trendBands(src) : null;
+    // 生理周期モードの説明（この機能の本体）。月経開始の3日前〜開始後3日に体重が増えて
+    // いるときだけ、「水分かもしれない」の一言を添える。
+    // **断定しない**: 「痩せていない」とも「大丈夫」とも言わず、可能性の提示にとどめる。
+    // 増えていないとき（weekW<=0）は何も足さない＝安心を押し売りしない
+    const waterDay = key === 'body' && cycleOn && weekW != null && weekW > 0
+      && isWaterRetentionWindow(cycleStarts, today)
+      ? cycleDay(cycleStarts, today)
+      : null;
     return (
       <View style={s.detailHead}>
         {/* 大数字は文字サイズ拡大でレイアウトが崩れやすいため上限1.3（本文系は制限しない） */}
@@ -1018,6 +1068,9 @@ export default function ChangesScreen() {
           <Text style={s.detailUnit}> {unit}</Text>
         </Text>
         <Text style={s.detailTrend}>{trendPhrase(src)}</Text>
+        {waterDay != null && (
+          <Text style={s.detailWater}>{t('この時期の増加は水分の可能性があります（周期{n}日目）', { n: waterDay })}</Text>
+        )}
         {bands && <TrendBands older={bands.older} recent={bands.recent} width={winW - 32} />}
       </View>
     );
@@ -1311,6 +1364,7 @@ const s = StyleSheet.create({
   detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   detailUnit: { fontSize: 16, fontWeight: '700', color: C.sub },
   detailTrend: { fontSize: 13.5, fontWeight: '700', color: C.sub, marginTop: 2 },
+  detailWater: { fontSize: 13, fontWeight: '700', color: C.teal, lineHeight: 19, marginTop: 4 },
   // トレンドの2期間平均線（B-17）
   bandBox: { marginTop: 10 },
   bandHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

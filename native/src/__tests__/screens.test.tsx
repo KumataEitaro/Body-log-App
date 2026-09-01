@@ -16,6 +16,7 @@ import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '../components/Lift
 import QuickLogFab from '../components/QuickLogFab';
 import { GuideProvider } from '../components/GuideTour';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
+import MenstrualCycleCard from '@/components/MenstrualCycleCard';
 
 jest.useFakeTimers();
 
@@ -78,5 +79,24 @@ describe('components smoke', () => {
   });
   it('過食の引き金カードが例外なくマウントできる', () => {
     expect(() => renderer.create(<BingeTriggerCard />)).not.toThrow();
+  });
+  // 生理周期カード: cycle_logs未作成（モックsupabaseはdata:null）でも空状態で成立すること
+  it('生理周期カードが記録ゼロでもレンダリングできる', async () => {
+    const tree = await mount(<MenstrualCycleCard />);
+    expect(tree.toJSON()).toBeTruthy();
+    await act(async () => { tree.unmount(); });
+  });
+  // 帯（bands）を渡しても既存のグラフ描画が壊れないこと
+  it('InteractiveChart が月経期間の帯つきでレンダリングできる', async () => {
+    const points = Array.from({ length: 40 }, (_, i) => ({
+      date: `2026-07-${String((i % 28) + 1).padStart(2, '0')}`,
+      value: 60 + (i % 5) * 0.2,
+    }));
+    const tree = await mount(
+      <InteractiveChart points={points} unit="kg" presetDays={30}
+                        bands={[{ from: '2026-07-05', to: '2026-07-09' }, { from: '2026-07-28', to: '2026-08-01' }]} />
+    );
+    expect(tree.toJSON()).toBeTruthy();
+    await act(async () => { tree.unmount(); });
   });
 });
