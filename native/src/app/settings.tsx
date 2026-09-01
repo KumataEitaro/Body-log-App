@@ -423,6 +423,10 @@ export default function SettingsScreen() {
     <Stack.Screen options={{
       headerShown: true, title: '', headerBackTitle: t('戻る'),
       headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
+      // 大型タイトル領域もテーマに合わせる。ここが未指定だとダークで
+      // 「戻る」の下に白い帯が残る（βフィードバック 2026-09-01）
+      headerLargeStyle: { backgroundColor: C.bg },
+      headerLargeTitleStyle: { color: C.ink },
     }} />
     <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }} contentContainerStyle={s.scroll}>
       <Text style={s.h}>{t('マイページ')}</Text>
