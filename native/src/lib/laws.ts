@@ -357,6 +357,17 @@ export async function latestLawSummary(): Promise<string | null> {
   return lawText(rows[0][1].kind, rows[0][1].p).title;
 }
 
+/** ハイライト（B-16）用: 最新の法則を生値つきで返す（未発見ならnull）。
+ *  文章はハイライト側が表示のたびに lawText で組み立て直す（言語切替に耐えるため）。
+ *  AsyncStorageを読むだけで軽い（サーバへは何も送らない） */
+export async function latestLawRaw(): Promise<{ id: string; kind: LawKind; p: LawParams; foundAt: string } | null> {
+  const store = await readStore();
+  const rows = Object.entries(store).sort((a, b) => (a[1].at > b[1].at ? -1 : 1));
+  if (rows.length === 0) return null;
+  const [id, v] = rows[0];
+  return { id, kind: v.kind, p: v.p, foundAt: v.at };
+}
+
 // ===== B-7: Day12「最初の法則」 =====
 
 /**
