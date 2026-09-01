@@ -248,8 +248,20 @@ export default function LoginScreen() {
           )}
         </Pressable>
 )}
+        {/* 規約同意の明示（clickwrap相当）。米国では『規約を提示せず同意したとみなす』構成は
+            同意の成立自体が争われるため、登録の直前に必ず出し、実際に読める先へリンクする */}
         {!isLogin && (
-          <Text style={s.terms}>{t('登録すると、記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。')}</Text>
+          <View>
+            <Text style={s.terms}>
+              {t('登録すると、')}
+              <Text style={s.termsLink} onPress={() => WebBrowser.openBrowserAsync('https://bodylog-orcin.vercel.app/terms')}>{t('利用規約')}</Text>
+              {t('と')}
+              <Text style={s.termsLink} onPress={() => WebBrowser.openBrowserAsync('https://bodylog-orcin.vercel.app/privacy')}>{t('プライバシーポリシー')}</Text>
+              {t('に同意したものとみなされます。')}
+            </Text>
+            <Text style={s.terms}>{t('本サービスは医療機器ではなく、表示される数値はAIによる推定です。16歳未満の方は利用できません。')}</Text>
+            <Text style={s.terms}>{t('記録データはあなた専用の領域に保存されます。退会（データ完全削除）はいつでも設定からできます。')}</Text>
+          </View>
         )}
       </View>
 
@@ -312,7 +324,8 @@ const s = StyleSheet.create({
   info: { color: C.teal, fontSize: 15, marginBottom: 6, lineHeight: 21 },
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   btnT: { color: C.panel, fontSize: 17, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従（現状未使用スタイル）
-  terms: { fontSize: 13, color: C.faint, marginTop: 12, lineHeight: 18, textAlign: 'center' },
+  terms: { fontSize: 13, color: C.faint, marginTop: 8, lineHeight: 18, textAlign: 'center' },
+  termsLink: { fontSize: 13, color: C.teal, fontWeight: '700', textDecorationLine: 'underline' },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
   orLine: { flex: 1, height: 0.5, backgroundColor: C.line },
   orT: { fontSize: 13, color: C.faint, fontWeight: '700' },

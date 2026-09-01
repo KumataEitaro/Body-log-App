@@ -64,6 +64,34 @@ export type Offer = {
   pkg: unknown;          // purchase()にそのまま渡す
 };
 
+// ===== ペイウォールに出すプラン（2026-09改定・2プラン構成） =====
+// 'lite' は新規販売を終了し、ペイウォールのカードから外した。ただし判定側（RANK・
+// currentPlan・lib/plan.ts のFALLBACK・plan_limitsのlite行・gate.ts）は温存する。
+// 既存のライト購入者を降格させない（entitlementが生きている限りliteのまま扱う）ため。
+export const PAYWALL_PLANS: Plan[] = ['standard', 'premium'];
+// 既定選択を探す順（主役=プレミアムが先）と、期間の優先順（年額 > 6ヶ月 > 月額）
+const PLAN_PREF: Plan[] = ['premium', 'standard'];
+const PERIOD_PREF: Offer['period'][] = ['annual', 'sixmonth', 'monthly'];
+
+/** ペイウォールの選択状態。画面全体でただ1つ（plan×periodの組が1つだけ） */
+export type Selection = { plan: Plan; period: Offer['period'] };
+
+/** そのプランで既定にすべき期間（年額 > 6ヶ月 > 月額）。買える期間が無ければnull */
+export function preferredPeriod(offers: Offer[], plan: Plan): Offer['period'] | null {
+  const mine = offers.filter((o) => o.plan === plan);
+  for (const p of PERIOD_PREF) if (mine.some((o) => o.period === p)) return p;
+  return mine[0]?.period ?? null;
+}
+
+/** ペイウォールを開いた時の既定選択。プレミアムの年額を第一候補にする */
+export function defaultSelection(offers: Offer[], plans: Plan[] = PLAN_PREF): Selection | null {
+  for (const plan of plans) {
+    const period = preferredPeriod(offers, plan);
+    if (period) return { plan, period };
+  }
+  return null;
+}
+
 // introPrice（お試しオファー）から無料トライアル日数を求める
 function trialDaysOf(intro: { price?: number; periodUnit?: string; periodNumberOfUnits?: number } | null | undefined): number {
   if (!intro || Number(intro.price) !== 0) return 0;   // 有料イントロ価格はトライアル扱いしない

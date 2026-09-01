@@ -16,6 +16,7 @@ import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
 import { Linking } from 'react-native';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
+import ReconsentGate from '@/components/ReconsentGate';
 import { installCrashReporter } from '@/lib/crash';
 
 installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モジュール読込時に一度だけ）
@@ -66,6 +67,9 @@ export default function RootLayout() {
         <GuideProvider>
           <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.scheme}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }} />
         </GuideProvider>
+        {/* 規約改定時の再同意ゲート。認証済みのときだけ判定が走る（lib/consent.ts）。
+            ルートに置くのは、どの画面からでも必ず表示させるため */}
+        {authed && <ReconsentGate />}
       </LaunchProvider>
     </ErrorBoundary>
   );
