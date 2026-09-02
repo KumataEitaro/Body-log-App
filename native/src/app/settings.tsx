@@ -1189,7 +1189,7 @@ export default function SettingsScreen() {
               <Text style={s.btnPrimaryT}>{t('連携を見直す（iOS設定を開く）')}</Text>
             </Pressable>
             <Pressable style={{ marginTop: 14, alignItems: 'center' }} onPress={healthImportWeights} disabled={busy}>
-              {busy ? <ActivityIndicator color={C.teal} /> : <Text style={[s.note, { color: C.teal, fontWeight: '700' }]}>{t('過去90日の体重をいま取り込む')}</Text>}
+              {busy ? <ActivityIndicator color={C.teal} /> : <Text style={[s.note, { color: C.accentInk, fontWeight: '700' }]}>{t('過去90日の体重をいま取り込む')}</Text>}
             </Pressable>
           </>
         ) : (
