@@ -21,7 +21,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  UtensilsCrossed, Activity, Camera, Weight, X, ChevronLeft, Salad, Pencil, Images,
+  UtensilsCrossed, Activity, Camera, Weight, X, ChevronLeft, Salad, Pencil, Images, Sparkles,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,8 +29,8 @@ import { C, RADIUS, SPACE, ICON, themed } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
 
-/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'exercise' | 'bodyphoto';
+/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート） */
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto';
 export type PlusStep = 'root' | 'meal' | 'weight';
 
 export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
@@ -136,6 +136,9 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                 <Tile Icon={Activity} label={t('運動')} onPress={() => pick('exercise')} testID="plus-exercise" />
                 <Tile Icon={Camera} label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
                 <Tile Icon={Weight} label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
+                {/* 5枚目「何を食べる？」（食事タブ内のAI相談）: ＋を押す習慣に乗せる第2の入口。
+                    記録ではなく相談なので2×2の外に横長1枚で置き、記録4種と混ぜない */}
+                <Tile Icon={Sparkles} label={t('何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" wide />
               </View>
             )}
 
@@ -172,16 +175,16 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
   );
 }
 
-/** 大きな選択タイル（2×2グリッドの1枡） */
-function Tile({ Icon, label, onPress, testID }: { Icon: LucideIcon; label: string; onPress: () => void; testID?: string }) {
+/** 大きな選択タイル（2×2グリッドの1枡）。wide=横長1枚（アイコンとラベルを横並び） */
+function Tile({ Icon, label, onPress, testID, wide }: { Icon: LucideIcon; label: string; onPress: () => void; testID?: string; wide?: boolean }) {
   return (
     <Pressable
       testID={testID} accessibilityRole="button" accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [s.tile, pressed && s.tilePressed]}
+      style={({ pressed }) => [s.tile, wide && s.tileWide, pressed && s.tilePressed]}
     >
-      <View style={s.tileIcon}>
-        <Icon size={ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} />
+      <View style={[s.tileIcon, wide && s.tileIconWide]}>
+        <Icon size={wide ? ICON.lg : ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} />
       </View>
       <Text style={s.tileT} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
     </Pressable>
@@ -209,7 +212,10 @@ const s = themed(() => ({
     shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
   tilePressed: { borderColor: C.teal, backgroundColor: C.accentSoft, transform: [{ scale: 0.97 }] },
+  // 横長1枚（「何を食べる？」）: 2×2の正方形タイルより低く、アイコンとラベルを横並びに
+  tileWide: { width: '100%', aspectRatio: undefined, flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 18, justifyContent: 'flex-start', gap: 12 },
   tileIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
+  tileIconWide: { width: 40, height: 40, borderRadius: 20 },
   tileT: { fontSize: 15, fontWeight: '800', color: C.ink },
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

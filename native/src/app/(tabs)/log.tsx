@@ -28,6 +28,7 @@ import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import AddFoodSheet, { type MyFoodDraft } from '@/components/AddFoodSheet';
 import MenuAdvisor from '@/components/MenuAdvisor';
+import WhatToEatSheet from '@/components/WhatToEatSheet';
 import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
 import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
@@ -229,6 +230,7 @@ export default function LogScreen() {
   const [recentOpen, setRecentOpen] = useState(false);
   // ===== ＋ボタン → 2段シート → 入力シート =====
   const [plusOpen, setPlusOpen] = useState(false);
+  const [eatOpen, setEatOpen] = useState(false);   // 「何を食べる？」シート（components/WhatToEatSheet.tsx）
   const [inputOpen, setInputOpen] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('text');
   // 「撮影する／写真を選ぶ」で開いたとき、入力シートが出きってからピッカーを起動するための予約
@@ -323,6 +325,8 @@ export default function LogScreen() {
       case 'meal:myfood': openInput('myfood'); break;
       case 'meal:library': openInput('library'); break;
       case 'meal:camera': openInput('camera'); break;
+      // 何を食べる？: 食事タブ内のAI相談シート（＋シートが閉じ切ってから届くので pageSheet を直接開ける）
+      case 'meal:whattoeat': setEatOpen(true); break;
       // 運動: 運動タブへ移り、「運動を記録する」（種目を選ぶ→時間ダイアル）のシートが開いた状態で着地
       // （training.tsx が open=activity を受ける。筋トレは運動タブの「筋トレを記録する」から全画面へ）
       case 'exercise':
@@ -1593,6 +1597,13 @@ export default function LogScreen() {
                 </View>
               </View>
             )}
+            {/* 「何を食べる？」の主導線: 残量が出ている＝いちばん悩む瞬間に1行で相談へ（components/WhatToEatSheet.tsx） */}
+            <Pressable style={({ pressed }) => [s.eatBtn, pressed && { opacity: 0.8 }]} onPress={() => setEatOpen(true)}
+                       accessibilityRole="button" accessibilityLabel={t('この残りで、何を食べる？')}>
+              <Sparkles size={ICON.sm} color={C.accentInk} strokeWidth={ICON.stroke} />
+              <Text style={s.eatBtnT}>{t('この残りで、何を食べる？')}</Text>
+              <Text style={s.eatBtnArrow}>›</Text>
+            </Pressable>
           </Animated.View>
         )}
 
@@ -1898,6 +1909,20 @@ export default function LogScreen() {
         onSaveWeight={saveWeightValue}
         weightUnit={units.weight}
         weightPlaceholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
+      />
+
+      {/* 「何を食べる？」（食事タブ内のAI相談・pageSheet）。ヒーローの1行ボタンと＋シート1段目のタイルから開く。
+          「これにする」はシートが閉じ切ってから届く → 入力欄に品名を充填してテキスト入力シートを開く（自動確定しない） */}
+      <WhatToEatSheet
+        visible={eatOpen} onClose={() => setEatOpen(false)}
+        remaining={{
+          kcal: left,
+          p: macros ? Math.round(macros.p) - eatenP : null,
+          f: macros ? Math.round(macros.f) - eatenF : null,
+          c: macros ? Math.round(macros.c) - eatenC : null,
+        }}
+        myFoods={myFoods}
+        onPick={(name) => { setChat(name); openInput('text'); }}
       />
 
       {/* ===== 入力シート（pageSheet）: 旧ドックの機能はすべてここに集約 =====
@@ -2311,6 +2336,14 @@ const s = themed(() => ({
   heroU: { fontSize: 17, color: C.sub, fontWeight: '600' },
   // アクティブぶんの上乗せ内訳（目標が増えた理由の1行）。増加は良い知らせなのでアクセント色
   heroActive: { fontSize: 12, fontWeight: '800', color: C.accentInk, marginTop: 4 },
+  // 「この残りで、何を食べる？」（ヒーロー末尾の1行導線）: アクセントの薄い面に載せ、目標調整より一段目立たせる
+  eatBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
+    paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.input,
+    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+  },
+  eatBtnT: { flex: 1, fontSize: 14, fontWeight: '800', color: C.accentInk },
+  eatBtnArrow: { fontSize: 17, fontWeight: '700', color: C.accentInk },
   hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
