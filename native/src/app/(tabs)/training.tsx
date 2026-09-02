@@ -355,7 +355,8 @@ export default function TrainingScreen() {
 
   /** 筋トレ記録画面（全画面）を開く。見ている日付を記録先として渡す */
   function openLiftSession() {
-    router.push({ pathname: '/lift-session', params: { date: viewDate } });
+    // typed routesの生成型が新画面を知らないため as never（laws.tsx/changes.tsxと同じ流儀）
+    router.push({ pathname: '/lift-session', params: { date: viewDate } } as never);
   }
 
   // ===== 固定ヘッダー（見出し＋日付ストリップ）: ScrollView の stickyHeaderIndices で上端に固定 =====
