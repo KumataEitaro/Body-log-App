@@ -5,9 +5,9 @@
 // ライトの背景色をハードコードしていたため、ダークモードで上部だけが白く残っていた
 // （βフィードバック 2026-09-01）。テーマを変えるとツリーが作り直されるので、
 // レンダー時に C を読めばそのまま追従する。
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 
 export default function StatusBarMask() {
   const insets = useSafeAreaInsets();
@@ -20,6 +20,6 @@ export default function StatusBarMask() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   mask: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-});
+}));

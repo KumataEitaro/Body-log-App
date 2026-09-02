@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronRight, ListChecks, PartyPopper, X } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { getDailyReminderPrefs } from '@/lib/notify';
@@ -181,11 +181,11 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   card: {
     backgroundColor: C.panel, borderRadius: 18, padding: 14, marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
-    shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
+    shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
   },
   cardDone: { backgroundColor: C.accentSoft, borderColor: C.tealWeak },
   head: { flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -200,4 +200,4 @@ const s = StyleSheet.create({
   circleDone: { backgroundColor: C.teal, borderColor: C.teal },
   rowT: { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.ink, lineHeight: 18 },
   rowTDone: { color: C.sub, opacity: 0.6 },
-});
+}));

@@ -1,10 +1,10 @@
 // 筋トレ種目を選ぶシート。
 // 基本47種を部位別に並べ、無い種目はその場で追加できる（追加分は次回から一覧に出る）。
 import { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Search, Plus, Trash2 } from 'lucide-react-native';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { LIFTS, LIFT_PARTS, liftName, useCustomLifts, addCustomLift, removeCustomLift } from '@/lib/lifts';
 
@@ -126,7 +126,7 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -161,4 +161,4 @@ const s = StyleSheet.create({
     borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
   },
   arrow: { fontSize: 21, color: C.faint },
-});
+}));

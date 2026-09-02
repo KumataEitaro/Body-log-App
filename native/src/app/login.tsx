@@ -1,13 +1,13 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
 import { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import { parseAuthCallback } from '@/lib/authCallback';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
 import { Languages, Check, KeyRound } from 'lucide-react-native';
@@ -382,7 +382,7 @@ export default function LoginScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // Appleサインインの白黒はブランド規定の固定色（テーマ非依存）。明暗はscheme分岐で切替
   appleBtn: { backgroundColor: '#000', borderColor: '#000' },
   appleBtnDark: { backgroundColor: '#fff', borderColor: '#fff' },
@@ -433,4 +433,4 @@ const s = StyleSheet.create({
   },
   gMark: { fontSize: 17, fontWeight: '900', color: '#4285F4' },
   ssoT: { color: C.ink, fontSize: 15, fontWeight: '800' },
-});
+}));

@@ -6,13 +6,13 @@
 // - 月カレンダー（任意日ジャンプ・「今日に戻る」）は従来どおり右端のアイコンから
 // props（value/onChange）は旧DateStripと互換。食事/運動の両タブがそのまま使う
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CalendarDays } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { todayJST } from '@/lib/calc';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { t, apiLang } from '@/lib/i18n';
 
 // チップの寸法。ヘッダー行に収まるよう小ぶりに固定する
@@ -155,7 +155,7 @@ function TodayPill({ visible, onPress }: { visible: boolean; onPress: () => void
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chips: { flexDirection: 'row', columnGap: GAP },
   chip: { width: CHIP_W, height: CHIP_H, alignItems: 'center', justifyContent: 'center' },
@@ -181,4 +181,4 @@ const s = StyleSheet.create({
   pickerTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
   todayBtn: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
   todayBtnT: { fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
-});
+}));

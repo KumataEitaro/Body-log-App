@@ -1,8 +1,8 @@
 // 入力ドック用の統一アイコンボタン（32×32グリッド・r10・アイコン18px/sw2.0）
 // 押下でスケール0.94＋薄い背景が点く（ミクロインタラクション統一）
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { useGuideTarget } from '@/components/GuideTour';
 
 export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18, guideKey }: {
@@ -27,7 +27,7 @@ export default function DockIconButton({ Icon, onPress, onLongPress, disabled, t
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   btn: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   pressed: { backgroundColor: C.pressed, transform: [{ scale: 0.94 }] },
-});
+}));

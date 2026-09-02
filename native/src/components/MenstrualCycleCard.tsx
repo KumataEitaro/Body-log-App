@@ -20,7 +20,7 @@ import {
 import { Droplet, Plus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
-import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import {
   listCycleStarts, saveCycleStart, deleteCycleStart,
@@ -184,7 +184,7 @@ export default function MenstrualCycleCard({ onChanged }: { onChanged?: () => vo
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: rgba(C.ink, 0.08), borderRadius: RADIUS.card, shadowColor: C.ink, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: HEAD.card.fontSize, fontWeight: '800', color: C.ink },
@@ -219,4 +219,4 @@ const s = StyleSheet.create({
   btnGhostT: { fontSize: 14, fontWeight: '800', color: C.sub },
   btnPrimary: { flex: 1, backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 12, alignItems: 'center' },
   btnPrimaryT: { fontSize: 14, fontWeight: '800', color: '#fff' },
-});
+}));

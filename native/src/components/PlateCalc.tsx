@@ -4,9 +4,9 @@
 // 目標総重量は重量ダイアルの現在値を初期値にして、±2.5kg（プレート1枚ぶん）で微調整できる。
 // 出力は片側のプレート構成。バーに刺さっている姿に見えるよう、大きさ違いの角丸バーで並べる。
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Modal } from 'react-native';
+import { View, Text, TextInput, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { platesFor, plateRemainder, BAR_OPTIONS } from '@/lib/plateCalc';
 
@@ -117,7 +117,7 @@ export default function PlateCalc({ initial, onClose }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)' },
   sheet: {
     backgroundColor: C.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22,
@@ -166,4 +166,4 @@ const s = StyleSheet.create({
     alignItems: 'center', marginTop: 14, backgroundColor: C.panel,
   },
   closeT: { fontSize: 15, fontWeight: '800', color: C.sub },
-});
+}));

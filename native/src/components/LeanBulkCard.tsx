@@ -7,7 +7,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-nati
 import { Gauge, Dumbbell, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { todayJST } from '@/lib/calc';
 
@@ -152,8 +152,8 @@ export default function LeanBulkCard() {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   muted: { fontSize: 13, color: C.sub, lineHeight: 19 },
@@ -172,4 +172,4 @@ const s = StyleSheet.create({
     borderRadius: 999, paddingVertical: 10,
   },
   goalBtnT: { fontSize: 13, fontWeight: '800', color: C.teal },
-});
+}));

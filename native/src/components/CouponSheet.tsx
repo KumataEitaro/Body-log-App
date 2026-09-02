@@ -3,13 +3,10 @@
 // 成功すると /api/redeem-coupon が profiles.plan を直接書き換える（RC購読とは独立・無期限）ため、
 // その場で gate のキャッシュを引き直して王冠が即消えるようにする（refreshGate）。
 import { useEffect, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, Modal, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ticket, X, PartyPopper } from 'lucide-react-native';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { apiPost } from '@/lib/api';
 import { refreshGate } from '@/lib/gate';
@@ -109,7 +106,7 @@ export default function CouponSheet({ visible, onClose, onRedeemed }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -128,4 +125,4 @@ const s = StyleSheet.create({
   doneSub: { fontSize: 13.5, color: C.sub, marginTop: 6, textAlign: 'center', lineHeight: 20 },
   doneCta: { backgroundColor: C.teal, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, marginTop: 18, alignSelf: 'stretch', alignItems: 'center' },
   doneCtaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
-});
+}));

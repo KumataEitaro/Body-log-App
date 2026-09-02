@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { TrendingUp, CalendarDays, Trophy, Share2, Flame, Dumbbell } from 'lucide-react-native';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
@@ -449,7 +449,7 @@ export function PersonalBestCard() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   prRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
   prName: { width: 96, fontSize: 13, fontWeight: '700', color: C.ink },
   prBarTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.track, overflow: 'hidden' },
@@ -472,7 +472,7 @@ const s = StyleSheet.create({
   pvBarTrack: { height: 92, width: '100%', justifyContent: 'flex-end' },
   pvBar: { width: '100%', borderRadius: 5, backgroundColor: C.teal },
   pvBarL: { fontSize: 11, color: C.faint, marginTop: 4, fontVariant: ['tabular-nums'] },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 8 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   chips: { flexDirection: 'row', gap: 6, marginVertical: 8, flexWrap: 'wrap' },
@@ -484,7 +484,8 @@ const s = StyleSheet.create({
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 10, marginTop: 4 },
   kpi: { flex: 1, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12 },
   weekNote: { fontSize: 11, fontWeight: '400', color: C.faint },
-  streak: { fontSize: 13, fontWeight: '800', color: '#d97706' },
+  // 連続記録の強調はアンバー。ダークでは明るいアンバーへ入れ替わる必要があるのでトークンで
+  streak: { fontSize: 13, fontWeight: '800', color: C.amber },
   earnT: { fontSize: 13, fontWeight: '700', color: C.teal, marginTop: 2, lineHeight: 19 },
   balRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   balLabel: { width: 38, fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
@@ -502,4 +503,4 @@ const s = StyleSheet.create({
   listT: { fontSize: 15, color: C.sub, fontWeight: '600' },
   viewToggle: { marginLeft: 6, marginTop: 8, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
   viewToggleT: { fontSize: 15, color: C.sub, fontWeight: '700' },
-});
+}));

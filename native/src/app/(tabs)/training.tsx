@@ -9,7 +9,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 import { ClipboardList, Timer, Footprints, Target, Flame, Activity } from 'lucide-react-native';
@@ -1032,7 +1032,7 @@ export default function TrainingScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
   h: { ...HEAD.section, color: C.ink, marginBottom: 12 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
@@ -1155,7 +1155,7 @@ const s = StyleSheet.create({
   restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
   restHint: { fontSize: 11, color: C.sub },
   prevRef: { fontSize: 13, color: C.sub, marginTop: 4, lineHeight: 18 },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   tRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 },
   tIn: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input, padding: 10, fontSize: 17, color: C.ink },
   tNum: { width: 56, textAlign: 'center' },
@@ -1191,4 +1191,4 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 4,
   },
   plateBtnT: { fontSize: 11, fontWeight: '800', color: C.sub },
-});
+}));

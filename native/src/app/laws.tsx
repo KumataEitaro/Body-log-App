@@ -10,7 +10,7 @@ import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Share2, PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BookOpen } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { C, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
@@ -187,7 +187,7 @@ export default function LawsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 48 },
   headRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
   h: { ...HEAD.page, color: C.ink },
@@ -196,9 +196,9 @@ const s = StyleSheet.create({
   emptyBox: { alignItems: 'center', gap: 8, backgroundColor: C.panel, borderRadius: RADIUS.card, padding: 22, marginBottom: 12 },
   emptyT: { fontSize: 13, color: C.sub, lineHeight: 19, textAlign: 'center' },
   card: {
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
     borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 10,
-    shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
+    shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
   },
   // ぼかし表現はカード全体の半透明で（内容を隠すのではなく「うっすら読める」お楽しみ側に倒す）
   cardGated: { opacity: 0.45, marginBottom: 2 },
@@ -228,4 +228,4 @@ const s = StyleSheet.create({
   celebMore: { fontSize: 12, color: C.sub, marginTop: 8 },
   celebCta: { backgroundColor: C.teal, borderRadius: RADIUS.input, paddingVertical: 12, paddingHorizontal: 26, marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
   celebCtaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
-});
+}));

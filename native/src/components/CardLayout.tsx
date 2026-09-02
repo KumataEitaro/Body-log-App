@@ -1,11 +1,11 @@
 // カードの並び替え＋表示/非表示を扱う共通レイヤー（Apple ヘルスケアの「リストを編集」に相当）
 // 編集モード: 各カードの左上に⊖、見出しの右に⊕。⊕で非表示カードの一覧を開いて戻せる。
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Minus, Plus, X, Search } from 'lucide-react-native';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 export type CardLayout = { order: string[]; hidden: string[] };
@@ -165,7 +165,7 @@ export function AddCardSheet({ visible: open, onClose, hidden, labels, onShow, s
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   minusBtn: {
     position: 'absolute', top: -6, left: -6, width: 26, height: 26, borderRadius: 13,
     backgroundColor: C.coral, alignItems: 'center', justifyContent: 'center', zIndex: 20,
@@ -187,4 +187,4 @@ const s = StyleSheet.create({
   checkCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.chipBg, alignItems: 'center', justifyContent: 'center' },
   rowT: { flex: 1, fontSize: 17, color: C.ink, fontWeight: '600' },
   note: { fontSize: 13, color: C.sub, marginTop: 20, lineHeight: 20 },
-});
+}));

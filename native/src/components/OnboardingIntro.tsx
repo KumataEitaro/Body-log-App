@@ -4,14 +4,14 @@
 // L1（つぶやき入力）・L3（あなたの法則）・L4（失敗の日に優しい）を先に見せてから設定に入る。
 // アニメーションはスプリング物理＋時差入場。視差効果を減らす設定では静止する。
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, FadeInDown,
 } from 'react-native-reanimated';
 import { MessageCircle, Camera, Flame, Sparkles } from 'lucide-react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import MoodFace from '@/components/MoodFace';
@@ -151,7 +151,7 @@ export default function OnboardingIntro({ onDone }: { onDone: () => void }) {
   );
 }
 
-const v = StyleSheet.create({
+const v = themed(() => ({
   slide: { flex: 1, paddingHorizontal: 32, justifyContent: 'center', paddingBottom: 90 },
   title: { fontSize: 24, fontWeight: '900', color: C.ink, marginTop: 26, lineHeight: 33 },
   sub: { fontSize: 14.5, color: C.sub, marginTop: 10, lineHeight: 23 },
@@ -176,4 +176,4 @@ const v = StyleSheet.create({
   flameN: { position: 'absolute', bottom: 14, fontSize: 13, fontWeight: '900', color: C.ink },
   kindCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 },
   kindT: { fontSize: 13.5, fontWeight: '700', color: C.ink },
-});
+}));

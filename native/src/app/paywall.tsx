@@ -10,11 +10,11 @@
 //  ・各カードの中に「月額」と「年額（月あたり換算・N%お得）」を両方見せる方式は維持
 //    （期間を切り替えないと年額の存在に気づけない＝価格比較の分断を避ける）。
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, Platform, Animated } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Linking, Platform, Animated } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Sparkles } from 'lucide-react-native';
-import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
@@ -388,7 +388,7 @@ export default function PaywallScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 48 },
   h: { ...HEAD.page, color: C.ink },
   lead: { fontSize: 14, color: C.sub, marginTop: 4, marginBottom: 14 },
@@ -435,4 +435,4 @@ const s = StyleSheet.create({
   liteNote: { fontSize: 12, color: C.sub, lineHeight: 18, marginTop: 2, marginBottom: 4 },
   link: { fontSize: 13, color: C.teal, fontWeight: '600' },
   legal: { fontSize: 11.5, color: C.sub, lineHeight: 17, marginTop: 20 },
-});
+}));

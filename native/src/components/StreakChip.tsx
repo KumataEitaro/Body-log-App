@@ -4,11 +4,11 @@
 // 未読バッジのドット: バッジを獲得しても気づけないという最大の弱点への対策。
 // 実績ページを開くまで赤丸に数字が残る（設定の実績行にも同じドットを出す）。
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Award, Flame } from 'lucide-react-native';
 import { TodoBadge } from '@/components/NotificationCenter';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { quickStreak, maybeEvaluateBadges, unseenBadgeCount } from '@/lib/achievements';
 
@@ -50,7 +50,7 @@ export default function StreakChip() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   chip: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
@@ -60,4 +60,4 @@ const s = StyleSheet.create({
   chipNew: { borderColor: C.accentBorder, backgroundColor: C.accentSoft },
   t: { fontSize: 12, fontWeight: '700', color: C.ink },
   n: { fontSize: 13, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
-});
+}));

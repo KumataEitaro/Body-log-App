@@ -9,7 +9,7 @@
 // v2は追従・スロット判定・退避・着地・自動スクロールすべてworklet。
 // JSへ渡るのは「並び確定」「ハプティクス」「スクロール停止」の離散イベントだけ。
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions, type RefreshControlProps } from 'react-native';
+import { View, Text, Pressable, Dimensions, type RefreshControlProps } from 'react-native';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedRef,
@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Minus } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const SPRING = { damping: 18, stiffness: 180, mass: 0.6 };
@@ -348,7 +348,7 @@ function DraggableCard({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   hideBtn: {
     position: 'absolute', top: -4, left: -4, width: 27, height: 27, borderRadius: 14,
     backgroundColor: C.coral, alignItems: 'center', justifyContent: 'center', zIndex: 30,
@@ -359,4 +359,4 @@ const s = StyleSheet.create({
     borderRadius: 20, padding: 18, marginBottom: 12, alignItems: 'center',
   },
   ghostT: { fontSize: 13, color: C.sub, fontWeight: '600' },
-});
+}));

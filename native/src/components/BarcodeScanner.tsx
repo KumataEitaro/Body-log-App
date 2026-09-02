@@ -6,7 +6,7 @@ import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { ScanBarcode } from 'lucide-react-native';
-import { C, rgba, sheetTopPad } from '@/lib/ui';
+import { C, rgba, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
 
@@ -84,7 +84,7 @@ export default function BarcodeScanner({ visible, onClose, onScanned }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18), paddingBottom: 24 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -100,4 +100,4 @@ const s = StyleSheet.create({
   },
   deniedBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   deniedT: { fontSize: 14, color: C.sub, lineHeight: 21, textAlign: 'center' },
-});
+}));

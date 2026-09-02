@@ -15,7 +15,7 @@ import Svg, { Polyline, Line as SvgLine, Circle } from 'react-native-svg';
 import { HeartPulse, Plus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import {
   listVitals, saveVital, deleteVital, needsDoctorNote, anyNeedsDoctorNote,
@@ -258,8 +258,8 @@ export default function VitalsCard({ width = 300 }: { width?: number }) {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 12, fontWeight: '700', color: C.faint },
@@ -280,7 +280,7 @@ const s = StyleSheet.create({
   legendT: { fontSize: 11, color: C.faint, fontWeight: '700' },
   // ---- 入力シート ----
   backdrop: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(14,17,22,0.45)' },
-  sheet: { backgroundColor: C.panel, borderRadius: 20, padding: 18, maxHeight: '86%', borderWidth: StyleSheet.hairlineWidth, borderColor: rgba(C.ink, 0.08), shadowColor: '#0e1116', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  sheet: { backgroundColor: C.panel, borderRadius: 20, padding: 18, maxHeight: '86%', borderWidth: StyleSheet.hairlineWidth, borderColor: rgba(C.ink, 0.08), shadowColor: C.shadow, shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 10 },
   dateBtn: { width: 34, height: 30, borderRadius: 10, backgroundColor: C.chipBg, alignItems: 'center', justifyContent: 'center' },
@@ -300,4 +300,4 @@ const s = StyleSheet.create({
   btnGhostT: { fontSize: 14, fontWeight: '800', color: C.sub },
   btnPrimary: { flex: 1, backgroundColor: C.teal, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   btnPrimaryT: { fontSize: 14, fontWeight: '800', color: '#fff' },
-});
+}));

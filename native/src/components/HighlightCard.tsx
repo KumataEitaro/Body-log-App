@@ -5,12 +5,12 @@
 //  ③ 描画（他のメニュー行より少しリッチな1枚・タップで該当詳細へ）
 // を担当する。どの候補も成立しない日はnullを返して何も出さない。
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { pickHighlight, highlightText, lastWeekStats, recentPR, type HighlightPick, type HighlightTarget } from '@/lib/highlight';
 import { latestLawRaw } from '@/lib/laws';
@@ -113,13 +113,13 @@ export default function HighlightCard({ rows, today, ready, onOpen }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // メニュー行より少しリッチ: アクセントの薄い面＋アクセント寄りの枠＋やや強い影
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 18, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12,
-    shadowColor: '#0e1116', shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+    shadowColor: C.shadow, shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
     overflow: 'hidden',   // Androidリップルを角丸内にクリップ
   },
   icon: {
@@ -130,4 +130,4 @@ const s = StyleSheet.create({
   title: { fontSize: 15.5, fontWeight: '800', color: C.ink, marginTop: 2 },
   body: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginTop: 2 },
   go: { fontSize: 21, color: C.faint, fontWeight: '600', marginLeft: 2 },
-});
+}));

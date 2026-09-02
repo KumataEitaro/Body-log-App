@@ -2,8 +2,9 @@
 // 同一見た目のオーバーレイに引き継ぎ、一拍見せてからアイコンをスケール＋フェードで消す。
 // 消え始めと同時に introDone=true を流し、各画面がコンポーネントを時差入場させる。
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import { themed } from '@/lib/ui';
 
 // JSがロードされるまでネイティブスプラッシュを保持（失敗しても起動は続行）
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -55,7 +56,7 @@ export function LaunchProvider({ ready, children }: { ready: boolean; children: 
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // app.jsonのsplash設定（背景#C8FAFB＝アイコンの水色・imageWidth 160）と完全に同じ見た目にして、
   // ネイティブスプラッシュ→JSオーバーレイのつなぎ目を消す。
   // ここを変えるときは app.json の splash.backgroundColor も必ず一緒に変える（色が飛ぶ）
@@ -64,4 +65,4 @@ const s = StyleSheet.create({
     backgroundColor: '#C8FAFB', alignItems: 'center', justifyContent: 'center', zIndex: 999,
   },
   icon: { width: 160, height: 160, resizeMode: 'contain' },
-});
+}));

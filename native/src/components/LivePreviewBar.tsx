@@ -2,8 +2,8 @@
 // 確定分（ソリッド）の先に、トレイの未保存分を「呼吸するゴースト」として重ねる。
 // 量が変わるたびにスプリングで伸縮し、目標を超える瞬間に色が赤へ切り替わる。
 import { useEffect, useRef } from 'react';
-import { View, Animated, Easing, StyleSheet } from 'react-native';
-import { C } from '@/lib/ui';
+import { View, Animated, Easing } from 'react-native';
+import { C, themed } from '@/lib/ui';
 import { useReduceMotion } from '@/lib/motion';
 import { previewFill, previewFillSplit } from '@/lib/preview';
 
@@ -90,9 +90,9 @@ export function GhostSegment({ pct, color, pulse }: { pct: number; color: string
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   track: { flex: 1, backgroundColor: C.track, overflow: 'hidden', flexDirection: 'row' },
-});
+}));
 
 /**
  * トレイのゴーストを「他の食品」と「注目中の1品」に分けて描く。

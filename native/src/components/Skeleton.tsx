@@ -3,11 +3,11 @@
 // （グラデーション移動より軽く、ダークテーマでも破綻しない）。
 // 視差軽減設定では往復を止めて静止した淡色ブロックにする。
 import { useEffect } from 'react';
-import { StyleSheet, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 import Reanimated, {
   cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { useReduceMotion } from '@/lib/motion';
 
 type Props = {
@@ -39,7 +39,7 @@ export default function Skeleton({ width = '100%', height = 14, radius = 8, styl
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // 溝色（プログレスバーの下地と同じトークン）＝どのテーマでも「まだ中身がない面」に見える
   block: { backgroundColor: C.track, opacity: 0.55 },
-});
+}));

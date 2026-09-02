@@ -4,7 +4,7 @@
 //  ・設定 → マイ食品の管理 → ＋追加（空のフォーム）
 //  ・食事の保存後の案内 → 登録してみる（名前・単位・栄養値が埋まった状態）
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Modal, ScrollView, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Modal, ScrollView, Alert, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Sparkles, Camera, Salad, ScanBarcode } from 'lucide-react-native';
@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { apiLang } from '@/lib/i18n';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -300,7 +300,7 @@ export default function MyFoodForm({ visible, draft, onClose, onSaved }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   note: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 10, lineHeight: 18 },
@@ -320,4 +320,4 @@ const s = StyleSheet.create({
   },
   aiBtnT: { fontSize: 13.5, fontWeight: '800', color: C.teal },
   aiHint: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 16 },
-});
+}));

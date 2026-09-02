@@ -4,10 +4,10 @@
 // カテゴリで畳んで全体像を見せ、開くと具体的な質問が並ぶ形にした。
 // 検索も付けて、聞きたいことが頭にある人はそこから辿れるようにしている。
 import { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Search, ChevronDown, ChevronRight, Sparkles } from 'lucide-react-native';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { askCategories } from '@/content/askExamples';
 
@@ -91,7 +91,7 @@ export default function AskCatalog({ visible, onClose, onPick }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -117,4 +117,4 @@ const s = StyleSheet.create({
   qText: { flex: 1, fontSize: 15, color: C.ink },
   qArrow: { fontSize: 21, color: C.faint },
   empty: { fontSize: 15, color: C.sub, marginTop: 24, textAlign: 'center', lineHeight: 21 },
-});
+}));

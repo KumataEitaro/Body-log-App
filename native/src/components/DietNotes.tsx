@@ -11,11 +11,11 @@
 // - 肯定的断定（安全です・食べられます・OK・緑の✓）を作らない（§6-やらないこと）
 // - 触覚・音を鳴らさない（不安を煽らない・§5）
 // - 警告のたびに免責を1行添える（§6-3）／無警告時も常設表記を出す（§6-4）
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { TriangleAlert, Info } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { t } from '@/lib/i18n';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import type { DietAlert, DietLevel, DietModeKey } from '@/lib/dietCheck';
 
 // i18nのキー抽出（native/scripts/i18n-keys.js・scripts/translate-loop.mjs）は
@@ -167,7 +167,7 @@ export function DietWarnRow({ alerts, onDetail }: { alerts: DietAlert[]; onDetai
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   panel: {
     backgroundColor: C.coralWeak, borderRadius: 14, borderWidth: 1, borderColor: rgba(C.coral, 0.3),
     padding: 12, marginBottom: 14,
@@ -201,4 +201,4 @@ const s = StyleSheet.create({
   warnLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 3 },
   warnHighT: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '700', color: C.ink },
   warnMaybeT: { flex: 1, fontSize: 12, lineHeight: 18, color: C.ink },
-});
+}));

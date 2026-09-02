@@ -5,7 +5,7 @@
 // 「これにする」で入力欄に品名を充填して既存のAI解析経路（送信→トレイ→✓保存）へ
 // 合流させる。勝手に確定しないのは既存のステージング哲学（本人の✓で確定）と同じ。
 import { useMemo, useState } from 'react';
-import { View, Text, Modal, ScrollView, StyleSheet, Alert, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, ScrollView, Alert, Pressable, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { UtensilsCrossed } from 'lucide-react-native';
@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
 import { t, apiLang } from '@/lib/i18n';
 import { getPurpose } from '@/lib/purpose';
-import { C, rgba, sheetTopPad } from '@/lib/ui';
+import { C, rgba, sheetTopPad, themed } from '@/lib/ui';
 // 食事の制約（B-18・docs/DIET-MODES.md §5）: 候補は**消さない**。
 // 消すと「安全な物だけ出た」と誤解させるため、印をつけて順位を下げるだけにする
 import { useDiet, isDietOff } from '@/lib/diet';
@@ -217,7 +217,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   note: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
@@ -247,4 +247,4 @@ const s = StyleSheet.create({
   pickKcal: { fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
   pickReason: { fontSize: 13, color: C.sub, lineHeight: 19, marginTop: 6 },
   footNote: { fontSize: 12, color: C.faint, lineHeight: 17, marginTop: 4, marginBottom: 6 },
-});
+}));

@@ -1,10 +1,7 @@
 // AIコーチ相談タブ: 本人データを根拠に回答
 // 初期状態は中央寄せのウェルカムUI（アイコン+2x2クイック質問）。会話開始後は通常のタイムライン
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal, Animated,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +15,7 @@ import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AiCoachLogo from '@/components/AiCoachLogo';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import VoiceHintButton from '@/components/VoiceHintButton';
@@ -480,7 +477,7 @@ export default function CoachScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, paddingHorizontal: SPACE.screen, paddingBottom: 6 },
   welcomeScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 10 },
   welcomeWrap: { alignItems: 'center', paddingBottom: 30 },
@@ -563,4 +560,4 @@ const s = StyleSheet.create({
   },
   histDate: { fontSize: 13, fontWeight: '800', color: C.sub, marginBottom: 6 },
   histEmpty: { fontSize: 15, color: C.sub, marginTop: 24, textAlign: 'center' },
-});
+}));

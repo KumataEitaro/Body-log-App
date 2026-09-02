@@ -2,11 +2,11 @@
 // バッジはメダル（BadgeIcon）で見せる。獲得済み=カテゴリ色の金属円盤＋獲得日、
 // 未獲得=無彩色のシルエット＋条件文（次に何をすればいいかと「集める余地」が常に見える）。
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { Share2, Flame, PartyPopper, UserPlus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { evaluateAchievements, markBadgesSeen, type AchievementReport, type BadgeCat, type BadgeState } from '@/lib/achievements';
@@ -282,7 +282,7 @@ export default function AchievementsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: 16, paddingTop: 8, paddingBottom: 48 },
   h: { fontSize: 26, fontWeight: '800', color: C.ink, marginBottom: 12 },
   hero: { alignItems: 'center', backgroundColor: C.panel, borderRadius: 18, paddingVertical: 20, marginBottom: 12 },
@@ -340,4 +340,4 @@ const s = StyleSheet.create({
   sheetOn: { fontSize: 13, fontWeight: '800', color: C.teal, marginTop: 12, fontVariant: ['tabular-nums'] },
   sheetCta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 20, marginTop: 14, alignSelf: 'stretch' },
   sheetCtaT: { fontSize: 14.5, fontWeight: '800', color: C.teal },
-});
+}));

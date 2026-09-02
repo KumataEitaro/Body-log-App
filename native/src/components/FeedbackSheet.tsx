@@ -11,15 +11,12 @@
 //  ・種別が「不具合」だった送信は端末に記録し、以後30日は★レビューを依頼しない
 //    （lib/reviewPrompt.ts）。不満のある人に星を求めない。
 import { useEffect, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, Modal, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
 import * as WebBrowser from 'expo-web-browser';
 import { MessageSquare, X } from 'lucide-react-native';
-import { C, sheetTopPad, RADIUS } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, themed } from '@/lib/ui';
 import { t, getLocale } from '@/lib/i18n';
 import { apiPost } from '@/lib/api';
 import { markBugReported } from '@/lib/reviewPrompt';
@@ -172,7 +169,7 @@ function KindPicker({ value, onChange }: { value: Kind; onChange: (k: Kind) => v
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -205,4 +202,4 @@ const s = StyleSheet.create({
   link: { fontSize: 12.5, color: C.teal, fontWeight: '700', marginTop: 6, textAlign: 'center' },
   doneBox: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 40 },
   doneT: { fontSize: 17, fontWeight: '800', color: C.ink, textAlign: 'center', lineHeight: 26 },
-});
+}));

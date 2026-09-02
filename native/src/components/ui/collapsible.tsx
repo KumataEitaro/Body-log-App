@@ -1,12 +1,13 @@
 import { SymbolView } from 'expo-symbols';
 import { PropsWithChildren, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { themed } from '@/lib/ui';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +41,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   heading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -62,4 +63,4 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.four,
     padding: Spacing.four,
   },
-});
+}));

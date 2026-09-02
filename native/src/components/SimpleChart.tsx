@@ -1,8 +1,8 @@
 // シンプルな折れ線チャート（react-native-svg）。Phase 2の基本版。
 // ピンチ操作・多段ビン等のリッチ版はPhase 3で移植する。
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import Svg, { Polyline, Line as SvgLine, Text as SvgText, Circle } from 'react-native-svg';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 export type ChartPoint = { date: string; value: number };
@@ -59,8 +59,8 @@ export default function SimpleChart({ points, unit, decimals = 1, planValue }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   empty: { height: 120, alignItems: 'center', justifyContent: 'center' },
   emptyT: { fontSize: 12, color: C.sub },
   latest: { fontSize: 11, color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
-});
+}));

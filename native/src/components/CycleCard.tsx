@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Repeat, Dumbbell } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { todayJST } from '@/lib/calc';
 import { cycleLabel, type PurposePeriod } from '@/lib/purpose';
@@ -117,8 +117,8 @@ export default function CycleCard({ periods, weights }: { periods: PurposePeriod
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   lead: { fontSize: 14, color: C.ink, lineHeight: 21, marginBottom: 6 },
@@ -133,4 +133,4 @@ const s = StyleSheet.create({
   liftRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   liftT: { fontSize: 12.5, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
   note: { fontSize: 12, color: C.faint, lineHeight: 17, marginTop: 6 },
-});
+}));

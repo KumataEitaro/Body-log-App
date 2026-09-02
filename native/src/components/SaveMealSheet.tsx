@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { UtensilsCrossed } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { saveMyMeal, defaultMealName, mealKcal } from '@/lib/meals';
 import type { FoodItem } from '@/lib/items';
@@ -78,12 +78,12 @@ export default function SaveMealSheet({ visible, uid, items, onClose, onSaved }:
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   backdrop: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(14,17,22,0.45)' },
   card: {
     backgroundColor: C.panel, borderRadius: 20, padding: 18,
     borderWidth: StyleSheet.hairlineWidth, borderColor: rgba(C.ink, 0.08),
-    shadowColor: '#0e1116', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+    shadowColor: C.shadow, shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -102,4 +102,4 @@ const s = StyleSheet.create({
   btnGhostT: { fontSize: 14, fontWeight: '800', color: C.sub },
   btnPrimary: { flex: 1, backgroundColor: C.teal, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   btnPrimaryT: { fontSize: 14, fontWeight: '800', color: '#fff' },
-});
+}));

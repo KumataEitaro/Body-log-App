@@ -1,6 +1,7 @@
 // デザイントークン。テーマ変更で「アクセントだけ」でなく、背景・枠線・文字・面の色まで
 // まとめて差し替わるよう、全色をこのオブジェクトに集約している。
 import { Platform, StatusBar, StyleSheet } from 'react-native';
+import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
 
 /** シート（pageSheetモーダル）の上端パディング。
  *  iOS: pageSheetはOSが上を空けるので素の値をそのまま返す＝iOSの見た目は完全に不変。
@@ -71,6 +72,8 @@ export type Palette = {
   segTrack: string;     // セグメントコントロールの溝
   pressed: string;      // 押下時の面
   calorieBar: string;   // 合計カロリーのバー（P/F/Cとは必ず別色にする）
+  hairline: string;     // カード外周のごく薄い縁取り（面とほぼ同色の1px）
+  shadow: string;       // 影の色（shadowColor専用。明暗で濃さの効き方が違う）
   coral: string;
   coralWeak: string;
   amber: string;
@@ -94,6 +97,8 @@ export const C: Palette = {
   segTrack: '#eef0ee',
   pressed: '#f1f3f0',
   calorieBar: '#3f4c5a',
+  hairline: 'rgba(14,17,22,0.08)',
+  shadow: '#0e1116',
   coral: '#e5484d',
   coralWeak: '#fdeeec',
   amber: '#b8860b',
@@ -107,41 +112,94 @@ export function rgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// StyleSheet.create で作った色はその場で固定されるため、あとからテーマを変えても
-// 反映されない。そこで生成されたスタイルを控えておき、変更時に旧色→新色へ置換する。
-// （このファイルは全コンポーネントが必ずimportするので、確実に先に読み込まれる）
-type Sheet = Record<string, Record<string, unknown>>;
-const sheets: Sheet[] = [];
+// ===== テーマに追従するスタイル定義 =====
+//
+// 【なぜこの形なのか】2026-09-02 の「まだらバグ」の根治
+//
+// 以前は StyleSheet.create にモンキーパッチを当てて生成物を控えておき、テーマ変更時に
+// 「旧い色文字列 → 新しい色文字列」を全スタイルに遡って置換していた。値ベースの置換には
+// 構造的な欠陥が4つあり、これが「画面の一部だけ色が変わる／触ると一部だけ白くなる」の正体だった。
+//
+//   1) **同じ値を持つ別トークンを区別できない**。たとえばライトの panel は '#ffffff' で、
+//      白文字として書かれた '#ffffff' と見分けがつかない。ダークへ切り替えると
+//      「白文字のはずの箇所」までカード面の暗色へ置換され、逆に3桁の '#fff' は
+//      対応表に載らず置換されない。**置換される要素と、されない要素が同じ画面に混在する**。
+//   2) **加工された色が対応表に載らない**。`rgba(C.teal, 0.3)` のように計算で作った色は
+//      パレットのどのトークンとも文字列一致しないため、永久に旧テーマのまま残る。
+//   3) **後から初めて評価されるモジュールを取りこぼす**。expo-routerは画面を遅延読込するため、
+//      テーマ変更後に初めて開いた画面の StyleSheet.create は applyPalette が走り終わった後に
+//      実行される。控えるだけの実装では、その回の差分が当たらない経路が残る。
+//   4) **オブジェクトを「中身だけ」書き換えても画面に届かない**。Reactはstyleプロパティを
+//      参照の同一性で差分判定するため、同じオブジェクトを破壊的に書き換えても
+//      「変化なし」と見なされ、ネイティブビューへ新しい色が送られない。既にマウント済みの
+//      要素は旧色のまま残り、再マウントされた要素だけが新色になる＝まだら。
+//
+// 【新方式】色の置換をやめ、**テーマが変わったらスタイルを作り直す**。
+// 定義を「オブジェクト」ではなく「オブジェクトを作る関数（factory）」で受け取り、
+// テーマ世代（generation）が変わったら factory を再実行して**新しいオブジェクト**を作る。
+//   - factory は毎回その時点の C を読むので、`rgba(C.teal, .3)` も派生値も正しく追従する（2の解決）
+//   - 遅れて初めて評価されたシートも、生成時点の最新テーマで作られる（3の解決）
+//   - トークン名で解決するので値の衝突が起きない（1の解決）
+//   - 世代が変わると**参照が変わる**ので、Reactが差分を検知してネイティブへ色が届く（4の解決）
+//
+// 返すのはProxyで、プロパティを読んだ瞬間に世代を確認して必要なら作り直す（遅延生成）。
+// 開いていない画面のスタイルを作り直す無駄がなく、モジュールスコープに
+// `const s = themed(() => ({ ... }))` と書けるので既存の書き方をほぼ変えずに済む。
+//
+// 【書き方の規約】スタイル定義は必ず `themed(() => ({ ... }))` で書くこと。
+// StyleSheet.create の直接使用は禁止（このファイル以外での使用はテストで落とす）。
 
-// RNはプレーンなオブジェクトもstyleとして受け付けるので、凍結されない複製を返す
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(StyleSheet as any).create = (obj: Sheet): Sheet => {
-  const out: Sheet = {};
-  for (const k of Object.keys(obj)) out[k] = { ...obj[k] };
-  sheets.push(out);
-  return out;
-};
+// RN本体の StyleSheet.create と同じ形の制約。これがないと 'row' などのリテラル型が
+// string へ広がってしまい ViewStyle に代入できなくなる（＝全画面で型エラーになる）
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 
-/** パレットを丸ごと差し替える。既存スタイルの色も遡って置換するので即座に反映される。 */
-export function applyPalette(next: Palette): void {
-  // 「旧い値 → 新しい値」の対応表を作る（変わらない色は無視）
-  const map = new Map<string, string>();
-  (Object.keys(next) as (keyof Palette)[]).forEach((k) => {
-    if (C[k] !== next[k]) map.set(C[k], next[k]);
-  });
-  if (map.size === 0) return;
+// テーマの世代番号。applyPalette のたびに増える
+let generation = 0;
 
-  for (const sheet of sheets) {
-    for (const key of Object.keys(sheet)) {
-      const style = sheet[key];
-      for (const prop of Object.keys(style)) {
-        const v = style[prop];
-        if (typeof v === 'string') {
-          const hit = map.get(v);
-          if (hit) style[prop] = hit;
-        }
-      }
+/** 現在のテーマ世代。Reactツリーの再マウントキーやテストで使う */
+export function themeGeneration(): number { return generation; }
+
+/**
+ * テーマに追従するスタイルシートを定義する。
+ * 使い方: `const s = themed(() => ({ card: { backgroundColor: C.panel } }));`
+ * factoryはテーマが変わった後の最初のアクセスで再実行される（＝常に現在の色になる）。
+ */
+export function themed<T extends NamedStyles<T> | NamedStyles<Record<string, unknown>>>(
+  factory: () => T & NamedStyles<Record<string, unknown>>,
+): T {
+  let gen = -1;
+  let sheet = {} as T;
+  // 現在の世代のスタイルを返す。世代が変わっていれば作り直す（遅延生成）
+  const live = (): Record<string | symbol, unknown> => {
+    if (gen !== generation) {
+      sheet = StyleSheet.create(factory());
+      gen = generation;
     }
-  }
+    return sheet as Record<string | symbol, unknown>;
+  };
+  return new Proxy({} as T, {
+    get: (_t, key) => live()[key],
+    has: (_t, key) => key in live(),
+    ownKeys: () => Reflect.ownKeys(live()),
+    // ownKeys を返す以上、対応する記述子も返さないとProxyの不変条件で例外になる。
+    // ターゲットは空オブジェクトなので configurable: true を必ず立てる
+    getOwnPropertyDescriptor: (_t, key) => {
+      const d = Object.getOwnPropertyDescriptor(live(), key);
+      return d ? { ...d, configurable: true } : undefined;
+    },
+  });
+}
+
+/**
+ * パレットを丸ごと差し替える。
+ * C を書き換えてから世代を進めるだけ。既存スタイルは次に読まれた時点で作り直される。
+ * （画面へ届けるにはコンポーネントの再描画が要る。ルートの Stack key と
+ *   useTheme() の購読でツリーが作り直されるため、切替直後の1フレームで揃う）
+ */
+export function applyPalette(next: Palette): void {
+  // 実際に変化があるときだけ世代を進める（無駄な再生成を避ける）
+  const changed = (Object.keys(next) as (keyof Palette)[]).some((k) => C[k] !== next[k]);
+  if (!changed) return;
   Object.assign(C, next);
+  generation += 1;
 }

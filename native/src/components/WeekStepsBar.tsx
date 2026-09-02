@@ -8,11 +8,11 @@
 // 置き場所: 運動タブ「きょうの動き」の週歩数ミニバーの上＋概要「歩数・睡眠」詳細。
 // 週は月曜起点（calcStreak・週別バランスと同じweekKeyの流儀）。
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { useReduceMotion } from '@/lib/motion';
 import { t } from '@/lib/i18n';
 
@@ -73,11 +73,11 @@ export default function WeekStepsBar({ days, today, goal }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { marginTop: 14 },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 },
   label: { fontSize: 11, fontWeight: '800', color: C.sub, letterSpacing: 0.2 },
   val: { fontSize: 12.5, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   track: { height: 10, borderRadius: 5, backgroundColor: C.track, overflow: 'hidden' },
   fill: { height: 10, borderRadius: 5 },
-});
+}));

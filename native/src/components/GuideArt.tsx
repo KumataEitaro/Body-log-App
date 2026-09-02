@@ -2,13 +2,13 @@
 // - 対象UIが画面に無い機能（マイ食品・法則図鑑・過食アラート等）を、
 //   実UIの雰囲気を模した小さなモックで見せる（既存のAIコーチデモと同じ紙芝居流儀）
 // - 色はCトークンのみ。静的な図解なのでアニメーションは持たない（reduce motionにも安全）
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import {
   RotateCcw, Sparkles, TriangleAlert, Flame, ShieldCheck, Award, Medal, Trophy,
   CheckCircle2, Circle, Bell, WifiOff, Check, Plus, Heart,
 } from 'lucide-react-native';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { pfcColors } from '@/lib/theme';
 import MoodFace from '@/components/MoodFace';
 import { t } from '@/lib/i18n';
@@ -312,7 +312,7 @@ export default function GuideArt({ id }: { id: GuideArtId }) {
   }
 }
 
-const a = StyleSheet.create({
+const a = themed(() => ({
   panel: {
     backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14,
     padding: 12, gap: 6, marginBottom: 12,
@@ -378,4 +378,4 @@ const a = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20, backgroundColor: C.tealWeak,
     alignItems: 'center', justifyContent: 'center',
   },
-});
+}));
