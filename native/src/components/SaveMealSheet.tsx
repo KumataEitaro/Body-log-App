@@ -1,4 +1,5 @@
-// マイミール保存シート: トレイ/記録の品目一式に名前をつけて my_meals へ保存する小フォーム。
+// マイ食品（セット）の登録シート: トレイ/記録の品目一式に名前をつけて my_meals へ保存する小フォーム。
+// ユーザーに見える呼称は単品と同じ「マイ食品」（内部名 meal/my_meals は互換のためそのまま）。
 // 既定名は「品目1つ目＋セット」。呼び出し元（食事タブ）の上に透過モーダルで重ねる
 // （pageSheetの内側からは使わない前提。iOSはpageSheet内のネストModalが出ないため）。
 import { useEffect, useState } from 'react';
@@ -53,9 +54,9 @@ export default function SaveMealSheet({ visible, uid, items, onClose, onSaved }:
         <View style={s.card}>
           <View style={s.titleRow}>
             <UtensilsCrossed size={17} color={C.teal} />
-            <Text style={s.title}>{t('マイミールに保存')}</Text>
+            <Text style={s.title}>{t('マイ食品に登録（セット）')}</Text>
           </View>
-          <Text style={s.sub}>{t('この組み合わせをセットとして保存し、次からはチップの1タップで再記録できます。')}</Text>
+          <Text style={s.sub}>{t('この組み合わせを1つのマイ食品として登録します。次からはチップの1タップで再記録できます。')}</Text>
           <Text style={s.meta}>{t('{n}品・約{k}kcal', { n: items.length, k: mealKcal(items).toLocaleString() })}</Text>
           <TextInput
             style={s.input} value={name} onChangeText={setName}
