@@ -267,6 +267,50 @@ export async function scheduleFirstLawNotification(): Promise<void> {
   } catch { /* Expo Go等では黙って諦める */ }
 }
 
+// ===== 気づきの通知（docs/INSIGHTS-ENGINE.md §8・E2） =====
+// 「食べすぎが起きやすい条件」がそろった朝に1件だけ。判断（smartのときだけ・1日1件・cautionのみ・
+// 8:00前の起動は8:00に予約）は lib/insightAlerts.planMorningNotification（純関数）。ここは予約の I/O だけ
+
+const INSIGHT_PREF_KEY = 'bl-notif-insight';   // '1' | '0'（既定ON）
+const INSIGHT_ID_KEY = 'bl-notif-insight-id';  // 予約中の通知ID（同日に組み直すとき前回分を消す）
+
+/** 設定「気づきの通知」（既定ON。記録リマインダーが smart のときだけ実際に届く） */
+export async function getInsightNotifyEnabled(): Promise<boolean> {
+  try { return (await AsyncStorage.getItem(INSIGHT_PREF_KEY)) !== '0'; } catch { return true; }
+}
+
+export async function setInsightNotifyEnabled(on: boolean): Promise<void> {
+  await AsyncStorage.setItem(INSIGHT_PREF_KEY, on ? '1' : '0').catch(() => {});
+  if (!on) await cancelInsightNotification();
+}
+
+/** 予約中の気づき通知を取り消す（設定OFF時） */
+export async function cancelInsightNotification(): Promise<void> {
+  try {
+    const id = await AsyncStorage.getItem(INSIGHT_ID_KEY);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      await AsyncStorage.removeItem(INSIGHT_ID_KEY).catch(() => {});
+    }
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
+/** 気づき通知を1件予約する。許可が無ければ静かにスキップ（アプリ内のカードで伝わる）。
+ *  「1日1件」の記録（bl-insight-alert-notified）は予約できたときだけ書く＝権限が無い日にカウントを消費しない */
+export async function scheduleInsightNotification(plan: { title: string; body: string; at: Date }, today: string, notifiedKey: string): Promise<boolean> {
+  try {
+    const cur = await Notifications.getPermissionsAsync();
+    if (!cur.granted) return false;
+    await cancelInsightNotification();
+    const id = await Notifications.scheduleNotificationAsync({
+      content: { title: plan.title, body: plan.body, data: { url: 'bodylog://log' } },   // タップで食事タブ（カードが出ている）
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: plan.at },
+    });
+    await AsyncStorage.multiSet([[INSIGHT_ID_KEY, id], [notifiedKey, today]]).catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
 // ===== 記録リマインダーのアクションボタン（B-10） =====
 
 /** 記録リマインダー用の通知カテゴリを登録する。

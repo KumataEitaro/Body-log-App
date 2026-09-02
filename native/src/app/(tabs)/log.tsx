@@ -51,6 +51,9 @@ import {
   resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm,
 } from '@/lib/timeSlots';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
+// 気づきアラート（docs/INSIGHTS-ENGINE.md §8・E2）: 本人の法則で駆動する事前アラート。判定は lib/correlate、配線は lib/insightAlerts
+import { loadInsightAlerts, closeInsightAlert, maybeScheduleMorningNotification, lawLinkForAlert, type InsightAlertState } from '@/lib/insightAlerts';
+import type { Alert as InsightAlert } from '@/lib/correlate';
 import { buildDailyBrief, type Brief } from '@/lib/dailyBrief';
 import DailyBrief from '@/components/DailyBrief';
 import { getColumns } from '@/content/columns';
@@ -1054,9 +1057,39 @@ export default function LogScreen() {
     }
   }
 
+  // ===== 気づきアラート（§8）: 食事タブを開くたびに判定（特徴量は15分TTLのキャッシュ・保存後はsyncが無効化） =====
+  // caution は既存の過食リスクカードと1枚に統合（二重に出さない）。positive は控えめな別カード。最大2枚
+  const [insightAlerts, setInsightAlerts] = useState<InsightAlertState>({ cards: [], insightsById: new Map(), all: [] });
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    (async () => {
+      const st = await loadInsightAlerts();
+      if (!alive) return;
+      setInsightAlerts(st);
+      // 朝の通知（smartのときだけ・1日1件・cautionのみ）。食事タブは起動時の最初のタブなので「起動時判定」を兼ねる
+      maybeScheduleMorningNotification(st.all).catch(() => {});
+    })();
+    return () => { alive = false; };
+  }, []));
+  const cautionAlert: InsightAlert | null = insightAlerts.cards.find((a) => a.tone === 'caution') ?? null;
+  const positiveAlerts = insightAlerts.cards.filter((a) => a.tone === 'positive');
+  async function closeAlert(a: InsightAlert) {
+    await closeInsightAlert(a.id);
+    setInsightAlerts((prev) => ({ ...prev, cards: prev.cards.filter((c) => c.id !== a.id) }));
+  }
+  // 「この法則の解説を読む →」: ルール → 図鑑の kind（laws.tsx の openDetail と同じパラメータ）
+  function openAlertLaw(a: InsightAlert) {
+    const link = lawLinkForAlert(a, insightAlerts.insightsById.get(a.ruleId));
+    if (!link) return;
+    Haptics.selectionAsync().catch(() => {});
+    router.push({ pathname: '/law-detail', params: { kind: link.kind, p: JSON.stringify(link.p), at: today } } as never);
+  }
+
+  // 統合カードの「気をつける」「+200kcal緩める」は、既存の過食リスクと今日の気づき（caution）をまとめて閉じる
   async function snoozeRisk() {
     try { await AsyncStorage.setItem('bl-risk-snooze', todayJST()); } catch { /* 無視 */ }
     setBingeRisk(null);
+    if (cautionAlert) await closeAlert(cautionAlert);
   }
 
   // 1タップ予防: 今日だけ目標を+200kcal緩める（チートデイ吸収の仕組みに乗せる）
@@ -1491,13 +1524,30 @@ export default function LogScreen() {
           </View>
         )}
 
-        {/* 過食リスクの事前アラート（理由つき・1タップ予防） */}
-        {bingeRisk && (
-          <View style={[s.card, { borderColor: bingeRisk.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
-            <Text style={s.h2}>{bingeRisk.level === 'high' ? '🌪 今日は食欲が爆発しやすい状態です' : t('🌤 今日は食欲が乱れやすいかも')}</Text>
-            {bingeRisk.reasons.map((r) => (
+        {/* 過食リスクの事前アラート（理由つき・1タップ予防）。
+            §8 気づきアラート（caution）が出た日はこの1枚に統合する: 見出しは「条件が{n}つそろっています」、
+            箇条書きは本人の法則の条件（＋従来の理由）、ボタンは従来どおり、末尾に法則の解説へのリンク */}
+        {(bingeRisk || cautionAlert) && (
+          <View style={[s.card, { borderColor: bingeRisk?.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
+            <View style={s.alertHead}>
+              <Text style={[s.h2, { flex: 1, marginBottom: 0 }]}>
+                {cautionAlert
+                  ? t('今日は食べすぎが起きやすい条件が{n}つそろっています', { n: cautionAlert.factors.length })
+                  : bingeRisk?.level === 'high' ? t('🌪 今日は食欲が爆発しやすい状態です') : t('🌤 今日は食欲が乱れやすいかも')}
+              </Text>
+              <Pressable hitSlop={10} onPress={snoozeRisk} accessibilityRole="button" accessibilityLabel={t('今日は閉じる')}>
+                <Text style={s.alertX}>×</Text>
+              </Pressable>
+            </View>
+            {cautionAlert?.factors.map((f) => (
+              <Text key={f} style={[s.mutedT, { lineHeight: 20 }]}>・{f}</Text>
+            ))}
+            {bingeRisk?.reasons.filter((r) => !cautionAlert?.factors.includes(r.text)).map((r) => (
               <Text key={r.key} style={[s.mutedT, { lineHeight: 20 }]}>・{r.text}</Text>
             ))}
+            {cautionAlert && (
+              <Text style={s.alertNote}>{t('あなたの記録から見つかった法則にもとづく予報です（相関であり、原因とは限りません）')}</Text>
+            )}
             <Text style={[s.mutedT, { marginTop: 6 }]}>
               {t('これは失敗のサインではなく、準備のサインです。たんぱく質多めの食事と「我慢しすぎない設定」が効きます。')}
             </Text>
@@ -1509,8 +1559,30 @@ export default function LogScreen() {
             ) : (
               <OptionButton style={{ marginTop: 10 }} variant="tonal" label={t('OK、気をつける')} onPress={snoozeRisk} />
             )}
+            {cautionAlert && lawLinkForAlert(cautionAlert, insightAlerts.insightsById.get(cautionAlert.ruleId)) && (
+              <Pressable onPress={() => openAlertLaw(cautionAlert)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 10 }}
+                         accessibilityRole="link">
+                <Text style={s.alertLink}>{t('この法則の解説を読む →')}</Text>
+              </Pressable>
+            )}
           </View>
         )}
+
+        {/* §8 ポジティブ側の気づき: 良い条件がそろった日は背中を押す（控えめなアクセント面・ボタン無し・×で今日は閉じる） */}
+        {positiveAlerts.map((a) => (
+          <View key={a.id} style={s.positiveCard}>
+            <View style={s.alertHead}>
+              <Sparkles size={16} color={C.teal} />
+              <Text style={s.positiveTitle}>{a.text}</Text>
+              <Pressable hitSlop={10} onPress={() => closeAlert(a)} accessibilityRole="button" accessibilityLabel={t('今日は閉じる')}>
+                <Text style={s.alertX}>×</Text>
+              </Pressable>
+            </View>
+            {a.factors.map((f) => (
+              <Text key={f} style={s.positiveFactor}>・{f}</Text>
+            ))}
+          </View>
+        ))}
 
         {/* 朝の気分カード（その日1回だけ・記録かスキップで消える） */}
         {vis('mood') && showMood && (
@@ -2129,6 +2201,14 @@ const s = themed(() => ({
   metaAdjust: { fontSize: 12, fontWeight: '800', color: C.teal },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
+  // 気づきアラート（§8）: 統合カードの見出し行・×・解説リンク・ポジティブ側の控えめな面
+  alertHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
+  alertX: { fontSize: 20, lineHeight: 22, color: C.faint, paddingHorizontal: 4 },
+  alertNote: { fontSize: 11, color: C.faint, lineHeight: 16, marginTop: 4 },
+  alertLink: { fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
+  positiveCard: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12 },
+  positiveTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
+  positiveFactor: { fontSize: 13, color: C.sub, lineHeight: 19 },
   h2sub: { fontWeight: '400', color: C.sub },
   mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },
   // 展開した品目行。記録行より一段内側に置き、従属関係を見せる

@@ -4,11 +4,14 @@ import { summarizeDay, type LogRow } from '@/lib/day';
 import { skipTodayReminder, rescheduleMealGapReminder } from '@/lib/notify';
 import { todayJST } from '@/lib/calc';
 import { updateWidgetData } from '@/lib/widget';
+import { invalidateDayFeatures } from '@/lib/features';
 
 export async function syncEntriesForDate(userId: string, d: string): Promise<(LogRow & { id: string; at: string })[]> {
   // 今日のぶんを記録したら、今夜の記録リマインダーは黙る（smartモードの中核。
   // ここは全保存経路の合流点なので、食事・体重・運動・取込のどれでも効く）
   if (d === todayJST()) skipTodayReminder().catch(() => {});
+  // 日次特徴量（インサイト・エンジン）は保存のたびに組み直す（次の buildDayFeatures でキャッシュを捨てる）
+  invalidateDayFeatures();
   const { data: logs } = await supabase.from('logs').select('*').eq('date', d).order('at', { ascending: true });
   const rows = (logs as (LogRow & { id: string; at: string })[]) || [];
   if (d === todayJST()) {
