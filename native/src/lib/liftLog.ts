@@ -9,21 +9,24 @@
 // 1種目だけ消す・書き換えるにはテキストを組み直す必要があるので、その解析と再構築をここに置く。
 //
 // 【自重種目】懸垂やディップスは入力するkgが「加重」なので、実負荷は体重＋加重になる。
-// 記録テキストでは加重を `+10kg`、加重なしを `自重` と書いて区別する。
+// 記録テキストでは加重を `+10kg`、加重なしを `自重`、補助（アシストマシン・バンド）を `-20kg` と書いて区別する。
 // 昔の記録（`懸垂 10kg×8×3`）も加重の意味なので、実負荷の計算では同じに扱う。
+// 補助は「体重から引く」負荷（実負荷 = 体重×係数 − 補助）。2026-09-02 の筋トレ記録画面で
+// 加重/補助を1本のダイアル（−60〜+60kg）で選べるようにしたときに追加した。
 import { bwRatioOf } from './lifts';
 
 /**
  * 重量の書き方。
- *  abs  … その重量そのものが負荷（ベンチプレス 80kg）
- *  plus … 自重に足した加重（懸垂 +10kg）
- *  bw   … 加重なしの自重のみ（懸垂 自重）
+ *  abs   … その重量そのものが負荷（ベンチプレス 80kg）
+ *  plus  … 自重に足した加重（懸垂 +10kg）
+ *  bw    … 加重なしの自重のみ（懸垂 自重）
+ *  minus … 自重から引く補助（懸垂 -20kg。アシストマシン・バンド）
  */
-export type LiftMode = 'abs' | 'plus' | 'bw';
+export type LiftMode = 'abs' | 'plus' | 'bw' | 'minus';
 
 export type LiftEntry = {
   name: string;
-  kg: number;     // absなら負荷そのもの、plusなら加重、bwなら0
+  kg: number;     // absなら負荷そのもの、plusなら加重、bwなら0、minusなら補助ぶん（負の数で持つ）
   reps: number;
   sets: number;   // 省略時は1
   mode: LiftMode;
@@ -39,18 +42,20 @@ export function parseLiftText(text: string): LiftEntry[] {
   const body = text.replace(/^🏋️\s*/, '');
   const out: LiftEntry[] = [];
   for (const part of body.split('、')) {
-    // 「種目名 80kg×8×3」「種目名 +10kg×8×3」「種目名 自重×8×3」
-    const m = part.trim().match(/^(.+?)\s+(?:自重|(\+)?([\d.]+)kg)(?:×(\d+))?(?:×(\d+))?$/);
+    // 「種目名 80kg×8×3」「種目名 +10kg×8×3」「種目名 -20kg×8×3」「種目名 自重×8×3」
+    // 符号は ASCII の -/+ のほか、全角マイナス（−）で手打ちされたものも読む
+    const m = part.trim().match(/^(.+?)\s+(?:自重|([+\-−])?([\d.]+)kg)(?:×(\d+))?(?:×(\d+))?$/);
     if (!m) continue;
     const isBw = m[3] === undefined;
-    const kg = isBw ? 0 : Number(m[3]);
-    if (!isBw && !(kg > 0)) continue;
+    const isMinus = m[2] === '-' || m[2] === '−';
+    const abs = isBw ? 0 : Number(m[3]);
+    if (!isBw && !(abs > 0)) continue;
     out.push({
       name: m[1].trim(),
-      kg,
+      kg: isMinus ? -abs : abs,
       reps: m[4] ? Number(m[4]) : 1,
       sets: m[5] ? Number(m[5]) : 1,
-      mode: isBw ? 'bw' : m[2] ? 'plus' : 'abs',
+      mode: isBw ? 'bw' : isMinus ? 'minus' : m[2] === '+' ? 'plus' : 'abs',
     });
   }
   return out;
@@ -63,6 +68,7 @@ export function parseLiftText(text: string): LiftEntry[] {
  *   訳すのは画面に出すときだけ。既定値を日本語にしているのはそのため。
  */
 export function liftSetLabel(e: LiftEntry, bwWord: string = BW_WORD): string {
+  // minus は kg を負の数で持っているので、そのまま文字列にすると「-20kg」になる
   const w = e.mode === 'bw' ? bwWord : e.mode === 'plus' ? `+${e.kg}kg` : `${e.kg}kg`;
   return `${w}×${e.reps}${e.sets > 1 ? `×${e.sets}` : ''}`;
 }
@@ -75,7 +81,7 @@ export function liftPart(e: LiftEntry): string {
 /** 種目の並びから記録テキストを組み直す。空なら空文字（＝記録を消す合図） */
 export function liftTextFrom(entries: LiftEntry[]): string {
   const parts = entries
-    .filter((e) => e.name.trim() && e.reps > 0 && (e.mode === 'bw' || e.kg > 0))
+    .filter((e) => e.name.trim() && e.reps > 0 && (e.mode === 'bw' || (e.mode === 'minus' ? e.kg < 0 : e.kg > 0)))
     .map(liftPart);
   return parts.length > 0 ? LIFT_PREFIX + parts.join('、') : '';
 }
@@ -93,15 +99,17 @@ export function removeLiftAt(entries: LiftEntry[], index: number):
 
 /**
  * 実際にかかった負荷(kg)。
- * 懸垂のような自重種目は「体重×係数 + 加重」。体重が分からないときは加重だけを返す。
+ * 懸垂のような自重種目は「体重×係数 ± kg」（加重は足す・補助は引く。kgの符号がそのまま効く）。
+ * 体重が分からないときは加重だけを返す（補助は体重が無いと意味を持たないので0）。
  * 昔の `懸垂 10kg` も加重の意味なので abs/plus の区別なく体重を足す。
+ * 補助が体重を上回る入力（あり得ないが）でも負の負荷は返さない。
  */
 export function effectiveKg(e: LiftEntry, bodyWeight?: number | null): number {
   const ratio = bwRatioOf(e.name);
   if (ratio > 0 && bodyWeight && bodyWeight > 0) {
-    return Math.round((bodyWeight * ratio + e.kg) * 10) / 10;
+    return Math.max(0, Math.round((bodyWeight * ratio + e.kg) * 10) / 10);
   }
-  return e.kg;
+  return Math.max(0, e.kg);
 }
 
 /** その種目の総挙上量（実負荷×回×セット）。日ごとの手応えを1つの数字で見せるため */

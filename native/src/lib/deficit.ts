@@ -61,13 +61,25 @@ export function deficitPlan(currentKg: number, targetKg: number, todayISO: strin
 
 /**
  * 1日に食べられるkcal（食事タブのヒーロー「目標」と同じ式）。
- *   食べられる量 = max(維持kcal − 必要赤字/日 + 手動調整, BMR)
+ *   食べられる量 = max(維持kcal − 運動ぶん − 必要赤字/日 + 手動調整, BMR) + 運動ぶん
  * BMRを下限にするのは、基礎代謝を下回る目標は健康リスクが大きいため（手動調整でも割らせない）。
  * 手動調整=0・赤字=0 なら維持kcalそのまま（従来の「（維持）」表示と一致）。
+ *
+ * 【運動ぶんを別引数にする理由（2026-09-02 βFB「運動を入れても目標が増えない」の根治）】
+ * 以前は運動込みの維持kcalをそのまま渡していた。すると赤字が大きくて BMR 下限に張り付いている日
+ * （例: BMR1,600・維持2,080・赤字700 → 1,380 → 下限1,600）は、運動で維持が +150 増えても
+ * 2,230 − 700 = 1,530 で依然 1,600 未満 ＝ 目標が1kcalも動かず、「運動を記録したのに
+ * 消費カロリーが摂取目標に反映されない」ように見えた。
+ * 運動で消費したぶんは基礎代謝の上に「食べ戻せる」量であって、下限判定に巻き込む理由がない。
+ * だから下限は運動抜きの土台にだけ掛け、運動ぶんは必ずその上に乗せる。
+ * @param maintenanceKcal その日の維持kcal（運動ぶん exerciseKcal を含んだ値のままでよい）
+ * @param exerciseKcal   維持kcalに含まれている運動ぶん（EX_ADD＋adj＋アクティブ上乗せ）。省略=0で従来と同じ式
  */
-export function dailyAllowance(maintenanceKcal: number, requiredDaily: number, bmr: number, adjust = 0): number {
-  const raw = Math.round(maintenanceKcal - requiredDaily + (Number.isFinite(adjust) ? adjust : 0));
-  return Math.max(raw, Math.round(bmr));
+export function dailyAllowance(maintenanceKcal: number, requiredDaily: number, bmr: number, adjust = 0, exerciseKcal = 0): number {
+  const ex = Number.isFinite(exerciseKcal) ? Math.max(0, Math.round(exerciseKcal)) : 0;
+  const base = maintenanceKcal - ex;   // 運動抜きの土台（BMR×生活係数）
+  const raw = Math.round(base - requiredDaily + (Number.isFinite(adjust) ? adjust : 0));
+  return Math.max(raw, Math.round(bmr)) + ex;
 }
 
 /**
