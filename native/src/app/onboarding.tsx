@@ -5,10 +5,7 @@
 // ③ 目標（体重・期日・体脂肪率は任意。減らす人も増やす人も同じ逆算）
 // ④ 筋トレ目標（任意・スキップ可）
 import { useEffect, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import Animated, {
   FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
@@ -18,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setFirstRunFlag } from '@/lib/firstrun';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
@@ -214,7 +211,7 @@ export default function Onboarding() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   purposeCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 16,
@@ -239,4 +236,4 @@ const s = StyleSheet.create({
   primaryBtn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 18 },
   primaryBtnT: { color: C.panel, fontSize: 15, fontWeight: '800' },  // ink地（ダーク=明色）に追従
   linkT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
-});
+}));

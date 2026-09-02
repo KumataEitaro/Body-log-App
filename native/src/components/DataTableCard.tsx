@@ -5,7 +5,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Table2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { kgToDisplay, useUnits } from '@/lib/units';
 import { Chip } from '@/components/ui/Selectable';
@@ -213,7 +213,7 @@ export function TableEntryCard({ onOpenBody, onOpenLift }: { onOpenBody: () => v
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: sheetTopPad(16) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -228,7 +228,7 @@ const s = StyleSheet.create({
   num: { textAlign: 'right' },
   strong: { fontWeight: '800' },
   empty: { fontSize: 15, color: C.sub, marginTop: 24, textAlign: 'center', lineHeight: 21 },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   entryRow: {
@@ -237,4 +237,4 @@ const s = StyleSheet.create({
   },
   entryT: { fontSize: 15, color: C.ink, fontWeight: '600' },
   entryArrow: { fontSize: 21, color: C.faint },
-});
+}));

@@ -13,9 +13,9 @@
 // Expo Goにはネイティブモジュールが無いため、health.tsと同じ流儀の動的requireで
 // 存在しない環境でもアプリ全体を落とさない。
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Platform, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useGate } from '@/lib/gate';
 
@@ -89,10 +89,10 @@ export default function AdBanner() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // カード群の間（card は marginBottom:12）に静かに挟まる余白
   wrap: { marginBottom: 12, borderRadius: 12, overflow: 'hidden' },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, paddingHorizontal: 2 },
   label: { fontSize: 11, color: C.faint },
   removeLink: { fontSize: 11, color: C.faint, textDecorationLine: 'underline' },
-});
+}));

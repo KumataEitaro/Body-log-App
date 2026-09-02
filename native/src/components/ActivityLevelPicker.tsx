@@ -1,7 +1,7 @@
 // 「生活係数」を人間の言葉で選ぶピッカー（内部では従来どおり係数に変換して保存）
 // 数値入力は誰にも伝わらなかったため廃止し、生活イメージ4択にした
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { C } from '@/lib/ui';
+import { View, Text, Pressable } from 'react-native';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 export const ACTIVITY_LEVELS = [
@@ -41,7 +41,7 @@ export default function ActivityLevelPicker({ value, onChange }: { value: number
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: 14,
@@ -53,4 +53,4 @@ const s = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: C.teal },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.teal },
-});
+}));

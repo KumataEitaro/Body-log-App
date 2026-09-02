@@ -8,8 +8,8 @@
 // 表示はするが、握りつぶしはしない。原因を追えるように直前の例外を保持して
 // 画面から見られるようにしている（クラッシュ計測を入れていないため）。
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { C } from '@/lib/ui';
+import { View, Text, Pressable, ScrollView } from 'react-native';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { reportCrash } from '@/lib/crash';
 
@@ -86,7 +86,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 20, justifyContent: 'center', gap: 12 },
   title: { fontSize: 21, fontWeight: '800', color: C.ink },
   body: { fontSize: 15, color: C.sub, lineHeight: 21 },
@@ -105,4 +105,4 @@ const s = StyleSheet.create({
   },
   compactT: { flex: 1, fontSize: 13, color: C.sub, fontWeight: '600' },
   retryT: { fontSize: 13, color: C.teal, fontWeight: '800', textDecorationLine: 'underline' },
-});
+}));

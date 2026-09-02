@@ -1,9 +1,9 @@
 // 全タブ共通の右上⚙ボタン（どの画面からでも設定へ飛べる）
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { useGuideTarget } from '@/components/GuideTour';
 
@@ -27,11 +27,11 @@ export default function HeaderGear({ guideKey }: { guideKey?: string }) {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   btn: {
     position: 'absolute', right: 16, zIndex: 30,
     width: 30, height: 30, borderRadius: 9,
     borderWidth: 1, borderColor: C.line, backgroundColor: C.panel,
     alignItems: 'center', justifyContent: 'center',
   },
-});
+}));

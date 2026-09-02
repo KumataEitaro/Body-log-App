@@ -1,8 +1,8 @@
 // 月グリッドカレンダー（Web版 components/Calendar.tsx の移植）
 // 記録あり=緑ドット / 目標超過=赤ドット / 未記録=? / 今日=強調。日タップで onSelect(dateKey)
 import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { C } from '@/lib/ui';
+import { View, Text, Pressable } from 'react-native';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const DOW = () => [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
@@ -107,7 +107,7 @@ export default function MonthCalendar({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18, marginBottom: 6 },
   nav: { paddingHorizontal: 10, paddingVertical: 2 },
   navT: { fontSize: 21, fontWeight: '800', color: C.sub },
@@ -123,4 +123,4 @@ const s = StyleSheet.create({
   legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' },
   legDot: { width: 7, height: 7, borderRadius: 4, marginLeft: 6 },
   legT: { fontSize: 11, color: C.sub },
-});
+}));

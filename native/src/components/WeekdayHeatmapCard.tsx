@@ -4,7 +4,7 @@
 // 責める言葉は使わず、観察（傾向）と先回りのコツだけを添える。
 import { View, Text, StyleSheet } from 'react-native';
 import { CalendarRange } from 'lucide-react-native';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { todayJST } from '@/lib/calc';
 
@@ -171,8 +171,8 @@ export default function WeekdayHeatmapCard({ rows }: { rows: WeekRow[] }) {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 12, fontWeight: '700', color: C.faint },
@@ -186,4 +186,4 @@ const s = StyleSheet.create({
   legendT: { fontSize: 11, color: C.faint, fontWeight: '700' },
   verdict: { fontSize: 14, fontWeight: '800', marginTop: 10, lineHeight: 20 },
   tip: { fontSize: 13, color: C.sub, lineHeight: 19, marginTop: 4 },
-});
+}));

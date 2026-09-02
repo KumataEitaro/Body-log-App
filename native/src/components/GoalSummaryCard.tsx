@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import { Target, Dumbbell, ChevronRight, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import GoalPanel from '@/components/GoalPanel';
 
@@ -64,10 +64,10 @@ export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' 
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
     paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12,
   },
   iconWrap: {
@@ -79,4 +79,4 @@ const s = StyleSheet.create({
   sheet: { flex: 1, backgroundColor: C.bg, padding: 16, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
-});
+}));

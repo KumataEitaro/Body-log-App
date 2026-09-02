@@ -1,7 +1,8 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { Platform, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { themed } from '@/lib/ui';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
@@ -30,7 +31,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   small: {
     fontSize: 15,
     lineHeight: 20,
@@ -70,4 +71,4 @@ const styles = StyleSheet.create({
     fontWeight: Platform.select({ android: 700 }) ?? 500,
     fontSize: 13,
   },
-});
+}));

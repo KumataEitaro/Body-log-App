@@ -5,12 +5,12 @@
 //         undo.show(t('削除しました'), onUndo) を呼び、undo.element を画面末尾に描く。
 // 連続削除は最後の1件だけを表示する（前の件のonExpireを先に確定させる＝取り消しの取りこぼしなし）。
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import Reanimated, {
   Easing, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 
@@ -106,14 +106,14 @@ function SnackBar({ item, onDone }: { item: Item; onDone: (key: number) => void 
   );
 }
 
-const sw = StyleSheet.create({
+const sw = themed(() => ({
   // 呼び出し側のbottom指定で、タブバーやインプットドックの上に重なる位置に出す
   wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   bar: {
     alignSelf: 'stretch', backgroundColor: C.panel,
     borderWidth: 1, borderColor: C.line, borderRadius: 16,
     paddingHorizontal: 14, paddingTop: 11, paddingBottom: 8,
-    shadowColor: '#0e1116', shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+    shadowColor: C.shadow, shadowOpacity: 0.14, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -122,4 +122,4 @@ const sw = StyleSheet.create({
   // 残り時間の細いプログレス（下辺に沿わせる）
   track: { height: 3, borderRadius: 2, backgroundColor: C.track, overflow: 'hidden', marginTop: 9 },
   fill: { height: 3, borderRadius: 2, backgroundColor: C.teal },
-});
+}));

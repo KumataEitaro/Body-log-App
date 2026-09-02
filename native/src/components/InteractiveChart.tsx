@@ -4,10 +4,10 @@
 // - Y軸は表示範囲にniceフィット・X目盛りはズームに応じ日/月/年へ自動切替
 // - ⤢で全画面モーダル展開
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Dimensions } from 'react-native';
+import { View, Text, Pressable, Modal, Dimensions } from 'react-native';
 import Svg, { Path, Line, Circle, Rect, Text as SvgText, Defs, LinearGradient, Stop, G } from 'react-native-svg';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 import {
   type RawPoint, dateToIdx, idxToDate, unitForDays,
   binPoints, smoothTrend, niceTicks, xTicks, smoothPath, linePath,
@@ -326,7 +326,7 @@ export default function InteractiveChart(props: Props) {
   return <Inner {...props} />;
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   range: { fontSize: 11, color: C.sub, fontVariant: ['tabular-nums'] },
   delta: { fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
@@ -341,4 +341,4 @@ const s = StyleSheet.create({
   fsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   fsTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
   fsClose: { fontSize: 14, fontWeight: '700', color: C.teal },
-});
+}));

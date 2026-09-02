@@ -5,10 +5,10 @@
 // 前回値を初期位置にした縦ホイール（1kg刻み）＋0.5刻みのホイールを横に並べる。
 // 体重計アプリなどでおなじみの形にして、説明なしで回せるようにしている。
 import { memo, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const ITEM_H = 38;
@@ -128,7 +128,7 @@ export default function WeightDial({ title, subtitle, unitLabel, initial, allowZ
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)' },
   sheet: {
     backgroundColor: C.panel, borderTopLeftRadius: 22, borderTopRightRadius: 22,
@@ -158,4 +158,4 @@ const s = StyleSheet.create({
   cancelT: { fontSize: 15, fontWeight: '800', color: C.sub },
   ok: { flex: 2, backgroundColor: C.teal, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   okT: { fontSize: 17, fontWeight: '800', color: '#fff', fontVariant: ['tabular-nums'] },
-});
+}));

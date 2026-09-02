@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import { useRouter } from 'expo-router';
 import { Hand, PartyPopper, CheckCircle2, ChevronRight, X } from 'lucide-react-native';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
 import { useReduceMotion } from '@/lib/motion';
 import { t } from '@/lib/i18n';
@@ -527,7 +527,7 @@ function CoachDemoPanel({ title, text, onNext, H, progress }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   cardIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 6 },
   skip: {
     position: 'absolute', top: 62, right: 16, backgroundColor: 'rgba(255,255,255,0.14)',
@@ -579,4 +579,4 @@ const s = StyleSheet.create({
   cardTitle: { fontSize: 21, fontWeight: '900', color: C.ink, textAlign: 'center', marginBottom: 8 },
   cardText: { fontSize: 15, color: C.sub, lineHeight: 21, textAlign: 'center' },
   linkT: { fontSize: 13, color: C.sub, textAlign: 'center', textDecorationLine: 'underline' },
-});
+}));

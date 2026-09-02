@@ -7,13 +7,14 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Pressable, useColorScheme, View } from 'react-native';
 
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { themed } from '@/lib/ui';
 
 export default function AppTabs() {
   return (
@@ -75,7 +76,7 @@ export function CustomTabList(props: TabListProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themed(() => ({
   tabListContainer: {
     position: 'absolute',
     width: '100%',
@@ -112,4 +113,4 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     marginLeft: Spacing.three,
   },
-});
+}));

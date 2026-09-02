@@ -1,10 +1,7 @@
 // 右下FAB → ハーフモーダルのクイック記録（食事タブ以外の全タブに常駐）
 // 開くと即キーボードが立ち、送信してもフォーカスを維持して連投できる
 import { useRef, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, StyleSheet, Modal,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Image,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, Images, Weight, ArrowUp } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
@@ -14,7 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { analyzeFood, saveParsed, type ParsedResult } from '@/lib/quicklog';
 import { sumItems } from '@/lib/items';
 import { confirmOutlierWeight } from '@/lib/guard';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { useDayStatus } from '@/lib/dayStatus';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveBar, usePulse } from '@/components/LivePreviewBar';
@@ -210,7 +207,7 @@ export default function QuickLogFab() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   preview: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 7 },
   previewMain: { fontSize: 12, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
   previewAb: { fontSize: 10, fontWeight: '900', color: C.sub },
@@ -244,4 +241,4 @@ const s = StyleSheet.create({
   input: { flex: 1, fontSize: 17, color: C.ink, paddingVertical: 6, paddingHorizontal: 4 },
   send: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   sendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
-});
+}));

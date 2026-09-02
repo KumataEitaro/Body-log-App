@@ -33,7 +33,7 @@ import GoalPanel from '@/components/GoalPanel';
 import { supabase } from '@/lib/supabase';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiPost } from '@/lib/api';
-import { C, rgba, sheetTopPad, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, rgba, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import { DIET_RULES } from '@/content/dietRules';
@@ -86,18 +86,18 @@ function BriefToggle() {
     </Pressable>
   );
 }
-const bt = StyleSheet.create({
+const bt = themed(() => ({
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.panel, borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
   },
   label: { fontSize: 15, fontWeight: '600', color: C.ink },
   track: { width: 44, height: 26, borderRadius: 13, backgroundColor: C.line, padding: 3 },
   trackOn: { backgroundColor: C.teal },
   knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
   knobOn: { alignSelf: 'flex-end' },
-});
+}));
 
 export default function SettingsScreen() {
   const router2 = useRouter();
@@ -1160,13 +1160,13 @@ export default function SettingsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingTop: 12, paddingBottom: 40 },  // ネイティブヘッダーが上を確保するため控えめに
   h: { ...HEAD.page, color: C.ink, marginBottom: 12 },
   // サマリー
   summary: {
     flexDirection: 'row', gap: 12, alignItems: 'center',
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 18,
   },
   avatarEdit: {
     position: 'absolute', bottom: -2, right: -2,
@@ -1195,7 +1195,9 @@ const s = StyleSheet.create({
     padding: 8, alignItems: 'stretch',
   },
   bgCardOn: { borderColor: C.teal, borderWidth: 2.5 },
-  bgMini: { height: 11, borderRadius: 4, backgroundColor: '#ffffff', borderWidth: 1 },
+  // 背景トーンの見本の中に置く「カード」。実際のカード面と同じトークンで塗る
+  // （生の白のままだとダークで見本だけ白いカードが浮いてしまう）
+  bgMini: { height: 11, borderRadius: 4, backgroundColor: C.panel, borderWidth: 1 },
   bgCardT: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 7, textAlign: 'center' },
   macroBlock: { marginTop: 14 },
   macroHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
@@ -1287,4 +1289,4 @@ const s = StyleSheet.create({
   mealHeadT: { fontSize: 15, fontWeight: '800', color: C.ink },
   foodName: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   foodKcal: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
-});
+}));

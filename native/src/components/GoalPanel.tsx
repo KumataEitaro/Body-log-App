@@ -5,7 +5,7 @@ import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Target, Beef, Dumbbell, Footprints } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { progressStatus, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
 import { trainingSeries } from '@/lib/training';
@@ -492,7 +492,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   puChip: {
     backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
     paddingHorizontal: 12, paddingVertical: 8,
@@ -503,7 +503,7 @@ const s = StyleSheet.create({
   seg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
   segOn: { backgroundColor: C.ink, borderColor: C.ink },
   segT: { fontSize: 15, fontWeight: '800', color: C.sub },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   divider: { height: 0.5, backgroundColor: C.line, marginVertical: 14 },
@@ -529,4 +529,4 @@ const s = StyleSheet.create({
   bar: { height: 8, backgroundColor: C.track, borderRadius: 4, marginTop: 5, overflow: 'hidden' },
   barFill: { height: 8, backgroundColor: C.teal, borderRadius: 4 },
   msg: { fontSize: 15, fontWeight: '600', paddingHorizontal: 4 },
-});
+}));

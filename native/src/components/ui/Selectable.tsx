@@ -5,9 +5,9 @@
 // 共通: 押下でscale縮小＋Haptics.selectionAsync
 // Android: Material 3の作法に合わせてタッチにリップルを出す（iOSはandroid_rippleを無視するため分岐不要）
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Animated, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { C, rgba } from '@/lib/ui';
+import { C, rgba, themed } from '@/lib/ui';
 
 
 function hapt() { Haptics.selectionAsync().catch(() => {}); }
@@ -115,7 +115,7 @@ export function OptionButton({ label, onPress, variant = 'filled', busy, disable
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   // Segmented
   track: { position: 'relative', flexDirection: 'row', backgroundColor: C.segTrack, borderRadius: 999, padding: 3 },
   plate: {
@@ -156,4 +156,4 @@ const s = StyleSheet.create({
   },
   optTonal: { backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line },
   optT: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
-});
+}));

@@ -7,8 +7,8 @@
 //    テーマを変えるとキャラの色も変わる（それ自体が動的）
 //  ・呼吸はゆっくり・ネイティブ駆動。reduce motion時は止める
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-native';
-import { C } from '@/lib/ui';
+import { View, Text, Pressable, Animated, Easing } from 'react-native';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import type { Brief, BriefMood } from '@/lib/dailyBrief';
@@ -78,7 +78,7 @@ export default function DailyBrief({ brief, onClose }: { brief: Brief; onClose: 
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: {
     backgroundColor: C.accentSoft, borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12,
@@ -89,4 +89,4 @@ const s = StyleSheet.create({
   bodyBox: { marginTop: 8, marginLeft: 36 },
   body: { fontSize: 13, color: C.sub, lineHeight: 20 },
   hint: { fontSize: 10, color: C.faint, marginTop: 6 },
-});
+}));

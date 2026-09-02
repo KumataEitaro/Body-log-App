@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Tornado } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { fmtWeight } from '@/lib/units';
 import { analyzeBinge, type AnalysisDay, type BingeReport } from '@/lib/bingeAnalysis';
@@ -163,8 +163,8 @@ export default function BingeTriggerCard() {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   count: { marginLeft: 'auto', fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
@@ -182,4 +182,4 @@ const s = StyleSheet.create({
   afterT: { fontSize: 13, color: C.sub, lineHeight: 21 },
   afterN: { fontWeight: '800', color: C.ink },
   note: { fontSize: 11, color: C.faint, marginTop: 12, lineHeight: 16 },
-});
+}));

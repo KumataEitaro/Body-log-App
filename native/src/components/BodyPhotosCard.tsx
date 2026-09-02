@@ -12,7 +12,7 @@ import { Camera, ImagePlus, X, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { OptionButton } from '@/components/ui/Selectable';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { t, apiLang } from '@/lib/i18n';
 
@@ -234,8 +234,8 @@ export default function BodyPhotosCard() {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 13, fontWeight: '400', color: C.sub },
@@ -284,4 +284,4 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   viewerT: { color: '#fff', fontSize: 15, fontWeight: '800' },
-});
+}));

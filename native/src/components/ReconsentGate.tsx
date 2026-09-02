@@ -9,12 +9,12 @@
 //  - 判定できないとき（列が無い・圏外）は**出さない**＝誤爆で全員を止めない
 //  - 記録は consent_log に履歴として積む（上書きしない＝後日の紛争で再現できる）
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { needsReconsent, recordConsent } from '@/lib/consent';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const TERMS_URL = 'https://bodylog-orcin.vercel.app/terms';
@@ -84,7 +84,7 @@ export default function ReconsentGate() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { paddingHorizontal: 22, paddingBottom: 40 },
   h1: { fontSize: 21, fontWeight: '900', color: C.ink, marginBottom: 10 },
   body: { fontSize: 14.5, color: C.sub, lineHeight: 23, marginBottom: 16 },
@@ -108,4 +108,4 @@ const s = StyleSheet.create({
   agreeT: { color: C.panel, fontSize: 15.5, fontWeight: '800' },
   outRow: { alignSelf: 'center', marginTop: 16, paddingVertical: 8 },
   out: { fontSize: 13, color: C.faint, textDecorationLine: 'underline' },
-});
+}));

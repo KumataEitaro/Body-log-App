@@ -10,7 +10,7 @@ import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { BookOpen } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { Chip } from '@/components/ui/Selectable';
 import { liftPartOf, liftPartLabel, LIFT_PARTS } from '@/lib/lifts';
 import {
@@ -218,8 +218,8 @@ export default function LiftHistoryCard({ showUndo }: { showUndo?: ShowUndo }) {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
+const s = themed(() => ({
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 14, marginBottom: 12 },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   muted: { fontSize: 15, color: C.sub },
@@ -242,4 +242,4 @@ const s = StyleSheet.create({
   moreBtnT: { fontSize: 13, color: C.teal, fontWeight: '800' },
   histHint: { fontSize: 13, color: C.faint, marginTop: 8 },
   err: { fontSize: 13, fontWeight: '700', color: C.coral, marginTop: 6 },
-});
+}));

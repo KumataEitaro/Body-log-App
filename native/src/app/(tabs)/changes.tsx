@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1237,7 +1237,7 @@ export default function ChangesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
   h: { ...HEAD.section, color: C.ink, marginBottom: 12 },
   pageTitle: { ...HEAD.page, color: C.ink },
@@ -1302,12 +1302,12 @@ const s = StyleSheet.create({
   actDate: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
   actVal: { fontSize: 13, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  kpi: { flex: 1, backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.panel, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 12 },
+  kpi: { flex: 1, backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.panel, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 12 },
   kpiL: { fontSize: 11, fontWeight: '700', color: C.sub },
   kpiV: { fontSize: 21, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
   kpiU: { fontSize: 13, color: C.sub, fontWeight: '600' },
   kpiD: { fontSize: 11, color: C.sub, marginTop: 2 },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   h2sub: { fontSize: 12, fontWeight: '700', color: C.faint },
   dayBox: { borderTopWidth: 0.5, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
@@ -1339,9 +1339,9 @@ const s = StyleSheet.create({
   // マスタメニュー（ヘルスケア式）
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
     borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 9,
-    shadowColor: '#0e1116', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
+    shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1,
   },
   menuIcon: {
     width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentSoft,
@@ -1350,7 +1350,7 @@ const s = StyleSheet.create({
   // スケルトン行（menuRowと同じ枠寸法。中身だけ角丸ブロックに置き換える）
   skelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)',
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
     borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 15, marginBottom: 9,
   },
   menuT: { fontSize: 15.5, fontWeight: '800', color: C.ink },
@@ -1374,4 +1374,4 @@ const s = StyleSheet.create({
   bandLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bandDot: { width: 8, height: 8, borderRadius: 4 },
   bandLegendT: { fontSize: 11, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
-});
+}));

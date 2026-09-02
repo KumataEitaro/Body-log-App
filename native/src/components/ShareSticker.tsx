@@ -4,7 +4,7 @@
 // ②写真に保存（透過のまま保存されるので、他のアプリでも重ねられる）
 // の2経路で渡す。白/黒の2トーンは、載せる写真の明暗に合わせてユーザーが選ぶ。
 import { useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Alert } from 'react-native';
+import { View, Text, Pressable, Modal, Alert } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
@@ -12,7 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Flame } from 'lucide-react-native';
 import { badgeIconOf } from '@/components/BadgeIcon';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 // ステッカーに載せる内容（種類ごとに1画面で完結する最小の情報だけ）
@@ -202,7 +202,7 @@ export default function ShareStickerModal({ data, visible, onClose }: { data: St
   );
 }
 
-const st = StyleSheet.create({
+const st = themed(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 22 },
   sheet: { backgroundColor: C.panel, borderRadius: 20, padding: 18 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -232,4 +232,4 @@ const st = StyleSheet.create({
   // 署名（右下の落款）。alignSelf:'flex-end' で本文の中央寄せを崩さずに右へ寄せる
   sign: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-end' },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-});
+}));

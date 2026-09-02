@@ -10,10 +10,7 @@
 //  ・最後の記録日（logsの最新date）が3日以上前 かつ 過去に記録が1件以上ある
 //  ・同じ空白期間には一度だけ（AsyncStorageに「表示時の最終記録日」を覚え、同値なら出さない）
 import { useEffect, useRef, useState } from 'react';
-import {
-  View, Text, TextInput, Pressable, StyleSheet, Modal,
-  KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { View, Text, TextInput, Pressable, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,7 +22,7 @@ import { invalidateStreak } from '@/lib/achievements';
 import { todayJST } from '@/lib/calc';
 import { useUnits, displayToKg } from '@/lib/units';
 import { confirmOutlierWeight } from '@/lib/guard';
-import { C } from '@/lib/ui';
+import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import MoodFace from '@/components/MoodFace';
 
@@ -174,7 +171,7 @@ export default function ComebackSheet({ onSaved }: {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 40 },
   heroBlock: { alignItems: 'center', marginBottom: 22 },
@@ -212,4 +209,4 @@ const s = StyleSheet.create({
   doneText: { fontSize: 15.5, fontWeight: '800', color: C.teal, textAlign: 'center', lineHeight: 22 },
   softClose: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 8 },
   softCloseT: { fontSize: 13.5, color: C.faint, fontWeight: '600' },
-});
+}));

@@ -4,8 +4,8 @@
 // デモ再生まで抱えている。そこへ動的な1件を割り込ませると進行状態と干渉するため、
 // 見た目だけ合わせた軽量版を別に用意した。進行管理は持たない。
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { View, Text, Pressable, StyleSheet, Modal, Dimensions, Animated, Easing } from 'react-native';
-import { C, RADIUS, SPACE } from '@/lib/ui';
+import { View, Text, Pressable, Modal, Dimensions, Animated, Easing } from 'react-native';
+import { C, RADIUS, SPACE, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -99,7 +99,7 @@ export default function SpotlightTip({
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   fill: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.62)',
@@ -123,4 +123,4 @@ const s = StyleSheet.create({
   laterT: { fontSize: 15, fontWeight: '700', color: C.sub },
   go: { flex: 1, backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center' },
   goT: { fontSize: 15, fontWeight: '800', color: '#fff' },
-});
+}));

@@ -8,7 +8,7 @@ import { loadLocale, useLocale, t } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
-import { C } from '@/lib/ui';
+import { C, themeGeneration } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
 import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
@@ -65,7 +65,10 @@ export default function RootLayout() {
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         {/* GuideProviderはルートに置く（設定画面がタブ外に出たため、タブ内限定だとuseGuideが届かない） */}
         <GuideProvider>
-          <Stack key={`${locale}-${theme.accent}-${theme.bg}-${theme.scheme}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{
+          {/* テーマ世代（themeGeneration）をキーに含める。アクセント・背景トーン・明暗の
+              どれが変わってもパレット差し替え＝世代更新なので、条件を数え上げる必要がない。
+              P/F/Cの配色はパレットとは独立した設定なので別途キーに含める */}
+          <Stack key={`${locale}-g${themeGeneration()}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: C.bg },
             // ヘッダー（設定などタブ外のスタック画面）もテーマに追従させる。

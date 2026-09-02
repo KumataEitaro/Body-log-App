@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
 import { getColumns, type Column } from '@/content/columns';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
 const READ_KEY = 'bl-columns-read';
@@ -158,10 +158,10 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   compactWrap: { alignSelf: 'stretch', marginTop: 18 },
   compactH: { fontSize: 13, fontWeight: '800', color: C.sub },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: 20, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: 20, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 16, marginBottom: 12 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   h2: { fontSize: 15, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 13, fontWeight: '400', color: C.sub },
@@ -190,4 +190,4 @@ const s = StyleSheet.create({
   srcBox: { marginTop: 26, borderTopWidth: 0.5, borderTopColor: C.line, paddingTop: 14 },
   srcHead: { fontSize: 13, fontWeight: '800', color: C.sub, marginBottom: 6 },
   srcLink: { fontSize: 13, color: C.teal, lineHeight: 20, textDecorationLine: 'underline' },
-});
+}));

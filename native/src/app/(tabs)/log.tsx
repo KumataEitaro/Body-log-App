@@ -40,7 +40,7 @@ import {
   claimOnce, releaseClaim, loadJobs, saveJobs, readPhotoPayloads, type ParseJob,
 } from '@/lib/parseJobs';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, rgba, RADIUS, SPACE, ICON, HEAD } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
 import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal } from '@/lib/activeKcal';
@@ -1863,7 +1863,7 @@ export default function LogScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   scroll: { padding: SPACE.screen },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   // B-7: 最初の法則の帯（今日のひとこと帯と同じ「帯」の文法・アクセント面で一段目立たせる）
@@ -1881,7 +1881,7 @@ const s = StyleSheet.create({
   doneBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   pageTitle: { ...HEAD.page, color: C.ink },
   hero: {
-    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
+    backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
   },
   heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
@@ -1893,7 +1893,7 @@ const s = StyleSheet.create({
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
-  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(14,17,22,0.08)', borderRadius: RADIUS.card, shadowColor: '#0e1116', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
+  card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   h2sub: { fontWeight: '400', color: C.sub },
   mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },
@@ -2057,4 +2057,4 @@ const s = StyleSheet.create({
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: RADIUS.input, borderWidth: 1, borderColor: C.line },
   thumbX: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
-});
+}));

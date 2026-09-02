@@ -1,10 +1,10 @@
 // 通知センター: 「いま入力すべきこと」を一覧で見て、その場で該当画面へ飛べる
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { X, BellRing, Check } from 'lucide-react-native';
-import { C, sheetTopPad } from '@/lib/ui';
+import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { buildTodos, badgeCount, type Todo } from '@/lib/todos';
 
@@ -102,7 +102,7 @@ export function TodoBadge({ count, style }: { count: number; style?: object }) {
   );
 }
 
-const s = StyleSheet.create({
+const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: sheetTopPad(16) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
@@ -126,4 +126,4 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
   },
   badgeT: { color: '#fff', fontSize: 11, fontWeight: '900' },
-});
+}));
