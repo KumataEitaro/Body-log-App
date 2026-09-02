@@ -7,7 +7,7 @@ import {
   ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, type DailyReminderMode } from '@/lib/notify';
+import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
 import { usePurpose } from '@/lib/purpose';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
@@ -234,12 +234,19 @@ export default function SettingsScreen() {
   const [remHour, setRemHour] = useState(21);
   const [notifWeekly, setNotifWeekly] = useState(false);
   const [notifGap, setNotifGap] = useState(false);
+  // 気づきの通知（§8）: 既定ON。記録リマインダーが smart のときだけ実際に届く（それ以外はトグルを薄く見せる）
+  const [notifInsight, setNotifInsight] = useState(true);
   const purpose = usePurpose(); // 食間リマインド行はbulk（増量）の人にだけ見せる
   useEffect(() => {
     getDailyReminderPrefs().then((p) => { setRemMode(p.mode); setRemHour(p.hour); }).catch(() => {});
     AsyncStorage.getItem('bl-notif-weekly').then((v) => setNotifWeekly(v === '1')).catch(() => {});
     AsyncStorage.getItem('bl-notif-gap').then((v) => setNotifGap(v === '1')).catch(() => {});
+    getInsightNotifyEnabled().then(setNotifInsight).catch(() => {});
   }, []);
+  function toggleInsight(on: boolean) {
+    setNotifInsight(on);
+    setInsightNotifyEnabled(on).catch(() => {});
+  }
   async function changeReminder(mode: DailyReminderMode, hour: number) {
     setRemMode(mode); setRemHour(hour);
     const ok = await setDailyReminderPrefs(mode, hour);
@@ -604,6 +611,19 @@ export default function SettingsScreen() {
           {remMode !== 'off' && (
             <Text style={[s.notifSub, { marginTop: 8 }]}>{t('通知をタップするとそのまま入力できます。「今日は聞かないで」を押した日も静かになります。')}</Text>
           )}
+        </View>
+        {/* 気づきの通知（§8）: あなたの法則の条件がそろった朝に1件だけ。smart 以外のモードでは届かないので薄く見せる */}
+        <View style={s.sep} />
+        <View style={[s.notifRow, remMode !== 'smart' && { opacity: 0.5 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.notifLabel}>{t('気づきの通知')}</Text>
+            <Text style={s.notifSub}>
+              {remMode === 'smart'
+                ? t('あなたの法則から「食べすぎが起きやすい条件」がそろった朝に、1件だけお知らせします。')
+                : t('記録リマインダーが「記録がない日だけ」のときに届きます。')}
+            </Text>
+          </View>
+          <Switch value={notifInsight} onValueChange={toggleInsight} trackColor={{ true: C.teal }} />
         </View>
         {/* 食間リマインドは増量（bulk）の人にだけ意味がある行なので、それ以外には見せない */}
         {purpose === 'bulk' && (
