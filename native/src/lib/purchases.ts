@@ -8,6 +8,19 @@ import { supabase } from '@/lib/supabase';
 export type Plan = 'free' | 'lite' | 'standard' | 'premium';
 const RANK: Record<string, number> = { lite: 1, standard: 2, premium: 3 };
 
+/** プランの強さ（free/null/未知=0 < lite < standard < premium） */
+export function planRank(plan: string | null | undefined): number {
+  return plan ? (RANK[plan] ?? 0) : 0;
+}
+
+/**
+ * 2つのプラン判定のうち強い方を返す（gate.ts が「サーバーのplan」と「端末のRC entitlement」を
+ * 併せるときに使う）。同格なら a を優先（サーバー値を正本として残す）。
+ */
+export function higherPlan(a: string | null, b: string | null): string | null {
+  return planRank(b) > planRank(a) ? b : a;
+}
+
 // プラットフォームごとにキーを選ぶ。Androidキーは未発行（2026-08-29時点）なので
 // Androidでは空文字 → purchasesAvailable()がfalse → 課金UIが一切出ない（安全側）。
 // iOSは従来どおり EXPO_PUBLIC_RC_IOS_KEY のみを見る＝挙動不変。

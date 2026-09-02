@@ -23,6 +23,7 @@ import HeaderGear from '@/components/HeaderGear';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
+import AdSlot from '@/components/AdSlot';
 import ColumnReader from '@/components/ColumnReader';
 import { featuredQuestions } from '@/content/askExamples';
 import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '@/lib/coachAction';
@@ -308,6 +309,8 @@ export default function CoachScreen() {
             contentContainerStyle={s.welcomeScroll}
             keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}>
+            {/* 広告枠（相談タブ・1枠）: 会話が無いときはウェルカムの最上部。入力欄からは最も遠い位置 */}
+            <AdSlot placement="coach" compact />
             <View style={s.welcomeWrap} ref={welcomeTarget} collapsable={false}
                   onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
               <View style={{ marginBottom: 14 }}><AiCoachLogo size={72} /></View>
@@ -337,6 +340,9 @@ export default function CoachScreen() {
           /* ===== 会話タイムライン ===== */
           <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
                       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            {/* 広告枠（相談タブ・1枠）: 会話リストの最上部。入力ドックの近くには置かない（誤タップ防止）。
+                新しい返答で scrollToEnd すると一緒に上へ流れる＝会話を邪魔しない */}
+            <AdSlot placement="coach" compact />
             {msgs.map((m, i) => (
               <View key={i}>
                 <View style={[s.bubble, m.role === 'user' ? s.bUser : s.bAi]}>
