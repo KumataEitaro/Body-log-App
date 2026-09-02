@@ -9,11 +9,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, type DailyReminderMode } from '@/lib/notify';
 import { usePurpose } from '@/lib/purpose';
-import { SegmentedControl, OptionButton, Chip } from '@/components/ui/Selectable';
-import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
+import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, Dumbbell, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import FeedbackSheet from '@/components/FeedbackSheet';
@@ -45,13 +44,13 @@ import { DietDisclaimerPanel, DietConsentCheck, dietModeLabel, dietModeSub } fro
 const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const });
 import { mifflinBMR } from '@/lib/calc';
 import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
-import { WEEK_GOAL_KEY, unseenBadgeCount } from '@/lib/achievements';
+import { unseenBadgeCount } from '@/lib/achievements';
 import { shareInvite } from '@/lib/invite';
 import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 
 type MyFoodLite = { id: string; name: string; kcal: number };
-type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goalW' | 'goalT' | 'columns' | 'diet';
+type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goal' | 'columns' | 'diet';
 
 // 記録のCSVエクスポート（データは本人のもの、を形にする）
 function ExportRow() {
@@ -137,7 +136,7 @@ export default function SettingsScreen() {
   const guide = useGuide();
   const gate = useGate();
 
-  // 相談タブ等からのディープリンク（/settings?open=goalW）で目的のシートを直接開く
+  // 相談タブ等からのディープリンク（/settings?open=goal）で目的のシートを直接開く
   const { open, ts } = useLocalSearchParams<{ open?: string; ts?: string }>();
   const consumedOpen = useRef<string | null>(null);
   useEffect(() => {
@@ -145,7 +144,9 @@ export default function SettingsScreen() {
     if (!open || consumedOpen.current === stamp) return;
     consumedOpen.current = stamp;
     // 'diet' は警告行の「詳しく」リンクからの遷移先（免責の全文が読める場所）
-    if (open === 'goalW' || open === 'goalT' || open === 'profile' || open === 'theme' || open === 'diet') openSheet(open);
+    // 'goalW' / 'goalT' は統合前の旧リンク。どちらも統合目標画面へ向ける（古い通知・相談履歴から来ても迷子にしない）
+    if (open === 'goal' || open === 'goalW' || open === 'goalT') openSheet('goal');
+    else if (open === 'profile' || open === 'theme' || open === 'diet') openSheet(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ts]);
 
@@ -197,33 +198,7 @@ export default function SettingsScreen() {
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
 
-  // 記録の週目標（ソフト週目標）。既定は「毎日」=現行と同じ意味なので、
-  // 何もしない人の体験は一切変わらない。値は実績ページのバッジ判定と共有する
-  const [weekGoal, setWeekGoal] = useState<'7' | '5' | '4' | '3'>('7');
-  useEffect(() => {
-    AsyncStorage.getItem(WEEK_GOAL_KEY).then((v) => {
-      if (v === '7' || v === '5' || v === '4' || v === '3') setWeekGoal(v);
-    }).catch(() => {});
-  }, []);
-  function changeWeekGoal(v: '7' | '5' | '4' | '3') {
-    setWeekGoal(v);
-    AsyncStorage.setItem(WEEK_GOAL_KEY, v).catch(() => {});
-  }
-
-  // 歩数の週目標（B-15）。日1万歩と違い、1日サボっても翌日に取り返せる
-  // 「週で帳尻が合えばOK」のゆるい自己契約（記録の週目標=B-13と同じ優しさ設計）。既定はオフ
-  const [stepsGoal, setStepsGoal] = useState<number>(0);   // 0=オフ
-  useEffect(() => {
-    AsyncStorage.getItem(WEEK_STEPS_GOAL_KEY).then((v) => {
-      const n = Number(v);
-      if ([35000, 50000, 70000].includes(n)) setStepsGoal(n);
-    }).catch(() => {});
-  }, []);
-  function changeStepsGoal(n: number) {
-    setStepsGoal(n);
-    if (n > 0) AsyncStorage.setItem(WEEK_STEPS_GOAL_KEY, String(n)).catch(() => {});
-    else AsyncStorage.removeItem(WEEK_STEPS_GOAL_KEY).catch(() => {});
-  }
+  // 記録の週目標・歩数の週目標は統合目標画面（GoalPanel hub → HabitGoals）へ移設した
 
   // アクティブカロリーを目標に反映するか（既定OFF）。
   // 表示（運動タブの実測kcal）は常に出すが、目標=「あと食べられる量」を増やすかは本人の判断。
@@ -541,40 +516,11 @@ export default function SettingsScreen() {
              onPress={() => openSheet('diet')} />
       </View>
 
-      {/* 目標 */}
+      {/* 目標: 体重・赤字・運動・習慣・食べられる量・PFCを1つの画面に統合（旧4行を1行へ） */}
       <Text style={s.groupLabel}>{t('目標')}</Text>
       <View style={s.group}>
-        <Row icon={<Target color={C.teal} size={ICON.xl} />} label={t('体重の目標')} sub={t('目標日・目標体重・PFC詳細')} onPress={() => openSheet('goalW')} />
-        <View style={s.sep} />
-        <Row icon={<Dumbbell color={C.teal} size={ICON.xl} />} label={t('運動の目標')} sub={t('週の運動習慣・種目ごとの目標重量（RM換算）')} onPress={() => openSheet('goalT')} />
-        <View style={s.sep} />
-        {/* ソフト週目標: 「毎日」を強いない自己契約。達成の表示は実績ページの「今週」ブロック */}
-        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={s.notifLabel}>{t('記録の週目標')}</Text>
-          <Text style={[s.notifSub, { marginBottom: 10 }]}>{t('毎日じゃなくていい。自分で決めたペースを守れたら、それは成功です。')}</Text>
-          <SegmentedControl
-            options={[
-              { key: '7', label: t('毎日') },
-              { key: '5', label: t('週5日') },
-              { key: '4', label: t('週4日') },
-              { key: '3', label: t('週3日') },
-            ]}
-            value={weekGoal} onChange={changeWeekGoal}
-          />
-        </View>
-        <View style={s.sep} />
-        {/* 歩数の週目標（B-15）: 日目標にしない理由はchangeStepsGoal上のコメント参照 */}
-        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
-          <Text style={s.notifLabel}>{t('歩数の週目標')}</Text>
-          <Text style={[s.notifSub, { marginBottom: 10 }]}>{t('1日サボっても、週のなかで取り返せばOK。運動タブと概要に進捗バーが出ます。')}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            <Chip label={t('オフ')} tone="ink" selected={stepsGoal === 0} onPress={() => changeStepsGoal(0)} />
-            {[35000, 50000, 70000].map((n) => (
-              <Chip key={n} label={t('{n}歩', { n: n.toLocaleString() })} tone="ink"
-                    selected={stepsGoal === n} onPress={() => changeStepsGoal(n)} />
-            ))}
-          </View>
-        </View>
+        <Row icon={<Target color={C.teal} size={ICON.xl} />} label={t('目標')}
+             sub={t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC')} onPress={() => openSheet('goal')} />
       </View>
 
       {/* 見た目（テーマカラー・PFCの色） */}
@@ -1090,23 +1036,14 @@ export default function SettingsScreen() {
       </View>
     </Modal>
 
-    {/* ===== 体重目標モーダル ===== */}
-    <Modal visible={sheet === 'goalW'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+    {/* ===== 統合目標モーダル（体重→赤字→運動→習慣→食べられる量→PFC） ===== */}
+    <Modal visible={sheet === 'goal'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<Target size={ICON.lg} color={C.teal} />} title={t("体重の目標")} />
+        <SheetHeader icon={<Target size={ICON.lg} color={C.teal} />} title={t("目標")} />
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          <GoalPanel mode="weight" weightSections="goal" />
+          <GoalPanel mode="hub" weightSections="goal" />
           <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
-
-    {/* ===== 筋トレ目標モーダル ===== */}
-    <Modal visible={sheet === 'goalT'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
-        <SheetHeader icon={<Dumbbell size={ICON.lg} color={C.teal} />} title={t("筋トレの目標")} />
-        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          <GoalPanel mode="training" />
+          <View style={{ height: 30 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>

@@ -140,7 +140,7 @@ export default function LeanBulkCard() {
             <Pressable
               style={s.goalBtn}
               // カロリー目標は目標体重・期日から逆算されるため、緩める操作は目標シートで行う
-              onPress={() => router.push({ pathname: '/settings', params: { open: 'goalW', ts: String(Date.now()) } })}
+              onPress={() => router.push({ pathname: '/settings', params: { open: 'goal', ts: String(Date.now()) } })}
             >
               <Text style={s.goalBtnT}>{t('目標を見直す')}</Text>
               <ChevronRight size={15} color={C.teal} />

@@ -362,7 +362,7 @@ export default function CoachScreen() {
                         </Pressable>
                         {m.action.kind !== 'meal' && (
                           <Pressable style={s.actionAlt}
-                                     onPress={() => router.push({ pathname: '/settings', params: { open: m.action!.kind === 'training' ? 'goalT' : 'goalW', ts: String(Date.now()) } })}>
+                                     onPress={() => router.push({ pathname: '/settings', params: { open: 'goal', ts: String(Date.now()) } })}>
                             <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
                           </Pressable>
                         )}

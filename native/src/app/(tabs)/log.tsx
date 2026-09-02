@@ -78,6 +78,8 @@ import ComebackSheet from '@/components/ComebackSheet';
 import StartChecklist from '@/components/StartChecklist';
 import { invalidateStreak, maybeEvaluateBadges, peekBadgeBanner, consumeBadgeBanner, badgeById } from '@/lib/achievements';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
+import { dailyAllowance, overLevel, balanceOf, balanceFill, type BalanceDay, type Balance } from '@/lib/deficit';
+import { useKcalAdjust } from '@/lib/kcalAdjust';
 import { t } from '@/lib/i18n';
 import { useReduceMotion, useCountUp } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
@@ -90,9 +92,9 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
-const LOG_CARDS = ['hero', 'checklist', 'mood', 'feed', 'recent', 'weight'];
+const LOG_CARDS = ['hero', 'balance', 'checklist', 'mood', 'feed', 'recent', 'weight'];
 const LOG_LABELS = (): Record<string, string> => ({
-  hero: t('あと食べられる量'), checklist: t('スタートチェックリスト'), mood: t('いまの気分は？'),
+  hero: t('あと食べられる量'), balance: t('週と月の収支'), checklist: t('スタートチェックリスト'), mood: t('いまの気分は？'),
   feed: t('今日の記録'), recent: t('前の食事をもう一度'), weight: t('体重を記録'),
 });
 
@@ -107,6 +109,73 @@ function shiftDate(d: string, n: number): string {
   dt.setDate(dt.getDate() + n);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
+
+// ===== 週間・月間の収支カード =====
+// 「この1週間: −3,200kcal（目標 −3,500）」をバー＋数字で。日別の超過/不足は7個のドット
+// （teal=不足 / 灰=ほぼ目標どおり / アンバー=超過 / 枠だけ=未記録）。
+// 数字の物差しは lib/deficit.ts（目標画面の赤字算出と同じ関数）。
+function fmtSigned(n: number): string {
+  return `${n > 0 ? '+' : n < 0 ? '−' : '±'}${Math.abs(n).toLocaleString()}`;
+}
+function BalanceRow({ label, b, isBulk }: { label: string; b: Balance; isBulk: boolean }) {
+  const fill = balanceFill(b);
+  // 目標に届いた（減量なら赤字が目標以上・増量なら黒字が目標以上）ときだけteal。途中は落ち着いたcalorieBar
+  const reached = b.goal !== 0 && fill >= 1;
+  const noGoal = b.goal === 0;
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={bs.row}>
+        <Text style={bs.label}>{label}</Text>
+        <Text style={bs.num} maxFontSizeMultiplier={1.3}>
+          {b.recorded === 0 ? t('記録なし') : `${fmtSigned(b.actual)}kcal`}
+          {!noGoal && <Text style={bs.goal}>（{t('目標')} {fmtSigned(b.goal)}）</Text>}
+          {noGoal && <Text style={bs.goal}>（{isBulk ? t('増量') : t('維持')}）</Text>}
+        </Text>
+      </View>
+      <View style={bs.track}>
+        <View style={[bs.fill, { width: `${Math.round(fill * 100)}%`, backgroundColor: reached ? C.teal : C.calorieBar }]} />
+      </View>
+    </View>
+  );
+}
+function BalanceCard({ days, perDayDeficit, isBulk }: { days: BalanceDay[]; perDayDeficit: number; isBulk: boolean }) {
+  const week = balanceOf(days.slice(-7), perDayDeficit);
+  const month = balanceOf(days.slice(-30), perDayDeficit);
+  return (
+    <View>
+      <Text style={bs.h2}>{t('週と月の収支')}</Text>
+      <BalanceRow label={t('この1週間')} b={week} isBulk={isBulk} />
+      {/* 日別ドット（左=6日前 … 右=今日）。増量ではドットの意味が反転するため色を入れ替える */}
+      <View style={bs.dots}>
+        {week.dots.map((d, i) => {
+          const good = isBulk ? d === 'over' : d === 'under';
+          const bad = isBulk ? d === 'under' : d === 'over';
+          return (
+            <View key={i} style={[bs.dot,
+              d === 'none' ? bs.dotNone : good ? { backgroundColor: C.teal } : bad ? { backgroundColor: C.amber } : { backgroundColor: C.faint }]} />
+          );
+        })}
+        <Text style={bs.dotsLegend}>{t('緑=控えめ・灰=ほぼ目標・橙=多め')}</Text>
+      </View>
+      <BalanceRow label={t('この1か月')} b={month} isBulk={isBulk} />
+      <Text style={bs.principle}>{t('体重は1日ではなく、週と月の合計で決まります。今日多めでも、週で戻せば大丈夫です。')}</Text>
+    </View>
+  );
+}
+const bs = themed(() => ({
+  h2: { ...HEAD.card, color: C.ink },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+  label: { fontSize: 13, fontWeight: '700', color: C.sub },
+  num: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  goal: { fontSize: 12, fontWeight: '600', color: C.sub },
+  track: { height: 6, backgroundColor: C.track, borderRadius: 3, overflow: 'hidden', marginTop: 5 },
+  fill: { height: 6, borderRadius: 3 },
+  dots: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotNone: { borderWidth: 1.5, borderColor: C.line, backgroundColor: 'transparent' },
+  dotsLegend: { fontSize: 11, color: C.faint, marginLeft: 6 },
+  principle: { fontSize: 13, color: C.sub, lineHeight: 19, marginTop: 10 },
+}));
 
 export default function LogScreen() {
   const insets = useSafeAreaInsets();
@@ -312,12 +381,14 @@ export default function LogScreen() {
   // 日常活動を二重に数えてしまう。だから「想定より多く動いた分」に絞る（lib/activeKcal.ts）
   const activeBonus = activeToGoal && activeKcalToday != null
     ? activeKcalGoalBonus(activeKcalToday, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
+  const [kcalAdjust] = useKcalAdjust();
   const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
   const todayEvent = events.find((e) => e.date === today) ?? null;
-  const planIntakeBase = plan ? Math.max(target - plan.requiredDailyWithEvents, Math.round(bmr)) : null;
-  const planIntake = planIntakeBase != null && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
-  const goalKcal = planIntake ?? target;
+  // 1日に食べられる量 = max(維持 − 必要赤字/日 + 手動調整, BMR)。目標画面の「結論」と同じ関数（lib/deficit.ts）。
+  // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する
+  const planIntakeBase = profile ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust) : 0;
+  const goalKcal = plan && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
   const heroLeft = useCountUp(left);   // 保存の瞬間、残量が数え下がって見える
@@ -328,6 +399,12 @@ export default function LogScreen() {
   // 残っていても責め色（coral）にせず「まだやることがある」アンバー、
   // 食べきったら減量の超過赤とは逆の達成表現（teal）にする
   const isBulk = purposeKey === 'bulk';
+  // 超過の3段階: 〜+300「少し多め」/ +300〜+800「多め。週で調整できます」/ +800超「かなり多め」。
+  // ピッタリかマイナスだけを正解に見せない（体重は週・月の収支で決まる）。増量では使わない（反転ロジックは別）
+  const overLv = isBulk ? 'none' : overLevel(-left);
+  const overColor = overLv === 'none' ? null : overLv === 'high' ? C.coral : C.amber;
+  const overBar = overLv === 'high' ? C.coral : overLv === 'mild' ? rgba(C.amber, 0.7) : C.amber;
+  const openGoalHub = () => router.push({ pathname: '/settings', params: { open: 'goal', ts: String(Date.now()) } });
   const macros = profile ? macroTargets(
     weightForBmr, goalKcal,
     goal?.protein_per_kg ?? purposePreset?.p,
@@ -820,6 +897,41 @@ export default function LogScreen() {
     }
   }
 
+  // ===== 週間・月間の収支（ヒーロー直下のカード） =====
+  // 過去29日の日次サマリー（entries）＋今日はlogsの生値。維持kcalは当日の運動を含め、
+  // 目標kcalは目標画面と同じ dailyAllowance（維持 − 赤字 + 調整）で日ごとに出す
+  const [pastRows, setPastRows] = useState<{ date: string; intake: number | null; ex: string | null; adj: number | null }[]>([]);
+  useEffect(() => {
+    if (!profile) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('entries').select('date,intake,ex,adj')
+          .gte('date', shiftDate(today, -29)).lt('date', today)
+          .order('date', { ascending: true });
+        if (alive && data) setPastRows(data as typeof pastRows);
+      } catch { /* ベストエフォート（カードは記録なし表示のまま） */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, today, dayLogs.length]);
+  const balanceDays: BalanceDay[] = useMemo(() => {
+    if (!profile) return [];
+    const base = Math.round(bmr * Number(profile.life_factor));
+    const req = plan ? plan.requiredDaily : 0;
+    const byDate = new Map(pastRows.map((r) => [r.date, r]));
+    const out: BalanceDay[] = [];
+    for (let i = 29; i >= 1; i--) {
+      const d = shiftDate(today, -i);
+      const r = byDate.get(d);
+      const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) : 0);
+      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust) });
+    }
+    out.push({ date: today, intake: summary.intake == null ? null : Math.round(summary.intake), maintenance: target, allowance: goalKcal });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, pastRows, bmr, plan?.requiredDaily, kcalAdjust, today, summary.intake, target, goalKcal]);
+
   // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
   const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
   // 今日のひとこと帯（データ由来・採点なし・その日は×で閉じられる）
@@ -1173,22 +1285,29 @@ export default function LogScreen() {
               {isBulk
                 // 増量: 残量はタスク（あと食べる）、使い切りは達成。減量の「オーバー赤」を出さない
                 ? (left > 0 ? t('増量ノルマ・あと食べる') : t('今日のぶんは食べきった 🎉'))
-                : (left < 0 ? t('オーバー') : t('あと食べられる'))}
+                : overLv === 'none' ? t('あと食べられる')
+                : overLv === 'mild' ? t('少し多め')
+                : overLv === 'mid' ? t('多め。週で調整できます')
+                : t('かなり多め')}
               {plan ? t('（計画）') : t('（維持）')}
             </Text>
             {/* ヒーローの大数字は文字サイズ拡大で崩れやすいため上限1.3（本文系は制限しない） */}
-            <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : left < 0 && { color: C.coral }]}
+            <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : overColor != null && { color: overColor }]}
                   maxFontSizeMultiplier={1.3}>
               {Math.abs(heroLeft).toLocaleString()}<Text style={s.heroU}> kcal</Text>
             </Text>
             <View style={[s.hline, { flexDirection: 'row' }]}>
-              <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: isBulk ? C.teal : C.coral }]} />
+              <View style={[s.hfill, { width: `${previewFill(eaten, 0, goalKcal).basePct}%` }, left < 0 && { backgroundColor: isBulk ? C.teal : overBar }]} />
               <GhostPair eaten={eaten} others={split('kcal').others} focus={split('kcal').focus}
                          target={goalKcal} color={C.calorieBar} pulse={pulse} />
             </View>
             <View style={s.heroMeta}>
               <Text style={s.metaT}>{t('摂取')} {eaten.toLocaleString()}</Text>
-              <Text style={s.metaT}>{t('目標')} {goalKcal.toLocaleString()}</Text>
+              {/* 目標の数字から統合目標画面へ直行（P/F/Cバーのタップと同じ導線）。小さく「目標を調整 ›」で発見性を担保 */}
+              <Pressable onPress={openGoalHub} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.metaT}>{t('目標')} <Text style={s.metaGoalN}>{goalKcal.toLocaleString()}</Text></Text>
+                <Text style={s.metaAdjust}>{t('目標を調整')} ›</Text>
+              </Pressable>
             </View>
             {/* 目標を黙って増やさない: アクティブ反映ONで上乗せが起きた日だけ内訳を1行出す。
                 「なぜ今日は多いのか」が分からない増加はアプリへの信頼を削る */}
@@ -1214,7 +1333,7 @@ export default function LogScreen() {
                   const scale = total > 100 ? 100 / total : 1;  // 超過時は全体を100%に収める
                   return (
                     <Pressable key={ab} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                               onPress={() => router.push({ pathname: '/settings', params: { open: 'goalW', ts: String(Date.now()) } })}>
+                               onPress={openGoalHub}>
                       <Text style={s.pfcL} numberOfLines={1}>{t(ja)}<Text style={s.pfcAb}> {ab}</Text></Text>
                       <View style={[s.pfcBar, { flexDirection: 'row' }]}>
                         {segs.length > 0 && segs.length <= 5 ? segs.map((w, i) => (
@@ -1248,6 +1367,15 @@ export default function LogScreen() {
                 </View>
               </View>
             )}
+          </Animated.View>
+        )}
+
+        {/* 週間・月間の収支カード: 「体重は1日ではなく週と月の合計で決まる」を数字で見せる。
+            目標の週間赤字は目標画面の算出値（computePlan.requiredDaily）と同じ物差し */}
+        {vis('balance') && profile && (
+          <Animated.View style={[s.card, enter[1]]}>
+            <MinusBadge editing={editing} onPress={() => cards.hide('balance')} />
+            <BalanceCard days={balanceDays} perDayDeficit={plan ? plan.requiredDaily : 0} isBulk={isBulk} />
           </Animated.View>
         )}
 
@@ -1893,6 +2021,9 @@ const s = themed(() => ({
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
+  // 目標の数字はタップできることが分かるよう濃く・下線。「目標を調整 ›」はアクセント色の小さな導線
+  metaGoalN: { fontWeight: '800', color: C.ink, textDecorationLine: 'underline' },
+  metaAdjust: { fontSize: 12, fontWeight: '800', color: C.teal },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   h2sub: { fontWeight: '400', color: C.sub },

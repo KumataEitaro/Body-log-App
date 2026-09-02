@@ -118,7 +118,7 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
 
   // 未完了行のタップ→該当機能へ誘導（既存の遷移手段だけを使う）
   const go: Record<CheckId, () => void> = {
-    profile: () => router.push({ pathname: '/settings', params: { open: missingProfile.current ? 'profile' : 'goalW', ts: String(Date.now()) } }),
+    profile: () => router.push({ pathname: '/settings', params: { open: missingProfile.current ? 'profile' : 'goal', ts: String(Date.now()) } }),
     meal: onFocusInput,
     photo: onTakePhoto,
     weight: onFocusWeight,

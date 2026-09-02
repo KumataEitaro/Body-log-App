@@ -1,5 +1,7 @@
 // 目標サマリーカード（概要タブ用）: 現状のひとことサマリーを表示し、
-// タップするとpageSheetの詳細入力画面（GoalPanel）が開く
+// タップするとpageSheetの詳細入力画面（GoalPanel）が開く。
+// 体重の目標は統合目標画面（hub: 体重→赤字→運動→習慣→食べられる量→PFC→チートデイ）、
+// 筋トレの目標はその一部（運動の目標だけ）を開く
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import { Target, Dumbbell, ChevronRight, X } from 'lucide-react-native';
@@ -54,7 +56,7 @@ export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' 
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
             {mode === 'weight'
-              ? <GoalPanel mode="weight" weightSections="all" />
+              ? <GoalPanel mode="hub" weightSections="all" />
               : <GoalPanel mode="training" />}
             <View style={{ height: 30 }} />
           </ScrollView>

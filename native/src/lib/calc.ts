@@ -15,7 +15,9 @@ export const EX_ADD: Record<ExLevel, number> = {
 };
 
 export const LIFE_FACTOR_DEFAULT = 1.3;
-export const FAT_KCAL_PER_KG = 7700;
+// 体脂肪1kg ≒ 7,200kcal（国内で広く使われる値）。目標画面の赤字算出（lib/deficit.ts）と
+// 計画計算（lib/goal.ts computePlan）が同じ物差しになるよう、ここ1か所で持つ
+export const FAT_KCAL_PER_KG = 7200;
 export const WEEKLY_STD = -3500; // 週の標準進捗（-500/日）
 export const AI_DAILY_LIMIT = 15; // AI解析の1人1日あたり回数
 // 全ユーザー合計の1日上限（課金の安全弁＝これ以上は誰が使っても止まる。1日の最大コストを固定する本当の天井）
