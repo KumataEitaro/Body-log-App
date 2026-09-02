@@ -36,7 +36,8 @@ import BingeTriggerCard from '@/components/BingeTriggerCard';
 import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
-import { Table2 } from 'lucide-react-native';
+import { Table2, Share2 } from 'lucide-react-native';
+import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
@@ -287,6 +288,8 @@ export default function ChangesScreen() {
   const [bodyTableOpen, setBodyTableOpen] = useState(false);
   const [liftTableOpen, setLiftTableOpen] = useState(false);
   const [tableMetric, setTableMetric] = useState<'weight' | 'waist' | 'bodyfat'>('weight');
+  // 体重変化グラフの共有ステッカー（体の記録の詳細ページ右上の共有アイコンから）
+  const [sticker, setSticker] = useState<StickerData | null>(null);
 
   // グラフやKPIから「数字の一覧」へ飛ぶ
   function openBodyTable(metric: 'weight' | 'waist' | 'bodyfat' = 'weight') {
@@ -1023,6 +1026,15 @@ export default function ChangesScreen() {
   }
   // 体重のミニスパークライン（kpi/chart行に添える。直近30日）
   const sparkVals = wRows.slice(-30).map((r) => Number(r.weight));
+  // 体重変化グラフのステッカー: 期間はグラフの期間チップに追従（30日 / 90日。「全」は90日に丸める）。
+  // 増量目的（bulk）のときは「増えた」が良い方向＝色づけを反転する（ShareSticker.weightDelta）
+  const stickerDays = range === 30 ? 30 : 90;
+  const stickerPoints = wRows.filter((r) => r.date >= addDays(today, -stickerDays)).map((r) => ({ date: r.date, kg: Number(r.weight) }));
+  function openWeightSticker() {
+    if (stickerPoints.length < 2) return;
+    Haptics.selectionAsync().catch(() => {});
+    setSticker({ kind: 'weight', points: stickerPoints, days: stickerDays, bulk: purpose === 'bulk' });
+  }
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
     detailTx.value = 0;   // 前回スワイプ途中の位置が残らないようにする
@@ -1216,7 +1228,16 @@ export default function ChangesScreen() {
                   <ChevronLeft size={ICON.xl} color={C.teal} />
                   <Text style={s.backT}>{t('概要')}</Text>
                 </Pressable>
-                <Text style={s.detailTitle}>{CARD_LABELS()[detailKey] ?? ''}</Text>
+                {/* 見出し行。体の記録だけ右上に共有アイコン（体重変化グラフの透過ステッカー。体重が2点以上あるとき） */}
+                <View style={s.detailTitleRow}>
+                  <Text style={[s.detailTitle, { flex: 1, marginBottom: 0 }]}>{CARD_LABELS()[detailKey] ?? ''}</Text>
+                  {detailKey === 'body' && stickerPoints.length >= 2 && (
+                    <Pressable onPress={openWeightSticker} hitSlop={10} style={s.detailShare}
+                               accessibilityRole="button" accessibilityLabel={t('体重の変化をストーリーに共有')}>
+                      <Share2 size={ICON.md} color={C.teal} />
+                    </Pressable>
+                  )}
+                </View>
                 {detailHeader(detailKey)}
                 <ErrorBoundary>{card(detailKey)}</ErrorBoundary>
               </Animated.View>
@@ -1231,6 +1252,7 @@ export default function ChangesScreen() {
       />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
+      <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
       <StatusBarMask />
       <HeaderGear guideKey="gear" />
     </View>
@@ -1359,6 +1381,9 @@ const s = themed(() => ({
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 2 },
   backT: { fontSize: 15, fontWeight: '800', color: C.accentInk },
   detailTitle: { fontSize: 24, fontWeight: '900', color: C.ink, marginBottom: 12 },
+  // 見出し＋右上の共有アイコン（体の記録）。アイコンは丸い薄いアクセント面（toTable と同じトーン）
+  detailTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  detailShare: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   // 詳細ページのヘルスケア式ヘッダー（大きな現在値＋トレンド文章）
   detailHead: { marginTop: -6, marginBottom: 14 },
   detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },

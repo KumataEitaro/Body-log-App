@@ -14,8 +14,7 @@
 //  ・本文は長文のため t() を通さず { ja, en } の多言語オブジェクト（remoteContent の L10n と同じ流儀）。
 //    英語は要点のみでよい。他言語は ja → en にフォールバック（pickL10n）
 //  ・キーは evidenceKey（'kind' または 'kind:variant'）。未登録キーは FALLBACK_ARTICLE（準備中）に落ちる。
-//    並行セッションが増やす新しい LawKind は、docs/INSIGHTS-ENGINE.md §3 末尾の表の evidenceKey で
-//    ここに記事を追記する（E1c）
+//    エンジン系9種（docs/INSIGHTS-ENGINE.md §3.1 の evidenceKey）は E1c で追記済み。以後の新 LawKind も同じ手順
 //  ・リモートの laws_text（lib/remoteContent）が同じ id に article を持てば **節ごとに上書き** する
 import { getRemoteContent, pickL10n, type L10n, type RemoteLawArticle } from '@/lib/remoteContent';
 
@@ -182,6 +181,135 @@ const MHLW_DRI_2025: EvidenceSource = {
   title: '日本人の食事摂取基準（2025年版）',
   journal: '厚生労働省「日本人の食事摂取基準」策定検討会報告書', year: 2024,
   url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/kenkou/eiyou/syokuji_kijyun.html',
+};
+
+// ----- E1c（エンジン系9種）で追加した出典。NCBI E-utilities（esummary）で PMID・著者・誌名・年を照合し、
+//       DOI / mhlw の URL は HTTP 200 を確認（2026-09-02） -----
+const NEDELTCHEVA_2009: EvidenceSource = {
+  authors: 'Nedeltcheva AV, Kilkus JM, Imperial J, Kasza K, Schoeller DA, Penev PD',
+  title: 'Sleep curtailment is accompanied by increased intake of calories from snacks',
+  journal: 'Am J Clin Nutr. 89(1):126-133', year: 2009,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/19056602/',
+};
+const MACHT_2008: EvidenceSource = {
+  authors: 'Macht M',
+  title: 'How emotions affect eating: a five-way model',
+  journal: 'Appetite. 50(1):1-11', year: 2008,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/17707947/',
+};
+const STEIN_2007: EvidenceSource = {
+  authors: 'Stein RI, Kenardy J, Wiseman CV, Dounchis JZ, Arnow BA, Wilfley DE',
+  title: "What's driving the binge in binge eating disorder?: A prospective examination of precursors and consequences",
+  journal: 'Int J Eat Disord. 40(3):195-203', year: 2007,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/17103418/',
+};
+const GANGWISCH_2015: EvidenceSource = {
+  authors: 'Gangwisch JE, Hale L, Garcia L, et al.',
+  title: "High glycemic index diet as a risk factor for depression: analyses from the Women's Health Initiative",
+  journal: 'Am J Clin Nutr. 102(2):454-463', year: 2015,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/26109579/',
+};
+const MANTANTZIS_2019: EvidenceSource = {
+  authors: 'Mantantzis K, Schlaghecken F, Sünram-Lea SI, Maylor EA',
+  title: 'Sugar rush or sugar crash? A meta-analysis of carbohydrate effects on mood',
+  journal: 'Neurosci Biobehav Rev. 101:45-67', year: 2019,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/30951762/',
+};
+const BREYMEYER_2016: EvidenceSource = {
+  authors: 'Breymeyer KL, Lampe JW, McGregor BA, Neuhouser ML',
+  title: 'Subjective mood and energy levels of healthy weight and overweight/obese healthy adults on high- and low-glycemic load experimental diets',
+  journal: 'Appetite. 107:253-259', year: 2016,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/27507131/',
+};
+const ZHENG_2012: EvidenceSource = {
+  authors: 'Zheng J, Huang T, Yu Y, Hu X, Yang B, Li D',
+  title: 'Fish consumption and CHD mortality: an updated meta-analysis of seventeen cohort studies',
+  journal: 'Public Health Nutr. 15(4):725-737', year: 2012,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/21914258/',
+};
+const HU_2019: EvidenceSource = {
+  authors: 'Hu Y, Hu FB, Manson JE',
+  title: 'Marine Omega-3 Supplementation and Cardiovascular Disease: An Updated Meta-Analysis of 13 Randomized Controlled Trials Involving 127 477 Participants',
+  journal: 'J Am Heart Assoc. 8(19):e013543', year: 2019,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/31567003/',
+};
+const GROSSO_2016: EvidenceSource = {
+  authors: 'Grosso G, Micek A, Marventano S, et al.',
+  title: 'Dietary n-3 PUFA, fish consumption and depression: A systematic review and meta-analysis of observational studies',
+  journal: 'J Affect Disord. 205:269-281', year: 2016,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/27544316/',
+};
+const MHLW_MERCURY: EvidenceSource = {
+  authors: '厚生労働省',
+  title: '魚介類に含まれる水銀について（妊婦への魚介類の摂食と水銀に関する注意事項）',
+  journal: '厚生労働省 医薬・生活衛生局 食品安全部', year: 2010,
+  url: 'https://www.mhlw.go.jp/topics/bukyoku/iyaku/syoku-anzen/suigin/',
+};
+const CHOI_2004: EvidenceSource = {
+  authors: 'Choi HK, Atkinson K, Karlson EW, Willett W, Curhan G',
+  title: 'Purine-rich foods, dairy and protein intake, and the risk of gout in men',
+  journal: 'N Engl J Med. 350(11):1093-1103', year: 2004,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/15014182/',
+};
+const JSGNU_2020: EvidenceSource = {
+  authors: 'Hisatome I, Ichida K, Mineo I, et al.（日本痛風・尿酸核酸学会 ガイドライン改訂委員会）',
+  title: 'Japanese Society of Gout and Uric & Nucleic Acids 2019 Guidelines for Management of Hyperuricemia and Gout 3rd edition（高尿酸血症・痛風の治療ガイドライン 第3版・英訳）',
+  journal: 'Gout and Uric & Nucleic Acids. 44(Suppl):sp-1-sp-40', year: 2020,
+  url: 'https://doi.org/10.14867/gnamtsunyo.44.Supplement_sp-1',
+};
+const EHEALTHNET_URIC: EvidenceSource = {
+  authors: '山岸良匡（厚生労働省 e-ヘルスネット）',
+  title: '高尿酸血症（生活習慣病などの情報）',
+  journal: '厚生労働省 e-ヘルスネット', year: 2024,
+  url: 'https://kennet.mhlw.go.jp/information/information/metabolic/m-05-007.html',
+};
+const KNOWLES_2018: EvidenceSource = {
+  authors: 'Knowles OE, Drinkwater EJ, Urwin CS, Lamon S, Aisbett B',
+  title: 'Inadequate sleep and muscle strength: Implications for resistance training',
+  journal: 'J Sci Med Sport. 21(9):959-968', year: 2018,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/29422383/',
+};
+const CRAVEN_2022: EvidenceSource = {
+  authors: 'Craven J, McCartney D, Desbrow B, et al.',
+  title: 'Effects of Acute Sleep Loss on Physical Performance: A Systematic and Meta-Analytical Review',
+  journal: 'Sports Med. 52(11):2669-2690', year: 2022,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/35708888/',
+};
+const MORTON_2018: EvidenceSource = {
+  authors: 'Morton RW, Murphy KT, McKellar SR, et al.',
+  title: 'A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength in healthy adults',
+  journal: 'Br J Sports Med. 52(6):376-384', year: 2018,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/28698222/',
+};
+const SCHOENFELD_2017: EvidenceSource = {
+  authors: 'Schoenfeld BJ, Ogborn D, Krieger JW',
+  title: 'Dose-response relationship between weekly resistance training volume and increases in muscle mass: A systematic review and meta-analysis',
+  journal: 'J Sports Sci. 35(11):1073-1082', year: 2017,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/27433992/',
+};
+const SCHOENFELD_ARAGON_2018: EvidenceSource = {
+  authors: 'Schoenfeld BJ, Aragon AA',
+  title: 'How much protein can the body use in a single meal for muscle-building? Implications for daily protein distribution',
+  journal: 'J Int Soc Sports Nutr. 15:10', year: 2018,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/29497353/',
+};
+const GORDON_2018: EvidenceSource = {
+  authors: 'Gordon BR, McDowell CP, Hallgren M, Meyer JD, Lyons M, Herring MP',
+  title: 'Association of Efficacy of Resistance Exercise Training With Depressive Symptoms: Meta-analysis and Meta-regression Analysis of Randomized Clinical Trials',
+  journal: 'JAMA Psychiatry. 75(6):566-576', year: 2018,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/29800984/',
+};
+const GORDON_2017: EvidenceSource = {
+  authors: 'Gordon BR, McDowell CP, Lyons M, Herring MP',
+  title: 'The Effects of Resistance Exercise Training on Anxiety: A Meta-Analysis and Meta-Regression Analysis of Randomized Controlled Trials',
+  journal: 'Sports Med. 47(12):2521-2532', year: 2017,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/28819746/',
+};
+const SCHUCH_2016: EvidenceSource = {
+  authors: 'Schuch FB, Vancampfort D, Richards J, Rosenbaum S, Ward PB, Stubbs B',
+  title: 'Exercise as a treatment for depression: A meta-analysis adjusting for publication bias',
+  journal: 'J Psychiatr Res. 77:42-51', year: 2016,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/26978184/',
 };
 
 // ===== 共通の注意（⑥）。すべての記事の末尾に出す =====
@@ -518,6 +646,354 @@ const SLEEP_FACTOR: LawArticle = {
   sources: [IAO_2021, CRISPIM_2011, ST_ONGE_2016, VUJOVIC_2022, AL_KHATIB_2017, MHLW_SLEEP_2023],
 };
 
+// ===== インサイト・エンジン系9種（E1c・docs/INSIGHTS-ENGINE.md §3.1） =====
+
+const SLEEP_DEBT_BINGE: LawArticle = {
+  meaning: {
+    ja: '睡眠の不足は一晩ぶんではなく「積み重なり」で効いてきます。5日間で合計5時間足りない状態（たとえば毎晩6時間）は、本人にはもう慣れて感じにくいのに、空腹のホルモンと食べものへの欲求は静かに強まっています。\nこの法則は、あなたの記録で「睡眠負債が5時間たまった日から翌日にかけて、食べすぎが普段の何倍起きているか」を数えたものです。食べすぎの前に、眠れていない日々があった。それが見えたということです。',
+    en: 'Sleep loss works by accumulation. Five hours short over five nights (say, six hours a night) no longer feels unusual, yet hunger hormones and food cravings quietly rise. This pattern counts how many times more often overeating happened on and after days when your sleep debt reached five hours. The overeating was preceded by nights of too little sleep, and now you can see it.',
+  },
+  science: [
+    {
+      text: { ja: '健康な若い男性の睡眠を2晩4時間に制限すると、満腹ホルモンのレプチンが18%減り、空腹ホルモンのグレリンが28%増え、空腹感と食欲（とくに高炭水化物・高カロリーの食品への）が強まりました。',
+      en: 'Two nights of 4-hour sleep in healthy young men lowered leptin by 18%, raised ghrelin by 28% and increased hunger and appetite, particularly for calorie-dense, high-carbohydrate foods.' },
+      refs: [SPIEGEL_2004],
+    },
+    {
+      text: { ja: '睡眠を5.5時間に制限した2週間は、8.5時間の2週間と比べて、食事の量は変わらないのに間食からのカロリーが1日あたり平均220kcal増えました。増えたのは主に夜の間食で、炭水化物の多いものでした。「たまった不足」が食べ方を変える様子を示した研究です。',
+      en: 'Two weeks of 5.5-hour sleep, compared with 8.5 hours, left meal intake unchanged but added about 220 kcal/day from snacks, mostly carbohydrate-rich snacks in the evening: accumulated sleep loss changes how we eat.' },
+      refs: [NEDELTCHEVA_2009],
+    },
+    {
+      text: { ja: '一晩の断眠のあとの脳画像では、食べものの選択を担う前頭葉の活動が下がり、報酬に反応する深部の領域が高カロリー食品に強く反応していました。判断より欲求が前に出る状態です。',
+      en: 'After one night without sleep, brain imaging showed reduced activity in frontal regions that govern food choice and stronger responses to high-calorie foods in deep reward regions: craving gets ahead of judgement.' },
+      refs: [GREER_2013],
+    },
+    {
+      text: { ja: '17研究のメタ分析では、部分的な睡眠不足の翌日は摂取エネルギーが平均385kcal増える一方、消費エネルギーは増えていませんでした。厚生労働省の睡眠ガイドは成人に6時間以上の睡眠を目安として勧めています。',
+      en: 'A meta-analysis of 17 studies found partial sleep loss adds about 385 kcal the next day with no rise in expenditure. Japan\'s sleep guideline recommends adults get at least 6 hours.' },
+      refs: [AL_KHATIB_2017, MHLW_SLEEP_2023],
+    },
+  ],
+  actions: [
+    { ja: '睡眠負債が5時間に近づいた日は「食べすぎが起きやすい日」と先に決めて、朝食にたんぱく質を入れ、夜の間食を小分けにしておく。', en: 'When sleep debt nears five hours, treat it as a high-risk day in advance: put protein in breakfast and portion evening snacks ahead of time.' },
+    { ja: '取り戻すのは一晩でなくていい。就寝を30分だけ早める日を2〜3日続けると、負債の数字は動きます。', en: 'You do not need to catch up in one night. Going to bed 30 minutes earlier for two or three nights moves the number.' },
+    { ja: '寝る前のスマホと飲酒を減らす。どちらも眠りを浅くし、翌日の負債を大きくします。', en: 'Cut screens and alcohol before bed; both lighten sleep and grow tomorrow\'s debt.' },
+  ],
+  seeDoctor: {
+    ja: '十分な時間寝ても眠気が抜けない、大きないびきや呼吸の止まりを指摘される、寝つけない・眠りが浅い状態が週3回以上・3か月以上続く、といった場合は睡眠の専門医に相談してください。',
+    en: 'If you stay sleepy after enough time in bed, are told you snore loudly or stop breathing, or have trouble falling or staying asleep 3+ nights a week for 3+ months, see a sleep specialist.',
+  },
+  sources: [SPIEGEL_2004, NEDELTCHEVA_2009, GREER_2013, AL_KHATIB_2017, MHLW_SLEEP_2023],
+};
+
+const MOOD_LAG_BINGE: LawArticle = {
+  meaning: {
+    ja: '気分と食べ方はつながっています。ただし同じ日だけでなく、少し遅れて効くことがあります。気分が3日つづけて落ちたあと、あなたの記録では数日後に食べすぎが起きやすくなっていました。\n落ち込んだ日にそのまま食べすぎるのではなく、「疲れがたまってから」反動が来る。この時間差を知っていると、気分が落ち始めた時点で先回りできます。',
+    en: 'Mood and eating are linked, and the link can run with a delay. In your log, after three consecutive days of low mood, overeating became more likely a few days later. The rebound arrives after the strain builds, not on the low day itself. Knowing the lag lets you act as soon as your mood starts to slip.',
+  },
+  science: [
+    {
+      text: { ja: '日常生活の中で気分を繰り返し記録した36研究（968人）のメタ分析では、過食の直前は普段より否定的な気分が高いことが示されています（効果量0.63）。気分の落ち込みは食べすぎの最も一貫した先行要因の一つです。',
+      en: 'A meta-analysis of 36 ecological momentary assessment studies (n=968) found negative affect is elevated before binge episodes (effect size 0.63); low mood is one of the most consistent precursors of overeating.' },
+      refs: [HAEDT_MATT_2011],
+    },
+    {
+      text: { ja: '過食性障害のある女性33人が携帯端末で気分と食事を記録した研究では、過食の数時間前から気分が下がり始め、空腹感も高まっていました。「前触れ」は当日の朝にはすでに始まっています。',
+      en: 'In 33 women with binge eating disorder logging mood and meals on handheld devices, mood began to decline hours before a binge and hunger rose: the warning starts well before the episode.' },
+      refs: [STEIN_2007],
+    },
+    {
+      text: { ja: '感情が食べ方に影響する経路を整理した総説では、否定的な感情は人によって「食欲を抑える」方向にも「気分をなだめるために食べる」方向にも働くとされています。どちらに出るかは、あなたの記録が教えてくれます。',
+      en: 'A review of how emotions shape eating notes that negative emotions can either suppress appetite or drive eating to regulate mood, depending on the person; your own log shows which way you lean.' },
+      refs: [MACHT_2008],
+    },
+    {
+      text: { ja: '慢性的なストレスはコルチゾールと報酬系を介して、高カロリーで嗜好性の高い食べものの摂取を増やす方向に働きます。気分の低下が数日続くことは、この経路に火をつけやすい状態です。',
+      en: 'Chronic stress, via cortisol and the reward system, pushes intake toward palatable high-calorie foods; several days of low mood is a state that readily lights this pathway.' },
+      refs: [ADAM_EPEL_2007],
+    },
+  ],
+  actions: [
+    { ja: '気分が2日つづけて落ちたら、その時点で「数日後に食べすぎが来やすい」と見て、たんぱく質と食物繊維のある食事を先に組む。', en: 'After two low-mood days in a row, expect a rebound a few days out and plan protein- and fiber-rich meals in advance.' },
+    { ja: '気分が落ちている間は赤字を小さくする。我慢が重なると、反動も大きくなります。', en: 'Keep the deficit small while your mood is low; stacked restraint means a bigger rebound.' },
+    { ja: '10分の散歩や誰かとの短い会話など、食べもの以外で気分を少し上げる手を1つ決めておく。', en: 'Pick one non-food mood lifter, a 10-minute walk or a short chat, and keep it ready.' },
+  ],
+  seeDoctor: {
+    ja: '気分の落ち込みが2週間以上ほぼ毎日続く、眠れない・楽しめない・自分を責める気持ちが強い、あるいはコントロールできない食べすぎが週1回以上・数か月続いている、といった場合は、こころや摂食に関する専門の相談が役に立ちます。医療機関や相談窓口に話してみてください。',
+    en: 'If low mood lasts most days for two weeks or more, with poor sleep, loss of enjoyment or strong self-blame, or if loss-of-control eating happens weekly for months, talk to a clinician or a helpline for mental health or eating concerns.',
+  },
+  sources: [HAEDT_MATT_2011, STEIN_2007, MACHT_2008, ADAM_EPEL_2007],
+};
+
+const WHEAT_VS_RICE_MOOD: LawArticle = {
+  meaning: {
+    ja: '「小麦中心の日」と「米中心の日」で、翌朝の気分に差が出ていました。これは小麦や米そのものの善悪ではありません。パン・麺・菓子パンなどの小麦中心の食事は、砂糖や脂質、加工度の高い食品、遅い時間の食事と一緒に来やすく、白米中心の食事は主菜・汁物・野菜と一緒に来やすい、といった「食事全体の形」の違いが気分に映っている可能性があります。\n逆向き（米中心の日のほうが低い）の人もいます。主食は入り口で、見るべきなのはその日の食事の中身と生活のリズムです。',
+    en: 'Your next-morning mood differed between wheat-centred and rice-centred days. This is not about wheat or rice being good or bad. Wheat-centred meals (bread, noodles, pastries) often arrive with sugar, fat, highly processed foods and late timing; rice-centred meals often come with a main dish, soup and vegetables. The pattern may reflect the shape of the whole day\'s eating. Some people see the reverse direction. The staple is the entry point; what matters is what the day\'s meals contained.',
+  },
+  science: [
+    {
+      text: { ja: '閉経後の女性約7万人を3年追った研究では、食事全体のグリセミック指数（GI）が高い人ほど、その後にうつ症状が新たに出る割合が高く、精製された穀物や添加糖の摂取が多いこととも関連していました。一方、食物繊維・野菜・果物・全粒穀物が多いことは低いリスクと関連していました。',
+      en: 'Among about 70,000 postmenopausal women followed for three years, a higher dietary glycemic index and higher intake of refined grains and added sugars were associated with new depressive symptoms, while fiber, vegetables, fruit and whole grains were associated with lower risk.' },
+      refs: [GANGWISCH_2015],
+    },
+    {
+      text: { ja: '過体重・肥満を含む健康な成人80人が「高GL食」と「低GL食」を28日ずつ食べ比べた無作為化クロスオーバー試験では、高GL食のときに抑うつ症状の得点が高く、疲労感も強くなっていました。同じカロリーでも、炭水化物の質で気分が変わりうることを示しています。',
+      en: 'In a randomized crossover trial in which 80 healthy adults (including overweight/obese) ate high- and low-glycemic-load diets for 28 days each, depressive symptom scores and fatigue were higher on the high-GL diet at matched calories.' },
+      refs: [BREYMEYER_2016],
+    },
+    {
+      text: { ja: '31研究のメタ分析では、炭水化物をとることで気分が良くなる効果は認められず、摂取後30〜60分の注意力の低下と疲労感の増加が見られました。「甘いもので元気になる」実感は、研究の平均では支持されていません。',
+      en: 'A meta-analysis of 31 studies found no mood-lifting effect of carbohydrate intake, but lower alertness and more fatigue within 30-60 minutes: the "sugar rush" is not supported on average.' },
+      refs: [MANTANTZIS_2019],
+    },
+    {
+      text: { ja: '厚生労働省「日本人の食事摂取基準（2025年版）」は、炭水化物のエネルギー比率とともに食物繊維の目標量を示しています。主食を「何にするか」より「精製度・食物繊維・一緒に食べるもの」に目を向ける根拠になります。',
+      en: 'Japan\'s Dietary Reference Intakes (2025) set targets for carbohydrate share and dietary fiber, supporting a focus on refinement, fiber and accompaniments rather than on which staple you choose.' },
+      refs: [MHLW_DRI_2025],
+    },
+  ],
+  actions: [
+    { ja: '「気分が低いほうの主食」の日を1つ選んで、その日の食事に何が一緒に来ていたか（甘いもの・脂っこいもの・時間）を記録で見返す。', en: 'Pick one "low-mood staple" day and look back at what came with it: sweets, fatty foods, timing.' },
+    { ja: '主食を変えるのではなく、たんぱく質と野菜を先に足す。同じパンでも卵とサラダが横にあれば、食事の形が変わります。', en: 'Rather than swapping the staple, add protein and vegetables first. The same bread with eggs and a salad beside it is a different meal.' },
+    { ja: '全粒粉パン・玄米・雑穀など、精製度の低い主食を週に数回だけ混ぜてみて、翌朝の気分を記録で比べる。', en: 'Mix in less-refined staples (whole-grain bread, brown rice, mixed grains) a few times a week and compare next-morning mood in your log.' },
+  ],
+  seeDoctor: {
+    ja: '小麦を食べたあとに腹痛・下痢・じんましん・息苦しさなどの体の症状が繰り返し出る場合は、気分の問題とは別に、セリアック病や小麦アレルギーなどの評価が必要なことがあります。自己判断で除去する前に医療機関に相談してください。',
+    en: 'If eating wheat is repeatedly followed by physical symptoms such as abdominal pain, diarrhea, hives or breathlessness, this is a separate matter from mood and may need evaluation for celiac disease or wheat allergy. See a doctor before cutting wheat on your own.',
+  },
+  caution: {
+    ja: '気分の差は主食そのものではなく、一緒に食べたもの・時間・その日の出来事の影響を受けます。診断なしに小麦（グルテン）を完全に除去することの利益は示されておらず、栄養の偏りを招くことがあります。',
+    en: 'The mood difference reflects accompaniments, timing and the day\'s events, not the staple alone. Completely removing wheat (gluten) without a diagnosis has no shown benefit and can unbalance nutrition.',
+  },
+  sources: [GANGWISCH_2015, BREYMEYER_2016, MANTANTZIS_2019, MHLW_DRI_2025],
+};
+
+const SALMON_MASTER: LawArticle = {
+  meaning: {
+    ja: 'サーモンをよく食べているのは、良い習慣です。魚、とくに脂の多い魚に含まれるオメガ3系脂肪酸（EPA・DHA）は、心臓や血管の健康と関連づけて研究されてきた栄養素で、たんぱく質の質も高い食材です。\nこの法則は「もっと食べよう」でも「減らそう」でもなく、あなたが自然に身につけている良い流れを見せたものです。ひとつ加えるなら、魚の種類を少し広げると栄養の幅も広がります。',
+    en: 'Eating salmon regularly is a good habit. Oily fish provide omega-3 fatty acids (EPA and DHA), long studied in relation to heart and vascular health, and high-quality protein. This pattern is neither "eat more" nor "eat less"; it shows a good rhythm you already have. If anything, widening the range of fish widens the range of nutrients.',
+  },
+  science: [
+    {
+      text: { ja: '17のコホート研究（約31万人）のメタ分析では、魚をほとんど食べない人と比べて、週1回以上魚を食べる人の冠動脈疾患による死亡は約15〜20%低く、1日15gの摂取増ごとに約6%低いという用量反応が見られました。',
+      en: 'A meta-analysis of 17 cohort studies (about 310,000 people) found coronary heart disease mortality roughly 15-20% lower in people eating fish at least once a week than in those who rarely ate fish, with about 6% lower risk per additional 15 g/day.' },
+      refs: [ZHENG_2012],
+    },
+    {
+      text: { ja: '13の無作為化比較試験（約12.7万人）のメタ分析では、海産オメガ3の補給は心筋梗塞と冠動脈疾患死亡のリスクをわずかに下げ、用量が多いほど効果が大きい傾向が見られました。効果は控えめで、サプリより食事からの摂取が基本です。',
+      en: 'A meta-analysis of 13 randomized trials (about 127,000 people) found marine omega-3 supplementation modestly lowered risk of myocardial infarction and coronary death, with larger effects at higher doses. The effect is modest, and food remains the first source.' },
+      refs: [HU_2019],
+    },
+    {
+      text: { ja: '観察研究のメタ分析では、魚やオメガ3の摂取が多い人ほどうつ病のリスクが低い関連が報告されています。因果までは示されていませんが、魚を食べる習慣が気分と無関係でないことを示す手がかりです。',
+      en: 'A meta-analysis of observational studies reported lower depression risk with higher fish and omega-3 intake. Causation is not established, but it suggests fish habits are not unrelated to mood.' },
+      refs: [GROSSO_2016],
+    },
+    {
+      text: { ja: '厚生労働省「日本人の食事摂取基準（2025年版）」はn-3系脂肪酸の目安量を年齢・性別ごとに示しています。また同省は、魚に含まれる水銀について、種類による差と妊婦向けの摂取の目安を公表しています。サーモンは水銀の少ない魚に含まれますが、種類を偏らせないことが最も安全な食べ方です。',
+      en: 'Japan\'s Dietary Reference Intakes (2025) set adequate intakes for n-3 fatty acids, and the ministry publishes guidance on mercury in fish by species, mainly for pregnancy. Salmon is among the lower-mercury fish; varying species is the safest approach.' },
+      refs: [MHLW_DRI_2025, MHLW_MERCURY],
+    },
+  ],
+  actions: [
+    { ja: '今の流れを続ける。週2回前後の魚は、多くのガイドラインが目安にしている量です。', en: 'Keep the rhythm. Around two fish meals a week is what many guidelines suggest.' },
+    { ja: '月に数回、サバ・イワシ・アジ・サンマなど別の青魚に置き換えてみる（缶詰でも十分）。', en: 'A few times a month, swap in another oily fish such as mackerel, sardine, horse mackerel or saury (canned is fine).' },
+    { ja: '調理法を記録で見返す。焼き・蒸し・刺身が中心なら、揚げ物やクリーム系ソースの日と翌朝の体重を比べてみる。', en: 'Review how it is cooked. If grilled, steamed or raw dominate, compare next-morning weight against fried or creamy-sauce days.' },
+  ],
+  sources: [ZHENG_2012, HU_2019, GROSSO_2016, MHLW_DRI_2025, MHLW_MERCURY],
+};
+
+const CHICKEN_HEAVY: LawArticle = {
+  meaning: {
+    ja: '鶏肉は脂質が少なく、たんぱく質の質も高い、減量や筋トレの強い味方です。この法則が言っているのは「鶏肉が悪い」ではなく、「この30日はたんぱく源が鶏肉に寄っていて、魚が少ない」ということです。\n同じたんぱく質でも、魚にはオメガ3、卵にはビタミンやミネラル、大豆には食物繊維と、食材ごとに一緒に入ってくるものが違います。偏りは栄養の幅を狭めます。また肉類にはプリン体が中程度含まれるため、量が多いときに知っておきたい一般情報を下に書きました（診断ではありません）。',
+    en: 'Chicken is lean, high-quality protein and a strong ally for fat loss and training. This pattern does not say chicken is bad; it says your protein sources leaned heavily on chicken over the last 30 days with little fish. Different protein foods bring different companions: omega-3 in fish, vitamins and minerals in eggs, fiber in soy. Leaning on one narrows the range. Meats also contain moderate purines, so general information for high intakes follows (this is not a diagnosis).',
+  },
+  science: [
+    {
+      text: { ja: '男性約4.7万人を12年追った研究では、肉の摂取が最も多い群は最も少ない群と比べて痛風の発症リスクが1.41倍、魚介類では1.51倍でした。一方、低脂肪の乳製品は発症リスクの低さと関連し、たんぱく質の総量そのものは痛風と関連していませんでした。問題は「たんぱく質の量」ではなく「何から取るかの偏り」です。',
+      en: 'In about 47,000 men followed for 12 years, the highest meat intake was associated with 1.41 times the risk of gout versus the lowest, and seafood with 1.51 times; low-fat dairy was associated with lower risk, and total protein was not associated with gout. The issue is not protein quantity but where it comes from.' },
+      refs: [CHOI_2004],
+    },
+    {
+      text: { ja: '日本痛風・尿酸核酸学会のガイドライン（第3版）は、高尿酸血症・痛風の生活指導として、プリン体の摂取を1日400mg程度までに抑えること、適正体重の維持、アルコールと果糖を含む甘い飲料を控えること、十分な水分摂取を挙げています。肉・魚の多くは100gあたり100〜200mg程度（中程度）のプリン体を含む群にあたります。',
+      en: 'The Japanese Society of Gout and Uric & Nucleic Acids guideline (3rd edition) advises limiting purine intake to about 400 mg/day, maintaining a healthy weight, moderating alcohol and fructose-sweetened drinks, and drinking enough water. Most meats and fish fall in the moderate group of roughly 100-200 mg purine per 100 g.' },
+      refs: [JSGNU_2020],
+    },
+    {
+      text: { ja: '厚生労働省 e-ヘルスネットは、血液中の尿酸値が7.0mg/dLを超える状態を高尿酸血症と説明し、プリン体の多い食品（白子・レバー・干物など）を控え、野菜・果物・豆類・全粒穀物をバランスよく取ること、アルコール全般を減らすことを勧めています。健康診断の尿酸値は、この法則と合わせて見る価値のある数字です。',
+      en: 'Japan\'s e-Health Net (MHLW) describes hyperuricemia as blood uric acid above 7.0 mg/dL and advises limiting purine-rich foods (fish roe, liver, dried fish), eating vegetables, fruit, beans and whole grains in balance, and reducing alcohol. Your check-up uric acid value is worth reading alongside this pattern.' },
+      refs: [EHEALTHNET_URIC],
+    },
+    {
+      text: { ja: '厚生労働省「日本人の食事摂取基準（2025年版）」は、たんぱく質の推奨量に加えてn-3系脂肪酸などの目安量を示しています。魚・卵・大豆を混ぜることは、これらをまとめて満たす近道です。',
+      en: 'Japan\'s Dietary Reference Intakes (2025) set recommended protein and adequate n-3 fatty acid intakes; mixing fish, eggs and soy is a shortcut to meeting them together.' },
+      refs: [MHLW_DRI_2025],
+    },
+  ],
+  actions: [
+    { ja: '週の鶏肉のうち2回を魚に、1回を卵か大豆（豆腐・納豆）に置き換える。量は変えなくていい。', en: 'Swap two chicken meals a week for fish and one for eggs or soy (tofu, natto). Keep the amount the same.' },
+    { ja: '健康診断の結果があれば「尿酸値」を見てみる。7.0mg/dLを超えていたら、この法則は医師に見せる価値があります。', en: 'If you have check-up results, look at uric acid. Above 7.0 mg/dL, this pattern is worth showing your doctor.' },
+    { ja: '水分をこまめに取り、ビールや甘い飲み物は控えめに。肉の量よりこちらのほうが尿酸には効きます。', en: 'Drink water regularly and go easy on beer and sugary drinks; these matter more for uric acid than the amount of meat.' },
+  ],
+  seeDoctor: {
+    ja: '健康診断で尿酸値が7.0mg/dLを超えている、足の親指のつけ根・足首・膝などが突然赤く腫れて強く痛む、腎臓の病気や尿路結石の経験がある、といった場合は医療機関に相談してください。この記事は一般情報で、あなたの尿酸値や病気の有無を判定するものではありません。',
+    en: 'See a doctor if a check-up showed uric acid above 7.0 mg/dL, if a joint such as the base of the big toe, ankle or knee suddenly becomes red, swollen and very painful, or if you have a history of kidney disease or kidney stones. This article is general information and does not assess your uric acid or diagnose any condition.',
+  },
+  caution: {
+    ja: '鶏肉の量だけで尿酸値や痛風のリスクは決まりません。体質・体重・アルコール・水分・腎機能など多くの要因が関わります。鶏肉を急にやめる必要はなく、たんぱく源を「混ぜる」ことが目的です。',
+    en: 'Chicken intake alone does not determine uric acid or gout risk; constitution, weight, alcohol, hydration and kidney function all play a part. There is no need to stop eating chicken; the goal is to mix your protein sources.',
+  },
+  sources: [CHOI_2004, JSGNU_2020, EHEALTHNET_URIC, MHLW_DRI_2025],
+};
+
+const LIFT_SLEEP: LawArticle = {
+  meaning: {
+    ja: 'トレーニングの手応えは、前の晩にすでに半分決まっています。7時間以上眠れた日のあなたのトレは、そうでない日と比べてボリューム（重量×回数の合計）が違っていました。\n多い方向なら、睡眠が力と集中を支えている素直な形です。少ない方向の人は、よく眠れた日が「休み明けの軽い日」や「オフ日の翌日」に重なっているなど、生活のリズムが映っている可能性があります。どちらでも、睡眠とトレの記録を並べて見る価値があります。',
+    en: 'How a workout feels is half decided the night before. On days after 7+ hours of sleep, your training volume (total weight x reps) differed from other days. If it was higher, sleep is plainly supporting strength and focus. If lower, well-slept days may coincide with light sessions or the day after a rest day; the pattern may reflect your weekly rhythm. Either way, sleep and training are worth reading side by side.',
+  },
+  science: [
+    {
+      text: { ja: '睡眠不足と筋力に関する研究の体系的レビューでは、睡眠が不十分なあとは筋力、とくに複数の関節を使う大きな種目（スクワット・デッドリフト・ベンチプレスなど）の出力が落ちることが示されています。単関節種目より、全身を使う種目ほど影響を受けやすいと整理されています。',
+      en: 'A systematic review on inadequate sleep and muscle strength found reduced force output after poor sleep, particularly in multi-joint compound lifts (squat, deadlift, bench press), which were more affected than single-joint exercises.' },
+      refs: [KNOWLES_2018],
+    },
+    {
+      text: { ja: '急性の睡眠不足が運動パフォーマンスに与える影響を集めたメタ分析では、睡眠の不足量が大きいほど、また測定が夕方以降になるほど、パフォーマンスの低下が大きくなっていました。「寝不足の日の夕方のトレ」が最も影響を受けやすい条件です。',
+      en: 'A meta-analysis of acute sleep loss and physical performance found larger declines with greater sleep loss and when testing occurred later in the day: an evening session after a short night is the most vulnerable setting.' },
+      refs: [CRAVEN_2022],
+    },
+    {
+      text: { ja: '厚生労働省「健康づくりのための睡眠ガイド2023」は、成人に6時間以上の睡眠を目安として勧め、日中の運動が睡眠の質を高めることにも触れています。睡眠とトレは、どちらかがどちらかの土台というより、互いを支え合う関係です。',
+      en: 'Japan\'s sleep guideline (2023) recommends adults get at least 6 hours and notes that daytime exercise improves sleep quality: sleep and training support each other.' },
+      refs: [MHLW_SLEEP_2023],
+    },
+  ],
+  actions: [
+    { ja: '重い日（スクワット・デッドリフトなど）を、よく眠れる見込みの日の翌日に置く。軽い日や有酸素は寝不足でもこなせる。', en: 'Schedule heavy days (squat, deadlift) after nights you expect to sleep well; light days and cardio tolerate a short night.' },
+    { ja: '寝不足の日は無理にボリュームを追わず、重量を10%落として動きの質を守る。翌週に取り戻せます。', en: 'On short-sleep days, drop the load by about 10% and protect movement quality instead of chasing volume. You can make it up next week.' },
+    { ja: 'トレの日は就寝時刻を先に決める。運動の日ほど、眠りが回復に直結します。', en: 'Set your bedtime first on training days; on those days sleep converts directly into recovery.' },
+  ],
+  sources: [KNOWLES_2018, CRAVEN_2022, MHLW_SLEEP_2023],
+};
+
+const LIFT_PROTEIN_PR: LawArticle = {
+  meaning: {
+    ja: 'たんぱく質が目標に届いた週は、あなたの自己ベスト更新が起きやすくなっていました。筋肉は「トレで壊れて、栄養と休養で作り直される」ので、材料が足りている週ほど、前回より少し強い自分に会いやすいのは自然な流れです。\nこの法則は「たんぱく質を増やせば記録が伸びる」という約束ではなく、「材料が揃っている週は、伸びるチャンスの週」という読み方が正確です。',
+    en: 'In weeks when you met your protein target, personal bests came more often. Muscle is broken down in training and rebuilt with nutrition and rest, so weeks with enough building material are naturally when you meet a slightly stronger self. Read this not as "more protein guarantees records" but as "a week with the materials in place is a week of opportunity".',
+  },
+  science: [
+    {
+      text: { ja: '49の無作為化比較試験（1,863人）のメタ分析では、筋トレにたんぱく質の補給を加えると、除脂肪量が平均0.30kg、1RM筋力が平均2.49kg多く増えました。総摂取量が体重1kgあたり約1.6g/日を超えると、それ以上の上乗せはほぼ見られませんでした。',
+      en: 'A meta-analysis of 49 randomized trials (1,863 people) found adding protein to resistance training increased fat-free mass by about 0.30 kg and 1RM strength by about 2.49 kg, with little further benefit above roughly 1.6 g/kg/day total intake.' },
+      refs: [MORTON_2018],
+    },
+    {
+      text: { ja: '1食で筋肉づくりに使えるたんぱく質の量を検討した総説では、体重1kgあたり約0.4gを1日4食程度に分けて取る配分が、筋肥大を最大化する上で妥当と提案されています（体重70kgなら1食約28g）。',
+      en: 'A review of how much protein a single meal can use for muscle building proposed about 0.4 g/kg per meal across roughly four meals a day as a sensible distribution for maximizing hypertrophy (about 28 g per meal at 70 kg).' },
+      refs: [SCHOENFELD_ARAGON_2018],
+    },
+    {
+      text: { ja: '週あたりのトレーニング量と筋肥大の関係を調べたメタ分析では、1部位あたり週10セット以上で筋肥大が大きくなる用量反応が見られました。たんぱく質は材料、ボリュームは刺激で、どちらも揃った週が伸びる週です。',
+      en: 'A meta-analysis of weekly training volume and hypertrophy found a dose-response, with greater growth at 10+ sets per muscle group per week. Protein is the material and volume the stimulus; weeks with both are the weeks that grow.' },
+      refs: [SCHOENFELD_2017],
+    },
+    {
+      text: { ja: '厚生労働省「日本人の食事摂取基準（2025年版）」は成人のたんぱく質の推奨量を示しています。筋トレをする人の目標（体重1kgあたり1.6〜2.0g程度）はこれより多めに設定されることが一般的で、アプリの目標もその範囲で計算しています。',
+      en: 'Japan\'s Dietary Reference Intakes (2025) give recommended protein intakes for adults; targets for people who train (around 1.6-2.0 g/kg) are commonly set higher, and the app\'s target is computed in that range.' },
+      refs: [MHLW_DRI_2025],
+    },
+  ],
+  actions: [
+    { ja: '毎食に「手のひら1枚ぶん」のたんぱく源を置く（肉・魚・卵・大豆のどれか）。1食25〜30gの目安になる。', en: 'Put a palm-sized protein source (meat, fish, eggs or soy) on every meal; that is roughly 25-30 g per meal.' },
+    { ja: '重い種目を狙う週の前半に、たんぱく質を先に整える。記録更新は「揃った週」の後半に来やすい。', en: 'Get protein in order early in a week when you plan a heavy attempt; records tend to land in the second half of a week with the materials in place.' },
+    { ja: '届かなかった週も落ち込まない。ボリュームと睡眠も含めて、揃った週にまた挑めばいい。', en: 'Do not dwell on a week that fell short. With volume and sleep also in place, try again in a week when everything lines up.' },
+  ],
+  sources: [MORTON_2018, SCHOENFELD_ARAGON_2018, SCHOENFELD_2017, MHLW_DRI_2025],
+};
+
+const LIFT_MOOD: LawArticle = {
+  meaning: {
+    ja: 'トレをした日の気分が、しなかった日と違っていました。高い方向なら、運動が気分を持ち上げる効果をあなたの記録が示しているということです。多くの研究で筋トレは抑うつや不安の症状を和らげることが報告されていて、あなたの体はそれを実際にやっています。\n低い方向の人は、疲労がたまっている・トレの日ほど忙しい・追い込みすぎ、といった背景が考えられます。トレそのものが悪いのではなく、量や置き方を見直す合図です。',
+    en: 'Your mood on training days differed from non-training days. If it was higher, your own log shows exercise lifting your mood, in line with many studies reporting that resistance training eases depressive and anxiety symptoms. If it was lower, fatigue, busier days or pushing too hard may be behind it: not a sign that training is bad, but a cue to review its amount and placement.',
+  },
+  science: [
+    {
+      text: { ja: '33の無作為化比較試験（1,877人）のメタ分析では、筋力トレーニングは抑うつ症状を有意に軽くしていました（効果量0.66）。効果は健康状態やトレーニングの量、筋力の向上度合いに左右されにくく、幅広い人に見られました。',
+      en: 'A meta-analysis of 33 randomized trials (1,877 people) found resistance training significantly reduced depressive symptoms (effect size 0.66), regardless of health status, training volume or strength gains.' },
+      refs: [GORDON_2018],
+    },
+    {
+      text: { ja: '同じグループによる16試験（922人）のメタ分析では、筋力トレーニングは不安の症状も小〜中程度軽くしていました（効果量0.31）。健康な人でより大きい効果が見られています。',
+      en: 'A meta-analysis of 16 trials (922 people) by the same group found resistance training also reduced anxiety symptoms by a small-to-moderate amount (effect size 0.31), with larger effects in healthy participants.' },
+      refs: [GORDON_2017],
+    },
+    {
+      text: { ja: '25の無作為化比較試験を対象に、出版バイアスを補正したうえで運動のうつ病への効果を推定したメタ分析では、補正後も大きな効果が残っていました。運動は「気分に効く」と言える数少ない生活習慣の一つです。',
+      en: 'A meta-analysis of 25 randomized trials that adjusted for publication bias still found a large effect of exercise on depression; exercise is one of the few lifestyle factors that can be said to work on mood.' },
+      refs: [SCHUCH_2016],
+    },
+  ],
+  actions: [
+    { ja: '気分が落ちそうな日ほど、短くてもいいからトレを入れる（20分・2種目で十分）。', en: 'On days your mood is likely to dip, train even briefly; 20 minutes and two exercises is enough.' },
+    { ja: 'トレの日の気分が低い人は、セット数を2割減らして1週間試し、気分の記録を比べる。', en: 'If your mood is lower on training days, cut sets by about 20% for a week and compare your mood log.' },
+    { ja: 'トレ後の気分をひとこと記録する。「効いた日」の共通点（時間帯・種目・睡眠）が見えてきます。', en: 'Log one word about your mood after training. Common threads of the days it "worked" (time, exercises, sleep) will emerge.' },
+  ],
+  seeDoctor: {
+    ja: '気分の落ち込みが2週間以上ほぼ毎日続く、眠れない・楽しめない・自分を責める気持ちが強い、日常生活に支障が出ている、といった場合は、運動だけで抱え込まず、こころの専門の相談窓口や医療機関に話してください。',
+    en: 'If low mood lasts most days for two weeks or more, with poor sleep, loss of enjoyment, strong self-blame or difficulty with daily life, do not carry it with exercise alone; talk to a mental health service or clinician.',
+  },
+  sources: [GORDON_2018, GORDON_2017, SCHUCH_2016],
+};
+
+const MULTI_BINGE: LawArticle = {
+  meaning: {
+    ja: '食べすぎは、たいてい一つの原因では起きません。寝不足だけ、気分の低下だけ、週末だけなら乗り越えられる日でも、それが重なった日は難しくなる。この法則は、あなたの記録の中で「そろうと食べすぎが起きやすくなる条件の組み合わせ」をエンジンが見つけたものです。\n条件は朝の時点で分かるものだけを使っています。つまり、その日の朝に「今日は条件がそろっている」と気づける。気づければ、先回りできます。',
+    en: 'Overeating rarely has a single cause. Short sleep alone, low mood alone or a weekend alone may be manageable, but the day they coincide is harder. This pattern is a combination of conditions that, in your log, raised the odds of overeating when they lined up. Only conditions known by the morning are used, so you can notice on the morning itself that the conditions are in place, and plan ahead.',
+  },
+  science: [
+    {
+      text: { ja: '日常生活の中で気分を繰り返し記録した36研究のメタ分析では、過食の直前は普段より否定的な気分が高いことが示されています。過食性障害のある女性を追った研究でも、過食の数時間前から気分の低下と空腹感の上昇が始まっていました。前日の気分・当日の朝の状態は、最も一貫した先行要因です。',
+      en: 'A meta-analysis of 36 ecological momentary assessment studies found negative affect elevated before binge episodes, and a prospective study in women with binge eating disorder found mood declining and hunger rising hours beforehand. Mood the day before and on the morning itself is the most consistent precursor.' },
+      refs: [HAEDT_MATT_2011, STEIN_2007],
+    },
+    {
+      text: { ja: '睡眠を4時間に制限した2晩のあと、レプチンは18%減りグレリンは28%増え、空腹感と食欲が強まりました。17研究のメタ分析では、部分的な睡眠不足の翌日は摂取が平均385kcal増える一方、消費は増えていません。睡眠の条件は、他の条件の効果を「底上げ」します。',
+      en: 'Two nights of 4-hour sleep cut leptin by 18% and raised ghrelin by 28% with stronger hunger; a meta-analysis of 17 studies found partial sleep loss adds about 385 kcal the next day. Sleep conditions raise the floor for every other trigger.' },
+      refs: [SPIEGEL_2004, AL_KHATIB_2017],
+    },
+    {
+      text: { ja: '厳しい食事制限は、ルールが崩れた瞬間に抑制が外れて食べすぎに向かいやすいという分析が古典的な論文で示されています。「前日が大きめの赤字」という条件が組み合わせに入るのは、この流れです。',
+      en: 'Strict dieting tends to end in disinhibition and overeating the moment the rule breaks. This is why "a large deficit the day before" appears among the conditions.' },
+      refs: [POLIVY_HERMAN_1985],
+    },
+    {
+      text: { ja: '米国の全国代表調査では、金〜日曜日の摂取エネルギーは平日より多く、脂質とアルコールの割合も上がっていました。曜日は「予定・外食・お酒」の代理変数として、他の条件と重なったときに効きます。',
+      en: 'In a nationally representative US survey, intake on Friday-Sunday exceeded weekdays with a higher share from fat and alcohol. Day of the week stands in for plans, eating out and drinks, and matters most when stacked with other conditions.' },
+      refs: [HAINES_2003],
+    },
+    {
+      text: { ja: '慢性的なストレスはコルチゾールと報酬系を介して、高カロリーで嗜好性の高い食べものへの欲求を高めます。複数の負荷が重なった日は、この経路が最も開きやすい日です。',
+      en: 'Chronic stress, via cortisol and the reward system, heightens desire for palatable high-calorie foods; a day with several strains stacked is when this pathway opens widest.' },
+      refs: [ADAM_EPEL_2007],
+    },
+  ],
+  actions: [
+    { ja: '朝、条件がそろっていると気づいた日は「今日は+200kcal緩める日」と先に決める。小さく認めるほうが、大きく崩れない。', en: 'On a morning when the conditions line up, decide in advance that today allows an extra 200 kcal. A small allowance prevents a big collapse.' },
+    { ja: '条件の中で動かせるもの（睡眠・前日の赤字）を1つだけ選んで、翌週はそれを整える。全部を直す必要はない。', en: 'Pick one condition you can change (sleep, yesterday\'s deficit) and fix only that next week. You do not need to fix everything.' },
+    { ja: 'そろった日も記録を続ける。組み合わせの精度は、そろった日の記録があるほど上がります。', en: 'Keep logging on stacked days too; the combination gets more accurate with every logged day it applies.' },
+  ],
+  seeDoctor: {
+    ja: '食べすぎのあとに強い罪悪感や自己嫌悪が続く、嘔吐や絶食などで埋め合わせをしている、コントロールできない食べすぎが週に1回以上・数か月続いている、といった場合は、摂食に関する専門の相談が役に立つことがあります。医療機関や相談窓口に話してみてください。',
+    en: 'If overeating is followed by lasting guilt, compensating by vomiting or fasting, or loss-of-control episodes happen weekly for months, specialist support for eating concerns can help. Talk to a clinician or a helpline.',
+  },
+  caution: {
+    ja: '組み合わせは「同じ時期に重なりやすい」ことを示すだけで、どの条件が原因かは特定できません。条件の数が多いほど該当する日は少なくなるため、数字は日数が増えると変わることがあります。',
+    en: 'A combination only shows what tends to coincide; it does not identify which condition is the cause. The more conditions, the fewer days qualify, so the number may shift as days accumulate.',
+  },
+  sources: [HAEDT_MATT_2011, STEIN_2007, SPIEGEL_2004, AL_KHATIB_2017, POLIVY_HERMAN_1985, HAINES_2003, ADAM_EPEL_2007],
+};
+
 /** 未登録キーのフォールバック（準備中）。注意と一般的な行動だけを出す */
 export const FALLBACK_ARTICLE: LawArticle = {
   meaning: {
@@ -552,6 +1028,17 @@ export const EVIDENCE: Record<string, LawArticle> = {
   recover: RECOVER,
   comeback: COMEBACK,
   sleep_factor: SLEEP_FACTOR,
+  // インサイト・エンジン系9種（E1c）。向きのある種類（wheat_vs_rice_mood / lift_sleep / lift_mood）は
+  // 1記事で両方向を扱う（sleep_factor と同じ流儀。variant 専用記事は無い）
+  sleep_debt_binge: SLEEP_DEBT_BINGE,
+  mood_lag_binge: MOOD_LAG_BINGE,
+  wheat_vs_rice_mood: WHEAT_VS_RICE_MOOD,
+  salmon_master: SALMON_MASTER,
+  chicken_heavy: CHICKEN_HEAVY,
+  lift_sleep: LIFT_SLEEP,
+  lift_protein_pr: LIFT_PROTEIN_PR,
+  lift_mood: LIFT_MOOD,
+  multi_binge: MULTI_BINGE,
 };
 
 /** kind＋variant → 実際に使う evidenceKey（'kind:variant' が無ければ 'kind'。どちらも無ければ 'kind' を返す＝呼び出し側で準備中判定） */

@@ -845,7 +845,7 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
   「今週の約束は守れました 🎉」の祝いトーン。目標は設定の「記録の週目標」（既定=毎日）
 - ストーリー用ステッカー作成ハブ（**自己ベストのみ**・2026-09-02 feat/law-articles で共有スコープを
   「バッジ・筋トレ実績（PR）・体重変化グラフ」の3種に限定。ストリーク/今日の食事/最新の運動のチップは外した。
-  バッジはバッジ詳細シートと祝祭から共有。体重変化グラフのステッカーは未実装）＋
+  バッジはバッジ詳細シートと祝祭から共有。体重変化グラフは概要「体の記録」詳細ページ右上の共有アイコンから）＋
   「アプリを紹介する」（2026-09-02・feat/invite・無彩色チップ＝ステッカー作成と別種の操作）
 - バッジ30種を4カテゴリ（継続／記録／体重／運動）の見出しで区切ってグリッド表示。
   カテゴリ内は「獲得済み→未獲得」の順（集めた棚が上に来る）。
@@ -957,8 +957,19 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
   Haines 2003・Wing & Phelan 2005・Burke 2011・Byrne 2003・McHill 2017・Garaulet 2013・Vujović 2022・
   Crispim 2011・St-Onge 2016・Iao 2021・厚労省 睡眠ガイド2023・食事摂取基準2025）。「最新の研究では」等の
   煽りは禁止（jestで固定）。本文は長文のため t() を通さず `{ja,en}`（他言語は ja→en フォールバック＝pickL10n）
-- **未登録キーは FALLBACK_ARTICLE（準備中）**: 注意＋一般的な行動3つだけの汎用記事。並行セッション（E1a）が
-  増やす LawKind は INSIGHTS-ENGINE.md §3 末尾の表の evidenceKey で E1c に追記する
+- **エンジン系9種の記事（2026-09-02・feat/law-evidence-2・E1c）**: sleep_debt_binge / mood_lag_binge / wheat_vs_rice_mood /
+  salmon_master / chicken_heavy / lift_sleep / lift_protein_pr / lift_mood / multi_binge を収録（向きのある種類は1記事で両方向）。
+  追加出典（NCBI E-utilities で PMID・著者・誌名・年を照合、DOI/mhlw は HTTP 200 確認）: Nedeltcheva 2009 AJCN・Macht 2008・
+  Stein 2007・Gangwisch 2015 AJCN・Breymeyer 2016・Mantantzis 2019メタ・Zheng 2012メタ・Hu 2019メタ・Grosso 2016メタ・
+  Choi 2004 NEJM・日本痛風・尿酸核酸学会ガイドライン第3版（英訳版DOI・J-STAGE）・厚労省 e-ヘルスネット「高尿酸血症」
+  （kennet.mhlw.go.jp）・厚労省「魚介類に含まれる水銀について」・Knowles 2018・Craven 2022メタ・Morton 2018 BJSMメタ・
+  Schoenfeld 2017メタ・Schoenfeld & Aragon 2018・Gordon 2018 JAMA Psychiatryメタ・Gordon 2017メタ・Schuch 2016メタ。
+  **chicken_heavy** は病名を断定しないが、プリン体（1日400mg目安）・尿酸値7.0mg/dL・受診の目安（健診値超過・関節の急な腫れ）
+  を記事側で正直に書く（法則カードの文言は変えない）。**wheat_vs_rice_mood** は「小麦が悪い」ではなく食事全体の形と説明し、
+  診断なしのグルテン除去を勧めない注意＋消化器症状は別途受診の目安。**law-detail の①「あなたのデータ」**も新9種に対応
+  （倍率・差・g/kg の大数字。chicken_heavy は鶏:魚の帯、multi_binge は条件の箇条書き〔correlate.conditionLabel〕）
+- **未登録キーは FALLBACK_ARTICLE（準備中）**: 注意＋一般的な行動3つだけの汎用記事。以後の新 LawKind は
+  INSIGHTS-ENGINE.md §3.1 の表の evidenceKey で記事を追記する（jest が「LAW_KINDS 全種に同梱記事」を固定）
 - **リモート差し替え**: `remote_content` kind='laws_text' の行に `article`（meaning/science/actions/seeDoctor/
   caution/sources・節ごとの部分上書き・seeDoctor:'' で同梱の目安を消す・出典は https のみ受理）を持たせると
   上書きされる（lib/remoteContent `validateLawArticle`）。未登録 kind でもリモートに記事があれば準備中にならない
@@ -971,9 +982,16 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 
 ## 共有ステッカー（Strava式）
 - 文字・数字・小ロゴだけの背景透過PNG。**2026-09-02（feat/law-articles）に共有スコープを「バッジ・筋トレ実績（PR）・
-  体重変化グラフ」の3種に限定**: 現在の StickerData は PERSONAL BEST（pr）と ACHIEVEMENT UNLOCKED（badge）の2種。
+  体重変化グラフ」の3種に限定**: StickerData は PERSONAL BEST（pr）・ACHIEVEMENT UNLOCKED（badge）・WEIGHT（weight）の3種。
   DISCOVERY〔法則〕は除外（熊田さん「法則をストーリーに乗せる意味はない」→法則は解説記事へ）、
-  DAY STREAK / TODAY / WORKOUT も同時に外した。体重変化グラフのステッカーは未実装（追って kind:'weight'）
+  DAY STREAK / TODAY / WORKOUT も同時に外した
+- **体重変化グラフのステッカー kind:'weight'（2026-09-02・feat/law-evidence-2）**: 「WEIGHT · 30 DAYS」ラベル→体重の
+  ミニ折れ線（軸なし・始点は薄い丸・終点は強調丸）→変化量の大数字「−2.4 kg」→「30日で」。期間は概要「体の記録」詳細の
+  グラフ期間チップに追従（30日 / それ以外は90日）。**導線**: 体の記録の詳細ページ右上の共有アイコン（体重2点以上のとき）
+  → ShareStickerModal。**良い方向だけ強調色**（白トーン=ミント・黒トーン=深緑。写真に載るためテーマ色ではなくトーン固定色）:
+  減量は減った（−）が良い、増量目的（purpose='bulk'）は増えた（+）が良い＝色づけを反転（符号は数学的な向きのまま。
+  `weightDelta()`・jest shareSticker.test.ts）。**実体重（開始・現在値）は既定で載せない**（G7 実数マスクを維持）。
+  モーダルの「開始・現在の体重（実数）も載せる」チェックをONにしたときだけ START → NOW の実数を描く（開くたびにOFFへ戻る）
 - 白/黒2トーン切替＋実プレビュー／クリップボードコピー（IGで長押しペースト）／写真に透過保存
 - 日付ラインとBodyLogerワードマーク刷り込み
 - **アプリ名の署名（2026-09-02・feat/invite）**: ワードマーク（○チェックの小マーク＋「BodyLoger」）を
@@ -1282,9 +1300,10 @@ PFC スウォッチのベリーは超過の赤と同値なので、選ぶと設�
 - **G6 アレルゲン免責**（lib/coachPrompt.ts）: アレルギーの有無を問われたら回答の冒頭で
   「このアプリは原材料や製造ラインの混入を判定できません。表示と店舗への確認をお願いします」
   と伝えてから一般情報を答える
-- **G7 共有ステッカーの実数マスク**: 全ステッカー型（streak/pr/today/workout/badge/law）に
-  体重の実数が載る型は存在しないことを確認済み（pr=挙上重量・today=摂取kcal。
-  減量系バッジも「-3kg」等の増減量表記のみで実体重は載らない）
+- **G7 共有ステッカーの実数マスク**: 全ステッカー型（pr/badge/weight）に
+  体重の実数が**既定で**載る型は存在しない（pr=挙上重量。減量系バッジも「-3kg」等の増減量表記のみ。
+  weight〔体重変化グラフ・2026-09-02〕は変化量「−2.4 kg」と軸なしの折れ線だけ。開始・現在の実数は
+  本人がモーダルのチェックを明示的にONにしたときだけ載り、開くたびにOFFへ戻る）
 - **G8 体重の外れ値確認**（native/src/lib/guard.ts confirmOutlierWeight）: 前回記録から
   ±15%以上ずれる体重を保存する前に「前回から大きく変わっています（{prev}kg → {next}kg）」の
   確認Alert（保存する/入力し直す）。適用経路=クイック体重・トレイ保存（AI解析の体重）・
