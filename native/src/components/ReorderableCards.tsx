@@ -44,10 +44,13 @@ type Props = {
   footer?: ReactNode;             // 並び替え対象の下に置く固定要素（導線カード・注記など。運動タブが使う）
   // ScrollViewへの追加プロパティ（キーボード挙動など）。並び替えに要る onScroll/scrollEnabled/ref は渡せない
   scrollProps?: Pick<ScrollViewProps, 'keyboardShouldPersistTaps' | 'keyboardDismissMode'>;
+  // スクロールしても上端に固定される見出し（日付ストリップなど）。ScrollView の先頭子要素として
+  // stickyHeaderIndices=[0] で固定する。header より上に描かれ、背景色は呼び側が付ける（下を流れるカードを隠すため）
+  stickyHeader?: ReactNode;
 };
 
 export default function ReorderableCards({
-  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide, footer, scrollProps,
+  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide, footer, scrollProps, stickyHeader,
 }: Props) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useSharedValue(0);
@@ -128,7 +131,9 @@ export default function ReorderableCards({
         onMomentumScrollEnd={(e) => { scrollNow.current = e.nativeEvent.contentOffset.y; }}
         onScrollEndDrag={(e) => { scrollNow.current = e.nativeEvent.contentOffset.y; }}
         refreshControl={editing ? undefined : refreshControl}
+        stickyHeaderIndices={stickyHeader ? [0] : undefined}
       >
+        {stickyHeader}
         {header}
         {order.map((k) => (
           <DraggableCard

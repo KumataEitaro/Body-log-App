@@ -64,6 +64,30 @@ describe('1日に食べられる量と手動調整', () => {
     expect(dailyAllowance(2200, 0, 1600)).toBe(2200);          // 目標なし・調整なし＝維持そのまま
   });
 
+  // βFB 2026-09-02「運動を入れたのに消費カロリーを加味した摂取カロリーにならない」の再発防止。
+  // 赤字が大きくてBMR下限に張り付いている日でも、運動を記録すれば当日の目標kcalは必ず増える
+  it('運動を記録すると当日の目標kcalが運動ぶんだけ増える（BMR下限に張り付いた日でも）', () => {
+    const bmr = 1600; const maintenance = 2080; const deficit = 700;   // 2080−700=1380 < BMR → 下限1600
+    const without = dailyAllowance(maintenance, deficit, bmr, 0, 0);
+    expect(without).toBe(1600);
+    // 筋トレ150kcalを記録: 維持は 2230 になり、旧式では 2230−700=1530 <1600 で目標が動かなかった
+    const withEx = dailyAllowance(maintenance + 150, deficit, bmr, 0, 150);
+    expect(withEx).toBe(1750);
+    expect(withEx - without).toBe(150);
+  });
+
+  it('下限に当たっていない日も、運動ぶんは1:1で目標に乗る（従来の式と同じ結果）', () => {
+    expect(dailyAllowance(2200, 500, 1600, 0, 0)).toBe(1700);
+    expect(dailyAllowance(2200 + 300, 500, 1600, 0, 300)).toBe(2000);
+    // exerciseKcal を省略した従来の呼び方は結果が変わらない
+    expect(dailyAllowance(2500, 500, 1600)).toBe(2000);
+  });
+
+  it('運動ぶんが負・非数でも壊れない（0として扱う）', () => {
+    expect(dailyAllowance(2200, 500, 1600, 0, -50)).toBe(1700);
+    expect(dailyAllowance(2200, 500, 1600, 0, NaN)).toBe(1700);
+  });
+
   it('手動調整の幅は±1,000kcalに丸める（整数化・非数は0）', () => {
     expect(clampAdjust(150.4)).toBe(150);
     expect(clampAdjust(5000)).toBe(1000);

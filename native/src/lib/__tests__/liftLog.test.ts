@@ -45,11 +45,19 @@ describe('記録テキストの解析', () => {
     expect(parseLiftText('🏋️ ベンチプレス 80kg×8×3、メモ')).toHaveLength(1);
   });
 
+  it('補助（-20kg）を補助として読む（kgは負・mode=minus）。全角マイナスも読む', () => {
+    expect(parseLiftText('🏋️ 懸垂 -20kg×8×3')[0]).toEqual({
+      name: '懸垂', kg: -20, reps: 8, sets: 3, mode: 'minus',
+    });
+    expect(parseLiftText('🏋️ 懸垂 −20kg×8')[0].kg).toBe(-20);
+  });
+
   it.each([
     '🏋️ ベンチプレス 80kg×8×3、スクワット 100kg×5',
     '🏋️ 懸垂 +10kg×8×3',
     '🏋️ 懸垂 自重×8×3',
     '🏋️ 懸垂 10kg×8×3',
+    '🏋️ 懸垂 -20kg×9、懸垂 -20kg×7、懸垂 -20kg×5',
   ])('組み直しても表記が変わらない: %s', (text) => {
     expect(liftTextFrom(parseLiftText(text))).toBe(text);
   });
@@ -90,6 +98,12 @@ describe('自重種目の実負荷', () => {
 
   it('通常種目に体重は足さない', () => {
     expect(effectiveKg(bw('🏋️ ベンチプレス 80kg×8'), 62)).toBe(80);
+  });
+
+  it('補助つき懸垂は体重から補助を引く（62kg・補助20 → 42）。表示は -20kg×8', () => {
+    expect(effectiveKg(bw('🏋️ 懸垂 -20kg×8'), 62)).toBe(42);
+    expect(liftSetLabel(bw('🏋️ 懸垂 -20kg×8'))).toBe('-20kg×8');
+    expect(volumeOf(bw('🏋️ 懸垂 -20kg×8'), 62)).toBe(42 * 8);
   });
 
   it('体重が分からないときは加重だけを返す（体重0で計算しない）', () => {
