@@ -3,13 +3,13 @@
 // ①クリップボードへコピー（Instagramのストーリーで長押し→ペーストで貼れる）
 // ②写真に保存（透過のまま保存されるので、他のアプリでも重ねられる）
 // の2経路で渡す。白/黒の2トーンは、載せる写真の明暗に合わせてユーザーが選ぶ。
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Modal, Alert } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { badgeIconOf } from '@/components/BadgeIcon';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
@@ -20,15 +20,54 @@ import { t } from '@/lib/i18n';
 //  ・'law'（法則）は除外: 熊田さん「法則をストーリーに乗せる意味はない」。法則はカードをタップして
 //    解説記事（app/law-detail.tsx）で「健康への視座と科学的裏付け」を読むものになった
 //  ・'streak' / 'today' / 'workout' も同時に外した: 「見せて自慢する」対象を実績（バッジ・PR）に絞る
-//  ・体重変化グラフのステッカーは未実装（追って kind:'weight' として追加する）
+//  ・'weight'（体重変化グラフ・2026-09-02 E1c）: 期間（30/90日）の体重ミニ折れ線＋「−2.4kg / 30日」の大数字。
+//    導線は概要「体の記録」詳細ページ右上の共有アイコン（app/(tabs)/changes.tsx）。
+//    **実体重（開始・現在値）は既定で載せない**（FEATURES.md G7「共有ステッカーの実数マスク」）。
+//    本人が「実数を載せる」を明示的にONにしたときだけ START/NOW の値を描く。
+//    bulk（増量目的）では「増えた」が良い方向なので、良い方向の色づけを反転する（符号は数学的な向きのまま）
 export type StickerData =
   | { kind: 'pr'; name: string; kg: number; date: string }
-  | { kind: 'badge'; id: string; name: string };
+  | { kind: 'badge'; id: string; name: string }
+  | { kind: 'weight'; points: { date: string; kg: number }[]; days: number; bulk: boolean };
 
 type Tone = 'light' | 'dark'; // light=白文字（暗い写真用） dark=黒文字（明るい写真用）
 
 function toneColor(tone: Tone): string { return tone === 'light' ? '#ffffff' : '#0e1116'; }
 function toneSub(tone: Tone): string { return tone === 'light' ? 'rgba(255,255,255,0.75)' : 'rgba(14,17,22,0.65)'; }
+// 「良い方向」の強調色（体重ステッカーの大数字）。写真の上に載るためテーマのCではなくトーン固定色。
+// 白文字トーンではミント、黒文字トーンでは深い緑（どちらも背景の明暗で読める）
+function toneGood(tone: Tone): string { return tone === 'light' ? '#5ee6a8' : '#0f8a5f'; }
+
+/** 体重の変化量。表示は数学的な向き（減れば−・増えれば+）。good は目的（減量/増量）で反転 */
+export function weightDelta(points: { kg: number }[], bulk: boolean): { delta: number; text: string; good: boolean } | null {
+  if (points.length < 2) return null;
+  const delta = Math.round((points[points.length - 1].kg - points[0].kg) * 10) / 10;
+  const text = `${delta > 0 ? '+' : delta < 0 ? '−' : '±'}${Math.abs(delta).toFixed(1)}`;
+  // 減量: 減った（<0）が良い。増量（bulk）: 増えた（>0）が良い。0は中立
+  const good = bulk ? delta > 0 : delta < 0;
+  return { delta, text, good };
+}
+
+// 体重のミニ折れ線（ステッカー用・軸なし）。始点と終点に小さな丸。線はトーン色、終点の丸だけ強調色
+function WeightLine({ points, tone, good }: { points: { kg: number }[]; tone: Tone; good: boolean }) {
+  const w = 190; const h = 64; const pad = 5;
+  const vals = points.map((p) => p.kg);
+  const min = Math.min(...vals); const max = Math.max(...vals);
+  const xy = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+    const y = max === min ? h / 2 : h - pad - ((v - min) / (max - min)) * (h - pad * 2);
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10] as const;
+  });
+  const col = toneColor(tone);
+  const last = xy[xy.length - 1]; const first = xy[0];
+  return (
+    <Svg width={w} height={h}>
+      <Polyline points={xy.map(([x, y]) => `${x},${y}`).join(' ')} stroke={col} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx={first[0]} cy={first[1]} r={3.5} fill={toneSub(tone)} />
+      <Circle cx={last[0]} cy={last[1]} r={4.5} fill={good ? toneGood(tone) : col} />
+    </Svg>
+  );
+}
 
 // 大数字＋小ラベルの1ブロック（Stravaの階層をそのまま踏襲）
 function Stat({ label, value, unit, tone, big }: { label: string; value: string; unit?: string; tone: Tone; big?: boolean }) {
@@ -49,8 +88,9 @@ function Rule({ tone }: { tone: Tone }) {
   return <View style={{ width: 42, height: 1.5, backgroundColor: toneSub(tone), marginVertical: 8, borderRadius: 1 }} />;
 }
 
-function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
+function StickerBody({ data, tone, showValues }: { data: StickerData; tone: Tone; showValues: boolean }) {
   const col = toneColor(tone);
+  const wd = data.kind === 'weight' ? weightDelta(data.points, data.bulk) : null;
   const today = new Date();
   const dateLine = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
   return (
@@ -70,6 +110,34 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
           <Text style={[st.prName, { color: col, marginTop: 4 }]}>{data.name}</Text>
           <Rule tone={tone} />
           <Text style={[st.label, { color: toneSub(tone) }]}>ACHIEVEMENT UNLOCKED</Text>
+        </>
+      )}
+      {data.kind === 'weight' && wd && (
+        <>
+          {/* 期間ラベル → ミニ折れ線 → 大数字（変化量）→ 期間の一言。良い方向だけ強調色 */}
+          <Text style={[st.label, { color: toneSub(tone) }]}>{`WEIGHT · ${data.days} DAYS`}</Text>
+          <View style={{ marginTop: 6, marginBottom: 2 }}>
+            <WeightLine points={data.points} tone={tone} good={wd.good} />
+          </View>
+          <Text style={[st.big, { color: wd.good ? toneGood(tone) : col }]} maxFontSizeMultiplier={1.3}>
+            {wd.text}
+            <Text style={[st.unit, { color: toneSub(tone) }]}> kg</Text>
+          </Text>
+          <Text style={[st.tagline, { color: toneSub(tone) }]}>{t('{n}日で', { n: data.days })}</Text>
+          {/* 実数（開始・現在）は本人がONにしたときだけ（G7 実数マスク） */}
+          {showValues && (
+            <View style={st.valRow}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[st.valLabel, { color: toneSub(tone) }]}>START</Text>
+                <Text style={[st.mid, { color: col }]} maxFontSizeMultiplier={1.3}>{data.points[0].kg.toFixed(1)}</Text>
+              </View>
+              <Text style={[st.valArrow, { color: toneSub(tone) }]}>→</Text>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[st.valLabel, { color: toneSub(tone) }]}>NOW</Text>
+                <Text style={[st.mid, { color: col }]} maxFontSizeMultiplier={1.3}>{data.points[data.points.length - 1].kg.toFixed(1)}</Text>
+              </View>
+            </View>
+          )}
         </>
       )}
       {/* アプリ名の署名（feat/invite）。
@@ -94,6 +162,9 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
 export default function ShareStickerModal({ data, visible, onClose }: { data: StickerData | null; visible: boolean; onClose: () => void }) {
   const [tone, setTone] = useState<Tone>('light');
   const [busy, setBusy] = useState(false);
+  // 体重ステッカーの「実数（開始・現在の体重）を載せる」。既定OFF＝G7 実数マスク。モーダルを開くたびにOFFへ戻る
+  const [showValues, setShowValues] = useState(false);
+  useEffect(() => { if (!visible) setShowValues(false); }, [visible]);
   const shotRef = useRef<View>(null);
 
   async function capturePng(): Promise<string> {
@@ -127,6 +198,8 @@ export default function ShareStickerModal({ data, visible, onClose }: { data: St
   }
 
   if (!data) return null;
+  // 体重ステッカーは点が2つ未満なら描けない（呼び出し側で防ぐが、型の上では来うる）
+  if (data.kind === 'weight' && data.points.length < 2) return null;
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={st.backdrop}>
@@ -137,9 +210,19 @@ export default function ShareStickerModal({ data, visible, onClose }: { data: St
           <View style={[st.preview, { backgroundColor: tone === 'light' ? '#3a4148' : '#e8e6e1' }]}>
             {/* これが実際に書き出される透過View（背景色なし） */}
             <View ref={shotRef} collapsable={false} style={{ backgroundColor: 'transparent' }}>
-              <StickerBody data={data} tone={tone} />
+              <StickerBody data={data} tone={tone} showValues={showValues} />
             </View>
           </View>
+          {/* 体重ステッカーだけ: 実数を載せるかの明示的な選択（既定は変化量だけ） */}
+          {data.kind === 'weight' && (
+            <Pressable style={st.optRow} onPress={() => setShowValues((v) => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: showValues }}>
+              <View style={[st.optBox, showValues && st.optBoxOn]}>{showValues && <Text style={st.optCheck}>✓</Text>}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.optT}>{t('開始・現在の体重（実数）も載せる')}</Text>
+                <Text style={st.optSub}>{t('OFFのままなら変化量だけが載り、体重そのものは写りません。')}</Text>
+              </View>
+            </Pressable>
+          )}
           <View style={st.toneRow}>
             {(['light', 'dark'] as const).map((tn) => (
               <Pressable key={tn} style={[st.toneBtn, tone === tn && st.toneBtnOn]} onPress={() => setTone(tn)}>
@@ -177,6 +260,13 @@ const st = themed(() => ({
   ctaTonal: { backgroundColor: C.accentSoft },
   ctaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   close: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
+  // 体重ステッカーの「実数を載せる」チェック行（シート側＝テーマ色）
+  optRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, paddingVertical: 4 },
+  optBox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  optBoxOn: { backgroundColor: C.teal, borderColor: C.teal },
+  optCheck: { fontSize: 13, fontWeight: '900', color: '#fff', lineHeight: 15 },
+  optT: { fontSize: 13, fontWeight: '700', color: C.ink },
+  optSub: { fontSize: 11.5, color: C.sub, marginTop: 1, lineHeight: 16 },
   // ステッカー内（写真の上に載る側）
   label: { fontSize: 11, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase' },
   dateLine: { fontSize: 10, fontWeight: '700', letterSpacing: 2.5, marginBottom: 2, fontVariant: ['tabular-nums'] },
@@ -187,6 +277,10 @@ const st = themed(() => ({
   prName: { fontSize: 19, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
   newPill: { backgroundColor: '#ff4d42', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
   newPillT: { fontSize: 10.5, fontWeight: '900', color: '#fff', letterSpacing: 2.5 },
+  // 体重ステッカーの実数行（START → NOW）。ONのときだけ描く
+  valRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 8 },
+  valLabel: { fontSize: 9.5, fontWeight: '800', letterSpacing: 2.5 },
+  valArrow: { fontSize: 16, fontWeight: '700', marginTop: 10 },
   // 署名（右下の落款）。alignSelf:'flex-end' で本文の中央寄せを崩さずに右へ寄せる
   sign: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-end' },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },

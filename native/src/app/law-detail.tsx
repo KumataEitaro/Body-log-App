@@ -20,6 +20,7 @@ import { useGate } from '@/lib/gate';
 import { useRemoteContent } from '@/lib/remoteContent';
 import CrownBadge from '@/components/CrownBadge';
 import { LAW_KINDS, lawText, lawVariant, type LawKind, type LawParams } from '@/lib/laws';
+import { conditionLabel } from '@/lib/correlate';
 import { getLawArticle, sourceNumber, pickArticleText, COMMON_CAUTIONS, type LawArticle, type EvidenceSource } from '@/content/evidence';
 
 const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
@@ -31,11 +32,14 @@ type DataSummary = {
   unit?: string;
   label: string;
   note: string;
-  bar?: { pct: number; left: string; right: string };   // 0..1 の割合（timeslot）
+  bar?: { pct: number; left: string; right: string };   // 0..1 の割合（timeslot・chicken_heavy の鶏:魚）
+  factors?: string[];                                    // 条件の箇条書き（multi_binge。correlate.conditionLabel で現在の言語）
 };
 
-// 既存8種だけ生値の形が分かっている。エンジン系の新しい種類（E1a）は E1c で追記するまで①を出さない（null）
+// 生値の形は lib/laws.ts detectLaws / detectEngineLaws（INSIGHTS-ENGINE.md §3.1 の表）に従う。
+// 既存8種＋エンジン系9種（E1c）。未知の種類は①を出さない（null）
 function summarize(kind: LawKind, p: LawParams): DataSummary | null {
+  const signed = (dir: unknown, v: string | number, downWord: string = 'down') => `${dir === downWord ? '−' : '+'}${v}`;
   switch (kind) {
     case 'food_up':
       return { value: `+${p.kg}`, unit: 'kg', label: t('「{food}」を食べた翌日の体重差（平均）', { food: String(p.food) }), note: t('食べた日{n}日ぶんの比較', { n: Number(p.n) }) };
@@ -57,6 +61,35 @@ function summarize(kind: LawKind, p: LawParams): DataSummary | null {
     case 'sleep_factor': {
       const min = Number(p.min) || 0;
       return { value: `${p.dir === 'long' ? '+' : '−'}${min}`, unit: t('分'), label: t('21時以降に食べた日の睡眠の差（平均）'), note: t('食べた日{a}日・食べなかった日{b}日の睡眠から', { a: Number(p.late), b: Number(p.off) }) };
+    }
+    // ---- インサイト・エンジン系（E1c）。倍率は「起きやすさ」、差は5段階の気分・%・kg など生値の単位のまま ----
+    case 'sleep_debt_binge':
+      return { value: String(p.x), unit: t('倍'), label: t('睡眠不足が5時間たまった日〜翌日の食べすぎの起きやすさ'), note: t('睡眠データのある{n}日の傾向から（該当{h}日）', { n: Number(p.n), h: Number(p.h) }) };
+    case 'mood_lag_binge':
+      return { value: String(p.x), unit: t('倍'), label: t('気分が3日つづけて落ちた{k}日後の食べすぎの起きやすさ', { k: Number(p.k) }), note: t('気分と食事の記録{n}日ぶんの傾向から', { n: Number(p.n) }) };
+    case 'wheat_vs_rice_mood':
+      return {
+        value: `−${p.d}`,
+        label: p.dir === 'rice_low' ? t('米中心の日の翌日の気分の差（5段階・小麦中心の日と比べて）') : t('小麦中心の日の翌日の気分の差（5段階・米中心の日と比べて）'),
+        note: t('小麦中心{a}日・米中心{b}日の翌日の気分から', { a: Number(p.a), b: Number(p.b) }),
+      };
+    case 'salmon_master':
+      return { value: Number(p.g).toLocaleString(), unit: 'g', label: t('この30日で食べたサーモン（週{w}回）', { w: String(p.w) }), note: t('サーモンを食べた日{n}日の記録から', { n: Number(p.days) }) };
+    case 'chicken_heavy': {
+      // 鶏:魚の帯。魚が0gのときは帯が鶏だけになる（それ自体が偏りの絵）
+      const g = Number(p.g) || 0; const fish = Number(p.fish) || 0;
+      const pct = g + fish > 0 ? g / (g + fish) : 1;
+      return { value: String(p.kg), unit: 'kg', label: t('この30日で食べた鶏肉'), note: t('同じ30日の魚は約{fish}g', { fish: fish.toLocaleString() }), bar: { pct, left: t('鶏肉'), right: t('魚') } };
+    }
+    case 'lift_sleep':
+      return { value: signed(p.dir, Number(p.pct) || 0), unit: '%', label: t('7時間以上寝た日のトレのボリューム差（平均）'), note: t('7時間以上の日{a}回・未満の日{b}回のトレから', { a: Number(p.a), b: Number(p.b) }) };
+    case 'lift_protein_pr':
+      return { value: String(p.x), unit: t('倍'), label: t('たんぱく質が目標に届いた週の自己ベスト更新の起きやすさ'), note: t('トレした{n}週の記録から（目標の9割以上を「届いた」と数える）', { n: Number(p.n) }) };
+    case 'lift_mood':
+      return { value: signed(p.dir, String(p.d)), label: t('トレした日の気分の差（5段階・しなかった日と比べて）'), note: t('トレした日{a}日・しなかった日{b}日の気分から', { a: Number(p.a), b: Number(p.b) }) };
+    case 'multi_binge': {
+      const factors = String(p.f ?? '').split('+').filter(Boolean).map((k) => conditionLabel(k));
+      return { value: String(p.x), unit: t('倍'), label: t('次の条件がそろった日の食べすぎの起きやすさ'), note: t('該当{h}日を含む{n}日の記録から（相関であり、原因とは限りません）', { h: Number(p.h), n: Number(p.n) }), factors };
     }
     default:
       return null;
@@ -138,6 +171,17 @@ export default function LawDetailScreen() {
               {!!data.unit && <Text style={s.statUnit}>{data.unit}</Text>}
             </View>
             <Text style={s.statLabel}>{data.label}</Text>
+            {/* multi_binge: そろった条件の箇条書き（条件キー→現在の言語。事前に分かる条件だけが並ぶ） */}
+            {data.factors && data.factors.length > 0 && (
+              <View style={{ marginTop: 8 }}>
+                {data.factors.map((f, i) => (
+                  <View key={i} style={s.factorRow}>
+                    <View style={s.factorDot} />
+                    <Text style={s.factorT}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
             {data.bar && (
               <View style={{ marginTop: 10 }}>
                 <View style={s.barTrack}>
@@ -266,6 +310,10 @@ const s = themed(() => ({
   barFill: { height: 10, borderRadius: 5, backgroundColor: C.teal },
   barLegend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   barLegendT: { fontSize: 11.5, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
+  // ① multi_binge の条件の箇条書き
+  factorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+  factorDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.teal },
+  factorT: { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.ink, lineHeight: 19 },
   // ④ できること
   actRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 9 },
   actRowSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },

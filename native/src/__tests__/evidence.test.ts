@@ -17,12 +17,20 @@ const row = (x: Partial<RemoteRow>): RemoteRow => ({
   id: 'r1', kind: 'laws_text', version: 1, payload: null, published_at: '2026-09-01T00:00:00Z', min_app_version: null, ...x,
 });
 
-// 既存8種＋分岐のある variant。並行セッション（E1a）が増やす種類は §3 の表に沿って E1c で追記するので、
-// ここは「記事が揃っているべき種類」を固定の一覧で持つ（LAW_KINDS 全体は後述の「落ちない」テストで見る）
+// 既存8種＋エンジン系9種（E1c）＋分岐のある variant。「記事が揃っているべき種類」を固定の一覧で持つ
+// （LAW_KINDS 全体は後述の「落ちない」テストで見る。新しい LawKind が増えたらここにも足す）
 const EXISTING_KINDS = ['food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback', 'sleep_factor'];
+const ENGINE_KINDS = [
+  'sleep_debt_binge', 'mood_lag_binge', 'wheat_vs_rice_mood', 'salmon_master', 'chicken_heavy',
+  'lift_sleep', 'lift_protein_pr', 'lift_mood', 'multi_binge',
+];
 const VARIANTS: [string, string][] = [
   ...EXISTING_KINDS.map((k): [string, string] => [k, 'default']),
+  ...ENGINE_KINDS.map((k): [string, string] => [k, 'default']),
   ['weekday', 'stable'], ['sleep_factor', 'long'], ['sleep_factor', 'short'],
+  // エンジン系の向きのある variant（1記事で両方向）
+  ['wheat_vs_rice_mood', 'wheat_low'], ['wheat_vs_rice_mood', 'rice_low'],
+  ['lift_sleep', 'up'], ['lift_sleep', 'down'], ['lift_mood', 'up'], ['lift_mood', 'down'],
 ];
 
 const ja = (v: unknown): string => (typeof v === 'string' ? v : (v as Record<string, string>)?.ja ?? '');
@@ -43,17 +51,37 @@ describe('カタログの網羅性（全LawKindに記事がある）', () => {
     expect(article).not.toBe(FALLBACK_ARTICLE);
   });
   it('LAW_KINDS のどの種類でも落ちず、記事（同梱か準備中）が返る', () => {
-    expect(LAW_KINDS).toEqual(expect.arrayContaining(EXISTING_KINDS));
+    expect(LAW_KINDS).toEqual(expect.arrayContaining([...EXISTING_KINDS, ...ENGINE_KINDS]));
     for (const k of LAW_KINDS) {
       const { article } = getLawArticle(k, 'default');
       expect(article.actions).toHaveLength(3);
       expect(ja(article.meaning).length).toBeGreaterThan(10);
     }
   });
+  it('LAW_KINDS の全種類に同梱記事があり、準備中に落ちる種類が無い（E1c 完了の固定）', () => {
+    for (const k of LAW_KINDS) expect(getLawArticle(k, 'default').ready).toBe(true);
+  });
+  it('chicken_heavy: 病名を断定せず、プリン体・尿酸の一般情報と受診の目安を記事側で正直に書く', () => {
+    const a = EVIDENCE.chicken_heavy;
+    const txt = allJaText(a);
+    expect(txt).toMatch(/プリン体/);
+    expect(txt).toMatch(/尿酸/);
+    expect(a.seeDoctor).toBeDefined();
+    expect(ja(a.seeDoctor)).toMatch(/7\.0/);
+    expect(txt).toMatch(/診断ではありません|判定するものではありません/);   // 診断しない線
+    expect(txt).not.toMatch(/あなたは痛風/);
+  });
+  it('食べすぎ系・気分系の記事は受診の目安を持つ（摂食・こころの相談先）', () => {
+    for (const k of ['sleep_debt_binge', 'mood_lag_binge', 'multi_binge', 'lift_mood']) {
+      expect(EVIDENCE[k].seeDoctor).toBeDefined();
+    }
+  });
   it('variant付きのキーは専用記事があるときだけ使う', () => {
     expect(evidenceKeyOf('weekday', 'stable')).toBe('weekday:stable');
     expect(evidenceKeyOf('weekday', 'default')).toBe('weekday');
     expect(evidenceKeyOf('sleep_factor', 'long')).toBe('sleep_factor');   // 方向は1記事で扱う
+    expect(evidenceKeyOf('lift_sleep', 'down')).toBe('lift_sleep');       // エンジン系の向きも1記事
+    expect(evidenceKeyOf('wheat_vs_rice_mood', 'rice_low')).toBe('wheat_vs_rice_mood');
   });
 });
 
@@ -79,7 +107,7 @@ describe('各記事の7節の整合', () => {
     const urls = new Set<string>();
     for (const src of a.sources) {
       expect(src.url).toMatch(/^https:\/\//);
-      expect(src.url).toMatch(/pubmed\.ncbi\.nlm\.nih\.gov|doi\.org|mhlw\.go\.jp/);   // 査読誌（PubMed/DOI）か公的機関
+      expect(src.url).toMatch(/pubmed\.ncbi\.nlm\.nih\.gov|doi\.org|mhlw\.go\.jp/);   // 査読誌（PubMed/DOI）か公的機関（e-ヘルスネット kennet.mhlw.go.jp を含む）
       expect(src.authors.length).toBeGreaterThan(2);
       expect(src.title.length).toBeGreaterThan(5);
       expect(src.journal.length).toBeGreaterThan(2);
@@ -153,9 +181,9 @@ describe('リモート（laws_text.article）での差し替え', () => {
 
   it('未登録の kind でもリモートに記事があれば準備中にならない', () => {
     resetRemoteContentForTest(mergeRemoteRows([row({ payload: { items: [
-      { id: 'lift_sleep', article: { meaning: { ja: '新しい法則の意味' } } },
+      { id: 'future_kind', article: { meaning: { ja: '新しい法則の意味' } } },
     ] } })], '1.0.20'));
-    const { ready, article } = getLawArticle('lift_sleep');
+    const { ready, article } = getLawArticle('future_kind');
     expect(ready).toBe(true);
     expect(ja(article.meaning)).toBe('新しい法則の意味');
     expect(article.actions).toEqual(FALLBACK_ARTICLE.actions);           // 他の節は汎用記事で埋める
