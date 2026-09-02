@@ -159,7 +159,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
               {upgrade && (
                 <Pressable hitSlop={8} style={({ pressed }) => [{ marginTop: 10 }, pressed && { opacity: 0.7 }]}
                            onPress={() => { setVisible(false); router.push('/paywall?src=limit_photo' as never); }}>
-                  <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+                  <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
                 </Pressable>
               )}
             </View>
@@ -240,7 +240,7 @@ const s = themed(() => ({
   dietBadgeHigh: { color: C.coral, backgroundColor: C.coralWeak },
   dietBadgeMaybe: { color: C.amber, backgroundColor: rgba(C.amber, 0.14) },
   bestBadge: {
-    alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', color: C.teal,
+    alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', color: C.accentInk,
     backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 6,
   },
   pickName: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: C.ink },

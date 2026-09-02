@@ -199,7 +199,7 @@ const s = themed(() => ({
   cta: { marginTop: 16, borderRadius: RADIUS.input, paddingVertical: 13, alignItems: 'center', backgroundColor: C.teal },
   ctaT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   note: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginTop: 14, textAlign: 'center' },
-  link: { fontSize: 12.5, color: C.teal, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+  link: { fontSize: 12.5, color: C.accentInk, fontWeight: '700', marginTop: 6, textAlign: 'center' },
   doneBox: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 40 },
   doneT: { fontSize: 17, fontWeight: '800', color: C.ink, textAlign: 'center', lineHeight: 26 },
 }));

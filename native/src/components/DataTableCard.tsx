@@ -90,7 +90,7 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
                 <View key={r.date} style={s.tr}>
                   <Text style={[s.td, { flex: 1.2, color: C.sub }]}>{r.date.slice(5).replace('-', '/')}</Text>
                   <Text style={[s.td, s.num, s.strong]}>{fmt(r.value)}</Text>
-                  <Text style={[s.td, s.num, r.delta != null && r.delta > 0 ? { color: C.coral } : r.delta != null && r.delta < 0 ? { color: C.teal } : null]}>
+                  <Text style={[s.td, s.num, r.delta != null && r.delta > 0 ? { color: C.coral } : r.delta != null && r.delta < 0 ? { color: C.successInk } : null]}>
                     {r.delta == null ? '—' : `${r.delta > 0 ? '+' : ''}${fmt(Math.abs(r.delta)).replace(/^/, r.delta < 0 ? '-' : '')}`}
                   </Text>
                   <Text style={[s.td, s.num, { color: C.faint }]}>{fmt(r.avg7)}</Text>
@@ -180,7 +180,7 @@ export function LiftTable({ visible, onClose }: { visible: boolean; onClose: () 
                   <Text style={[s.td, { flex: 1.2, color: C.sub }]}>{r.date.slice(5).replace('-', '/')}</Text>
                   <Text style={[s.td, s.num, s.strong]}>{w(r.kg)}</Text>
                   <Text style={[s.td, s.num]}>{r.reps}</Text>
-                  <Text style={[s.td, s.num, r.rm >= best ? { color: C.teal, fontWeight: '800' } : null]}>
+                  <Text style={[s.td, s.num, r.rm >= best ? { color: C.successInk, fontWeight: '800' } : null]}>
                     {w(r.rm)}{r.rm >= best ? ' ⭐' : ''}
                   </Text>
                 </View>

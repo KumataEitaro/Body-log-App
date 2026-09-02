@@ -239,7 +239,7 @@ const s = themed(() => ({
   liftSet: { fontSize: 15, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
   liftX: { fontSize: 17, color: C.coral, fontWeight: '800', paddingHorizontal: 2 },
   moreBtn: { alignSelf: 'center', paddingVertical: 9, paddingHorizontal: 14, marginTop: 6 },
-  moreBtnT: { fontSize: 13, color: C.teal, fontWeight: '800' },
+  moreBtnT: { fontSize: 13, color: C.accentInk, fontWeight: '800' },
   histHint: { fontSize: 13, color: C.faint, marginTop: 8 },
   err: { fontSize: 13, fontWeight: '700', color: C.coral, marginTop: 6 },
 }));

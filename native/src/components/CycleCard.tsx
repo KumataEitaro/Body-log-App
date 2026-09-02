@@ -126,7 +126,7 @@ const s = themed(() => ({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   badge: { borderWidth: 1.5, borderColor: C.teal, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeT: { fontSize: 11, fontWeight: '800', color: C.teal },
+  badgeT: { fontSize: 11, fontWeight: '800', color: C.accentInk },
   statRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginTop: 4 },
   delta: { fontSize: 19, fontWeight: '800', fontVariant: ['tabular-nums'] },
   pace: { fontSize: 12.5, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },

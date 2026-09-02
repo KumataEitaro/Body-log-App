@@ -30,7 +30,7 @@ export default function GuideArt({ id }: { id: GuideArtId }) {
     case 'myfood': return (
       <View style={a.panel}>
         <View style={a.rowWrap}>
-          <View style={[a.chip, a.chipOn]}><Text style={[a.chipT, { color: C.teal }]}>{t('プロテイン')}</Text></View>
+          <View style={[a.chip, a.chipOn]}><Text style={[a.chipT, { color: C.accentInk }]}>{t('プロテイン')}</Text></View>
           <View style={a.chip}><Text style={a.chipT}>{t('ゆで卵')}</Text></View>
           <View style={a.chip}><Text style={a.chipT}>{t('オートミール')}</Text></View>
         </View>
@@ -53,7 +53,7 @@ export default function GuideArt({ id }: { id: GuideArtId }) {
       <View style={a.panel}>
         <View style={[a.listRow, a.pickRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[a.listT, { color: C.teal }]}>{t('鶏の炭火焼き定食')}</Text>
+            <Text style={[a.listT, { color: C.accentInk }]}>{t('鶏の炭火焼き定食')}</Text>
             <Text style={a.listSub}>{t('約650kcal・タンパク質がしっかり取れます')}</Text>
           </View>
           <View style={a.pickPill}><Text style={a.pickPillT}>{t('おすすめ')}</Text></View>
@@ -239,7 +239,7 @@ export default function GuideArt({ id }: { id: GuideArtId }) {
           <Flame size={20} color={C.amber} />
           <Text style={[a.listT, { fontSize: 16, fontWeight: '900', flex: 1 }]}>{t('12日連続')}</Text>
           <ShieldCheck size={16} color={C.teal} />
-          <Text style={[a.listSub, { color: C.teal, fontWeight: '700' }]}>{t('お守り ×1')}</Text>
+          <Text style={[a.listSub, { color: C.accentInk, fontWeight: '700' }]}>{t('お守り ×1')}</Text>
         </View>
         <Text style={a.hint}>{t('週1回まで、抜けた日を自動でカバー')}</Text>
       </View>
@@ -360,7 +360,7 @@ const a = themed(() => ({
     alignSelf: 'flex-start', backgroundColor: C.tealWeak, borderRadius: 999,
     paddingHorizontal: 8, paddingVertical: 3, marginTop: 2,
   },
-  newPillT: { fontSize: 11, fontWeight: '800', color: C.teal },
+  newPillT: { fontSize: 11, fontWeight: '800', color: C.accentInk },
   cell: { flex: 1, height: 12, borderRadius: 3 },
   countPill: { backgroundColor: C.chipBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   countPillT: { fontSize: 11, fontWeight: '800', color: C.sub },

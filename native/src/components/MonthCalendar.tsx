@@ -117,7 +117,7 @@ const s = themed(() => ({
   sel: { backgroundColor: C.accentBadge },
   dow: { fontSize: 11, fontWeight: '700', color: C.sub },
   num: { fontSize: 15, fontWeight: '600', color: C.ink, fontVariant: ['tabular-nums'] },
-  today: { color: C.teal, fontWeight: '800' },
+  today: { color: C.accentInk, fontWeight: '800' },
   dot: { width: 5, height: 5, borderRadius: 3, marginTop: 2 },
   q: { fontSize: 11, fontWeight: '800', color: C.faint, marginTop: 0 },
   legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' },

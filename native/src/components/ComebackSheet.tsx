@@ -206,7 +206,7 @@ const s = themed(() => ({
     backgroundColor: C.tealWeak, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 16,
     alignItems: 'center',
   },
-  doneText: { fontSize: 15.5, fontWeight: '800', color: C.teal, textAlign: 'center', lineHeight: 22 },
+  doneText: { fontSize: 15.5, fontWeight: '800', color: C.successInk, textAlign: 'center', lineHeight: 22 },
   softClose: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 8 },
   softCloseT: { fontSize: 13.5, color: C.faint, fontWeight: '600' },
 }));

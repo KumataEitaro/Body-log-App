@@ -130,7 +130,7 @@ export default function QuickLogFab() {
             {msg?.upgrade && (
               <Pressable hitSlop={8} style={({ pressed }) => [{ alignSelf: 'flex-start', marginBottom: 6 }, pressed && { opacity: 0.7 }]}
                          onPress={() => { setOpen(false); router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never); }}>
-                <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+                <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
               </Pressable>
             )}
             {pending > 0 && (
@@ -209,7 +209,7 @@ export default function QuickLogFab() {
 
 const s = themed(() => ({
   preview: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 7 },
-  previewMain: { fontSize: 12, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  previewMain: { fontSize: 12, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   previewAb: { fontSize: 10, fontWeight: '900', color: C.sub },
   fab: {
     position: 'absolute', right: 18, width: 54, height: 54, borderRadius: 27,

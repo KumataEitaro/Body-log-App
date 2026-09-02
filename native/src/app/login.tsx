@@ -298,7 +298,7 @@ export default function LoginScreen() {
         {showSignupHint && mode === 'login' && (
           <Pressable onPress={() => { setMode('signup'); setMsg(''); setShowSignupHint(false); }} hitSlop={8}
                      style={{ alignSelf: 'center', marginTop: 6 }}>
-            <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' }}>
               {t('初めての方はこちら → 新規登録に切り替える')}
             </Text>
           </Pressable>
@@ -398,7 +398,7 @@ const s = themed(() => ({
   sheet: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(16) },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
-  sheetClose: { fontSize: 15, fontWeight: '700', color: C.teal },
+  sheetClose: { fontSize: 15, fontWeight: '700', color: C.accentInk },
   langRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 15, borderBottomWidth: 0.5, borderBottomColor: C.line,
@@ -416,14 +416,14 @@ const s = themed(() => ({
   },
   // 「保存済みのアカウントから選ぶ」（OSの自動入力を促す導線）
   pickBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 4 },
-  pickBtnT: { fontSize: 13.5, fontWeight: '700', color: C.teal },
+  pickBtnT: { fontSize: 13.5, fontWeight: '700', color: C.accentInk },
   pickHint: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginBottom: 6 },
   err: { color: C.coral, fontSize: 15, marginBottom: 6 },
-  info: { color: C.teal, fontSize: 15, marginBottom: 6, lineHeight: 21 },
+  info: { color: C.accentInk, fontSize: 15, marginBottom: 6, lineHeight: 21 },
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   btnT: { color: C.panel, fontSize: 17, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従（現状未使用スタイル）
   terms: { fontSize: 13, color: C.faint, marginTop: 8, lineHeight: 18, textAlign: 'center' },
-  termsLink: { fontSize: 13, color: C.teal, fontWeight: '700', textDecorationLine: 'underline' },
+  termsLink: { fontSize: 13, color: C.accentInk, fontWeight: '700', textDecorationLine: 'underline' },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
   orLine: { flex: 1, height: 0.5, backgroundColor: C.line },
   orT: { fontSize: 13, color: C.faint, fontWeight: '700' },

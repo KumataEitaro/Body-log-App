@@ -165,7 +165,7 @@ export default function WeekdayHeatmapCard({ rows }: { rows: WeekRow[] }) {
           </Text>
         </>
       ) : (
-        <Text style={[s.verdict, { color: C.teal }]}>{t('どの曜日も安定しています')}</Text>
+        <Text style={[s.verdict, { color: C.successInk }]}>{t('どの曜日も安定しています')}</Text>
       )}
     </View>
   );

@@ -92,7 +92,7 @@ export default function PlateCalc({ initial, onClose }: {
               return (
                 <View key={i} style={{ alignItems: 'center', gap: 4 }}>
                   <View style={[s.plate, { height: sz.h, width: sz.w }, big ? s.plateBig : s.plateSmall]} />
-                  <Text style={[s.plateT, big && { color: C.teal }]}>{p % 1 === 0 ? p : p.toFixed(2).replace(/0$/, '')}</Text>
+                  <Text style={[s.plateT, big && { color: C.accentInk }]}>{p % 1 === 0 ? p : p.toFixed(2).replace(/0$/, '')}</Text>
                 </View>
               );
             })}
@@ -145,7 +145,7 @@ const s = themed(() => ({
   },
   barChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
   barChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  barChipTOn: { color: C.teal },
+  barChipTOn: { color: C.accentInk },
   note: { fontSize: 13, color: C.sub, lineHeight: 19 },
   rack: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 6,

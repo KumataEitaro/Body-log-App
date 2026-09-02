@@ -26,7 +26,7 @@ import { BellRing, FileText, Droplet } from 'lucide-react-native';
 import { shareMedicalReport } from '@/lib/medicalReport';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
-import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, BG_TINTS, paletteFor, darkPaletteFor } from '@/lib/theme';
+import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, PFC_PRESETS, BG_TINTS, paletteFor, darkPaletteFor, type PfcColors } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
 import { useGuide } from '@/components/GuideTour';
 import GoalPanel from '@/components/GoalPanel';
@@ -56,6 +56,64 @@ type MyFoodLite = { id: string; name: string; kcal: number; items?: unknown; cre
 type FoodEntry = { kind: 'food' | 'set'; id: string; name: string; kcal: number; count: number | null; createdAt: string };
 type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goal' | 'columns' | 'diet';
 
+// テーマ変更でルートのツリーが作り直されるとき、次のマウントで開き直すシート。
+// モジュール変数なので再マウントをまたいで残り、読んだ直後に消す（通常の初回マウントでは null）
+let reopenSheet: Sheet = null;
+
+// テーマ設定のプレビュー。いま効いているパレット（C）だけで描くので、選択→再マウントのたびに新しい配色になる。
+// ヒーロー（アクセントの塗り面＋白文字）・P/F/Cバー・意味色（達成/注意/超過）・リンク文字（accentInk）を
+// 1枚に収め、「塗り面のアクセント」と「文字のアクセント（濃い側）」の差もここで見える
+function ThemePreview({ pfc }: { pfc: PfcColors }) {
+  return (
+    <View style={pv.card}>
+      <View style={pv.hero}>
+        {/* グラデーションの明端（accentHi）を右上に重ね、#4D7CFF→#6AA3FF の流れを擬似的に出す */}
+        <View style={pv.heroHi} />
+        <Text style={pv.heroLabel}>{t('あと食べられる')}</Text>
+        <Text style={pv.heroN} maxFontSizeMultiplier={1.3}>1,240<Text style={pv.heroU}> kcal</Text></Text>
+      </View>
+      <View style={pv.bars}>
+        {([[t('たんぱく質'), pfc.p, '72%'], [t('脂質'), pfc.f, '48%'], [t('炭水化物'), pfc.c, '88%']] as const).map(([label, col, w]) => (
+          <View key={label} style={pv.barRow}>
+            <Text style={pv.barL} numberOfLines={1}>{label}</Text>
+            <View style={pv.track}><View style={[pv.fill, { width: w, backgroundColor: col }]} /></View>
+          </View>
+        ))}
+      </View>
+      <View style={pv.foot}>
+        <View style={pv.pill}><Text style={pv.pillT}>{t('達成')}</Text></View>
+        <Text style={pv.warn}>{t('注意')}</Text>
+        <Text style={pv.over}>{t('超過')}</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={pv.link}>{t('くわしく見る')} →</Text>
+      </View>
+    </View>
+  );
+}
+const pv = themed(() => ({
+  card: {
+    backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
+    shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
+    padding: 12, marginTop: 4, gap: 12,
+  },
+  hero: { backgroundColor: C.teal, borderRadius: RADIUS.panel, padding: 14, overflow: 'hidden' },
+  heroHi: { position: 'absolute', right: -30, top: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: C.accentHi, opacity: 0.55 },
+  heroLabel: { fontSize: 12, fontWeight: '800', color: '#fff', opacity: 0.9 },   // アクセント地の上の白文字（固定色。テーマに追従させない）
+  heroN: { fontSize: 28, fontWeight: '800', color: '#fff', marginTop: 2, fontVariant: ['tabular-nums'] },  // 同上
+  heroU: { fontSize: 14, fontWeight: '700' },
+  bars: { gap: 8 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  barL: { width: 64, fontSize: 12, fontWeight: '700', color: C.sub },
+  track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.track, overflow: 'hidden' },
+  fill: { height: 8, borderRadius: 4 },
+  foot: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pill: { backgroundColor: C.successWeak, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 3 },
+  pillT: { fontSize: 11.5, fontWeight: '800', color: C.successInk },
+  warn: { fontSize: 12, fontWeight: '800', color: C.amber },
+  over: { fontSize: 12, fontWeight: '800', color: C.coral },
+  link: { fontSize: 12.5, fontWeight: '800', color: C.accentInk },
+}));
+
 // 記録のCSVエクスポート（データは本人のもの、を形にする）
 function ExportRow() {
   const [busy, setBusy] = useState(false);
@@ -68,7 +126,7 @@ function ExportRow() {
       setBusy(false);
     }}>
       <Text style={bt.label}>{t('記録をエクスポート（CSV）')}</Text>
-      {busy ? <ActivityIndicator color={C.teal} /> : <Text style={{ color: C.teal, fontWeight: '800' }}>↗</Text>}
+      {busy ? <ActivityIndicator color={C.teal} /> : <Text style={{ color: C.accentInk, fontWeight: '800' }}>↗</Text>}
       {err ? <Text style={{ position: 'absolute', bottom: -16, left: 14, fontSize: 11, color: C.coral }}>{err}</Text> : null}
     </Pressable>
   );
@@ -128,7 +186,9 @@ export default function SettingsScreen() {
   const [meals, setMeals] = useState<MyMeal[]>([]);
   // 名前変更中の行（行がその場でTextInputに変わる。単品・セットのどちらも同じUI）
   const [renameEdit, setRenameEdit] = useState<{ kind: 'food' | 'set'; id: string; name: string } | null>(null);
-  const [sheet, setSheet] = useState<Sheet>(null);
+  // テーマ変更でツリーが作り直されたときだけ、直前まで開いていたシートを引き継ぐ（reopenSheet 参照）
+  const [sheet, setSheet] = useState<Sheet>(() => { const v = reopenSheet; reopenSheet = null; return v; });
+  const reopened = useRef(sheet !== null);
   const [couponOpen, setCouponOpen] = useState(false); // クーポンコード入力（プラン行の隣の入口）
   const [feedbackOpen, setFeedbackOpen] = useState(false); // ご意見・不具合の報告（サポート節の入口）
   const [busy, setBusy] = useState(false);
@@ -202,6 +262,9 @@ export default function SettingsScreen() {
   const [avatarOpen, setAvatarOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
+  // テーマの変更は applyPalette → 世代更新 → ルートの Stack 再マウントを伴う。
+  // この画面も作り直されるので、開いているテーマシートを次のマウントへ引き継いでから適用する
+  function changeTheme(patch: Parameters<typeof setTheme>[0]) { reopenSheet = 'theme'; void setTheme(patch); }
 
   // 記録の週目標・歩数の週目標は統合目標画面（GoalPanel hub → HabitGoals）へ移設した
 
@@ -842,41 +905,54 @@ export default function SettingsScreen() {
       </KeyboardAvoidingView>
     </Modal>
 
-    {/* ===== テーマ選択モーダル ===== */}
-    <Modal visible={sheet === 'theme'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+    {/* ===== テーマ選択モーダル =====
+        構成（2026-09-02 刷新）: プレビュー → 明暗 → アクセント → 背景トーン → P/F/C（プリセット＋個別）。
+        選択のたびにパレット世代が進みルートの Stack がツリーごと作り直されるため、この画面も再マウントされる。
+        reopenSheet（モジュール変数）で「テーマシートを開いたまま」を引き継ぎ、再表示のときはスライドの
+        アニメを省く（毎タップで下からせり上がるのを防ぐ） */}
+    <Modal visible={sheet === 'theme'} animationType={reopened.current ? 'none' : 'slide'} presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
         <SheetHeader icon={<Palette size={ICON.lg} color={C.teal} />} title={t('テーマカラー')} />
-        <ScrollView>
-          <Text style={s.label}>{t('外観')}</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* 1) プレビュー: いま効いている配色（C）でヒーロー風のミニカードを描く。選ぶと即時に変わる */}
+          <Text style={s.label}>{t('プレビュー')}</Text>
+          <ThemePreview pfc={theme.pfc} />
+
+          {/* 2) 明暗 */}
+          <Text style={[s.label, { marginTop: 22 }]}>{t('外観')}</Text>
           <Text style={s.note}>{t('「自動」は端末のダークモード設定に合わせて昼夜で切り替わります。')}</Text>
           <SegmentedControl
             options={[
+              { key: 'system', label: t('自動') },
               { key: 'light', label: t('ライト') },
               { key: 'dark', label: t('ダーク') },
-              { key: 'system', label: t('自動') },
             ]}
             value={theme.mode}
-            onChange={(m) => setTheme({ mode: m as 'light' | 'dark' | 'system' })}
+            onChange={(m) => changeTheme({ mode: m as 'light' | 'dark' | 'system' })}
           />
 
+          {/* 3) アクセント（先頭が新既定のエレクトリック） */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('アクセントカラー')}</Text>
+          <Text style={s.note}>{t('ボタンや選択中の印の色です。白地の文字に使うときは読みやすさのため自動で少し濃くなります。')}</Text>
           <View style={s.swatchRow}>
             {ACCENTS.map((a) => {
               // ダーク表示中はダーク版パレットでプレビュー（実際の見え方と一致させる）
               const pal = theme.scheme === 'dark' ? darkPaletteFor(a.key) : PALETTES[a.key];
+              const on = theme.accent === a.key;
               return (
-              <Pressable key={a.key} style={s.swatchWrap} onPress={() => setTheme({ accent: a.key })}>
-                <View style={[s.swatch, { backgroundColor: pal.bg, borderWidth: 1, borderColor: pal.line }, theme.accent === a.key && s.swatchOn]}>
+              <Pressable key={a.key} style={s.swatchWrap} onPress={() => changeTheme({ accent: a.key })}>
+                <View style={[s.swatch, { backgroundColor: pal.bg, borderWidth: 1, borderColor: pal.line }, on && s.swatchOn]}>
                   <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 16, backgroundColor: pal.accentBadge }} />
                   <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: pal.teal }} />
-                  {theme.accent === a.key && <Text style={s.swatchCheck}>✓</Text>}
+                  {on && <Text style={s.swatchCheck}>✓</Text>}
                 </View>
-                <Text style={[s.swatchT, theme.accent === a.key && { color: C.ink, fontWeight: '800' }]}>{t(a.label)}</Text>
+                <Text style={[s.swatchT, on && { color: C.ink, fontWeight: '800' }]}>{t(a.label)}</Text>
               </Pressable>
               );
             })}
           </View>
 
+          {/* 4) 背景トーン（ダークは Navy/Card Gray の2階調固定なので選択肢を出さない） */}
           {theme.scheme === 'dark' ? (
             <Text style={[s.note, { marginTop: 22 }]}>{t('「背景」の淡色設定はライト表示のときに使えます。')}</Text>
           ) : (
@@ -889,11 +965,11 @@ export default function SettingsScreen() {
               const on = theme.bg === b.key;
               return (
                 <Pressable key={b.key} style={[s.bgCard, { backgroundColor: pal.bg }, on && s.bgCardOn]}
-                           onPress={() => setTheme({ bg: b.key })}>
+                           onPress={() => changeTheme({ bg: b.key })}>
                   {/* 下地の上に白いカードを重ね、実際の見え方をそのまま見せる */}
                   <View style={[s.bgMini, { borderColor: pal.line }]} />
                   <View style={[s.bgMini, { borderColor: pal.line, marginTop: 3 }]} />
-                  <Text style={[s.bgCardT, on && { color: C.teal }]}>{t(b.label)}</Text>
+                  <Text style={[s.bgCardT, on && { color: C.accentInk }]} numberOfLines={1}>{t(b.label)}</Text>
                 </Pressable>
               );
             })}
@@ -901,8 +977,28 @@ export default function SettingsScreen() {
           </>
           )}
 
+          {/* 5) P/F/C: プリセット3つ → 個別ピッカー */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('P/F/Cバーの色')}</Text>
           <Text style={s.note}>{t('たんぱく質・脂質・炭水化物をそれぞれ好きな色にできます。目標を超えたバーは赤で表示されます。')}</Text>
+          <View style={s.presetRow}>
+            {PFC_PRESETS.map((p) => {
+              const on = p.colors.p === theme.pfc.p && p.colors.f === theme.pfc.f && p.colors.c === theme.pfc.c;
+              return (
+                <Pressable key={p.key} style={[s.presetCard, on && s.presetCardOn]} onPress={() => changeTheme({ pfc: p.colors })}>
+                  <View style={s.presetBars}>
+                    {([p.colors.p, p.colors.f, p.colors.c] as const).map((col, i) => (
+                      <View key={i} style={[s.presetBar, { backgroundColor: col, width: (['80%', '55%', '95%'] as const)[i] }]} />
+                    ))}
+                  </View>
+                  <View style={s.presetFoot}>
+                    <Text style={[s.presetT, on && { color: C.ink, fontWeight: '800' }]} numberOfLines={1}>{t(p.label)}</Text>
+                    {on && <Text style={s.presetCheck}>✓</Text>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={s.subLabel}>{t('個別に選ぶ')}</Text>
 
           {([
             ['p', t('たんぱく質')],
@@ -923,7 +1019,7 @@ export default function SettingsScreen() {
                   const usedElsewhere = (['p', 'f', 'c'] as const)
                     .some((m) => m !== macro && theme.pfc[m] === sw.color);
                   return (
-                    <Pressable key={sw.key} onPress={() => setTheme({ pfc: { ...theme.pfc, [macro]: sw.color } })}>
+                    <Pressable key={sw.key} onPress={() => changeTheme({ pfc: { ...theme.pfc, [macro]: sw.color } })}>
                       <View style={[s.macroSw, { backgroundColor: sw.color }, selected && s.macroSwOn,
                                     usedElsewhere && !selected && { opacity: 0.28 }]}>
                         {selected && <Text style={s.macroCheck}>✓</Text>}
@@ -937,6 +1033,10 @@ export default function SettingsScreen() {
           {(theme.pfc.p === theme.pfc.f || theme.pfc.f === theme.pfc.c || theme.pfc.p === theme.pfc.c) && (
             <Text style={s.dupWarn}>{t('同じ色が重複しています。見分けにくくなるので別の色をおすすめします。')}</Text>
           )}
+          {/* ベリーは超過の赤（C.coral）と同じ値。選べるようにはするが、超過が見分けられなくなることは伝える */}
+          {[theme.pfc.p, theme.pfc.f, theme.pfc.c].includes(C.coral) && (
+            <Text style={s.dupWarn}>{t('超過の赤と同じ色が含まれています。目標を超えたときに見分けにくくなります。')}</Text>
+          )}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
@@ -949,8 +1049,8 @@ export default function SettingsScreen() {
         <ScrollView>
           {LOCALES.map((l) => (
             <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}>
-              <Text style={[s.langT, locale === l.code && { color: C.teal, fontWeight: '800' }]}>{l.label}</Text>
-              {locale === l.code && <Text style={{ color: C.teal, fontWeight: '800' }}>✓</Text>}
+              <Text style={[s.langT, locale === l.code && { color: C.accentInk, fontWeight: '800' }]}>{l.label}</Text>
+              {locale === l.code && <Text style={{ color: C.accentInk, fontWeight: '800' }}>✓</Text>}
             </Pressable>
           ))}
           <Text style={s.note}>{t('未翻訳の項目は日本語で表示されます。翻訳は順次追加していきます。')}</Text>
@@ -991,7 +1091,7 @@ export default function SettingsScreen() {
                 autoFocus maxLength={40} returnKeyType="done" onSubmitEditing={saveRename}
               />
               <Pressable onPress={saveRename} hitSlop={8}>
-                <Text style={{ color: C.teal, fontWeight: '800', fontSize: 14 }}>{t('保存')}</Text>
+                <Text style={{ color: C.accentInk, fontWeight: '800', fontSize: 14 }}>{t('保存')}</Text>
               </Pressable>
               <Pressable onPress={() => setRenameEdit(null)} hitSlop={8}>
                 <Text style={{ color: C.sub, fontWeight: '700', fontSize: 14 }}>{t('やめる')}</Text>
@@ -1135,9 +1235,19 @@ const s = themed(() => ({
   groupLabel: { fontSize: 13, fontWeight: '700', color: C.sub, marginBottom: 6, marginLeft: 6, letterSpacing: 0.4 },
   bgRow: { flexDirection: 'row', gap: 7 },
   bgCard: {
-    flex: 1, borderRadius: RADIUS.input, borderWidth: 1.5, borderColor: C.line,
+    flex: 1, minWidth: 0, borderRadius: RADIUS.input, borderWidth: 1.5, borderColor: C.line,
     padding: 8, alignItems: 'stretch',
   },
+  // P/F/Cプリセット（3枚横並び。中に3本のバーで配色をそのまま見せる）
+  presetRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  presetCard: { flex: 1, minWidth: 0, borderRadius: RADIUS.tile, borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, padding: 10, gap: 8 },
+  presetCardOn: { borderColor: C.teal, borderWidth: 2.5, backgroundColor: C.accentSoft },
+  presetBars: { gap: 5 },
+  presetBar: { height: 7, borderRadius: 4 },
+  presetFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
+  presetT: { flex: 1, fontSize: 12, fontWeight: '700', color: C.sub },
+  presetCheck: { fontSize: 13, fontWeight: '900', color: C.accentInk },
+  subLabel: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 16 },
   bgCardOn: { borderColor: C.teal, borderWidth: 2.5 },
   // 背景トーンの見本の中に置く「カード」。実際のカード面と同じトークンで塗る
   // （生の白のままだとダークで見本だけ白いカードが浮いてしまう）
@@ -1199,7 +1309,7 @@ const s = themed(() => ({
   sheetBody: { flex: 1, backgroundColor: C.bg, padding: 18, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sheetTitle: { ...HEAD.card, color: C.ink },
-  sheetClose: { fontSize: 15, fontWeight: '700', color: C.teal },
+  sheetClose: { fontSize: 15, fontWeight: '700', color: C.accentInk },
   // フォーム
   label: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 12, marginBottom: 4 },
   input: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input, padding: 12, fontSize: 17, color: C.ink },
@@ -1233,7 +1343,7 @@ const s = themed(() => ({
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 7, paddingVertical: 2,
   },
-  badgeT: { fontSize: 11, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  badgeT: { fontSize: 11, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   foodName: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   foodKcal: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
 }));

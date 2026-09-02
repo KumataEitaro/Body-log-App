@@ -173,12 +173,12 @@ const s = themed(() => ({
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6,
   },
-  todayPillT: { fontSize: 11, fontWeight: '800', color: C.teal },
+  todayPillT: { fontSize: 11, fontWeight: '800', color: C.accentInk },
   calBtn: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   calBtnPast: { backgroundColor: rgba(C.amber, 0.12), borderWidth: 1, borderColor: rgba(C.amber, 0.55) },  // 生HEX禁止（Cトークン由来）
   back: { flex: 1, backgroundColor: 'rgba(14,17,22,0.35)', justifyContent: 'center', padding: 24 },
   pickerCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
   pickerTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
   todayBtn: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
-  todayBtnT: { fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
+  todayBtnT: { fontSize: 13, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
 }));

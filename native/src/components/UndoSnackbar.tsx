@@ -118,7 +118,7 @@ const sw = themed(() => ({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   label: { flex: 1, fontSize: 14, fontWeight: '700', color: C.ink },
-  undo: { fontSize: 14, fontWeight: '800', color: C.teal },
+  undo: { fontSize: 14, fontWeight: '800', color: C.accentInk },
   // 残り時間の細いプログレス（下辺に沿わせる）
   track: { height: 3, borderRadius: 2, backgroundColor: C.track, overflow: 'hidden', marginTop: 9 },
   fill: { height: 3, borderRadius: 2, backgroundColor: C.teal },

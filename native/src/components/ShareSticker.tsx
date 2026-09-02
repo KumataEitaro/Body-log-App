@@ -151,7 +151,7 @@ export default function ShareStickerModal({ data, visible, onClose }: { data: St
             <Text style={st.ctaT}>{t('コピーしてストーリーに貼る')}</Text>
           </Pressable>
           <Pressable style={[st.cta, st.ctaTonal]} onPress={saveSticker} disabled={busy}>
-            <Text style={[st.ctaT, { color: C.teal }]}>{t('写真に保存')}</Text>
+            <Text style={[st.ctaT, { color: C.accentInk }]}>{t('写真に保存')}</Text>
           </Pressable>
           <Pressable onPress={onClose} hitSlop={8} style={{ alignSelf: 'center', marginTop: 10 }}>
             <Text style={st.close}>{t('とじる')}</Text>
@@ -172,7 +172,7 @@ const st = themed(() => ({
   toneBtn: { flex: 1, borderWidth: 1.5, borderColor: C.line, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
   toneBtnOn: { borderColor: C.teal, backgroundColor: C.accentSoft },
   toneT: { fontSize: 12.5, fontWeight: '700', color: C.sub },
-  toneTOn: { color: C.teal },
+  toneTOn: { color: C.accentInk },
   cta: { backgroundColor: C.teal, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 10 },
   ctaTonal: { backgroundColor: C.accentSoft },
   ctaT: { fontSize: 15, fontWeight: '800', color: '#fff' },

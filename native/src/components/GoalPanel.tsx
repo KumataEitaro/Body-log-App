@@ -488,7 +488,7 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
             {allowance === Math.round(bmr ?? 0) && requiredDaily > 0 ? `（${t('基礎代謝を下回らない下限で止めています')}）` : ''}
           </Text>
           {exPerDay > 0 && (
-            <Text style={[s.note, { color: C.teal, fontWeight: '700' }]}>
+            <Text style={[s.note, { color: C.accentInk, fontWeight: '700' }]}>
               {t('運動の目標（週{w}kcal）を達成すると、平均で1日 +{n}kcal 食べられます。運動を記録した日に自動で上乗せされます。', { w: Number(exWeeklyKcal).toLocaleString(), n: exPerDay.toLocaleString() })}
             </Text>
           )}
@@ -749,7 +749,7 @@ const s = themed(() => ({
   statusBig: { fontSize: 24, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   statusSub: { fontSize: 15, fontWeight: '700', marginTop: 2 },
   label: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 10, marginBottom: 4 },
-  rmPreview: { fontSize: 13, fontWeight: '700', color: C.teal, marginTop: 8 },
+  rmPreview: { fontSize: 13, fontWeight: '700', color: C.accentInk, marginTop: 8 },
   input: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 17, color: C.ink },
   note: { fontSize: 13, color: C.sub, lineHeight: 18, marginBottom: 6 },
   tiny: { fontSize: 11, color: C.faint, lineHeight: 15, marginTop: 8 },
@@ -764,7 +764,7 @@ const s = themed(() => ({
   bigNum: { fontSize: 40, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], lineHeight: 46 },
   bigUnit: { fontSize: 17, fontWeight: '600', color: C.sub, marginBottom: 6 },
   adjBadge: { backgroundColor: C.accentBadge, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8, marginLeft: 4 },
-  adjBadgeT: { fontSize: 12, fontWeight: '800', color: C.teal },
+  adjBadgeT: { fontSize: 12, fontWeight: '800', color: C.accentInk },
   projBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: rgba(C.amber, 0.08), borderRadius: 12, padding: 10, marginTop: 10 },
   projT: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   optBadge: { backgroundColor: C.chipBg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },

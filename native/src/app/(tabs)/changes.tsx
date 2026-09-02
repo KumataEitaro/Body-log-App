@@ -584,14 +584,14 @@ export default function ChangesScreen() {
           <Text style={s.kpiL}>{t('体重')}</Text>
           <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
           {latestW != null && firstW != null && (
-            <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.teal : C.coral }]}>
+            <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.successInk : C.coral }]}>
               {t('30日で')}{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
             </Text>
           )}
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('累計収支')}</Text>
-          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.teal : C.coral }]} maxFontSizeMultiplier={1.3}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
+          <Text style={[s.kpiV, { color: sumAll <= 0 ? C.successInk : C.coral }]} maxFontSizeMultiplier={1.3}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
           <Text style={s.kpiD}>{t('脂肪 約')}{(sumAll / 7200).toFixed(1)}kg</Text>
         </View>
         <View style={s.kpi}>
@@ -719,14 +719,14 @@ export default function ChangesScreen() {
           <View style={s.card}>
             <View style={s.h2Row}><FlaskConical size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食材とあなたの体の傾向')}</Text></View>
             <Text style={s.note}>{t('よく食べる食材ごとに「食べた翌日」と「食べなかった翌日」の体重変化を比べました。')}</Text>
-            {down.length > 0 && <Text style={[s.fxHead, { color: C.teal }]}>{t('▼ 食べた翌日、下がりやすい')}</Text>}
+            {down.length > 0 && <Text style={[s.fxHead, { color: C.accentInk }]}>{t('▼ 食べた翌日、下がりやすい')}</Text>}
             {down.map((f) => (
               <View key={f.name} style={s.fxRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.fxName}>{f.name}</Text>
                   <Text style={s.note}>{t('食べた日{n}日の平均', { n: f.withN })} {g(f.withAvg)} ／ {t('食べない日')} {g(f.withoutAvg)}</Text>
                 </View>
-                <Text style={[s.fxVal, { color: C.teal }]}>{g(f.effect)}</Text>
+                <Text style={[s.fxVal, { color: C.accentInk }]}>{g(f.effect)}</Text>
               </View>
             ))}
             {up.length > 0 && <Text style={[s.fxHead, { color: C.coral }]}>{t('▲ 食べた翌日、上がりやすい')}</Text>}
@@ -1254,7 +1254,7 @@ const s = themed(() => ({
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12,
     backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 4,
   },
-  toTableT: { fontSize: 11, fontWeight: '800', color: C.teal },
+  toTableT: { fontSize: 11, fontWeight: '800', color: C.accentInk },
   addBtn: {
     width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
@@ -1286,7 +1286,7 @@ const s = themed(() => ({
   },
   moveLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   moveBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  moveBtnT: { fontSize: 17, fontWeight: '800', color: C.teal },
+  moveBtnT: { fontSize: 17, fontWeight: '800', color: C.accentInk },
   actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
   actBtnT: { fontSize: 13, fontWeight: '800', color: C.ink },
   actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
@@ -1315,7 +1315,7 @@ const s = themed(() => ({
   dayRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   dayText: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
   kcalBadge: { backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 3 },  // 生HEX淡緑はダークで浮くためトークン化
-  kcalBadgeT: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  kcalBadgeT: { fontSize: 13, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   fxHead: { fontSize: 13, fontWeight: '800', marginTop: 8, marginBottom: 2 },
   fxRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line },
   fxName: { fontSize: 15, fontWeight: '700', color: C.ink },
@@ -1357,14 +1357,14 @@ const s = themed(() => ({
   menuSub: { fontSize: 12.5, color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
   menuGo: { fontSize: 21, color: C.faint, fontWeight: '600', marginLeft: 2 },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 2 },
-  backT: { fontSize: 15, fontWeight: '800', color: C.teal },
+  backT: { fontSize: 15, fontWeight: '800', color: C.accentInk },
   detailTitle: { fontSize: 24, fontWeight: '900', color: C.ink, marginBottom: 12 },
   // 詳細ページのヘルスケア式ヘッダー（大きな現在値＋トレンド文章）
   detailHead: { marginTop: -6, marginBottom: 14 },
   detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   detailUnit: { fontSize: 16, fontWeight: '700', color: C.sub },
   detailTrend: { fontSize: 13.5, fontWeight: '700', color: C.sub, marginTop: 2 },
-  detailWater: { fontSize: 13, fontWeight: '700', color: C.teal, lineHeight: 19, marginTop: 4 },
+  detailWater: { fontSize: 13, fontWeight: '700', color: C.accentInk, lineHeight: 19, marginTop: 4 },
   // トレンドの2期間平均線（B-17）
   bandBox: { marginTop: 10 },
   bandHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

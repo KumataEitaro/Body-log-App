@@ -340,5 +340,5 @@ const s = themed(() => ({
   fsWrap: { flex: 1, backgroundColor: C.bg, paddingTop: 64, paddingHorizontal: 16 },
   fsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   fsTitle: { fontSize: 17, fontWeight: '800', color: C.ink },
-  fsClose: { fontSize: 14, fontWeight: '700', color: C.teal },
+  fsClose: { fontSize: 14, fontWeight: '700', color: C.accentInk },
 }));

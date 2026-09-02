@@ -89,7 +89,7 @@ const s = themed(() => ({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   sub: { fontSize: 13, color: C.sub, lineHeight: 19 },
-  meta: { fontSize: 12, fontWeight: '700', color: C.teal, marginTop: 8, fontVariant: ['tabular-nums'] },
+  meta: { fontSize: 12, fontWeight: '700', color: C.accentInk, marginTop: 8, fontVariant: ['tabular-nums'] },
   input: {
     marginTop: 8, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 17, color: C.ink,

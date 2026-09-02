@@ -95,7 +95,7 @@ const s = themed(() => ({
   cardH: { fontSize: 14, fontWeight: '800', color: C.ink, marginBottom: 8 },
   li: { fontSize: 13.5, color: C.sub, lineHeight: 22 },
   linkRow: { paddingVertical: 10 },
-  link: { fontSize: 14.5, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
+  link: { fontSize: 14.5, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 18 },
   box: {
     width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: C.line,
