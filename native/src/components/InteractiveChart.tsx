@@ -334,7 +334,7 @@ const s = themed(() => ({
   fsBtnT: { fontSize: 13, color: C.sub, fontWeight: '700' },
   foot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   footT: { fontSize: 11, color: C.sub, fontVariant: ['tabular-nums'] },
-  footHint: { fontSize: 9.5, color: C.faint },
+  footHint: { fontSize: 11, color: C.faint },
   empty: { alignItems: 'center', justifyContent: 'center' },
   emptyT: { fontSize: 12.5, color: C.sub },
   fsWrap: { flex: 1, backgroundColor: C.bg, paddingTop: 64, paddingHorizontal: 16 },

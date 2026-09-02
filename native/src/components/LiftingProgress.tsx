@@ -148,7 +148,7 @@ export function LiftKpiCard() {
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('回数')}</Text>
           {/* KPIの大数字は3列固定グリッドのため文字サイズ拡大は上限1.3 */}
-          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? ` / ${habit.perWeek}回` : t('回')}</Text></Text>
+          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{count}<Text style={s.kpiU}>{habit.perWeek != null ? t(' / {n}回', { n: habit.perWeek }) : t('回')}</Text></Text>
         </View>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('消費')}</Text>
@@ -364,7 +364,7 @@ export function LiftChartCard() {
         points={chartMode === '1rm'
           ? rmPoints
           : exPoints.map((p) => ({ date: p.date, value: chartMode === 'kg' ? p.maxKg : p.volume }))}
-        unit={chartMode === 'volume' ? 'kg·回' : 'kg'} decimals={0}
+        unit={chartMode === 'volume' ? t('kg·回') : 'kg'} decimals={0}
         planValue={chartMode === '1rm' && activeEx ? goalKg.get(activeEx) ?? null : null}
         presetDays={null}
       />
@@ -457,7 +457,7 @@ const s = themed(() => ({
   prKg: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   prUnit: { fontSize: 11, fontWeight: '600', color: C.sub },
   prNew: { fontSize: 11, fontWeight: '900', color: C.coral },
-  prDate: { fontSize: 10.5, color: C.faint },
+  prDate: { fontSize: 11, color: C.faint },
   pvChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   pvChip: { paddingHorizontal: 11, paddingVertical: 6 },
   pvChipOn: { backgroundColor: C.ink, borderColor: C.ink },

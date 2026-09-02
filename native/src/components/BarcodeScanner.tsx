@@ -2,7 +2,7 @@
 // 1500人監査ペイン2位「バーコード・公式栄養DBが無い」への入口。
 // 読み取り成功で触覚1回→即クローズ→onScanned(jan) を呼ぶ（照会は呼び出し側の責務）。
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Modal, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { ScanBarcode } from 'lucide-react-native';

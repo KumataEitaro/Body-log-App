@@ -22,6 +22,11 @@ export const WEEKLY_STD = -3500; // 週の標準進捗（-500/日）
 export const AI_DAILY_LIMIT = 15; // AI解析の1人1日あたり回数
 // 全ユーザー合計の1日上限（課金の安全弁＝これ以上は誰が使っても止まる。1日の最大コストを固定する本当の天井）
 export const GLOBAL_AI_DAILY_CAP = 200;
+// プラン別の上限が点火しているか。正本はサーバー側 lib/calc.ts の同名定数で、ここはその鏡
+// （jest `lib/__tests__/gate.test.ts` が両ファイルの値の一致を固定する）。false の間は全機能無料運用なので
+// 王冠（useGate().gated）は出さない＝「課金すれば開く」という嘘を画面に出さないための止め金。
+// 点火するときは両方を同時に true にしてビルドする（docs/BACKLOG.md「課金列車」）
+export const AI_LIMITS_ENABLED = false;
 
 // AI回数無制限のアカウント（管理者）。上限チェックのみスキップし、使用回数の記録など他の挙動は全ユーザー共通
 export const UNLIMITED_EMAILS = ['gotcha429@gmail.com'];

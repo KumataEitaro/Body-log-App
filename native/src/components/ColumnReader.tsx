@@ -192,7 +192,7 @@ const s = themed(() => ({
   title: { fontSize: 15, fontWeight: '700', color: C.ink, flexShrink: 1 },
   newDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.teal },
   newPill: { backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 6, paddingVertical: 1 },
-  newPillT: { fontSize: 10, fontWeight: '900', color: C.accentInk, letterSpacing: 0.4 },
+  newPillT: { fontSize: 11, fontWeight: '900', color: C.accentInk, letterSpacing: 0.4 },
   lead: { fontSize: 13, color: C.sub, marginTop: 2 },
   readerWrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   readerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

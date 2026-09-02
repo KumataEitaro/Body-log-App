@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import { Flame } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';

@@ -74,12 +74,12 @@ export default function NotificationCenter({ visible, onClose }: { visible: bool
                   <Text style={s.icon}>{todo.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={s.rowT} numberOfLines={1}>{t(todo.title)}</Text>
+                      <Text style={s.rowT} numberOfLines={1}>{todo.title}</Text>
                       <View style={[s.tag, { backgroundColor: u.bg }]}>
                         <Text style={[s.tagT, { color: u.fg }]}>{u.label}</Text>
                       </View>
                     </View>
-                    <Text style={s.rowSub}>{t(todo.detail)}</Text>
+                    <Text style={s.rowSub}>{todo.detail}</Text>
                   </View>
                   <Text style={s.arrow}>›</Text>
                 </Pressable>

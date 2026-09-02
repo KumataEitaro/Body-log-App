@@ -2,6 +2,7 @@
 // 目標を立てていない項目は出さない（使わない機能を毎日せかさないため）。
 import { supabase } from './supabase';
 import { todayJST } from './calc';
+import { t } from './i18n';
 
 export type Todo = {
   key: string;
@@ -45,8 +46,8 @@ export async function buildTodos(): Promise<TodoResult> {
     todos.push({
       key: 'meal',
       icon: '🍽',
-      title: '今日の食事がまだ未記録です',
-      detail: '1行書くだけでOK。記録が続くほど数字が現実に近づきます。',
+      title: t('今日の食事がまだ未記録です'),
+      detail: t('1行書くだけでOK。記録が続くほど数字が現実に近づきます。'),
       route: '/log',
       urgency: 'now',
     });
@@ -60,8 +61,8 @@ export async function buildTodos(): Promise<TodoResult> {
     todos.push({
       key: 'weight',
       icon: '⚖️',
-      title: hasWeightGoal ? '今日の体重がまだです' : `体重が${daysSinceWeight >= 99 ? '未記録' : `${daysSinceWeight}日ぶり`}です`,
-      detail: hasWeightGoal ? '目標日までの計画を正しく引き直すために使います。' : '週に数回でも記録があると、傾向が読めるようになります。',
+      title: hasWeightGoal ? t('今日の体重がまだです') : daysSinceWeight >= 99 ? t('体重が未記録です') : t('体重が{n}日ぶりです', { n: daysSinceWeight }),
+      detail: hasWeightGoal ? t('目標日までの計画を正しく引き直すために使います。') : t('週に数回でも記録があると、傾向が読めるようになります。'),
       route: '/log',
       urgency: hasWeightGoal ? 'now' : 'soon',
     });
@@ -80,8 +81,8 @@ export async function buildTodos(): Promise<TodoResult> {
       todos.push({
         key: 'exercise',
         icon: '🏃',
-        title: `今週の運動があと${perWeek - exDays}回`,
-        detail: `目標は週${perWeek}回。いまは${exDays}回です。散歩でも1回に数えられます。`,
+        title: t('今週の運動があと{n}回', { n: perWeek - exDays }),
+        detail: t('目標は週{w}回。いまは{n}回です。散歩でも1回に数えられます。', { w: perWeek, n: exDays }),
         route: '/training',
         urgency: 'soon',
       });
@@ -96,8 +97,8 @@ export async function buildTodos(): Promise<TodoResult> {
       todos.push({
         key: 'photo',
         icon: '📸',
-        title: lastPhoto ? `体の写真が${d}日ぶりです` : '体の写真をまだ撮っていません',
-        detail: '同じ場所・同じポーズで週1枚。数字に出ない変化が見えます。',
+        title: lastPhoto ? t('体の写真が{n}日ぶりです', { n: d }) : t('体の写真をまだ撮っていません'),
+        detail: t('同じ場所・同じポーズで週1枚。数字に出ない変化が見えます。'),
         route: '/changes',
         urgency: 'soon',
       });
@@ -109,8 +110,8 @@ export async function buildTodos(): Promise<TodoResult> {
     todos.push({
       key: 'mood',
       icon: '💭',
-      title: '今日の気分が未記録です',
-      detail: '気分と食欲はつながっています。1タップで記録できます。',
+      title: t('今日の気分が未記録です'),
+      detail: t('気分と食欲はつながっています。1タップで記録できます。'),
       route: '/log',
       urgency: 'info',
     });
@@ -121,8 +122,8 @@ export async function buildTodos(): Promise<TodoResult> {
     todos.unshift({
       key: 'goal',
       icon: '🎯',
-      title: '目標がまだ設定されていません',
-      detail: '目標を決めると、毎日の「あと食べられる量」が自動で計算されます。',
+      title: t('目標がまだ設定されていません'),
+      detail: t('目標を決めると、毎日の「あと食べられる量」が自動で計算されます。'),
       route: '/settings',
       urgency: 'now',
     });
@@ -136,8 +137,8 @@ export async function buildTodos(): Promise<TodoResult> {
     todos.push({
       key: 'backfill',
       icon: '📝',
-      title: '昨日の食事が未記録のままです',
-      detail: 'ざっくりでOK。抜けが続くと収支の数字と現実がズレていきます。',
+      title: t('昨日の食事が未記録のままです'),
+      detail: t('ざっくりでOK。抜けが続くと収支の数字と現実がズレていきます。'),
       route: '/log',
       urgency: 'soon',
     });

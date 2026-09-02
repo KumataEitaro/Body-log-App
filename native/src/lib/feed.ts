@@ -40,11 +40,11 @@ export function logTitle(l: FeedLog): string {
   if (l.text?.startsWith('🏃')) return l.text.replace(/^🏃 /, '');
   if (items.length > 0) {
     const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
-    return names + (items.length > 3 ? ` ほか${items.length - 3}品` : '');
+    return names + (items.length > 3 ? t(' ほか{n}品', { n: items.length - 3 }) : '');
   }
   if (l.kcal != null) return String(l.text || t('食事（概算）')).replace(/^（|）$/g, '').slice(0, 60);
   if (l.weight != null) return t('体重 {n}kg', { n: Number(l.weight).toFixed(1) });
-  if (l.ex && l.ex !== 'オフ') return `運動 ${l.ex}`;
+  if (l.ex && l.ex !== 'オフ') return t('運動 {ex}', { ex: t(l.ex) });
   // 気分は「4/5」の分数を見せない（テキスト消費箇所＝削除確認Alert等でもドットにする）
   const lv = moodLevelOf(l);
   if (lv != null) return `${t('気分')} ${'●'.repeat(lv)}${'○'.repeat(5 - lv)}`;

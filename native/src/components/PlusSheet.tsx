@@ -16,7 +16,7 @@
 // - タイルは C.panel の面・RADIUS.card の角丸・押下でアクセント縁＋わずかに縮む。
 //   アイコンはアクセント色の薄い円の上に載せ、ラベルは 15px/800
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -104,6 +104,9 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={flush} statusBarTranslucent>
+      {/* 体重の段でキーボードが出ると、画面下端に置いたシートごと隠れる（入力欄も「体重を記録」も見えない）。
+          KAV でシートをキーボードの上へ持ち上げる（2026-09-02 自己監査） */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel={t('閉じる')} />
         <GestureDetector gesture={pan}>
@@ -164,6 +167,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
           </Animated.View>
         </GestureDetector>
       </GestureHandlerRootView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

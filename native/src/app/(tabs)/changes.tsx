@@ -45,7 +45,6 @@ import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
 import StatusBarMask from '@/components/StatusBarMask';
-import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import LiftHistoryCard from '@/components/LiftHistoryCard';
 import ErrorBoundary from '@/components/ErrorBoundary';

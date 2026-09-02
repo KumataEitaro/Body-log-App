@@ -5,14 +5,13 @@
 // ③ 目標（体重・期日・体脂肪率は任意。減らす人も増やす人も同じ逆算）
 // ④ 筋トレ目標（任意・スキップ可）
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, {
   FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setFirstRunFlag } from '@/lib/firstrun';
 import { supabase } from '@/lib/supabase';
 import { C, themed } from '@/lib/ui';
