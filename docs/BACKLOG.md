@@ -4,6 +4,22 @@
 横断変更は全機能スイープ（grep全数→全件判定→対象外の正しさ監査）を行うこと。
 更新日: 2026-08-27（夜: 全消し込み実施）
 
+## ✅ 実装済み（2026-09-02 v1.1.0・App Store提出版・featureブランチ残置）
+- 目標統合（体重/運動/習慣/カロリー/PFC常時表示・赤字の日/週/月算出・手動調整） … feat/goal-hub
+- 超過3段階＋週間・月間収支カード（ダイエットの基本原理） … feat/goal-hub
+- 食事入力を＋ボタン→2段シートへ（固定ドック廃止・バーコード無し）・日付スティッキー・記録行タイポ … feat/input-plus
+- 筋トレ記録全画面（レスト/セット/±kgダイアル）・運動記録シート・消費kcal不反映の修正 … feat/lift-screen
+- 運動タブ並び替え・歩数からの消費推定（3段階） … feat/exercise-reorder-steps
+- リモートコンテンツ（読み物/バッジDSL/法則文言をOTA・migration-30） … feat/remote-content
+- インサイト・エンジン（日次特徴量・相関・新法則9種・coach注入）＋気づきアラート … feat/insights-engine, feat/insight-alerts
+- 法則の解説記事（7節・出典実在確認・17種） … feat/law-articles, feat/law-evidence-2
+- 食べた時間チップ … feat/meal-time ／ マイ食品AI登録・呼称統一（migration-31） … feat/myfoods-ai
+- ヘルスケア恒久同期（変更イベント駆動・BG配信・体重自動取込） … feat/health-autosync
+- 新パレット（エレクトリック・accentInk・AA検査） … feat/palette-electric ／ アイコン刷新・黒縁除去
+- 招待導線(/invite)・生理周期（migration-28）・フィードバック窓口＋★依頼（migration-29）・バイタル＋受診PDF（migration-25）
+- 広告枠を全タブへ・課金即時消去 … feat/ads-all-tabs ／ 食事タブ内「何を食べる？」 … feat/what-to-eat
+- 自己検閲1.1（UX16件・バグ12件修正・カード調停・日付跨ぎ・王冠の嘘・テンプレ削除） … fix/self-audit-1.1b（docs/SELF-AUDIT-1.1.md）
+
 ## ✅ 実装済み（2026-08-29 v1.0.19・featureブランチ残置）— 残件ゼロ化バッチ
 - 安全ガード8件（BMI18.5下限＋週1kgペース上限／過食2,500kcal超の非審判文言／
   妊娠・授乳フラグ=migration-21／復帰トーン確認／AI相談の安全チェック層／
