@@ -1829,4 +1829,5 @@ export const ES: Record<string, string> = {
   "PFCの内訳": "Distribución de PFC",
   "目的に合わせて既定値が入っています。そのままでも大丈夫。変えたい人だけ書き換えてください。": "Valores predeterminados según tu objetivo. Puedes dejarlos como están o cambiarlos si lo prefieres.",
   "PFCを保存する": "Guardar PFC",
+  "ほかに、このアプリで記録した運動 {n}kcal": "Además, {n}kcal de ejercicio registrado en esta app",
 };

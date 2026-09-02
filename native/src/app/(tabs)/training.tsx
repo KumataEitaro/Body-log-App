@@ -1,10 +1,11 @@
 // 運動タブ: かんたん記録（散歩レベルの日常運動をMETs換算で1タップ記録）＋筋トレ
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { healthAvailable, requestHealthAuth, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, activeEnergyAuthState, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import { activeKcalGoalBonus, useActiveKcalToGoal } from '@/lib/activeKcal';
+import { resolveBurnKcal, stepsForKcal } from '@/lib/stepsKcal';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +17,8 @@ import { ClipboardList, Timer, Footprints, Target, Flame, Activity } from 'lucid
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
 import StatusBarMask from '@/components/StatusBarMask';
-import { useGuideTarget, useGuideScroller } from '@/components/GuideTour';
+import { useGuide, useGuideTarget } from '@/components/GuideTour';
+import ReorderableCards from '@/components/ReorderableCards';
 import HeaderGear from '@/components/HeaderGear';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
@@ -31,7 +33,7 @@ import {
   ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, DEFAULT_VISIBLE,
 } from '@/lib/activities';
 import { bumpFoodFreq, readFoodFreq, foodScores } from '@/lib/foods';
-import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
+import { AddCardSheet, useCardLayout, useCardOrder } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
@@ -49,12 +51,15 @@ const REST_OPTIONS = [30, 60, 90, 120, 180, 300, 600];
 // レスト秒数の表示（60の倍数は「分」、90秒などはそのまま「秒」）
 const fmtRest = (n: number) => (n >= 60 && n % 60 === 0 ? t('{n}分', { n: n / 60 }) : t('{n}秒', { n }));
 
-// 表示/非表示できるカード（上から: きょうの動き→ゆる記録→筋トレ入力）。
+// 並び替え・表示/非表示できるカード（既定の並び: きょうの動き→ゆる記録→レストタイマー→筋トレ入力）。
+// 概要タブと同じ操作（日付ストリップ or カードの長押し→編集モード／ドラッグで並び替え／⊖で非表示／⊕で戻す）。
+// 非表示は 'bl-cards-exercise'（useCardLayout）・並び順は 'bl-order-exercise'（useCardOrder）に別キーで保存。
 // 筋トレ履歴カードは概要タブ「筋トレの成長」へ移設した（components/LiftHistoryCard.tsx）
-const EX_CARDS = ['move', 'quick', 'liftInput'];
+const EX_CARDS = ['move', 'quick', 'rest', 'liftInput'];
 const EX_LABELS = (): Record<string, string> => ({
   move: t('きょうの動き'),
   quick: t('今日の消費カロリーを記録'),
+  rest: t('レストタイマー'),
   liftInput: t('今日のトレーニングを記録'),
 });
 
@@ -75,11 +80,8 @@ export default function TrainingScreen() {
   const restTarget = useGuideTarget('restTimer');  // ガイド章「筋トレは全部無料」: レストタイマー
   const liftTarget = useGuideTarget('liftInput');  // ガイド章「筋トレは全部無料」: 筋トレ入力カード
   const router = useRouter();
-  const trScrollRef = useRef<ScrollView>(null);
-  const trY = useRef(0);
-  useGuideScroller('/training', useCallback((delta: number) => {
-    trScrollRef.current?.scrollTo({ y: Math.max(0, trY.current + delta), animated: true });
-  }, []));
+  // ガイドツアーの自動スクロールは ReorderableCards の onScroller 経由で登録する（概要タブと同じ）
+  const guide = useGuide();
 
   // レストタイマーのカウントダウン（0になった瞬間にバイブで知らせる）
   useEffect(() => {
@@ -112,10 +114,19 @@ export default function TrainingScreen() {
   const [viewDate, setViewDate] = useState(todayJST());
   // 運動目標の編集モーダル
   const [goalOpen, setGoalOpen] = useState(false);
+  // 表示/非表示（従来キー）と並び順（新キー）。編集モードの開始/確定/離脱時保存は useCardOrder が持つ
   const cards = useCardLayout('bl-cards-exercise', EX_CARDS);
-
-  const vis = (k: string) => !cards.layout.hidden.includes(k);
-  const [editing, setEditing] = useState(false);
+  const orderCtl = useCardOrder('bl-order-exercise', EX_CARDS);
+  const { editing, setEditing } = orderCtl;
+  const hiddenCards = cards.layout.hidden;
+  const visibleOrder = orderCtl.order.filter((k) => !hiddenCards.includes(k));
+  // 表示中カードの並べ替え結果を、非表示カードの位置を保ったまま全体の順序へ戻す（概要タブと同じ）
+  const setVisibleOrder = (nextVisible: string[]) => {
+    let i = 0;
+    orderCtl.setOrder(orderCtl.order.map((k) => (hiddenCards.includes(k) ? k : nextVisible[i++])));
+  };
+  // 最初の並び・表示に戻す
+  function resetLayout() { cards.reset(); orderCtl.reset(); }
   const [addOpen, setAddOpen] = useState(false);
 
   // ===== オフラインキュー（ジム地下の圏外対策）=====
@@ -150,10 +161,12 @@ export default function TrainingScreen() {
     setProf((pr.data as { sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number } | null) ?? null);
   }, []);
   useEffect(() => { loadMove(viewDate); }, [viewDate, loadMove]);
-  const loadHealth = useCallback(async () => {
-    if (!healthAvailable()) return;
+  const loadHealth = useCallback(async (): Promise<HealthDaySummary[] | null> => {
+    if (!healthAvailable()) return null;
     const r = await readActivitySummary(7);
-    if (!('error' in r)) setHealthDays(r);
+    if ('error' in r) return null;
+    setHealthDays(r);
+    return r;
   }, []);
   useEffect(() => { loadHealth(); }, [loadHealth]);
   // 時間帯別の歩数（0-23時・ヘルスケア式バー）。HealthKitが無い環境ではnullのまま＝出さない
@@ -169,12 +182,6 @@ export default function TrainingScreen() {
   }
   const dayOfView = healthDays?.find((d) => d.date === viewDate) ?? null;
   const stepsOfView = dayOfView?.steps ?? null;
-  // アクティブkcal（ヘルスケア実測・歩行や日常活動を含む）。未連携/非対応環境はnull＝
-  // 従来どおりアプリ記録ぶん（logs adj）だけを「消費（記録）」として見せる。
-  // 直近7日が全部0のときも「実測が取れていない」と見て従来表示に落とす
-  // （アクティブの許可だけ拒否された場合に「0 kcal」を実測として誇らないため）
-  const activeOfView = healthDays != null && healthDays.some((d) => d.activeKcal > 0)
-    ? (dayOfView?.activeKcal ?? 0) : null;
   // 歩数の週目標（B-15・オフ=null）。日目標と違い1日サボっても取り返せる、ゆるい自己契約
   const weekStepsGoal = useWeekStepsGoal();
 
@@ -249,6 +256,43 @@ export default function TrainingScreen() {
       });
   }, []);
   const weightAt = weightLookup(weightRows);
+
+  // ===== 消費kcalの出どころ（lib/stepsKcal.ts resolveBurnKcal に優先順位を固定） =====
+  //   ① ヘルスケア実測（アクティブエネルギー）が >0 → それ
+  //   ② 実測が 0/取れないが歩数 >0 → 歩数からの推定（歩数×0.0005×体重・「およそ」を明示）
+  //   ③ どちらも無し → アプリ記録ぶん（logs adj）だけの従来表示
+  // 「10,013歩なのに 0kcal」（βFB）は、実測が無い環境（再許可されていない／Apple Watchなし）で
+  // 従来表示に落ちていたのが原因。歩数が取れている限り②で必ず数字が出る
+  const burn = resolveBurnKcal({
+    measured: healthDays != null ? (dayOfView?.activeKcal ?? 0) : null,
+    steps: stepsOfView,
+    weightKg: myWeight,
+    recorded: burnToday,
+  });
+  // 目標への上乗せに使える「アクティブ相当」。③は目標側にすでにadjで入っているので渡さない
+  const activeOfView = burn.source !== 'recorded' ? burn.kcal : null;
+  // アクティブエネルギーの読み取りが未許可らしい: 歩数は取れているのに直近7日の実測が全部0。
+  // iOSは読み取りの許可状態を教えないので、これが唯一の手がかり（Watchなしで本当に0の人も含む）
+  const needsActiveAuth = healthDays != null && stepsOfView != null && !healthDays.some((d) => d.activeKcal > 0);
+  const [authBusy, setAuthBusy] = useState(false);
+  // 再要求してもダイアログが出ない（すでに聞いた後）ときの設定アプリへの案内文
+  const [authHint, setAuthHint] = useState<string | null>(null);
+  async function reauthActiveEnergy() {
+    if (authBusy) return;
+    setAuthBusy(true); setAuthHint(null);
+    try {
+      const st = await activeEnergyAuthState();
+      if (st !== 'asked') {
+        // まだ聞いていない（READ_TYPESに型を足した後の既存ユーザー）→ iOSは追加した型だけ聞いてくれる
+        await requestHealthAuth();
+        invalidateActiveEnergyCache();
+        const r = await loadHealth();
+        if (r && r.some((d) => d.activeKcal > 0)) return;   // 取れた。表示は①へ切り替わる
+      }
+      // 一度拒否されると再ダイアログは出ない（iOSの仕様）。設定アプリの場所を案内する
+      setAuthHint(t('許可のダイアログは一度しか出ません。iOSの「設定 > ヘルスケア > データアクセスとデバイス > BodyLoger」で「アクティブエネルギー」をオンにしてください（タップで設定を開く）。Apple Watchが無い場合は実測が無いことがあり、その間は歩数から推定します。'));
+    } finally { setAuthBusy(false); }
+  }
 
   // ヘルスケア取込モード（Apple Watch等のワークアウトを一括登録）
   const [hkOpen, setHkOpen] = useState(false);
@@ -509,14 +553,11 @@ export default function TrainingScreen() {
     }
   }
 
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-    <ScrollView
-      ref={trScrollRef}
-      style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
-      onScroll={(e) => { trY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={32}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); invalidateActiveEnergyCache(); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
-    >
+  // ===== ヘッダー（ReorderableCards の header: 見出し・編集ボタン・未同期チップ・メッセージ） =====
+  // 編集モードの入口は概要タブと同じ「長押し」（日付ストリップ or カード本体）。
+  // 編集中は日付ストリップの代わりに ⊕（戻す）／元に戻す／完了 を出す
+  const headerJSX = (
+    <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginRight: 38 }}>
         <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
         {editing ? (
@@ -524,7 +565,8 @@ export default function TrainingScreen() {
             <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
               <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
             </Pressable>
-            <Pressable onPress={() => setEditing(false)} style={s.doneBtn2} hitSlop={8}>
+            <Pressable onPress={resetLayout} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
+            <Pressable onPress={orderCtl.finishEditing} style={s.doneBtn2} hitSlop={8}>
               <Text style={s.doneBtn2T}>{t('完了')}</Text>
             </Pressable>
           </View>
@@ -534,6 +576,7 @@ export default function TrainingScreen() {
           </Pressable>
         )}
       </View>
+      {editing && <Text style={s.editHint}>{t('カードを長押し→そのままドラッグで並び替え。⊖で隠す。「完了」で保存します')}</Text>}
 
       {/* 未同期バッジ: 圏外保存の積み残しがあるときだけ、控えめなチップで知らせる（タップで手動送信） */}
       {pendingN > 0 && (
@@ -545,10 +588,14 @@ export default function TrainingScreen() {
 
       {/* 操作結果のメッセージ（どのカードの操作もここに出す） */}
       {msg && <Text style={[s.msg, { marginTop: 0, marginBottom: 10, color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+    </>
+  );
 
-      {/* ===== きょうの動き: 消費kcal・歩数・目標への逆算（食事の残量と同じ文法） ===== */}
-      {vis('move') && (() => {
-        const kcalPerStep = Math.max(0.02, myWeight * 0.0005); // 87kgで約0.044kcal/歩
+  // ===== 並び替え対象のカード（キー→JSX）。ReorderableCards が visibleOrder の順に描く =====
+  // ⊖バッジ・長押しで編集開始・編集中の操作停止（pointerEvents）は ReorderableCards 側が付ける
+  function renderCard(key: string) {
+    if (key === 'move') {
+        // ===== きょうの動き: 消費kcal・歩数・目標への逆算（食事の残量と同じ文法） =====
         const walkKcalMin = 0.0613 * myWeight;                 // はや歩き3.5METs相当
         // 目標への上乗せ（設定「アクティブカロリーを目標に反映する」がONのときだけ）。
         // アクティブ全量ではなく max(0, アクティブ − BMR×(生活係数−1)) を足す
@@ -568,7 +615,8 @@ export default function TrainingScreen() {
             ? { text: t('増量ノルマまで あと{n}kcal 食べる', { n: (-over).toLocaleString() }), color: C.amber }
             : { text: t('今日の増量ノルマ達成💪'), color: C.teal };
         } else if (over > 0) {
-          const steps = Math.ceil(over / kcalPerStep / 100) * 100;
+          // 歩数への逆算は消費推定と同じ係数（lib/stepsKcal.ts）＝表示の数字と往復しても食い違わない
+          const steps = stepsForKcal(over, myWeight);
           const min = Math.max(5, Math.round(over / walkKcalMin / 5) * 5);
           line = { text: t('食べすぎぶんは あと約{s}歩（はや歩き{m}分）で帳尻が合います', { s: steps.toLocaleString(), m: min }), color: C.amber };
         } else {
@@ -579,31 +627,46 @@ export default function TrainingScreen() {
         const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
         return (
           <Animated.View entering={FadeInDown.duration(320)} style={s.card}>
-            <MinusBadge editing={editing} onPress={() => cards.hide('move')} />
             {/* ガイドの照射対象は上段（見出し・2スタット・逆算の1行）だけ。カード全体は縦に長く、
                 スポットライトが画面からはみ出すため（レイアウトへの影響なし: 親はgap未使用） */}
             <View ref={moveTarget} collapsable={false}>
             <View style={s.h2Row}><Activity size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('きょうの動き')}</Text></View>
             <View style={s.mvRow}>
-              {/* 消費スタット: ヘルスケア連携があれば「アクティブ実測」を主に出す。
-                  歩数10,013歩なのに消費0kcalという不合理（βFB 2026-09-01）は、
-                  アプリに手で記録した運動（logs adj）だけを見ていたことが原因。
-                  実測は歩行・日常活動を含むので1万歩なら数百kcalになる。
-                  副にアプリ記録ぶんを小さく添え、どちらの数字かが分かるようにする */}
+              {/* 消費スタット: 出どころは burn.source（①実測 → ②歩数からの推定 → ③アプリ記録）。
+                  歩数10,013歩なのに消費0kcalという不合理（βFB 2026-09-01）は、実測が無い環境で
+                  アプリに手で記録した運動（logs adj）だけに落ちていたのが原因。歩数が取れている限り
+                  ②で必ず数字が出る。副に出どころとアプリ記録ぶんを小さく添え、どの数字かが分かるようにする */}
               <View style={s.mvStat}>
                 <View style={s.mvLblRow}><Flame size={13} color={C.sub} />
-                  <Text style={s.mvLbl}>{activeOfView != null ? t('消費（運動）') : t('消費（記録）')}</Text>
+                  <Text style={s.mvLbl}>
+                    {burn.source === 'measured' ? t('消費（運動）') : burn.source === 'steps' ? t('消費（歩数から推定）') : t('消費（記録）')}
+                  </Text>
                 </View>
                 {/* 2スタットの大数字は横並び固定のため文字サイズ拡大は上限1.3 */}
                 <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>
-                  {(activeOfView != null ? activeOfView : Math.round(burnToday)).toLocaleString()}
+                  {burn.kcal.toLocaleString()}
                   <Text style={s.mvUnit}> kcal</Text>
                 </Text>
-                {activeOfView != null && (
+                {burn.source === 'measured' && (
                   <>
                     <Text style={s.mvStatSub}>{t('アクティブ（ヘルスケア実測）')}</Text>
                     <Text style={s.mvStatSub}>{t('うちアプリ記録ぶん {n}kcal', { n: Math.round(burnToday).toLocaleString() })}</Text>
                   </>
+                )}
+                {burn.source === 'steps' && (
+                  <>
+                    <Text style={s.mvStatSub}>{t('歩数からの推定（およそ）')}</Text>
+                    {burnToday > 0 && (
+                      <Text style={s.mvStatSub}>{t('ほかに、このアプリで記録した運動 {n}kcal', { n: Math.round(burnToday).toLocaleString() })}</Text>
+                    )}
+                  </>
+                )}
+                {/* 権限の再要求導線: 歩数は取れているのに実測が全部0＝アクティブエネルギーだけ未許可の可能性。
+                    タップで requestAuthorization を再呼び出し（追加した型ぶんのダイアログが出る） */}
+                {needsActiveAuth && (
+                  <Pressable onPress={reauthActiveEnergy} disabled={authBusy} hitSlop={6}>
+                    <Text style={[s.mvAuthLink, authBusy && { opacity: 0.5 }]}>{t('消費カロリーの読み取りを許可する →')}</Text>
+                  </Pressable>
                 )}
               </View>
               <View style={s.mvStat}>
@@ -620,13 +683,28 @@ export default function TrainingScreen() {
             {/* 重複計上の注意: 同じランニングをアプリにも記録していれば、実測の中にも
                 そのぶんが入っている。厳密な差分計算はしない（過剰に賢くしない）ので、
                 「重なりうる」ことだけ正直に断る */}
-            {activeOfView != null && (
+            {burn.source === 'measured' && (
               <Text style={s.mvNote}>{t('ヘルスケアの実測にはアプリ記録ぶんも含まれることがあります')}</Text>
             )}
+            {/* 推定のときは「およそ」であること・なぜ実測でないか（Watchなし等）を正直に断る */}
+            {burn.source === 'steps' && (
+              <Text style={s.mvNote}>{t('歩数からの推定はおよその値です（歩幅・速度で変わります）。Apple Watchが無いと実測が無いことがあるため、歩数から出しています')}</Text>
+            )}
+            {/* 再要求してもダイアログが出なかったとき: 設定アプリの場所を案内（タップで設定を開く） */}
+            {authHint && (
+              <Pressable onPress={() => Linking.openSettings().catch(() => {})} hitSlop={6}>
+                <Text style={s.mvAuthHint}>{authHint}</Text>
+              </Pressable>
+            )}
             {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
-            {/* 目標を黙って増やさない: ONで上乗せが起きた日は、その額をここに出す */}
+            {/* 目標を黙って増やさない: ONで上乗せが起きた日は、その額をここに出す。
+                推定ベースのときは（推定）を付けて、実測と同じ顔をさせない */}
             {activeBonus > 0 && (
-              <Text style={s.mvNote}>{t('歩いたぶん +{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })}</Text>
+              <Text style={s.mvNote}>
+                {burn.source === 'steps'
+                  ? t('歩いたぶん（推定）+{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })
+                  : t('歩いたぶん +{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })}
+              </Text>
             )}
             </View>
             {/* 週間歩数目標（B-15）: ミニバーの上に週プログレス1本。目標オフ/未連携時は出さない */}
@@ -683,12 +761,12 @@ export default function TrainingScreen() {
             })()}
           </Animated.View>
         );
-      })()}
+    }
 
-      {/* ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 ===== */}
-      {vis('quick') && (
+    if (key === 'quick') {
+      // ===== かんたん記録: 散歩レベルでもOK・1タップで消費kcalに反映 =====
+      return (
         <View style={s.card} ref={trainInputTarget} collapsable={false}>
-          <MinusBadge editing={editing} onPress={() => cards.hide('quick')} />
           <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日の消費カロリーを記録')}</Text></View>
           <Text style={s.muted}>{t('犬の散歩でも立派な運動。記録すると消費カロリーを計算して、今日の「あと食べられる量」に自動で上乗せします。')}</Text>
           <View style={s.actGrid}>
@@ -733,41 +811,13 @@ export default function TrainingScreen() {
           />
           <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
         </View>
-      )}
+      );
+    }
 
-      {/* ===== ヘルスケア取込モーダル ===== */}
-      <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
-        <View style={s.hkWrap}>
-          <View style={s.hkHead}>
-            <Text style={s.hkTitle}>{t('ヘルスケアから取り込む')}</Text>
-            <Pressable onPress={() => setHkOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
-          </View>
-          <Text style={s.hkSub}>{t('直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。')}</Text>
-          {hkBusy && hkList.length === 0 && <ActivityIndicator color={C.teal} style={{ marginTop: 30 }} />}
-          {hkMsg !== '' && <Text style={s.hkMsg}>{hkMsg}</Text>}
-          <ScrollView style={{ flex: 1, marginTop: 8 }}>
-            {hkList.map((w) => {
-              const on = hkSel.has(w.id);
-              return (
-                <Pressable key={w.id} style={[s.hkRow, !on && { opacity: 0.4 }]}
-                           onPress={() => setHkSel((prev) => { const n = new Set(prev); if (n.has(w.id)) n.delete(w.id); else n.add(w.id); return n; })}>
-                  <Text style={s.hkCheck}>{on ? '☑' : '☐'}</Text>
-                  <Text style={s.hkDate}>{w.date.slice(5).replace('-', '/')}</Text>
-                  <Text style={s.hkName} numberOfLines={1}>{w.name}</Text>
-                  <Text style={s.hkMeta}>{w.minutes}{t('分')}{w.km ? ` ${w.km}km` : ''} ・ {w.kcal}kcal</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          {hkList.length > 0 && (
-            <OptionButton variant="teal" label={t('選択した{n}件を取り込む', { n: [...hkSel].length })}
-                          onPress={importSelected} busy={hkBusy} disabled={hkSel.size === 0} />
-          )}
-        </View>
-      </Modal>
-
-      {/* レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー）
-          ガイドの照射対象: 稼働中/待機中どちらの見た目でも同じ枠で照らせるよう外側をViewで包む */}
+    if (key === 'rest') {
+      // レストタイマー（保存で自動開始のほか、いつでも手動で起動できる独立タイマー）
+      // ガイドの照射対象: 稼働中/待機中どちらの見た目でも同じ枠で照らせるよう外側をViewで包む
+      return (
       <View ref={restTarget} collapsable={false}>
       {(
         restLeft != null ? (
@@ -804,10 +854,13 @@ export default function TrainingScreen() {
         )
       )}
       </View>
+      );
+    }
 
-      {/* 入力 */}
-      <View style={[s.card, !vis('liftInput') && { display: 'none' }]} ref={liftTarget} collapsable={false}>
-        <MinusBadge editing={editing} onPress={() => cards.hide('liftInput')} />
+    if (key === 'liftInput') {
+      // ===== 筋トレ入力 =====
+      return (
+      <View style={s.card} ref={liftTarget} collapsable={false}>
         <View style={s.h2Row}>
           <ClipboardList size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('今日のトレーニングを記録')}</Text>
           {/* プレート計算機（重量ダイアル付近の小さな入口。目標総重量→片側のプレート構成） */}
@@ -900,7 +953,14 @@ export default function TrainingScreen() {
           ))}
         </View>
       </View>
+      );
+    }
+    return null;
+  }
 
+  // ===== 並び替え対象の下に置く固定要素（ReorderableCards の footer） =====
+  const footerJSX = (
+    <>
       {/* 挙上重量グラフは概要タブへ移設（入力と振り返りの役割分離） */}
       {history.length > 0 && (
         <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「挙上重量の推移」で見られます')}</Text>
@@ -919,19 +979,6 @@ export default function TrainingScreen() {
         </Pressable>
       )}
 
-      {/* 運動目標の編集モーダル */}
-      <Modal visible={goalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGoalOpen(false)}>
-        <View style={s.hkWrap}>
-          <View style={s.hkHead}>
-            <Text style={s.hkTitle}>{t('運動の目標')}</Text>
-            <Pressable onPress={() => setGoalOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
-          </View>
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <GoalPanel mode="training" />
-          </ScrollView>
-        </View>
-      </Modal>
-
       {/* 筋トレ履歴カードは概要タブ「筋トレの成長」へ移設（入力は運動タブ・振り返りは概要タブ）。
           ここには小さな導線だけ残す。NativeTabsでもrouter.pushでタブ遷移できる（coach.tsxと同じ流儀） */}
       {history.length > 0 && (
@@ -939,7 +986,74 @@ export default function TrainingScreen() {
           <Text style={s.moveNote}>{t('筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
         </Pressable>
       )}
-    </ScrollView>    <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
+    </>
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    {/* カードの並び替え（概要タブと同じ ReorderableCards: 長押し→ジグル→ドラッグ・触覚・⊖）。
+        ヘッダーとフッターは並び替え対象外の固定要素。編集中は pull-to-refresh を止める */}
+    <ReorderableCards
+      editing={editing}
+      order={visibleOrder}
+      onOrderChange={setVisibleOrder}
+      renderCard={renderCard}
+      onHide={cards.hide}
+      ghostLabel={(k) => EX_LABELS()[k] ?? k}
+      header={headerJSX}
+      footer={footerJSX}
+      onEnterEdit={() => setEditing(true)}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); invalidateActiveEnergyCache(); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
+      contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+      onScroller={(fn) => guide.registerScroller('/training', fn)}
+      scrollProps={{ keyboardShouldPersistTaps: 'handled', keyboardDismissMode: 'on-drag' }}
+    />
+
+    {/* ===== ヘルスケア取込モーダル ===== */}
+    <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
+      <View style={s.hkWrap}>
+        <View style={s.hkHead}>
+          <Text style={s.hkTitle}>{t('ヘルスケアから取り込む')}</Text>
+          <Pressable onPress={() => setHkOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
+        </View>
+        <Text style={s.hkSub}>{t('直近30日のワークアウト。タップで取込対象を選べます（取込済みは自動でスキップ）。')}</Text>
+        {hkBusy && hkList.length === 0 && <ActivityIndicator color={C.teal} style={{ marginTop: 30 }} />}
+        {hkMsg !== '' && <Text style={s.hkMsg}>{hkMsg}</Text>}
+        <ScrollView style={{ flex: 1, marginTop: 8 }}>
+          {hkList.map((w) => {
+            const on = hkSel.has(w.id);
+            return (
+              <Pressable key={w.id} style={[s.hkRow, !on && { opacity: 0.4 }]}
+                         onPress={() => setHkSel((prev) => { const n = new Set(prev); if (n.has(w.id)) n.delete(w.id); else n.add(w.id); return n; })}>
+                <Text style={s.hkCheck}>{on ? '☑' : '☐'}</Text>
+                <Text style={s.hkDate}>{w.date.slice(5).replace('-', '/')}</Text>
+                <Text style={s.hkName} numberOfLines={1}>{w.name}</Text>
+                <Text style={s.hkMeta}>{w.minutes}{t('分')}{w.km ? ` ${w.km}km` : ''} ・ {w.kcal}kcal</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        {hkList.length > 0 && (
+          <OptionButton variant="teal" label={t('選択した{n}件を取り込む', { n: [...hkSel].length })}
+                        onPress={importSelected} busy={hkBusy} disabled={hkSel.size === 0} />
+        )}
+      </View>
+    </Modal>
+
+    {/* 運動目標の編集モーダル */}
+    <Modal visible={goalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGoalOpen(false)}>
+      <View style={s.hkWrap}>
+        <View style={s.hkHead}>
+          <Text style={s.hkTitle}>{t('運動の目標')}</Text>
+          <Pressable onPress={() => setGoalOpen(false)} hitSlop={10}><Text style={s.hkClose}>×</Text></Pressable>
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          <GoalPanel mode="training" />
+        </ScrollView>
+      </View>
+    </Modal>
+
+    <Modal visible={pickerOpen} animationType="slide" presentationStyle="pageSheet"
            onRequestClose={() => setPickerOpen(false)}>
       <View style={s.hkWrap}>
         <View style={s.hkHead}>
@@ -1038,7 +1152,14 @@ const s = themed(() => ({
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   doneBtn2T: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  // 編集モードの「元に戻す」とヒント（概要タブと同じ見た目）
+  editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
+  editBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
+  editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
   pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 12 },
+  // 消費カロリーの読み取り許可への導線（スタット内の小さなリンク）と、設定アプリへの案内文
+  mvAuthLink: { fontSize: 11.5, fontWeight: '800', color: C.teal, marginTop: 6, lineHeight: 15 },
+  mvAuthHint: { fontSize: 11.5, color: C.amber, fontWeight: '600', lineHeight: 16, marginTop: 8 },
   // きょうの動きカード
   mvRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   mvStat: { flex: 1, backgroundColor: C.bg, borderRadius: RADIUS.tile, paddingVertical: 12, paddingHorizontal: 14 },

@@ -1,8 +1,9 @@
 // カードの並び替え＋表示/非表示を扱う共通レイヤー（Apple ヘルスケアの「リストを編集」に相当）
 // 編集モード: 各カードの左上に⊖、見出しの右に⊕。⊕で非表示カードの一覧を開いて戻せる。
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Minus, Plus, X, Search } from 'lucide-react-native';
 import { C, sheetTopPad, themed } from '@/lib/ui';
@@ -74,6 +75,62 @@ export function useCardLayout(storageKey: string, all: string[]) {
   );
 
   return { layout, visible, loaded, hide, show, setOrder, save, reset };
+}
+
+/**
+ * カードの並び順＋編集モードのライフサイクル（概要タブ changes.tsx の 'bl-order-all2' と同じ流儀）。
+ * - 起動時に storageKey から復元し、現行のカード構成へすり合わせる（mergeLayout と同じ規則）
+ * - 編集中の並びは「完了」（finishEditing）／アプリのバックグラウンド化／他タブへの移動 のいずれかで確定保存
+ *   （ドラッグごとに書かない＝並べ替え中に何度も保存しない）
+ * - reset で既定の並びに戻し、保存も消す
+ * 表示/非表示は useCardLayout 側が持つ。「どれを見せるか」と「どの順に見せるか」を別キーで保存するので、
+ * 片方の仕様が変わっても他方の保存が壊れない。
+ */
+export function useCardOrder(storageKey: string, all: string[]) {
+  const [order, setOrder] = useState<string[]>(all);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(storageKey)
+      .then((raw) => {
+        const saved = raw ? (JSON.parse(raw) as unknown) : null;
+        if (Array.isArray(saved)) setOrder(mergeLayout({ order: saved as string[] }, all).order);
+      })
+      .catch(() => { /* 初回など。既定の並びのまま */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // 離脱時確定用に最新値をrefへ同期（AppState/blurリスナーの古いクロージャ対策）
+  const ref = useRef({ editing, order });
+  ref.current = { editing, order };
+
+  const finishEditing = useCallback(async () => {
+    setEditing(false);
+    try {
+      await AsyncStorage.setItem(storageKey, JSON.stringify(ref.current.order));
+    } catch { /* 保存失敗はレイアウトが戻るだけ */ }
+  }, [storageKey]);
+
+  // 編集中にホーム画面へ戻った（バックグラウンド化）ら、その時点の並びで確定する
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if ((st === 'background' || st === 'inactive') && ref.current.editing) finishEditing();
+    });
+    return () => sub.remove();
+  }, [finishEditing]);
+
+  // 編集中に他タブへ移動した場合も確定する
+  useFocusEffect(
+    useCallback(() => () => { if (ref.current.editing) finishEditing(); }, [finishEditing]),
+  );
+
+  const reset = useCallback(() => {
+    setOrder(all);
+    AsyncStorage.removeItem(storageKey).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  return { order, setOrder, editing, setEditing, finishEditing, reset };
 }
 
 /** 編集モード中にカードを包み、左上に⊖を出す */

@@ -9,7 +9,7 @@
 // v2は追従・スロット判定・退避・着地・自動スクロールすべてworklet。
 // JSへ渡るのは「並び確定」「ハプティクス」「スクロール停止」の離散イベントだけ。
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { View, Text, Pressable, Dimensions, type RefreshControlProps } from 'react-native';
+import { View, Text, Pressable, Dimensions, type RefreshControlProps, type ScrollViewProps } from 'react-native';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedRef,
@@ -41,10 +41,13 @@ type Props = {
   contentContainerStyle?: object;
   onScroller?: (scrollBy: (delta: number) => void) => void; // ガイドツアーの自動スクロール受け口
   onHide?: (key: string) => void; // 編集中に⊖でカードを非表示にする
+  footer?: ReactNode;             // 並び替え対象の下に置く固定要素（導線カード・注記など。運動タブが使う）
+  // ScrollViewへの追加プロパティ（キーボード挙動など）。並び替えに要る onScroll/scrollEnabled/ref は渡せない
+  scrollProps?: Pick<ScrollViewProps, 'keyboardShouldPersistTaps' | 'keyboardDismissMode'>;
 };
 
 export default function ReorderableCards({
-  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide,
+  editing, order, onOrderChange, renderCard, ghostLabel, header, onEnterEdit, refreshControl, contentContainerStyle, onScroller, onHide, footer, scrollProps,
 }: Props) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useSharedValue(0);
@@ -115,6 +118,7 @@ export default function ReorderableCards({
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Animated.ScrollView
+        {...scrollProps}
         ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={contentContainerStyle}
@@ -151,6 +155,7 @@ export default function ReorderableCards({
             )}
           </DraggableCard>
         ))}
+        {footer}
       </Animated.ScrollView>
     </GestureHandlerRootView>
   );

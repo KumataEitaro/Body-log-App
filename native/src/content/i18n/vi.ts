@@ -1748,4 +1748,5 @@ export const VI: Record<string, string> = {
   "PFCの内訳": "Tỷ lệ PFC",
   "目的に合わせて既定値が入っています。そのままでも大丈夫。変えたい人だけ書き換えてください。": "Giá trị mặc định đã được điền theo mục tiêu của bạn. Cứ để nguyên cũng không sao, chỉ cần chỉnh sửa nếu bạn muốn thay đổi.",
   "PFCを保存する": "Lưu PFC",
+  "ほかに、このアプリで記録した運動 {n}kcal": "Ngoài ra, bài tập đã ghi trong ứng dụng này {n}kcal",
 };

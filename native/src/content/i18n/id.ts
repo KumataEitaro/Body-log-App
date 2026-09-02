@@ -1748,4 +1748,5 @@ export const ID: Record<string, string> = {
   "PFCの内訳": "Rincian PFC",
   "目的に合わせて既定値が入っています。そのままでも大丈夫。変えたい人だけ書き換えてください。": "Sudah diisi nilai default sesuai tujuanmu. Boleh dibiarkan begitu saja, ubah hanya jika kamu mau.",
   "PFCを保存する": "Simpan PFC",
+  "ほかに、このアプリで記録した運動 {n}kcal": "Olahraga lain yang dicatat di aplikasi ini {n}kcal",
 };
