@@ -22,6 +22,7 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
+import { useTodayRollover } from '@/lib/rollover';
 import { ClipboardList, Timer, Footprints, Target, Flame, Activity, Dumbbell, ChevronRight, Plus } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
@@ -87,6 +88,8 @@ export default function TrainingScreen() {
 
   // 記録先の日付（既定=今日。過去日にも記録できる）
   const [viewDate, setViewDate] = useState(todayJST());
+  // 日付跨ぎ（JST 0時）: 「今日」を見ていた人はタブに戻った/前景復帰したときに新しい今日へ追従（食事タブと同じ）
+  useTodayRollover(viewDate, setViewDate);
   // 運動目標の編集モーダル
   const [goalOpen, setGoalOpen] = useState(false);
   // 表示/非表示（従来キー）と並び順（新キー）。編集モードの開始/確定/離脱時保存は useCardOrder が持つ

@@ -64,7 +64,7 @@ export default function DailyBrief({ brief, onClose }: { brief: Brief; onClose: 
           <Buddy mood={brief.mood} />
         </Animated.View>
         <Text style={s.title} numberOfLines={open ? undefined : 1}>{brief.title}</Text>
-        <Pressable hitSlop={10} onPress={onClose}>
+        <Pressable hitSlop={10} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('今日は閉じる')}>
           <Text style={s.x}>×</Text>
         </Pressable>
       </View>
@@ -88,5 +88,5 @@ const s = themed(() => ({
   x: { fontSize: 17, color: C.faint, fontWeight: '700', paddingHorizontal: 2 },
   bodyBox: { marginTop: 8, marginLeft: 36 },
   body: { fontSize: 13, color: C.sub, lineHeight: 20 },
-  hint: { fontSize: 10, color: C.faint, marginTop: 6 },
+  hint: { fontSize: 11, color: C.faint, marginTop: 6 },
 }));

@@ -39,8 +39,10 @@ export function shouldShowChecklist(
   return true;
 }
 
-export default function StartChecklist({ editing, onHide, onFocusInput, onTakePhoto, onFocusWeight, refreshKey }: {
+export default function StartChecklist({ editing, onHide, onFocusInput, onTakePhoto, onFocusWeight, refreshKey, onVisible, suppressed }: {
   editing: boolean;
+  onVisible?: (v: boolean) => void;   // 表示条件（14日以内・未完了）を満たしているかを親へ知らせる（ヒーロー直下の調停 lib/logCards.ts の候補に使う）
+  suppressed?: boolean;               // 親の調停で今回は枠が無いとき。判定は続けるが描かない
   onHide: () => void;          // cards.hide('checklist')（⊕からいつでも戻せる）
   onFocusInput: () => void;    // 入力ドックへフォーカス（つぶやき入力）
   onTakePhoto: () => void;     // 写真ボタン（カメラ撮影→AI解析）
@@ -61,11 +63,12 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
-      if (!user) { setShow(false); return; }
+      if (!user) { setShow(false); onVisible?.(false); return; }
       const doneRaw = await getFirstRunFlag(DONE_KEY);
       const doneAt = doneRaw != null && Number.isFinite(Number(doneRaw)) ? Number(doneRaw) : null;
       if (!shouldShowChecklist((user as { created_at?: string }).created_at, doneAt, Date.now())) {
         setShow(false);
+        onVisible?.(false);
         return;
       }
       // 判定クエリはすべてlimit 1系（存在確認だけ）で軽く
@@ -96,13 +99,14 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
       setChecks(next);
       setAllDone(done);
       setShow(true);
+      onVisible?.(true);
       // 全完了の初検出: 祝祭（成功ハプティクス）＋完了時刻を永続化（翌日から自動で消える起点）
       if (done && doneAt == null) {
         await setFirstRunFlag(DONE_KEY, String(Date.now()));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
-    } catch { setShow(false); /* 判定に失敗しても画面は壊さない */ }
-  }, []);
+    } catch { setShow(false); onVisible?.(false); /* 判定に失敗しても画面は壊さない */ }
+  }, [onVisible]);
 
   // マウント時＋タブがフォーカスされるたびに再判定（記録して戻ってきたら✓が付く）
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -114,7 +118,7 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
     Animated.spring(progress, { toValue: doneCount / CHECK_IDS.length, useNativeDriver: false, friction: 8, tension: 60 }).start();
   }, [doneCount, progress]);
 
-  if (!show || !checks) return null;
+  if (!show || !checks || suppressed) return null;
 
   // 未完了行のタップ→該当機能へ誘導（既存の遷移手段だけを使う）
   const go: Record<CheckId, () => void> = {

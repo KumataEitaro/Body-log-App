@@ -35,7 +35,7 @@ import * as Haptics from 'expo-haptics';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
-import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
+import { pfcAdvice, PFC_LABEL } from '@/lib/pfcAdvice';
 import { pfcColors } from '@/lib/theme';
 import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -103,6 +103,8 @@ import { usePurpose, purposeOf } from '@/lib/purpose';
 import { setDayStatus } from '@/lib/dayStatus';
 import { confirmOutlierWeight } from '@/lib/guard';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
+import { arbitrateAttention } from '@/lib/logCards';
+import { useTodayRollover } from '@/lib/rollover';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -218,7 +220,6 @@ export default function LogScreen() {
   const [dayLogs, setDayLogs] = useState<DayLog[]>([]);
   const [chat, setChat] = useState('');
   const [parsed, setParsed] = useState<Parsed | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string; upgrade?: boolean; kind?: 'text' | 'photo' | 'coach' } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -294,6 +295,19 @@ export default function LogScreen() {
     setInputOpen(true);
   }
   function closeInput() { setInputOpen(false); }
+  // 入力シートが閉じ切ってから出す案内（マイ食品の登録案内・食事の制約の案内）。
+  // iOS: Modal の onDismiss で流す／Android: onDismiss が無いので閉じアニメ後のタイマー（二重発火は ref で防ぐ）
+  const pendingTip = useRef<(() => void) | null>(null);
+  function flushPendingTip() {
+    const f = pendingTip.current;
+    pendingTip.current = null;
+    if (f) f();
+  }
+  function queueTip(show: () => void) {
+    pendingTip.current = show;
+    // iOSは onDismiss が先に拾う（タイマーは保険。シートが開いていなかった場合にも必ず出す）
+    setTimeout(flushPendingTip, Platform.OS === 'ios' ? 900 : 400);
+  }
   // シートが出きった瞬間: 写真経路なら即ピッカー、テキストなら即キーボード（autoFocusの取りこぼし対策）
   function onInputShown() {
     const p = pendingPick.current;
@@ -368,6 +382,11 @@ export default function LogScreen() {
   const [editing, setEditing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [viewDate, setViewDate] = useState(todayJST());
+  // 日付跨ぎ（JST 0時）: 「今日」を見ていた人はタブに戻った/前景復帰したときに新しい今日へ追従する
+  // （タブは常駐するので、夜に開いたまま翌朝戻ると昨日のまま残り、朝食が昨日の12:00に入っていた）
+  useTodayRollover(viewDate, setViewDate);
+  // 「今日」のキー。日付跨ぎで変わると、その日1回系（気分の既読・穴埋め・過食リスク・ひとこと）を組み直す
+  const todayKey = todayJST();
   const today = viewDate;
   // ヘルスケアのアクティブkcal（実測）と、それを目標へ反映する設定（既定OFF）。
   // 読み取りはlib/health.ts側でキャッシュ済み＝毎レンダーでHealthKitを叩かない
@@ -477,16 +496,22 @@ export default function LogScreen() {
   const eatenP = Math.round(summary.p ?? 0);
   const eatenF = Math.round(summary.f ?? 0);
   const eatenC = Math.round(summary.c ?? 0);
-  // FABのクイック記録でも同じ残量を見せるため、計算結果を共有ストアへ置く
+  // ホームウィジェット（lib/widget.ts）が同じ残量を見せるため、計算結果を共有ストアへ置く。
+  // ウィジェットの見出しは「今日の残り」なので、**過去日を表示中の数字は流さない**（別日を見ている間に
+  // 3日前の残量が「今日」として書かれていた・2026-09-02 自己監査）。依存配列なしで毎レンダー走っていたのも直す
+  const macroP = macros ? Math.round(macros.p) : 0;
+  const macroF = macros ? Math.round(macros.f) : 0;
+  const macroC = macros ? Math.round(macros.c) : 0;
+  const hasMacros = macros != null;
   useEffect(() => {
-    if (!profile || !macros) return;
+    if (!profile || !hasMacros || viewDate !== todayKey) return;
     setDayStatus({
       goalKcal, eaten,
-      p: { eaten: eatenP, target: Math.round(macros.p) },
-      f: { eaten: eatenF, target: Math.round(macros.f) },
-      c: { eaten: eatenC, target: Math.round(macros.c) },
+      p: { eaten: eatenP, target: macroP },
+      f: { eaten: eatenF, target: macroF },
+      c: { eaten: eatenC, target: macroC },
     });
-  });
+  }, [profile, hasMacros, viewDate, todayKey, goalKcal, eaten, eatenP, eatenF, eatenC, macroP, macroF, macroC]);
 
   // ===== 写真の取得（Web版と同じ最大辺1280px・JPEG品質0.72に圧縮してAPIへ） =====
   async function compressToPayload(uri: string): Promise<{ uri: string; base64: string } | null> {
@@ -907,14 +932,16 @@ export default function LogScreen() {
 
       invalidateStreak();   // 🔥チップを最新化
       refreshBadgeBand(true).catch(() => {});   // 保存で条件を満たしたバッジをその場で拾う
-      // よく食べる食品の検出（保存が成功したときだけ学習する）
+      // よく食べる食品の検出（保存が成功したときだけ学習する）。
+      // 案内（SpotlightTip＝透過Modal）は入力シート（pageSheet）が**閉じ切ってから**出す。
+      // iOSは表示中/閉じかけのModalの兄弟に別のModalを出せないため、直後に出すと表示されないことがある
       try {
         await recordItems(items, viewDate);
         const s2 = await pickSuggestion(myFoods.map((f) => f.name), viewDate);
-        if (s2) { setSuggest(s2); await markShown(viewDate); }
+        if (s2) { queueTip(() => setSuggest(s2)); await markShown(viewDate); }
         else if (await shouldShowDietTip(dietProfile)) {
           // 食事の制約が未設定のまま解析を何度も使っている人にだけ、存在を知らせる
-          setDietTip(true); await markDietTipShown();
+          queueTip(() => setDietTip(true)); await markDietTipShown();
         }
       } catch { /* 案内は本体機能に影響させない */ }
       return true;
@@ -946,9 +973,12 @@ export default function LogScreen() {
       setSaving(false);
     }
   }
+  // 体重カードのエラーはカードの中に出す（画面上部のメッセージ欄はカードから遠く、気づけない）
+  const [wErr, setWErr] = useState<string | null>(null);
   async function saveWeight() {
+    setWErr(null);
     const err = await saveWeightValue(wWeight);
-    if (err !== null) { if (err) setMsg({ ok: false, text: err }); return; }
+    if (err !== null) { if (err) setWErr(err); return; }
     setWWeight('');
   }
 
@@ -1037,12 +1067,14 @@ export default function LogScreen() {
       } catch { /* ベストエフォート */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile]);
+  }, [profile, todayKey]);
 
   // ===== B-7: Day12「最初の法則」の帯 =====
   // 記録12日到達＋法則1件以上を初検出したら、21:05の通知予約＋この帯を一度きり出す。
   // 判定・永続化はlib/laws側（'bl-day12-done'）。帯はタップ/×で消化され、以後は出ない
   const [firstLaw, setFirstLaw] = useState(false);
+  // スタートチェックリストが表示条件（登録14日以内・未完了）を満たしているか（子から通知・調停の候補に使う）
+  const [checklistLive, setChecklistLive] = useState(false);
   useEffect(() => {
     checkFirstLawUnlock(scheduleFirstLawNotification).then(setFirstLaw).catch(() => {});
   }, []);
@@ -1164,7 +1196,7 @@ export default function LogScreen() {
         setBackfill({ date: y, binge });
       } catch { /* 穴埋めは本体機能に影響させない */ }
     })();
-  }, []);
+  }, [todayKey]);
 
   async function backfillSave(extra: number) {
     if (!backfill || !profile || !uid || backfillBusy) return;
@@ -1175,7 +1207,7 @@ export default function LogScreen() {
         user_id: uid, date: backfill.date, at: `${backfill.date}T21:00:00+09:00`,
         items: [], kcal: baseEst + extra, p: null, f: null, c: null, weight: null,
         ex: 'オフ', adj: 0, mood: '',
-        text: extra > 0 ? `（あとから概算: 食べすぎ +${extra}kcal）` : t('（あとから確定: だいたい目安どおり）'),
+        text: extra > 0 ? t('（あとから概算: 食べすぎ +{n}kcal）', { n: extra }) : t('（あとから確定: だいたい目安どおり）'),
         photo_urls: [],
       });
       if (error) { setMsg({ ok: false, text: t('保存に失敗しました。もう一度お試しください。') }); return; }
@@ -1195,11 +1227,11 @@ export default function LogScreen() {
   // 朝の気分カード: その日まだ気分が無ければ1タップで聞く（スキップはその日限り）
   const [moodSnoozed, setMoodSnoozed] = useState(true);
   useEffect(() => {
-    AsyncStorage.getItem('bl-mood-snooze').then((v) => setMoodSnoozed(v === todayJST())).catch(() => {});
-  }, []);
+    AsyncStorage.getItem('bl-mood-snooze').then((v) => setMoodSnoozed(v === todayKey)).catch(() => {});
+  }, [todayKey]);
   const [moodBusy, setMoodBusy] = useState(false);
   const hasMoodToday = dayLogs.some((l) => l.mood);
-  const showMood = viewDate === todayJST() && profile != null && !hasMoodToday && !moodSnoozed;
+  const showMood = viewDate === todayKey && profile != null && !hasMoodToday && !moodSnoozed;
   async function saveMood(n: number) {
     if (!uid || moodBusy) return;
     setMoodBusy(true);
@@ -1258,7 +1290,7 @@ export default function LogScreen() {
   const [mealTime, setMealTime] = useState<string | null>(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [timeDraft, setTimeDraft] = useState<Date>(new Date());   // ピッカー内の仮の値（iOSは「決定」で確定）
-  const isViewToday = viewDate === todayJST();
+  const isViewToday = viewDate === todayKey;
   const mealTimeResolved = resolveMealTime(mealTime, isViewToday);
   // 保存に使う at。「いま」は送らずDBの now() に任せる（いちばん正確）
   const mealAt = mealTimeResolved === MEAL_TIME_NOW ? null : buildAtJST(viewDate, mealTimeResolved);
@@ -1378,6 +1410,24 @@ export default function LogScreen() {
     );
   })() : null;
 
+  // ===== ヒーロー直下の調停（lib/logCards.ts）: 何を何枚出すかは1か所で決める =====
+  // カード最大2枚（caution > backfill > checklist > mood > positive）・帯最大2本（badge > firstLaw > brief）。
+  // 過去日を表示中は「今日は〜」のもの（caution/backfill/mood/positive/brief）を候補から外す
+  const attention = arbitrateAttention({
+    isToday: isViewToday,
+    candidates: {
+      caution: bingeRisk || cautionAlert ? 1 : 0,
+      backfill: backfill ? 1 : 0,
+      checklist: vis('checklist') && checklistLive ? 1 : 0,
+      mood: vis('mood') && showMood ? 1 : 0,
+      positive: positiveAlerts.length,
+      badge: badgeIds.length > 0 ? 1 : 0,
+      firstLaw: firstLaw ? 1 : 0,
+      brief: brief ? 1 : 0,
+    },
+  });
+  const shownPositive = positiveAlerts.slice(0, attention.positive);
+
   // マイ食品（セット）の登録シート（記録行の長押しメニュー／✓保存の長押しから。
   // alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う）。
   // 透過Modalなので、入力シート（pageSheet）が開いている間はその**内側**で、閉じている間はルートで描く
@@ -1441,20 +1491,8 @@ export default function LogScreen() {
         {/* 🔥ストリーク常設チップ（タップで実績ページへ） */}
         <StreakChip />
 
-        {/* B-7: 最初の法則の帯（一度きり。タップで法則図鑑へ・×は見ずに消化） */}
-        {firstLaw && (
-          <Pressable style={s.lawBand} onPress={() => dismissFirstLaw(true)}>
-            <BookOpen size={16} color={C.teal} />
-            <Text style={s.lawBandT}>{t('あなたの最初の法則が見つかりました')}</Text>
-            <Text style={s.lawBandGo}>{t('見にいく')} →</Text>
-            <Pressable hitSlop={10} onPress={() => dismissFirstLaw(false)}>
-              <Text style={s.lawBandX}>×</Text>
-            </Pressable>
-          </Pressable>
-        )}
-
-        {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる） */}
-        {brief && (
+        {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる）。帯の3本目なら出ない（調停） */}
+        {brief && attention.brief > 0 && (
           <DailyBrief brief={brief} onClose={() => {
             setBrief(null);
             AsyncStorage.setItem('bl-brief-closed', todayJST()).catch(() => {});
@@ -1569,8 +1607,8 @@ export default function LogScreen() {
 
         {/* バッジ獲得の帯（ヒーロー直下・一度きり。タップで実績ページへ・×は見ずに消化）。
             B-7の法則の帯と同じ「帯」の文法（面・枠・→の位置）を共有する */}
-        {badgeIds.length > 0 && (
-          <Pressable style={[s.lawBand, { marginTop: -8 }]} onPress={() => dismissBadgeBand(true)}>
+        {attention.badge > 0 && (
+          <Pressable style={[s.lawBand, { marginTop: -8 }]} onPress={() => dismissBadgeBand(true)} accessibilityRole="button">
             <BadgeIcon id={badgeIds[0]} size={30} earned />
             <Text style={s.lawBandT} numberOfLines={2}>
               {badgeIds.length > 1
@@ -1578,13 +1616,27 @@ export default function LogScreen() {
                 : t('「{name}」バッジを獲得しました', { name: badgeById(badgeIds[0])?.name ?? '' })}
             </Text>
             <Text style={s.lawBandGo}>{t('見にいく')} →</Text>
-            <Pressable hitSlop={10} onPress={() => dismissBadgeBand(false)}>
+            <Pressable hitSlop={10} onPress={() => dismissBadgeBand(false)} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
               <Text style={s.lawBandX}>×</Text>
             </Pressable>
           </Pressable>
         )}
 
-        {/* スタートチェックリスト（新規ユーザーの最初の1週間・登録14日以内だけ・自動判定） */}
+        {/* B-7: 最初の法則の帯（一度きり。タップで法則図鑑へ・×は見ずに消化）。
+            バッジの帯と同じ位置・同じ文法（以前はヘッダーとヒーローの間にあり、帯が2か所に散っていた） */}
+        {attention.firstLaw > 0 && (
+          <Pressable style={[s.lawBand, attention.badge === 0 && { marginTop: -8 }]} onPress={() => dismissFirstLaw(true)} accessibilityRole="button">
+            <BookOpen size={16} color={C.teal} />
+            <Text style={s.lawBandT}>{t('あなたの最初の法則が見つかりました')}</Text>
+            <Text style={s.lawBandGo}>{t('見にいく')} →</Text>
+            <Pressable hitSlop={10} onPress={() => dismissFirstLaw(false)} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
+              <Text style={s.lawBandX}>×</Text>
+            </Pressable>
+          </Pressable>
+        )}
+
+        {/* スタートチェックリスト（新規ユーザーの最初の1週間・登録14日以内だけ・自動判定）。
+            判定は子が続け（onVisible で候補になる）、枠が無い回は suppressed で描かない */}
         {vis('checklist') && (
           <StartChecklist
             editing={editing}
@@ -1593,11 +1645,13 @@ export default function LogScreen() {
             onTakePhoto={() => openInput('camera')}
             onFocusWeight={() => wInputRef.current?.focus()}
             refreshKey={dayLogs.length}
+            onVisible={setChecklistLive}
+            suppressed={attention.checklist === 0}
           />
         )}
 
         {/* 昨日の穴埋めカード（責めないトーン） */}
-        {backfill && (
+        {backfill && attention.backfill > 0 && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
             <Text style={s.h2}>{backfill.binge
               ? t('🍃 {date}の分、ざっくりだけ記録しませんか', { date: dateLabelOf(backfill.date) })
@@ -1633,7 +1687,7 @@ export default function LogScreen() {
         {/* 過食リスクの事前アラート（理由つき・1タップ予防）。
             §8 気づきアラート（caution）が出た日はこの1枚に統合する: 見出しは「条件が{n}つそろっています」、
             箇条書きは本人の法則の条件（＋従来の理由）、ボタンは従来どおり、末尾に法則の解説へのリンク */}
-        {(bingeRisk || cautionAlert) && (
+        {attention.caution > 0 && (
           <View style={[s.card, { borderColor: bingeRisk?.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
             <View style={s.alertHead}>
               <Text style={[s.h2, { flex: 1, marginBottom: 0 }]}>
@@ -1675,7 +1729,7 @@ export default function LogScreen() {
         )}
 
         {/* §8 ポジティブ側の気づき: 良い条件がそろった日は背中を押す（控えめなアクセント面・ボタン無し・×で今日は閉じる） */}
-        {positiveAlerts.map((a) => (
+        {shownPositive.map((a) => (
           <View key={a.id} style={s.positiveCard}>
             <View style={s.alertHead}>
               <Sparkles size={16} color={C.teal} />
@@ -1691,7 +1745,7 @@ export default function LogScreen() {
         ))}
 
         {/* 朝の気分カード（その日1回だけ・記録かスキップで消える） */}
-        {vis('mood') && showMood && (
+        {attention.mood > 0 && (
           <View style={s.card}>
             <MinusBadge editing={editing} onPress={() => cards.hide('mood')} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1711,6 +1765,18 @@ export default function LogScreen() {
               <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('今日は聞かないで')}</Text>
             </Pressable>
           </View>
+        )}
+
+        {/* 操作の結果（保存・書き換え・削除・失敗）はフィードの直上に出す。
+            以前はフィードと広告の下にあり、✓保存でシートが閉じた直後の「保存しました。」が
+            画面外（記録が多い日ほど下）に出て見えなかった（2026-09-02 自己監査） */}
+        {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+        {msg?.upgrade && (
+          // 上限到達（429 plan_limit）→ kindに応じた文脈見出しつきペイウォールへ（src=limit_*）
+          <Pressable onPress={() => router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never)} hitSlop={8}
+            style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: -4, marginBottom: 10 }, pressed && { opacity: 0.7 }]}>
+            <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+          </Pressable>
         )}
 
         {/* 今日のフィード */}
@@ -1781,7 +1847,7 @@ export default function LogScreen() {
                 <Text style={[s.h2, { marginBottom: 0 }]}>{t('前の食事をもう一度')}</Text>
                 <Text style={s.h2sub}>{t('{n}件', { n: recentMeals.length })}</Text>
               </View>
-              <Text style={{ color: C.sub, fontSize: 15, fontWeight: '800' }}>{recentOpen ? '▴ とじる' : t('▾ ひらく')}</Text>
+              <Text style={{ color: C.sub, fontSize: 15, fontWeight: '800' }}>{recentOpen ? t('▴ とじる') : t('▾ ひらく')}</Text>
             </Pressable>
             {recentOpen && (
               <>
@@ -1801,26 +1867,19 @@ export default function LogScreen() {
           </View>
         )}
 
-        {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
-        {msg?.upgrade && (
-          // 上限到達（429 plan_limit）→ kindに応じた文脈見出しつきペイウォールへ（src=limit_*）
-          <Pressable onPress={() => router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never)} hitSlop={8}
-            style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 6 }, pressed && { opacity: 0.7 }]}>
-            <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
-          </Pressable>
-        )}
-
-        {/* 体重クイック入力 */}
+        {/* 体重クイック入力。入力ミスの文言はカードの中に出す（画面上部のメッセージ欄は遠くて気づけない） */}
         {vis('weight') && (
         <Animated.View style={[s.card, enter[2]]}>
           <MinusBadge editing={editing} onPress={() => cards.hide('weight')} />
           <View style={[s.wRow, { marginTop: 0 }]}>
             <TextInput ref={wInputRef} style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
-                       placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight} />
+                       placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight}
+                       accessibilityLabel={t('体重を記録')} />
             <Text style={s.wUnit}>{units.weight}</Text>
             <OptionButton variant="tonal" label={t('体重を記録')} leading={<Weight size={15} color={C.ink} />}
                           onPress={saveWeight} busy={saving} disabled={!wWeight} />
           </View>
+          {wErr && <Text style={[s.mutedT, { color: C.coral, fontSize: 13, marginTop: 8 }]}>{wErr}</Text>}
         </Animated.View>
         )}
 
@@ -1847,7 +1906,7 @@ export default function LogScreen() {
           （写真サムネ・複数行テキスト・🎤/カメラ/ライブラリ/外食おすすめ・↑送信）。
           キーボードは KeyboardAvoidingView（pageSheet の中なら日本語IMEの候補バーで揺れる旧問題は起きにくい＝
           シート全体が持ち上がるだけで、下に固定ドックがあった頃のタブバー分の過剰リフトは無い） */}
-      <Modal visible={inputOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeInput} onShow={onInputShown}>
+      <Modal visible={inputOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeInput} onShow={onInputShown} onDismiss={flushPendingTip}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetWrap}>
           <View style={[s.sheetHead, { paddingTop: sheetTopPad(14) }]}>
             <View style={{ flex: 1 }}>
