@@ -103,9 +103,10 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   「食べ戻せる」量なので、下限は運動抜きの土台にだけ掛け、運動ぶん（EX_ADD＋adj＋アクティブ上乗せ）は必ずその上に乗せる。
   第5引数 `exerciseKcal` を省略すれば従来と同じ式（GoalPanel の結論表示は運動抜きなので不変）。
   再発防止テスト「運動を記録すると当日の目標kcalが増える（下限に張り付いた日でも）」を deficit.test.ts に固定。
-  **log.tsx 側は並行改修中のため未反映**: `planIntakeBase = dailyAllowance(target, …, kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)`
-  と、収支カードの `dailyAllowance(maintenance, req, bmr, kcalAdjust, maintenance − base)` の2箇所へ第5引数を渡すこと
-  （運動タブから戻ったときに logs を再読込する useFocusEffect も log.tsx 側に無い＝保存直後の目標が古いままになる経路が残る）
+  **log.tsx 側も反映済み（2026-09-02・feat/input-plus）**: `planIntakeBase = dailyAllowance(target, …, kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)`
+  と、収支カードの日別 `dailyAllowance(maintenance, req, bmr, kcalAdjust, maintenance − base)` の2箇所に第5引数を渡す。
+  あわせて logs の読込を `useEffect([viewDate])` から `useFocusEffect` へ（運動タブで運動を記録して食事タブに戻った瞬間に
+  dayLogs が読み直され、目標kcalがその場で増える。以前は表示日を変えるまで古いままだった）
 - P/F/C残量バー（食事ごとの寄与を白い区切り線で分割表示・5食以内）
 - 未保存トレイ分を「呼吸するゴースト」として重ね表示
 - P/F/Cバーのタップで統合目標画面へ直行（「目標」の数字タップと同じ導線）

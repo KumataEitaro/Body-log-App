@@ -414,7 +414,10 @@ export default function LogScreen() {
     setRecentMeals(meals);
   }, [viewDate]);
 
-  useEffect(() => { load(); }, [load]);
+  // 表示日が変わったとき＋この画面に戻ってきたときに読み直す（useFocusEffect は初回フォーカス時にも走るので
+  // マウント時の useEffect と二重にしない）。以前は [viewDate] だけだったため、運動タブで運動を記録して
+  // 戻っても dayLogs が古いまま＝「運動を入れたのに消費kcalが目標に反映されない」ように見えた（2026-09-02 βFB）
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // ===== 目安・ヒーロー計算（Web版と同一ロジック） =====
   const summary = summarizeDay(dayLogs);
@@ -441,8 +444,13 @@ export default function LogScreen() {
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
   const todayEvent = events.find((e) => e.date === today) ?? null;
   // 1日に食べられる量 = max(維持 − 必要赤字/日 + 手動調整, BMR)。目標画面の「結論」と同じ関数（lib/deficit.ts）。
-  // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する
-  const planIntakeBase = profile ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust) : 0;
+  // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する。
+  // 第5引数＝target に含まれている運動ぶん（アプリ記録の EX_ADD＋adj と、アクティブ反映の上乗せ）。
+  // BMR下限は運動抜きの土台にだけ掛かり、運動ぶんは必ずその上に乗る（lib/deficit.ts の説明のとおり。
+  // これが無いと赤字が大きい日に運動を記録しても目標が1kcalも動かなかった）
+  const planIntakeBase = profile
+    ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)
+    : 0;
   const goalKcal = plan && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
@@ -972,7 +980,8 @@ export default function LogScreen() {
       const d = shiftDate(today, -i);
       const r = byDate.get(d);
       const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) : 0);
-      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust) });
+      // 第5引数＝その日の運動ぶん（maintenance − 土台）。ヒーローの目標と同じく、運動ぶんはBMR下限の上に乗せる
+      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust, maintenance - base) });
     }
     out.push({ date: today, intake: summary.intake == null ? null : Math.round(summary.intake), maintenance: target, allowance: goalKcal });
     return out;
