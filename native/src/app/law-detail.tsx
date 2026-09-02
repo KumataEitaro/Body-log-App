@@ -188,7 +188,7 @@ export default function LawDetailScreen() {
                   <View style={[s.barFill, { width: `${Math.round(data.bar.pct * 100)}%` }]} />
                 </View>
                 <View style={s.barLegend}>
-                  <Text style={[s.barLegendT, { color: C.teal }]}>{data.bar.left} {Math.round(data.bar.pct * 100)}%</Text>
+                  <Text style={[s.barLegendT, { color: C.accentInk }]}>{data.bar.left} {Math.round(data.bar.pct * 100)}%</Text>
                   <Text style={s.barLegendT}>{data.bar.right} {100 - Math.round(data.bar.pct * 100)}%</Text>
                 </View>
               </View>
@@ -284,7 +284,7 @@ function ArticleBody({ article, ready, next }: { article: LawArticle; ready: boo
 
 const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 56 },
-  kicker: { fontSize: 12.5, fontWeight: '800', color: C.teal, marginBottom: 6, letterSpacing: 0.3 },
+  kicker: { fontSize: 12.5, fontWeight: '800', color: C.accentInk, marginBottom: 6, letterSpacing: 0.3 },
   h: { fontSize: 22, fontWeight: '800', color: C.ink, lineHeight: 30 },
   sub: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
   date: { fontSize: 11.5, color: C.faint, marginTop: 4, marginBottom: 14, fontVariant: ['tabular-nums'] },
@@ -296,10 +296,10 @@ const s = themed(() => ({
   // 節の見出し（changes.tsx の h2Row/h2 と同じ段: HEAD.card・gap 6・下余白 8）
   secHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   secNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
-  secNumT: { fontSize: 12, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
+  secNumT: { fontSize: 12, fontWeight: '900', color: C.accentInk, fontVariant: ['tabular-nums'] },
   secT: { ...HEAD.card, color: C.ink, flex: 1 },
   body: { fontSize: 14.5, color: C.ink, lineHeight: 23 },
-  ref: { fontSize: 12, fontWeight: '800', color: C.teal },
+  ref: { fontSize: 12, fontWeight: '800', color: C.accentInk },
   // ① あなたのデータ（changes.tsx の detailVal/detailUnit と同じ大数字の段）
   statRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   statVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
@@ -328,7 +328,7 @@ const s = themed(() => ({
   // ⑦ 出典
   srcLead: { fontSize: 12, color: C.faint, lineHeight: 17, marginBottom: 6 },
   srcRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, borderRadius: RADIUS.input },
-  srcNum: { width: 20, fontSize: 12.5, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  srcNum: { width: 20, fontSize: 12.5, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   srcTitle: { fontSize: 13, fontWeight: '700', color: C.ink, lineHeight: 18 },
   srcMeta: { fontSize: 11.5, color: C.sub, marginTop: 2, lineHeight: 16 },
   // 準備中チップ
