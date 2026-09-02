@@ -3,18 +3,19 @@
 //  ・新規発見は祝祭（実績ページのCelebrateOverlayと同じ流儀: スプリング＋触覚）
 //  ・未発見はシルエットで見せて「まだ見つかっていない法則がある」という好奇心を残す
 //  ・スタンダード未満（無料・ライト。課金ゲート有効時）は最新3枚だけ通常表示、4枚目以降は半透明＋王冠
+//  ・カード全体をタップ → 解説記事（/law-detail・E1b）。健康への視座と科学的裏付けをそこで読む
+//  ・共有アイコンはカードから外した（熊田さん: 「法則をストーリーに乗せる意味はない」。共有は実績ページのバッジ・PRだけ）
 //  ・分析は全て端末内ローカル（lib/laws.ts）。サーバへは何も送らない
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Share2, PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BookOpen } from 'lucide-react-native';
+import { PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BedDouble, BookOpen, ChevronRight, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { C, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
-import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import { refreshLaws, markLawsSeen, lawKindHint, LAW_KINDS, type Law, type LawKind } from '@/lib/laws';
 
 // スタンダード未満（無料・ライト）で通常表示する枚数（最新から数える）。それ以降は王冠つきのぼかし表示
@@ -31,6 +32,9 @@ function KindIcon({ kind, size = 18, color = C.teal }: { kind: LawKind; size?: n
     case 'timeslot': return <Moon {...p} />;
     case 'recover': return <HeartPulse {...p} />;
     case 'comeback': return <Undo2 {...p} />;
+    case 'sleep_factor': return <BedDouble {...p} />;
+    // インサイト・エンジン系の新しい種類（E1a）は専用アイコンが付くまで共通の印
+    default: return <Sparkles {...p} />;
   }
 }
 
@@ -69,7 +73,6 @@ export default function LawsScreen() {
   const [laws, setLaws] = useState<Law[] | null>(null);   // null=読み込み中
   const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
   const [celebrate, setCelebrate] = useState<Law[]>([]);
-  const [sticker, setSticker] = useState<StickerData | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -93,40 +96,46 @@ export default function LawsScreen() {
   // 課金ゲート: gateが非activeなら全開放（現在の全機能無料運用と同じ見た目）
   const locked = gate.gated('laws');
 
-  function openPaywall() {
+  /**
+   * 解説記事へ。生値（p）と発見日をそのまま持ち回る（記事側は lawText で文章を再構成するので
+   * 図鑑ストアの再読込が要らない）。ロック中も記事ページへ行き、そこで②〜⑦がゲートカードになる
+   */
+  function openDetail(l: Law, gated: boolean) {
     Haptics.selectionAsync().catch(() => {});
-    // typed routesが動的srcを知らないためas never（changes.tsxと同じ流儀）
-    router.push('/paywall?src=laws' as never);
+    // typed routesが動的パスを知らないためas never（changes.tsxと同じ流儀）
+    router.push({
+      pathname: '/law-detail',
+      params: { kind: l.kind, p: JSON.stringify(l.p), at: l.foundAt, ...(gated ? { locked: '1' } : {}) },
+    } as never);
   }
 
   function lawCard(l: Law, i: number) {
     const gated = locked && i >= FREE_VISIBLE;
     const body = (
-      <View style={[s.card, gated && s.cardGated]}>
+      <Pressable style={({ pressed }) => [s.card, gated && s.cardGated, pressed && { backgroundColor: C.pressed }]}
+        onPress={() => openDetail(l, gated)}
+        accessibilityRole="button" accessibilityLabel={l.title} accessibilityHint={t('解説記事を開く')}>
         <View style={s.cardHead}>
           <View style={s.kindBubble}><KindIcon kind={l.kind} /></View>
           <View style={{ flex: 1 }}>
             <Text style={s.cardTitle}>{l.title}</Text>
             <Text style={s.cardSub}>{l.sub}</Text>
           </View>
-          {gated ? (
-            <CrownBadge size={14} />
-          ) : (
-            <Pressable hitSlop={10} onPress={() => setSticker({ kind: 'law', title: l.title, sub: l.sub })}>
-              <Share2 size={ICON.md} color={C.faint} />
-            </Pressable>
-          )}
+          {gated ? <CrownBadge size={14} /> : <ChevronRight size={ICON.lg} color={C.faint} />}
         </View>
-        <Text style={s.cardDate}>{t('{d} 発見', { d: l.foundAt.slice(5).replace('-', '/') })}</Text>
-      </View>
+        <View style={s.cardFoot}>
+          <Text style={s.cardRead}>{t('解説を読む')}</Text>
+          <Text style={s.cardDate}>{t('{d} 発見', { d: l.foundAt.slice(5).replace('-', '/') })}</Text>
+        </View>
+      </Pressable>
     );
     if (gated) {
       // ぼかし表現: 伏せ字にはせず、半透明＋王冠＋一言で「開けば読める」ことを伝える
       return (
-        <Pressable key={l.id} onPress={openPaywall}>
+        <View key={l.id}>
           {body}
           <Text style={s.gateHint}>{t('スタンダードで図鑑のすべてが開きます')}</Text>
-        </Pressable>
+        </View>
       );
     }
     if (freshIds.has(l.id)) {
@@ -182,7 +191,6 @@ export default function LawsScreen() {
       {celebrate.length > 0 && (
         <CelebrateOverlay laws={celebrate} onClose={() => setCelebrate([])} />
       )}
-      <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
     </View>
   );
 }
@@ -206,7 +214,9 @@ const s = themed(() => ({
   kindBubble: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 15, fontWeight: '800', color: C.ink, lineHeight: 21 },
   cardSub: { fontSize: 12, color: C.sub, marginTop: 3 },
-  cardDate: { fontSize: 11, color: C.faint, marginTop: 8, fontVariant: ['tabular-nums'], textAlign: 'right' },
+  cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  cardRead: { fontSize: 11.5, fontWeight: '700', color: C.teal },
+  cardDate: { fontSize: 11, color: C.faint, fontVariant: ['tabular-nums'] },
   gateHint: { fontSize: 11.5, fontWeight: '700', color: C.amber, textAlign: 'center', marginBottom: 10 },
   silhouetteHead: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 8 },
   silhouette: {

@@ -163,11 +163,12 @@ export default function AchievementsScreen() {
     return m;
   }, [report]);
 
-  // 「いつでも共有」の選択肢（データがあるものだけ出す）
+  // 「いつでも共有」の選択肢（データがあるものだけ出す）。
+  // 共有スコープは **バッジ・筋トレ実績（自己ベスト）・体重変化グラフ** の3種に限定（docs/INSIGHTS-ENGINE.md §5・2026-09-02）。
+  //  ・法則ステッカーは除外（熊田さん: 「法則をストーリーに乗せる意味はない」。法則はタップで解説記事を読むものになった）
+  //  ・ストリーク／今日の食事／最新の運動のチップも同時に外した（「見せて自慢する」対象を実績＝バッジとPRに絞る）
+  //  ・バッジはバッジ詳細シートと祝祭から共有する（このハブには出さない）。体重変化グラフのステッカーは未実装（追って）
   const shareOptions: { key: string; label: string; data: StickerData | null }[] = report ? [
-    { key: 'streak', label: t('🔥 ストリーク'), data: report.streak > 0 ? { kind: 'streak', days: report.streak } : null },
-    { key: 'today', label: t('🍽 今日の食事'), data: report.share.today ? { kind: 'today', left: 0, ...report.share.today } : null },
-    { key: 'workout', label: t('🏃 最新の運動'), data: report.share.workout ? { kind: 'workout', ...report.share.workout } : null },
     { key: 'pr', label: t('🏆 自己ベスト'), data: report.share.pr ? { kind: 'pr', ...report.share.pr } : null },
   ] : [];
 
