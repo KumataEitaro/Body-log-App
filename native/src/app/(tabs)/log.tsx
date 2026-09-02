@@ -14,7 +14,7 @@ import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import DateStrip from '@/components/DateStrip';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
-import MyFoodForm, { type MyFoodDraft } from '@/components/MyFoodForm';
+import AddFoodSheet, { type MyFoodDraft } from '@/components/AddFoodSheet';
 import MenuAdvisor from '@/components/MenuAdvisor';
 import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
 import { removeItemAt } from '@/lib/itemLog';
@@ -188,9 +188,9 @@ export default function LogScreen() {
   const [events, setEvents] = useState<(PlanEvent & { id: string })[]>([]);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [myFoods, setMyFoods] = useState<MyFood[]>([]);
-  // マイミール（複数品目のセット）。migration-24未適用のDBでは常に空＝チップが出ないだけ
+  // マイ食品（セット・複数品目）。migration-24未適用のDBでは常に空＝チップが出ないだけ
   const [myMeals, setMyMeals] = useState<MyMeal[]>([]);
-  // マイミール保存シートの下書き（alsoSave=トレイの✓保存長押し経由: 保存も一緒に行う）
+  // セット登録シートの下書き（alsoSave=トレイの✓保存長押し経由: 保存も一緒に行う）
   const [mealDraft, setMealDraft] = useState<{ items: FoodItem[]; alsoSave: boolean } | null>(null);
   const [dayLogs, setDayLogs] = useState<DayLog[]>([]);
   const [chat, setChat] = useState('');
@@ -342,7 +342,7 @@ export default function LogScreen() {
       supabase.from('logs').select('id,date,items,kcal')
         .lt('date', viewDate).not('kcal', 'is', null)
         .order('at', { ascending: false }).limit(40),
-      listMyMeals(),   // テーブル未作成なら空（マイミールチップが出ないだけ）
+      listMyMeals(),   // テーブル未作成なら空（セットのチップが出ないだけ）
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
     if (goalRes.data) setGoal(goalRes.data as Goal);
@@ -660,7 +660,7 @@ export default function LogScreen() {
     const items = addServing(parsed?.items ?? [], fd);
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
   }
-  // マイミールチップ: タップでセットの全品目をトレイへ投入
+  // セット（複数品目のマイ食品）のチップ: タップでセットの全品目をトレイへ投入
   // （AI解析なし・保存済みの栄養値をそのまま使う＝「前の食事↺」と同じ流儀）
   function tapMeal(m: MyMeal) {
     Haptics.selectionAsync().catch(() => {});
@@ -671,14 +671,14 @@ export default function LogScreen() {
     }));
   }
 
-  // マイミールチップ: 長押しで削除（確認ダイアログなし・Undoスナックバーで約5秒の取り消し猶予）。
+  // セットのチップ: 長押しで削除（確認ダイアログなし・Undoスナックバーで約5秒の取り消し猶予）。
   // 復元は削除前に控えた内容を新しい行として保存し直す（idはDB採番）
   async function deleteMealNow(m: MyMeal) {
     if (!uid) return;
     const ok = await deleteMyMeal(m.id);
     if (!ok) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
     setMyMeals(await listMyMeals());
-    undoBar.show(t('マイミール「{name}」を削除しました', { name: m.name }), async () => {
+    undoBar.show(t('マイ食品「{name}」を削除しました', { name: m.name }), async () => {
       const r = await saveMyMeal(uid, m.name, m.items);
       if (!r.ok) { setMsg({ ok: false, text: t('元に戻せませんでした。通信環境を確認してください。') }); return; }
       setMyMeals(await listMyMeals());
@@ -724,8 +724,8 @@ export default function LogScreen() {
     Alert.alert(canEdit ? t('この記録をどうしますか？') : t('この記録を削除しますか？'), logTitle(l), [
       { text: t('キャンセル'), style: 'cancel' },
       ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
-      // マイミール: 品目内訳のある食事だけセット保存できる（気分・体重だけの行では出さない）
-      ...(items.length > 0 ? [{ text: t('マイミールに保存'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
+      // マイ食品（セット）: 品目内訳のある食事だけ登録できる（気分・体重だけの行では出さない）
+      ...(items.length > 0 ? [{ text: t('マイ食品に登録'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
       { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
     ]);
   }
@@ -826,7 +826,7 @@ export default function LogScreen() {
     return names + (items.length > 3 ? t(' ほか{n}品', { n: items.length - 3 }) : '');
   }
 
-  // トレイの内容を確定保存（成功したかを返す: マイミール同時登録の文言出し分けに使う）
+  // トレイの内容を確定保存（成功したかを返す: セット同時登録の文言出し分けに使う）
   async function save(): Promise<boolean> {
     if (!uid || !parsed) return false;
     setSaving(true); setMsg(null);
@@ -1656,8 +1656,8 @@ export default function LogScreen() {
           </ScrollView>
         )}
         {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可）
-            先頭にマイミールチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
-            長押しで削除→Undoスナックバー）。ミールは常に先頭固定＝並び替えの保存対象はマイ食品だけ */}
+            先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
+            長押しで削除→Undoスナックバー）。セットは常に先頭固定＝並び替えの保存対象は単品だけ */}
         {(myFoods.length > 0 || myMeals.length > 0) && (() => {
           const mealChipEl = (m: MyMeal) => (
             <Pressable key={m.id} style={s.mealChip}
@@ -1827,7 +1827,7 @@ export default function LogScreen() {
             {parsed != null && (
               <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                 <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
-                {/* ✓保存の長押し=保存してマイミールにも登録（書き換え中は保存の意味が変わるため出さない） */}
+                {/* ✓保存の長押し=保存してマイ食品（セット）にも登録（書き換え中は保存の意味が変わるため出さない） */}
                 <Pressable style={s.traySave} onPress={save} disabled={saving} delayLongPress={450}
                            onLongPress={() => {
                              if (!editingId && !saving && parsed.items.length > 0) setMealDraft({ items: parsed.items, alsoSave: true });
@@ -1959,12 +1959,12 @@ export default function LogScreen() {
           markDietTipDeclined().catch(() => {});   // 一度断られたら二度と出さない
         }}
       />
-      <MyFoodForm
+      <AddFoodSheet
         visible={foodDraft != null} draft={foodDraft}
         onClose={() => setFoodDraft(null)}
-        onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に追加しました。下のチップから1タップで足せます。') }); }}
+        onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に登録しました。下のチップから1タップで足せます。') }); }}
       />
-      {/* マイミール保存シート（記録行の長押しメニュー/✓保存の長押しから。
+      {/* マイ食品（セット）の登録シート（記録行の長押しメニュー/✓保存の長押しから。
           alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う） */}
       <SaveMealSheet
         visible={mealDraft != null} uid={uid} items={mealDraft?.items ?? []}
@@ -1975,9 +1975,9 @@ export default function LogScreen() {
           setMyMeals(await listMyMeals());
           if (alsoSave) {
             const ok = await save();   // 失敗時はsave()側のエラーメッセージを残す（トレイも残る）
-            if (ok) setMsg({ ok: true, text: t('保存して、マイミール「{name}」にも登録しました。', { name }) });
+            if (ok) setMsg({ ok: true, text: t('保存して、マイ食品「{name}」にも登録しました。', { name }) });
           } else {
-            setMsg({ ok: true, text: t('マイミール「{name}」を登録しました。入力欄の上のチップから1タップで呼び出せます。', { name }) });
+            setMsg({ ok: true, text: t('マイ食品「{name}」を登録しました。入力欄の上のチップから1タップで呼び出せます。', { name }) });
           }
         }}
       />
@@ -2054,7 +2054,7 @@ const s = themed(() => ({
     borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, marginRight: 6, overflow: 'hidden',
   },
   chipOn: { borderColor: C.ink },
-  // マイミールチップ（マイ食品と見た目で区別: 皿アイコン＋アクセント面・teal文字）
+  // セット（複数品目）のチップ（単品のマイ食品と見た目で区別: 皿アイコン＋アクセント面・teal文字）
   mealChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: C.accentBadge, borderWidth: 1.5, borderColor: C.accentBorder,

@@ -1,0 +1,12 @@
+-- BodyLog migration-31: マイ食品に品目内訳（items）を持たせる
+-- 【ユーザー実行待ち】Supabase SQL Editor で実行:
+-- https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
+--
+-- 背景: 設定＞マイ食品の管理＞「食品を追加」で、複数の食材（例: 鶏むね肉100g、ブロッコリー50g、
+-- 白米150g）をAIで計算して1つのマイ食品として登録できるようにした。合計のkcal/PFCは従来の
+-- 列に入るが、何をどれだけ足した結果なのか（内訳）が残らないと後から見直せないため、
+-- 品目配列（FoodItem[]）を任意列として持たせる。単品の登録では null のまま。
+--
+-- アプリはこの列が無くても壊れない: 追加時に列が無いエラー（PGRST204）が返ったら
+-- 内訳を落として合計だけで再登録する（lib/foods.ts saveMyFood）。
+alter table public.my_foods add column if not exists items jsonb;

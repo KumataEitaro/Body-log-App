@@ -1,6 +1,8 @@
-// マイ食品の「よく使う量」まわりのロジック
+// マイ食品のロジック: 登録（CRUD）・複数食材→1品への合算・「よく使う量」・チップの並び順
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { qtyNumber, rescaleByQty } from '@/lib/items';
+import { supabase } from '@/lib/supabase';
+import { qtyNumber, rescaleByQty, sumItems, type FoodItem } from '@/lib/items';
+import { t } from '@/lib/i18n';
 
 export type MyFoodRow = {
   id: string; name: string; unit: string;
@@ -195,4 +197,98 @@ export function servingOf(fd: MyFoodRow): { qty: string; kcal: number; p: number
     f: round1((Number(fd.f) || 0) * r),
     c: round1((Number(fd.c) || 0) * r),
   };
+}
+
+// ===== 登録（my_foods への書き込み） =====
+// 設定＞マイ食品の管理＞「食品を追加」と、食事タブの登録案内（よく食べる品目の検出）の両方から使う。
+
+/** 登録1件ぶんの入力。items は複数食材をAIで合算したときの内訳（単品では省略） */
+export type MyFoodInput = {
+  name: string; unit: string;
+  kcal: number; p: number; f: number; c: number;
+  kind?: 'food' | 'recipe';
+  items?: FoodItem[] | null;
+};
+
+/**
+ * 複数の食材（AI解析の品目一覧）を1つのマイ食品にまとめる純関数。
+ * 名前が空なら「先頭の食材＋セット」。1品だけならその品の量を「1回分」にし、単品（food）として扱う。
+ * 2品以上は unit=「1セット」・kind='recipe'（my_foods.kind の既存値）で、内訳を items に残す。
+ */
+export function composeMyFood(name: string, items: FoodItem[]): MyFoodInput {
+  const nm = String(name ?? '').trim();
+  const total = sumItems(items);
+  const first = items[0]?.name?.trim() ?? '';
+  const single = items.length === 1;
+  return {
+    name: nm || (first ? t('{name}セット', { name: first }) : t('マイ食品')),
+    unit: single ? (String(items[0].qty ?? '').trim() || t('1人前')) : t('1セット'),
+    kcal: total.kcal, p: total.p, f: total.f, c: total.c,
+    kind: single ? 'food' : 'recipe',
+    items: single ? null : items,
+  };
+}
+
+/** 同名の登録があればそのid（unique(user_id, name) に当たる前に上書きの意思を聞くため） */
+export async function findMyFoodByName(uid: string, name: string): Promise<string | null> {
+  try {
+    const { data } = await supabase.from('my_foods').select('id').eq('user_id', uid).eq('name', name).maybeSingle();
+    const id = (data as { id?: string } | null)?.id;
+    return id ? String(id) : null;
+  } catch { return null; }
+}
+
+// items 列が無いDB（migration-31未適用）は PostgREST が PGRST204（列が見つからない）を返す
+function isMissingItemsColumn(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false;
+  return e.code === 'PGRST204' || /items/i.test(String(e.message ?? ''));
+}
+
+/**
+ * マイ食品を1件保存する。overwriteId を渡すとその行を上書き（同名の再登録）。
+ * items 列が無いDBでは内訳を落として合計だけで再試行する＝未適用でも登録は必ず成功させる。
+ */
+export async function saveMyFood(
+  uid: string, input: MyFoodInput, overwriteId?: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const nm = String(input.name ?? '').trim();
+  if (!nm) return { ok: false, error: t('名前を入力してください。') };
+  if (!(Number(input.kcal) > 0)) return { ok: false, error: t('カロリーを入力してください。') };
+  const base: Record<string, unknown> = {
+    user_id: uid, name: nm,
+    unit: String(input.unit ?? '').trim() || t('1人前'),
+    kcal: Number(input.kcal), p: Number(input.p) || 0, f: Number(input.f) || 0, c: Number(input.c) || 0,
+    kind: input.kind ?? 'food',
+  };
+  const withItems = input.items && input.items.length > 0 ? { ...base, items: input.items } : null;
+  const write = async (row: Record<string, unknown>) => {
+    try {
+      const q = overwriteId
+        ? await supabase.from('my_foods').update(row).eq('id', overwriteId)
+        : await supabase.from('my_foods').insert(row);
+      return (q.error ?? null) as { code?: string; message?: string } | null;
+    } catch { return { message: 'network' }; }
+  };
+  let err = await write(withItems ?? base);
+  if (err && withItems && isMissingItemsColumn(err)) err = await write(base);   // 列が無い → 内訳なしで再登録
+  if (err) return { ok: false, error: t('保存に失敗しました。もう一度お試しください。') };
+  return { ok: true };
+}
+
+/** 名前変更（設定＞マイ食品の管理から。同名が既にあれば unique 制約で失敗＝false） */
+export async function renameMyFood(id: string, name: string): Promise<boolean> {
+  const nm = String(name ?? '').trim();
+  if (!nm) return false;
+  try {
+    const { error } = await supabase.from('my_foods').update({ name: nm }).eq('id', id);
+    return !error;
+  } catch { return false; }
+}
+
+/** 削除（チップから消えるだけ。過去の記録は変わらない） */
+export async function deleteMyFood(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('my_foods').delete().eq('id', id);
+    return !error;
+  } catch { return false; }
 }
