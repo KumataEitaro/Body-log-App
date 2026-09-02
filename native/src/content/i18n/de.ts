@@ -1764,4 +1764,9 @@ export const DE: Record<string, string> = {
   "マイ食品": "Meine Lebensmittel",
   "1セット": "1 Portion/Set",
   "マイ食品を登録できませんでした。通信環境を確認してもう一度お試しください。": "Speichern fehlgeschlagen. Bitte Internetverbindung prüfen und erneut versuchen.",
+  "歩いたぶん（推定） +{n}kcal": "Vom Gehen (geschätzt) +{n}kcal",
+  "いま": "Jetzt",
+  "⏱ 時刻を選ぶ": "⏱ Uhrzeit wählen",
+  "食べた時間": "Uhrzeit der Mahlzeit",
+  "決定": "Fertig",
 };

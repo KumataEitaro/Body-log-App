@@ -85,12 +85,18 @@ export async function analyzeFood(
 }
 
 // ステージング内容をログとして確定保存（dateを渡せば過去日にも記録できる。省略時=今日）
-export async function saveParsed(uid: string, p: ParsedResult, note: string, date?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * トレイの内容を logs に1行 insert。
+ * @param at 食べた時刻（UTCのISO・トレイの「食べた時間」チップで組む）。省略/nullなら
+ *           DBの now()（＝「いま」）。過去日に現在時刻を入れないため、過去日は呼び出し側が必ず渡す
+ */
+export async function saveParsed(uid: string, p: ParsedResult, note: string, date?: string, at?: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
   const total = sumItems(p.items);
   const hasMeal = p.items.length > 0;
   const today = date || todayJST();
   const { error } = await supabase.from('logs').insert({
     user_id: uid, date: today,
+    ...(at ? { at } : {}),
     items: p.items,
     kcal: hasMeal ? total.kcal : null,
     p: hasMeal ? total.p : null, f: hasMeal ? total.f : null, c: hasMeal ? total.c : null,

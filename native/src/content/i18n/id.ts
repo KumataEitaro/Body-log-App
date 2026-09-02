@@ -1764,4 +1764,9 @@ export const ID: Record<string, string> = {
   "マイ食品": "Makanan Kustom",
   "1セット": "1 porsi paket",
   "マイ食品を登録できませんでした。通信環境を確認してもう一度お試しください。": "Gagal menyimpan Makanan Kustom. Periksa koneksi internetmu lalu coba lagi.",
+  "歩いたぶん（推定） +{n}kcal": "Dari jalan kaki (est.) +{n}kcal",
+  "いま": "Sekarang",
+  "⏱ 時刻を選ぶ": "⏱ Pilih waktu",
+  "食べた時間": "Waktu makan",
+  "決定": "Selesai",
 };

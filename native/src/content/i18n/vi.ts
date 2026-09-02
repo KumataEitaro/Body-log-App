@@ -1764,4 +1764,9 @@ export const VI: Record<string, string> = {
   "マイ食品": "Món của tôi",
   "1セット": "1 phần",
   "マイ食品を登録できませんでした。通信環境を確認してもう一度お試しください。": "Không thể lưu vào Món của tôi. Vui lòng kiểm tra kết nối mạng và thử lại nhé.",
+  "歩いたぶん（推定） +{n}kcal": "Đi bộ (ước tính) +{n}kcal",
+  "いま": "Bây giờ",
+  "⏱ 時刻を選ぶ": "⏱ Chọn giờ",
+  "食べた時間": "Thời gian ăn",
+  "決定": "Xác nhận",
 };

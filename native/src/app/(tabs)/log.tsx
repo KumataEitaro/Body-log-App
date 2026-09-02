@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing,
+  ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, UtensilsCrossed } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import VoiceHintButton from '@/components/VoiceHintButton';
@@ -43,7 +44,12 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
-import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal } from '@/lib/activeKcal';
+import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal, useStepsOfDay } from '@/lib/activeKcal';
+import { resolveBurnKcal } from '@/lib/stepsKcal';
+import {
+  MEAL_TIME_PRESETS, MEAL_TIME_NOW, MEAL_TIME_STEP_MIN,
+  resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm,
+} from '@/lib/timeSlots';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 import { buildDailyBrief, type Brief } from '@/lib/dailyBrief';
 import DailyBrief from '@/components/DailyBrief';
@@ -80,7 +86,7 @@ import { invalidateStreak, maybeEvaluateBadges, peekBadgeBanner, consumeBadgeBan
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { dailyAllowance, overLevel, balanceOf, balanceFill, type BalanceDay, type Balance } from '@/lib/deficit';
 import { useKcalAdjust } from '@/lib/kcalAdjust';
-import { t } from '@/lib/i18n';
+import { t, apiLang } from '@/lib/i18n';
 import { useReduceMotion, useCountUp } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
@@ -325,6 +331,7 @@ export default function LogScreen() {
   // ヘルスケアのアクティブkcal（実測）と、それを目標へ反映する設定（既定OFF）。
   // 読み取りはlib/health.ts側でキャッシュ済み＝毎レンダーでHealthKitを叩かない
   const activeKcalToday = useActiveKcal(viewDate);
+  const stepsOfView = useStepsOfDay(viewDate);
   const activeToGoal = useActiveKcalToGoal();
 
   const load = useCallback(async () => {
@@ -379,8 +386,15 @@ export default function LogScreen() {
   // ONのときも足すのは max(0, アクティブ − BMR×(生活係数−1)) だけ。
   // 生活係数（既定1.3）には日常活動がすでに入っているので、実測全量を足すと
   // 日常活動を二重に数えてしまう。だから「想定より多く動いた分」に絞る（lib/activeKcal.ts）
-  const activeBonus = activeToGoal && activeKcalToday != null
-    ? activeKcalGoalBonus(activeKcalToday, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
+  //
+  // アクティブ相当の出どころは運動タブ「きょうの動き」と同じ3段階（lib/stepsKcal.ts resolveBurnKcal）:
+  //   ① 実測>0 → 実測 ／ ② 実測0で歩数>0 → 歩数からの推定（「（推定）」を添える）／ ③ どちらも無し → 上乗せなし
+  // ③の「アプリ記録ぶん（adj）」は target の dayExerciseKcal にすでに入っているので recorded=0 で渡し、
+  // source が 'recorded' のときは上乗せしない（二重計上しない）
+  const heroBurn = resolveBurnKcal({ measured: activeKcalToday, steps: stepsOfView, weightKg: weightForBmr, recorded: 0 });
+  const activeEquivalent = heroBurn.source !== 'recorded' ? heroBurn.kcal : null;
+  const activeBonus = activeToGoal && activeEquivalent != null
+    ? activeKcalGoalBonus(activeEquivalent, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
   const [kcalAdjust] = useKcalAdjust();
   const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
@@ -647,7 +661,7 @@ export default function LogScreen() {
       const items = addServing([], fd);
       const r = await saveParsed(uid, {
         items, weight: null, waist: null, ex: null, adj: 0, mood: null,
-      }, fd.name, viewDate);
+      }, fd.name, viewDate, mealAt);   // 時刻はトレイのチップと同じ解決（過去日に現在時刻を入れない）
       if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setMsg({ ok: true, text: t('「{name}」を記録しました（長押しで即記録）', { name: fd.name }) });
@@ -702,9 +716,26 @@ export default function LogScreen() {
     setFocusItem(null);   // 品目が変わったら注目を解除（消えた品を指し続けないため）
   }
   function clearTray() {
-    setParsed(null); setStagedNote(''); setFocusItem(null);
+    setParsed(null); setStagedNote(''); setFocusItem(null); setMealTime(null);
     setAiNote(null); parseHistory.current = [];
     setAiDietFlags({});   // 制約の判定はこのトレイ限りのもの（次の解析に持ち越さない）
+  }
+
+  // 食べた時間のピッカーを開く。初期値は選択中の時刻（「いま」なら現在時刻）を15分刻みに丸めたもの
+  function openTimePicker() {
+    const now = new Date();
+    const base = mealTimeResolved === MEAL_TIME_NOW ? null : parseHm(mealTimeResolved);
+    const src = base ?? { h: now.getHours(), m: now.getMinutes() };
+    const r = roundHm(src.h, src.m);
+    const d = new Date(); d.setHours(r.h, r.m, 0, 0);
+    setTimeDraft(d);
+    setTimePickerOpen(true);
+  }
+  // ピッカーの値を 'H:mm' にしてチップの選択へ（端末ローカル時刻の時・分をそのまま使う＝
+  // 表示中の日付とJSTで組むのは buildAtJST 側の仕事）
+  function commitTime(d: Date) {
+    setMealTime(fmtHm(d.getHours(), d.getMinutes()));
+    Haptics.selectionAsync().catch(() => {});
   }
 
   // 量調整ポップ: 注目中の1品に倍率を適用してkcal/PFCを再計算する
@@ -764,13 +795,15 @@ export default function LogScreen() {
     setStagedNote(typeof l.text === 'string' ? l.text : '');
     setFocusItem(null);
     setEditingId(l.id);
+    // 元の記録の時刻を「食べた時間」の既定にする（置き換え保存で時刻が「いま」にずれない）
+    setMealTime(hmJST(l.at));
     editingDateRef.current = viewDate;
     setMsg({ ok: true, text: t('下のトレイに戻しました。直して✓保存すると置き換わります。') });
   }
 
   // 編集をやめる（記録は元のまま残る）
   function cancelEdit() {
-    setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
+    setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null); setMealTime(null);
     editingDateRef.current = null;
     setMsg(null);
   }
@@ -836,7 +869,8 @@ export default function LogScreen() {
       if (parsed.weight != null && !(await confirmOutlierWeight(latestWeight, Number(parsed.weight)))) {
         return false;   // トレイは残る。体重チップの×で外すか、値を直して再保存できる
       }
-      const res = await saveParsed(uid, parsed, stagedNote, viewDate);
+      // 食べた時間（トレイのチップ）。「いま」なら null → DBの now()。過去日は既定12:00か選んだ時刻が必ず入る
+      const res = await saveParsed(uid, parsed, stagedNote, viewDate, mealAt);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return false; }
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
       let delFailed = false;
@@ -849,7 +883,7 @@ export default function LogScreen() {
       // G2: 1回の食事が2,500kcal超のとき、保存後の一言だけを非審判の文言に差し替える
       // （赤の超過表示や計算はいじらない。過食直後の罪悪感で記録をやめさせないための一点）
       const savedKcal = items.length > 0 ? Math.round(sumItems(items).kcal) : 0;
-      setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
+      setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null); setMealTime(null);
       editingDateRef.current = null;
       await load();
       setMsg(delFailed
@@ -1167,6 +1201,15 @@ export default function LogScreen() {
   const [focusItem, setFocusItem] = useState<number | null>(null);
   // 編集中の記録ID: セットされている間、✓保存はこの記録を置き換える（新規追加ではない）
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 「食べた時間」チップ（§4）。null=未操作（今日なら「いま」・過去日なら12:00に解決）／'now'／'H:mm'。
+  // 選んだ時刻は logs.at にクライアントから明示的に入れる（DB now() 任せだと過去日に嘘の時刻が入る）
+  const [mealTime, setMealTime] = useState<string | null>(null);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [timeDraft, setTimeDraft] = useState<Date>(new Date());   // ピッカー内の仮の値（iOSは「決定」で確定）
+  const isViewToday = viewDate === todayJST();
+  const mealTimeResolved = resolveMealTime(mealTime, isViewToday);
+  // 保存に使う at。「いま」は送らずDBの now() に任せる（いちばん正確）
+  const mealAt = mealTimeResolved === MEAL_TIME_NOW ? null : buildAtJST(viewDate, mealTimeResolved);
   // よく食べる食品の登録案内（保存後に1件だけ出す）
   const [suggest, setSuggest] = useState<Suggestion | null>(null);
   // 食事の制約（除外アラート）の存在を知らせる案内。
@@ -1180,6 +1223,8 @@ export default function LogScreen() {
   // 編集を始めた日付。表示日を動かしたら編集を打ち切る（記録が別の日へ移るのを防ぐ）
   const editingDateRef = useRef<string | null>(null);
   useEffect(() => {
+    // 日付を動かしたら時刻の選択は既定に戻す（今日=「いま」・過去日=12:00 は日付ごとに解決し直す）
+    setMealTime(null);
     if (editingId && editingDateRef.current && editingDateRef.current !== viewDate) {
       setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
       editingDateRef.current = null;
@@ -1312,7 +1357,11 @@ export default function LogScreen() {
             {/* 目標を黙って増やさない: アクティブ反映ONで上乗せが起きた日だけ内訳を1行出す。
                 「なぜ今日は多いのか」が分からない増加はアプリへの信頼を削る */}
             {activeBonus > 0 && (
-              <Text style={s.heroActive}>{t('歩いたぶん +{n}kcal', { n: activeBonus.toLocaleString() })}</Text>
+              <Text style={s.heroActive}>
+                {heroBurn.source === 'steps'
+                  ? t('歩いたぶん（推定） +{n}kcal', { n: activeBonus.toLocaleString() })   // 歩数からの推定＝実測と同じ顔をさせない
+                  : t('歩いたぶん +{n}kcal', { n: activeBonus.toLocaleString() })}
+              </Text>
             )}
             {/* 残りPFCプログレスバー（英字P/F/Cは初心者に伝わらないため日本語を主・英字は補助） */}
             {macros && (
@@ -1606,10 +1655,13 @@ export default function LogScreen() {
       <Reanimated.View style={dockLift}>
       <Animated.View style={[s.dockWrap, { paddingBottom: insets.bottom + 8 }, enter[3]]} ref={dockTarget} collapsable={false}>
         {/* いつの記録か（常時表示）: 過去日に書いていることへの気づき（今日以外はアンバー強調）。
-            保存時刻はDB側のnow()で決まる（過去日でも実際の操作時刻が入る）ため、
-            嘘の時刻を見せないよう日付だけを言う */}
-        <Text style={[s.dockDate, viewDate !== todayJST() && s.dockDatePast]}>
+            時刻は本人がトレイの「食べた時間」チップで選んだときだけ薄く添える
+            （「いま」はDB側のnow()で決まるので出さない＝嘘の時刻を見せない） */}
+        <Text style={[s.dockDate, !isViewToday && s.dockDatePast]}>
           {t('{date} の記録', { date: dateLabelOf(viewDate) })}
+          {parsed != null && mealTimeResolved !== MEAL_TIME_NOW && (
+            <Text style={s.dockTime}>{'  '}{mealTimeResolved}</Text>
+          )}
         </Text>
         {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
         {profile != null && (() => {
@@ -1750,6 +1802,24 @@ export default function LogScreen() {
             )}
             {/* 食事の制約の警告行（§5）。トレイ上部・保存は止めない・免責を毎回添える */}
             <DietWarnRow alerts={dietAlerts} />
+            {/* 食べた時間（§4）: 「いま」（今日だけ）／候補5つ／⏱で15分刻みのピッカー。
+                選んだ時刻が logs.at に入る＝食べる時間帯の分析と特徴量が「保存した時刻」ではなく
+                「食べた時刻」を見られるようになる。過去日は「いま」を出さず12:00を仮置き */}
+            {parsed != null && (() => {
+              const isPreset = mealTimeResolved === MEAL_TIME_NOW || MEAL_TIME_PRESETS.includes(mealTimeResolved);
+              const chip = (key: string, label: string, on: boolean, onPress: () => void) => (
+                <Pressable key={key} style={[s.timeChip, on && s.timeChipOn]} onPress={onPress} hitSlop={4}>
+                  <Text style={[s.timeChipT, on && s.timeChipTOn]}>{label}</Text>
+                </Pressable>
+              );
+              return (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.timeRow}>
+                  {isViewToday && chip('now', t('いま'), mealTimeResolved === MEAL_TIME_NOW, () => setMealTime(MEAL_TIME_NOW))}
+                  {MEAL_TIME_PRESETS.map((hm) => chip(hm, hm, mealTimeResolved === hm, () => setMealTime(hm)))}
+                  {chip('pick', isPreset ? t('⏱ 時刻を選ぶ') : `⏱ ${mealTimeResolved}`, !isPreset, openTimePicker)}
+                </ScrollView>
+              );
+            })()}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {parsed?.items.map((it, i) => {
                 const on = focusItem === i;
@@ -1912,6 +1982,39 @@ export default function LogScreen() {
         </View>
       </Animated.View>
       </Reanimated.View>
+
+      {/* 食べた時間のピッカー（15分刻み）。iOSはスピナー＋「決定」、Androidは端末のダイアログで即確定 */}
+      <Modal visible={timePickerOpen} transparent animationType="fade" onRequestClose={() => setTimePickerOpen(false)}>
+        <Pressable style={s.timeBack} onPress={() => setTimePickerOpen(false)}>
+          <Pressable style={s.timeCard} onPress={() => {}}>
+            <Text style={s.timeTitle}>{t('食べた時間')}</Text>
+            <DateTimePicker
+              locale={apiLang()}
+              value={timeDraft} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minuteInterval={MEAL_TIME_STEP_MIN}
+              onChange={(ev, d) => {
+                if (Platform.OS !== 'ios') {
+                  // Androidはダイアログの「OK」で確定・戻るで取り消し（イベント1回で閉じる）
+                  setTimePickerOpen(false);
+                  if (ev.type === 'set' && d) commitTime(d);
+                  return;
+                }
+                if (d) setTimeDraft(d);
+              }}
+            />
+            {Platform.OS === 'ios' && (
+              <View style={s.timeBtns}>
+                <Pressable style={s.timeBtnGhost} onPress={() => setTimePickerOpen(false)} hitSlop={6}>
+                  <Text style={s.timeBtnGhostT}>{t('キャンセル')}</Text>
+                </Pressable>
+                <Pressable style={s.timeBtn} onPress={() => { commitTime(timeDraft); setTimePickerOpen(false); }} hitSlop={6}>
+                  <Text style={s.timeBtnT}>{t('決定')}</Text>
+                </Pressable>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
       {/* 削除のUndoスナックバー（ドックの上に重ねる。触れない領域は素通し） */}
       {undoBar.element}
       <AddCardSheet
@@ -2100,6 +2203,26 @@ const s = themed(() => ({
   // 「いつの記録か」の常設表示。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
   dockDate: { fontSize: 11, fontWeight: '700', color: C.faint, paddingHorizontal: 6, marginBottom: 3, fontVariant: ['tabular-nums'] },
   dockDatePast: { color: C.amber, fontWeight: '800' },  // 生HEX禁止（ダーク対応はCトークン経由）
+  // 選んだ「食べた時間」を日付に薄く添える（本人が選んだ時刻なので出してよい・「いま」は出さない）
+  dockTime: { color: C.faint, fontWeight: '700' },
+  // 食べた時間チップ列（トレイ上部・警告行の下・品目チップの上）
+  timeRow: { marginBottom: 6 },
+  timeChip: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.chip, marginRight: 5,
+    borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel,
+  },
+  timeChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
+  timeChipT: { fontSize: 12, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  timeChipTOn: { color: C.teal },
+  // 時刻ピッカー（DateStripの月カレンダーと同じ「透過背景＋角丸カード」の文法）
+  timeBack: { flex: 1, backgroundColor: rgba(C.ink, 0.35), justifyContent: 'center', padding: 24 },
+  timeCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
+  timeTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
+  timeBtns: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  timeBtnGhost: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel },
+  timeBtnGhostT: { fontSize: 15, fontWeight: '800', color: C.sub },
+  timeBtn: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, backgroundColor: C.teal },
+  timeBtnT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   dock: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4,
     backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
