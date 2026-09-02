@@ -9,7 +9,7 @@
 // （無効ビルドで王冠を出すと「課金すれば開く」という嘘になるため）
 import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
-import { purchasesAvailable } from './purchases';
+import { purchasesAvailable, currentPlan, higherPlan } from './purchases';
 import { isUnlimited } from './calc';
 
 // ゲート対象の機能キー。画面を足すたびにここへ追加する（文字列unionで拡張）
@@ -20,15 +20,30 @@ export type GatedFeature = 'laws' | 'digest' | 'eating' | 'coach' | 'insights' |
 
 // ===== plan のモジュールスコープキャッシュ =====
 // プラン判定の正本はサーバー（profiles.plan。RC webhookとクーポンAPIが更新する）。
+// ただし購入直後はwebhookがprofiles.planへ届くまで数秒〜数十秒の遅れがあるため、
+// 端末のRC entitlement（purchases.currentPlan）も併せ、**強い方**を採用する（higherPlan）。
+// これで「購入直後・復元直後・アプリ再起動（webhook未着やオフライン）」のどのケースでも、
+// 王冠と広告（AdSlot）がその場で消える。弱い方に倒れることは無い＝課金した人に広告を見せない。
+//
 // アプリ起動中に何度も引かない: 最初のuseGateマウントで1回だけ取得し、全画面で共有。
-// useSyncExternalStore なので取得完了時だけ再レンダーされる（再レンダー地獄にしない）。
-let plan: string | null = null;
+// useSyncExternalStore なので値が変わったときだけ再レンダーされる（再レンダー地獄にしない）。
+let serverPlan: string | null = null;      // profiles.plan（正本）
+let entitlementPlan: string | null = null; // RC entitlement 由来（購入直後の即時反映・オフライン時）
+let plan: string | null = null;            // 両者の強い方（購読者に見せる値）
 let unlimited = false; // UNLIMITED_EMAILS（管理者）は常にゲートしない。plan取得と同時にemailで判定
 let fetched = false;   // 取得成功後はtrue（失敗時はfalseのまま＝次のマウントで再試行）
 let fetching = false;  // 多重リクエストの抑止
 const listeners = new Set<() => void>();
 const subscribe = (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
 const getPlan = () => plan;
+
+// 合成値を作り直し、変わっていれば購読者（useGate を呼ぶ全画面・全AdSlot）へ通知
+function recompute(): void {
+  const next = higherPlan(serverPlan, entitlementPlan);
+  if (next === plan) return;
+  plan = next;
+  listeners.forEach((l) => l());
+}
 
 async function fetchPlanOnce(): Promise<void> {
   if (fetched || fetching) return;
@@ -39,11 +54,20 @@ async function fetchPlanOnce(): Promise<void> {
     if (!uid) return; // 未ログイン中は保留（ログイン後のマウントで再試行）
     // UNLIMITED免除: 管理者アカウントはプランに関係なく全機能を開放する（追加クエリなし）
     unlimited = isUnlimited(session?.user?.email);
-    const { data, error } = await supabase.from('profiles').select('plan').eq('id', uid).maybeSingle();
-    if (error) return; // plan列が無い環境・通信断は「無料扱い」のまま次回に任せる
-    plan = (data?.plan as string | null) ?? null;
+    // サーバーの正本と端末のentitlementを並行して引く。entitlementはRC SDKのキャッシュが効くので
+    // オフラインでも直近の値が返る（=再起動直後に広告が一瞬出る、を防ぐ）
+    const [srv, ent] = await Promise.all([
+      supabase.from('profiles').select('plan').eq('id', uid).maybeSingle(),
+      currentPlan().catch(() => 'free' as const),
+    ]);
+    // 上書きではなく強い方を残す: applyEntitlement（購入直後）の値を、直後の引き直しで
+    // RC SDK のキャッシュが一瞬古い場合に潰さない。セッション内で entitlement が下がる
+    // （期限切れ）のは再起動時に反映されればよい＝広告を出す側に倒す方が害が大きい
+    entitlementPlan = higherPlan(entitlementPlan, ent === 'free' ? null : ent);
+    if (srv.error) { recompute(); return; } // plan列が無い環境・通信断は「無料扱い」のまま次回に任せる
+    serverPlan = (srv.data?.plan as string | null) ?? null;
     fetched = true;
-    listeners.forEach((l) => l());
+    recompute();
   } catch { /* 失敗しても機能は止めない（gatedはnull=無料として判定する） */ }
   finally { fetching = false; }
 }
@@ -53,6 +77,22 @@ export async function refreshGate(): Promise<void> {
   fetched = false;
   fetching = false;
   await fetchPlanOnce();
+}
+
+/**
+ * 購入・復元が通った直後に、端末のentitlement（purchase()/restore()の戻り値）を即時反映する。
+ * webhook→profiles.plan の到着を待たずに王冠と広告枠がその場で消える（AdSlot は畳むアニメへ）。
+ * 併せてサーバー値も引き直すが、強い方を採るので webhook 未着で戻ってしまうことは無い。
+ */
+export function applyEntitlement(newPlan: string | null): void {
+  entitlementPlan = newPlan == null || newPlan === 'free' ? null : newPlan;
+  recompute();
+  refreshGate().catch(() => {});
+}
+
+/** いまの合成プラン（React外から参照する用・テスト用）。useGate と同じ値 */
+export function peekGatePlan(): string | null {
+  return plan;
 }
 
 export type Gate = {
@@ -86,5 +126,6 @@ export function useGate(): Gate {
 
 /** テスト用: キャッシュを初期状態に戻す */
 export function __resetGateForTest(): void {
-  plan = null; unlimited = false; fetched = false; fetching = false; listeners.clear();
+  serverPlan = null; entitlementPlan = null; plan = null;
+  unlimited = false; fetched = false; fetching = false; listeners.clear();
 }

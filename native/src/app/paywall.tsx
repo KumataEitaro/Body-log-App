@@ -19,6 +19,7 @@ import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import CouponSheet from '@/components/CouponSheet';
+import { applyEntitlement } from '@/lib/gate';
 import {
   purchasesAvailable, fetchOffers, purchase, restore, currentPlan,
   PAYWALL_PLANS, defaultSelection, preferredPeriod,
@@ -198,6 +199,9 @@ export default function PaywallScreen() {
       const newPlan = await purchase(offer);
       if (newPlan && newPlan !== 'free') {
         setPlan(newPlan);
+        // gate のキャッシュへ即時反映 → 全タブの王冠と広告枠（AdSlot）がその場で消える。
+        // webhook→profiles.plan の到着を待たない（サーバー値の引き直しは applyEntitlement が裏で行う）
+        applyEntitlement(newPlan);
         Alert.alert(t('ありがとうございます！'), t('プランが有効になりました。'));
         router.back();
       }
@@ -212,6 +216,8 @@ export default function PaywallScreen() {
     try {
       const p = await restore();
       setPlan(p);
+      // 復元も購入と同じ経路で gate へ即時反映（機種変更直後に広告が残らない）
+      if (p !== 'free') applyEntitlement(p);
       Alert.alert(p === 'free' ? t('復元できる購入が見つかりませんでした') : t('購入を復元しました'));
     } finally { setBusy(false); }
   }

@@ -30,6 +30,7 @@ import { usePurpose, fetchPurposePeriods, cycleLabel, type PurposePeriod } from 
 import { Repeat } from 'lucide-react-native';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
+import AdSlot from '@/components/AdSlot';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
@@ -1124,6 +1125,11 @@ export default function ChangesScreen() {
     const first = visibleOrder.find((k) => sec.keys.includes(k));
     if (first) sectionHeadOf.set(first, sec.title());
   }
+  // 広告枠（概要タブ・1枠）: 「からだ」セクションと「食事」セクションの間＝食事セクションの
+  // 見出しの直上。詳細ページ（detailKey!=null）には置かない。並び替え中も非表示。
+  // 食事セクションの行が全部隠されているときは枠を出さない（無理に別の場所へ置かない）
+  const adBeforeKey = editing ? null
+    : (visibleOrder.find((k) => SECTION_DEFS[1].keys.includes(k)) ?? null);
   function menuRow(key: string) {
     const withSpark = key === 'body' && sparkVals.length >= 2;
     // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
@@ -1170,6 +1176,7 @@ export default function ChangesScreen() {
     if (secTitle == null) return row;
     return (
       <View>
+        {key === adBeforeKey && <AdSlot placement="changes" />}
         <Text style={s.sectionH}>{secTitle}</Text>
         {row}
       </View>

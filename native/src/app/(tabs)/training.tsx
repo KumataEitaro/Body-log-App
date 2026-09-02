@@ -39,6 +39,7 @@ import { activityName, activityKcal, type Activity as ActivityKind } from '@/lib
 import { bumpFoodFreq, readFoodFreq, foodScores } from '@/lib/foods';
 import { AddCardSheet, useCardLayout, useCardOrder } from '@/components/CardLayout';
 import { OptionButton } from '@/components/ui/Selectable';
+import AdSlot from '@/components/AdSlot';
 import { t } from '@/lib/i18n';
 
 type HistRow = { id: string; date: string; text: string };
@@ -431,6 +432,7 @@ export default function TrainingScreen() {
         const maxSteps = Math.max(1, ...last7.map((d) => d.steps));
         const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
         return (
+          <>
           <Animated.View entering={FadeInDown.duration(320)} style={[s.card, s.cardCompact]}>
             <View ref={moveTarget} collapsable={false}>
             <View style={s.h2Row}><Activity size={ICON.sm} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('きょうの動き')}</Text></View>
@@ -549,6 +551,11 @@ export default function TrainingScreen() {
               );
             })()}
           </Animated.View>
+          {/* 広告枠（運動タブ・1枠）: 「きょうの動き」＝閲覧領域の直下、記録カード群の手前に置く。
+              記録ボタンの直上には置かない（誤タップ防止・審査上の配置判断）。
+              並び替え中はドラッグの座標計算と視界を邪魔しないので非表示 */}
+          {!editing && <AdSlot placement="training" />}
+          </>
         );
     }
 
@@ -636,6 +643,9 @@ export default function TrainingScreen() {
   // ===== 並び替え対象の下に置く固定要素（ReorderableCards の footer） =====
   const footerJSX = (
     <>
+      {/* 「きょうの動き」カードを隠している人だけ、枠はカード群の下（導線の上）へ退避。
+          いずれの場合も運動タブの枠は1つだけ */}
+      {!editing && !visibleOrder.includes('move') && <AdSlot placement="training" />}
       {history.length > 0 && (
         <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「挙上重量の推移」で見られます')}</Text>
       )}
