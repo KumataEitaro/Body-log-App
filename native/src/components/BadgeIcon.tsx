@@ -11,11 +11,16 @@ import {
   Flame, Bird, Calendar, CalendarCheck, Sunrise,
   Camera, Aperture, MessageCircle, Brain, Salad, BookOpen, CheckCheck, Timer, Moon,
   Scale, Medal, Trophy, Mountain, Flag, Dumbbell, Weight, Footprints, Route, Zap, TrendingUp,
-  Award, type LucideIcon,
+  Award,
+  // 以下はリモート配信のバッジが名前で指せる追加分（許可リスト。同梱＝バンドルに含まれることが保証される）
+  Activity, Apple, Bike, Carrot, Coffee, Crown, Droplet, Egg, Fish, Gem, Heart, HeartPulse, Leaf,
+  Lightbulb, Rocket, Sparkles, Sprout, Star, Sun, Target, Waves, Wheat, Wind, Utensils, CalendarDays,
+  Smile, Users, UserPlus, Share2, Pencil, ClipboardList, ListChecks, Repeat, History, Gauge,
+  type LucideIcon,
 } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { hueOf, medalTones, silhouetteTones, spreadHues, type MedalTones } from '@/lib/badgeArt';
-import { badgeCatOf, type BadgeCat } from '@/lib/achievements';
+import { badgeById, badgeCatOf, type BadgeCat } from '@/lib/achievements';
 
 const MAP: Record<string, LucideIcon> = {
   // 継続
@@ -30,7 +35,35 @@ const MAP: Record<string, LucideIcon> = {
   vol10t: Weight, vol20t: Dumbbell, km50: Footprints, km100: Route, burn5000: Zap, pr5: TrendingUp,
 };
 
-export function badgeIconOf(id: string): LucideIcon { return MAP[id] ?? Award; }
+/**
+ * リモート定義のバッジが `icon: 'Flame'` のように名前で指せるアイコンの許可リスト。
+ * Lucideの全アイコンを受け付けない理由: ①名前の誤記や未知の名前で落ちない
+ * ②バンドルに実際に含まれているものだけを保証する（Metroは使っていないアイコンを同梱しない）。
+ * 足したいときは import に加えてここに1行書き、docs/REMOTE-CONTENT.md の一覧も更新する
+ */
+export const BADGE_ICONS: Record<string, LucideIcon> = {
+  Flame, Bird, Calendar, CalendarCheck, CalendarDays, Sunrise, Sun, Moon, Star, Sparkles,
+  Camera, Aperture, MessageCircle, Brain, Lightbulb, Pencil, ClipboardList, ListChecks, Repeat, History,
+  Salad, Apple, Carrot, Coffee, Egg, Fish, Leaf, Sprout, Wheat, Utensils, BookOpen, CheckCheck, Timer,
+  Scale, Medal, Trophy, Award, Crown, Gem, Mountain, Flag, Target, Rocket,
+  Dumbbell, Weight, Footprints, Route, Bike, Waves, Wind, Zap, TrendingUp, Activity, Gauge,
+  Heart, HeartPulse, Droplet, Smile, Users, UserPlus, Share2,
+};
+
+/** 許可リストに載っているアイコン名か（純関数・テスト対象） */
+export function isAllowedBadgeIcon(name: string | undefined | null): boolean {
+  return !!name && Object.prototype.hasOwnProperty.call(BADGE_ICONS, name);
+}
+
+/**
+ * バッジidからアイコンを決める。①同梱の対応表 ②定義のicon名（許可リスト内） ③既定（Award）。
+ * リモートで同梱バッジの文言だけ差し替えた場合も、アイコンは同梱の対応表が優先される
+ */
+export function badgeIconOf(id: string, iconName?: string | null): LucideIcon {
+  if (MAP[id]) return MAP[id];
+  const name = iconName ?? badgeById(id)?.icon;
+  return (isAllowedBadgeIcon(name) ? BADGE_ICONS[name!] : undefined) ?? Award;
+}
 
 /**
  * カテゴリ別の色相。テーマのアクセント（C.teal）を「記録」に据え、

@@ -10,6 +10,10 @@ import { supabase } from './supabase';
 import { todayJST } from './calc';
 import { parseLiftText, effectiveKg, weightLookup } from './liftLog';
 import { t } from './i18n';
+import {
+  evaluateDeclarativeBadge, getRemoteContent, mergeById, onRemoteContentChange, pickL10n,
+  type BadgeCondition, type BadgeMetrics, type RemoteBadge,
+} from './remoteContent';
 
 const EARNED_KEY = 'bl-badges-earned';   // { [id]: 'YYYY-MM-DD' }
 const REST_COUNT_KEY = 'bl-rest-count';  // レストタイマー起動回数（端末ローカル）
@@ -33,6 +37,12 @@ export type Badge = {
   name: string;
   desc: string;                 // 未獲得時に出す条件文
   cat: BadgeCat;
+  // 獲得条件の宣言的DSL（lib/remoteContent）。あるものは evaluateDeclarativeBadge で判定し、
+  // 無いもの（不死鳥・週末・週の約束・全部入り・深夜ゼロ・五合目・登頂）はコードで判定する
+  when?: BadgeCondition[];
+  // Lucideのアイコン名（リモート定義用。同梱のバッジは components/BadgeIcon の対応表を使う）
+  icon?: string;
+  remote?: boolean;             // true=リモート配信で増えた定義
 };
 
 export type BadgeState = Badge & { earnedOn: string | null };
@@ -128,47 +138,80 @@ export function hadComeback(recordedSorted: string[], today: string): boolean {
 }
 
 // ===== バッジ定義 =====
-export function badgeDefs(): Badge[] {
+// 条件は可能な限り宣言的DSL（when）で書く。ここでDSLを使うのは、リモート配信のバッジと
+// 同じ評価器（evaluateDeclarativeBadge）を同梱バッジでも通す＝評価器が本番で毎日検証されるため。
+const ge = (metric: BadgeCondition['metric'], value: number): BadgeCondition[] => [{ metric, op: '>=', value }];
+
+function bundledBadgeDefs(): Badge[] {
   return [
     // 継続
-    { id: 'streak3', emoji: '🔥', name: t('種火'), desc: t('3日連続で記録する'), cat: 'streak' },
-    { id: 'streak7', emoji: '🔥', name: t('焚き火'), desc: t('7日連続で記録する'), cat: 'streak' },
-    { id: 'streak14', emoji: '🔥', name: t('かがり火'), desc: t('14日連続で記録する'), cat: 'streak' },
-    { id: 'streak30', emoji: '🕯️', name: t('松明'), desc: t('30日連続で記録する'), cat: 'streak' },
-    { id: 'streak60', emoji: '🏮', name: t('篝火の主'), desc: t('60日連続で記録する'), cat: 'streak' },
-    { id: 'streak100', emoji: '🌋', name: t('百日行'), desc: t('100日連続で記録する'), cat: 'streak' },
+    { id: 'streak3', emoji: '🔥', name: t('種火'), desc: t('3日連続で記録する'), cat: 'streak', when: ge('streak', 3) },
+    { id: 'streak7', emoji: '🔥', name: t('焚き火'), desc: t('7日連続で記録する'), cat: 'streak', when: ge('streak', 7) },
+    { id: 'streak14', emoji: '🔥', name: t('かがり火'), desc: t('14日連続で記録する'), cat: 'streak', when: ge('streak', 14) },
+    { id: 'streak30', emoji: '🕯️', name: t('松明'), desc: t('30日連続で記録する'), cat: 'streak', when: ge('streak', 30) },
+    { id: 'streak60', emoji: '🏮', name: t('篝火の主'), desc: t('60日連続で記録する'), cat: 'streak', when: ge('streak', 60) },
+    { id: 'streak100', emoji: '🌋', name: t('百日行'), desc: t('100日連続で記録する'), cat: 'streak', when: ge('streak', 100) },
+    // 以下3つはDSLで書けない（履歴の形・週の構造・自己契約の有無）ためコード判定
     { id: 'phoenix', emoji: '🐦‍🔥', name: t('不死鳥'), desc: t('途切れたあと、もう一度30日つなぐ'), cat: 'streak' },
     { id: 'weekend4', emoji: '📅', name: t('週末も欠かさず'), desc: t('土日を含む週を4週連続で記録する'), cat: 'streak' },
     { id: 'week_promise', emoji: '🤝', name: t('週の約束'), desc: t('自分で決めた週目標を4週連続で守った'), cat: 'streak' },
-    { id: 'morning14', emoji: '🌅', name: t('朝型'), desc: t('朝（10時まで）の記録を累計14日'), cat: 'streak' },
+    { id: 'morning14', emoji: '🌅', name: t('朝型'), desc: t('朝（10時まで）の記録を累計14日'), cat: 'streak', when: ge('morningDays', 14) },
     // 記録（アプリを使いこなす行動）
-    { id: 'photo1', emoji: '📸', name: t('はじめての写真解析'), desc: t('写真から食事を解析する'), cat: 'action' },
-    { id: 'photo30', emoji: '🎞️', name: t('カメラの達人'), desc: t('写真解析を累計30枚'), cat: 'action' },
-    { id: 'coach10', emoji: '💬', name: t('相談上手'), desc: t('AI相談を累計10往復'), cat: 'action' },
-    { id: 'coach100', emoji: '🧠', name: t('AIの相棒'), desc: t('AI相談を累計100往復'), cat: 'action' },
-    { id: 'myfood5', emoji: '🥣', name: t('マイ食品コレクター'), desc: t('マイ食品を5個登録する'), cat: 'action' },
-    { id: 'myfood20', emoji: '📚', name: t('自分だけの食品辞典'), desc: t('マイ食品を20個登録する'), cat: 'action' },
+    { id: 'photo1', emoji: '📸', name: t('はじめての写真解析'), desc: t('写真から食事を解析する'), cat: 'action', when: ge('photoCount', 1) },
+    { id: 'photo30', emoji: '🎞️', name: t('カメラの達人'), desc: t('写真解析を累計30枚'), cat: 'action', when: ge('photoCount', 30) },
+    { id: 'coach10', emoji: '💬', name: t('相談上手'), desc: t('AI相談を累計10往復'), cat: 'action', when: ge('coachCount', 10) },
+    { id: 'coach100', emoji: '🧠', name: t('AIの相棒'), desc: t('AI相談を累計100往復'), cat: 'action', when: ge('coachCount', 100) },
+    { id: 'myfood5', emoji: '🥣', name: t('マイ食品コレクター'), desc: t('マイ食品を5個登録する'), cat: 'action', when: ge('myFoodCount', 5) },
+    { id: 'myfood20', emoji: '📚', name: t('自分だけの食品辞典'), desc: t('マイ食品を20個登録する'), cat: 'action', when: ge('myFoodCount', 20) },
+    // 同日一致・7日連続の複合条件はコード判定
     { id: 'fullday', emoji: '💯', name: t('全部入りの一日'), desc: t('食事・運動・体重を同じ日に記録する'), cat: 'action' },
-    { id: 'rest50', emoji: '⏱️', name: t('ジムの相棒'), desc: t('レストタイマーを累計50回使う'), cat: 'action' },
+    { id: 'rest50', emoji: '⏱️', name: t('ジムの相棒'), desc: t('レストタイマーを累計50回使う'), cat: 'action', when: ge('restCount', 50) },
     { id: 'nolate7', emoji: '🌙', name: t('深夜ゼロ週間'), desc: t('21時以降の食事なしで7日間記録する'), cat: 'action' },
     // 体重
-    { id: 'lost1', emoji: '⚖️', name: t('最初の1kg'), desc: t('開始時から体重-1kg'), cat: 'body' },
-    { id: 'lost3', emoji: '🏅', name: t('-3kg'), desc: t('開始時から体重-3kg'), cat: 'body' },
-    { id: 'lost5', emoji: '🏆', name: t('-5kg'), desc: t('開始時から体重-5kg'), cat: 'body' },
+    { id: 'lost1', emoji: '⚖️', name: t('最初の1kg'), desc: t('開始時から体重-1kg'), cat: 'body', when: ge('weightLossKg', 1) },
+    { id: 'lost3', emoji: '🏅', name: t('-3kg'), desc: t('開始時から体重-3kg'), cat: 'body', when: ge('weightLossKg', 3) },
+    { id: 'lost5', emoji: '🏆', name: t('-5kg'), desc: t('開始時から体重-5kg'), cat: 'body', when: ge('weightLossKg', 5) },
+    // 目標系は「目標体重が設定されているか」という前提条件を持つためコード判定
     { id: 'goal50', emoji: '⛰️', name: t('五合目'), desc: t('目標体重までの道のりの半分を越える'), cat: 'body' },
     { id: 'goal100', emoji: '🚩', name: t('登頂'), desc: t('目標体重に到達する'), cat: 'body' },
     // 運動
-    { id: 'vol10t', emoji: '🐘', name: t('月間10トン'), desc: t('挙上ボリューム（重量×回数）が月間10t'), cat: 'move' },
-    { id: 'vol20t', emoji: '🦏', name: t('月間20トン'), desc: t('挙上ボリュームが月間20t'), cat: 'move' },
-    { id: 'km50', emoji: '🏃', name: t('月間50km'), desc: t('有酸素の距離が月間50km'), cat: 'move' },
-    { id: 'km100', emoji: '🛣️', name: t('月間100km'), desc: t('有酸素の距離が月間100km'), cat: 'move' },
-    { id: 'burn5000', emoji: '🔋', name: t('週5,000kcal'), desc: t('運動の消費が週に5,000kcal'), cat: 'move' },
-    { id: 'pr5', emoji: '📈', name: t('記録更新×5'), desc: t('自己ベストを5回更新する'), cat: 'move' },
+    { id: 'vol10t', emoji: '🐘', name: t('月間10トン'), desc: t('挙上ボリューム（重量×回数）が月間10t'), cat: 'move', when: ge('liftVolumeMonthKg', 10000) },
+    { id: 'vol20t', emoji: '🦏', name: t('月間20トン'), desc: t('挙上ボリュームが月間20t'), cat: 'move', when: ge('liftVolumeMonthKg', 20000) },
+    { id: 'km50', emoji: '🏃', name: t('月間50km'), desc: t('有酸素の距離が月間50km'), cat: 'move', when: ge('cardioKmMonth', 50) },
+    { id: 'km100', emoji: '🛣️', name: t('月間100km'), desc: t('有酸素の距離が月間100km'), cat: 'move', when: ge('cardioKmMonth', 100) },
+    { id: 'burn5000', emoji: '🔋', name: t('週5,000kcal'), desc: t('運動の消費が週に5,000kcal'), cat: 'move', when: ge('burnKcalWeek', 5000) },
+    { id: 'pr5', emoji: '📈', name: t('記録更新×5'), desc: t('自己ベストを5回更新する'), cat: 'move', when: ge('prCount', 5) },
   ];
 }
 
-// id→カテゴリの対応（メダルの色相に使う。翻訳を伴わないので一度作れば使い回せる）
+/** リモート定義（多言語オブジェクト）→ 表示言語で解決した Badge */
+export function badgeFromRemote(r: RemoteBadge): Badge {
+  return {
+    id: r.id,
+    emoji: r.emoji ?? '🏅',
+    name: pickL10n(r.name),
+    desc: pickL10n(r.desc),
+    cat: r.cat,
+    when: Array.isArray(r.when) ? r.when : [r.when],
+    icon: r.icon,
+    remote: true,
+  };
+}
+
+/**
+ * 表示・評価に使うバッジ定義＝同梱＋リモート（idで統合。同idはリモートが上書き＝文言差し替え、
+ * 新idは末尾に追加）。文言は表示のたびに現在の言語で組み直す
+ */
+export function badgeDefs(): Badge[] {
+  const remote = getRemoteContent().badges;
+  if (remote.length === 0) return bundledBadgeDefs();
+  return mergeById(bundledBadgeDefs(), remote.map(badgeFromRemote));
+}
+
+// id→カテゴリの対応（メダルの色相に使う。翻訳を伴わないので一度作れば使い回せる。
+// リモート定義が届いて集合が変わったら作り直す）
 let catCache: Record<string, BadgeCat> | null = null;
+onRemoteContentChange(() => { catCache = null; });
 export function badgeCatOf(id: string): BadgeCat {
   if (!catCache) {
     catCache = {};
@@ -427,23 +470,26 @@ async function runEvaluate(): Promise<AchievementReport> {
   const maxWeekKcal = Math.max(0, ...kcalByWeek.values());
 
   // ===== 判定 =====
-  const ok: Record<string, boolean> = {
-    streak3: streak >= 3, streak7: streak >= 7, streak14: streak >= 14,
-    streak30: streak >= 30, streak60: streak >= 60, streak100: streak >= 100,
+  // ①DSLで書ける条件は、メトリクスに数値を並べて evaluateDeclarativeBadge に任せる
+  //   （リモートで増えたバッジも同じ経路で判定される＝コード追加なしで新バッジが機能する）
+  const metrics: BadgeMetrics = {
+    streak, recordedDays: recorded.size, morningDays,
+    photoCount: photoN, coachCount: coachN, myFoodCount: foodsN, restCount: restN,
+    weightLossKg: lost, liftVolumeMonthKg: maxVol, cardioKmMonth: maxKm, burnKcalWeek: maxWeekKcal,
+    prCount, weekCount: week.count,
+  };
+  // ②DSLで書けない条件だけコードで判定する
+  const codeOk: Record<string, boolean> = {
     phoenix: hadComeback(recordedSorted, today),
-    weekend4, morning14: morningDays >= 14,
+    weekend4,
     // 週の約束: 自分で週目標を設定した状態でだけ判定する（未設定=契約していない）
     week_promise: weekGoalRaw != null && weekPromiseOk(recorded, today, weekGoal),
-    photo1: photoN >= 1, photo30: photoN >= 30,
-    coach10: coachN >= 10, coach100: coachN >= 100,
-    myfood5: foodsN >= 5, myfood20: foodsN >= 20,
-    fullday, rest50: restN >= 50, nolate7,
-    lost1: lost >= 1, lost3: lost >= 3, lost5: lost >= 5,
+    fullday, nolate7,
     goal50: goalHalf, goal100: goalDone,
-    vol10t: maxVol >= 10000, vol20t: maxVol >= 20000,
-    km50: maxKm >= 50, km100: maxKm >= 100,
-    burn5000: maxWeekKcal >= 5000, pr5: prCount >= 5,
   };
+  const defs = badgeDefs();
+  const ok: Record<string, boolean> = {};
+  for (const b of defs) ok[b.id] = b.when ? evaluateDeclarativeBadge(b, metrics) : (codeOk[b.id] ?? false);
 
   // ===== 獲得の確定（通知するか静かに確定するかは planBadgeUnlocks が決める） =====
   let earnedPrev: Record<string, string> = {};
@@ -455,7 +501,7 @@ async function runEvaluate(): Promise<AchievementReport> {
       seenPrev = Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
     } catch { seenPrev = []; }
   }
-  const defs = badgeDefs();
+  // リモートで増えた定義もdefsに含まれるので、seen集合に無いid＝遡及通知（retro）がそのまま働く
   const plan = planBadgeUnlocks({ defIds: defs.map((b) => b.id), ok, earned: earnedPrev, seen: seenPrev, today });
   const newIds = plan.unlocks.map((u) => u.id);
   const retroIds = plan.unlocks.filter((u) => u.retro).map((u) => u.id);

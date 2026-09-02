@@ -6,10 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookOpen, X, ChevronRight } from 'lucide-react-native';
 import { getColumns, type Column } from '@/content/columns';
-import { C, sheetTopPad, themed } from '@/lib/ui';
+import { C, RADIUS, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { isRecent, useRemoteContent } from '@/lib/remoteContent';
+import { todayJST } from '@/lib/calc';
 
 const READ_KEY = 'bl-columns-read';
+// 「NEW」を出す期間: リモート配信の記事が公開日からこの日数以内で、まだ読んでいないもの
+const NEW_DAYS = 30;
 
 // **太字** と ・箇条書き と空行に対応した軽量レンダラ
 function Body({ text }: { text: string }) {
@@ -46,6 +50,10 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
   const [open, setOpen] = useState<Column | null>(null);
   const [read, setRead] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
+  // リモート配信の記事が届いたら（起動後に取得が終わったら）一覧を組み直す
+  useRemoteContent();
+  const todayStr = todayJST();
+  const isNew = (c: Column) => !read.has(c.id) && isRecent(c.publishedAt, todayStr, NEW_DAYS);
 
   useEffect(() => {
     AsyncStorage.getItem(READ_KEY).then((v) => {
@@ -145,7 +153,10 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={s.title} numberOfLines={1}>{c.title}</Text>
-              {!read.has(c.id) && <View style={s.newDot} />}
+              {/* 新着（リモート配信・公開30日以内・未読）は「NEW」、それ以外の未読は点だけ */}
+              {isNew(c)
+                ? <View style={s.newPill}><Text style={s.newPillT}>{t('NEW')}</Text></View>
+                : !read.has(c.id) && <View style={s.newDot} />}
             </View>
             <Text style={s.lead} numberOfLines={1}>{c.lead}・{t('{n}分', { n: c.minutes })}</Text>
           </View>
@@ -180,6 +191,8 @@ const s = themed(() => ({
   emoji: { fontSize: 21 },
   title: { fontSize: 15, fontWeight: '700', color: C.ink, flexShrink: 1 },
   newDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.teal },
+  newPill: { backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 6, paddingVertical: 1 },
+  newPillT: { fontSize: 10, fontWeight: '900', color: C.teal, letterSpacing: 0.4 },
   lead: { fontSize: 13, color: C.sub, marginTop: 2 },
   readerWrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   readerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

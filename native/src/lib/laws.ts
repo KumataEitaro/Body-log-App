@@ -15,6 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { t } from './i18n';
+import { getRemoteContent, pickL10n, type RemoteLawText } from './remoteContent';
 import { todayJST, mifflinBMR, targetKcal, type ExLevel } from './calc';
 import { foodWeightEffects, buildItemDays, type ItemDay, type WeightPoint } from './insights';
 import { analyzeBinge, type AnalysisDay } from './bingeAnalysis';
@@ -84,8 +85,55 @@ const SLEEP_MIN_DIFF_H = 0.5;  // 睡眠×夜食: 差が30分未満は法則と�
 
 const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
-/** 未発見シルエットに薄く見せる「種類のヒント」 */
+// ===== 文言のリモート差し替え（lib/remoteContent・kind 'laws_text'） =====
+// 法則の**検出**は統計計算＝コードなので新しい法則はアップデートが要る。ここで差し替えられるのは
+// 図鑑の文言（発見文 title・根拠 sub・未発見ヒント hint）だけ。
+// id は 'kind' または 'kind:variant'。variant は分岐のある種類だけ持つ:
+//   weekday → 'stable' | 'default'、sleep_factor → 'long' | 'short'
+
+/** 種類＋生値 → 文言のvariant（分岐の無い種類は 'default'） */
+export function lawVariant(kind: LawKind, p: LawParams): string {
+  if (kind === 'weekday') return p.d === 'stable' ? 'stable' : 'default';
+  if (kind === 'sleep_factor') return p.dir === 'long' ? 'long' : 'short';
+  return 'default';
+}
+
+/** リモートの文言定義を探す（'kind:variant' → 'kind' の順） */
+function remoteLawText(kind: LawKind, variant?: string): RemoteLawText | undefined {
+  const list = getRemoteContent().lawsText;
+  if (list.length === 0) return undefined;
+  return (variant ? list.find((x) => x.id === `${kind}:${variant}`) : undefined) ?? list.find((x) => x.id === kind);
+}
+
+/**
+ * 差し込み変数。生値をそのまま渡し、表示加工が要るもの（曜日名・引き金ラベルの翻訳・
+ * kcalの桁区切り）だけ上書きする。リモート文言は {food} {kg} {n} {d} {kcal} {x} {lift} {pct}
+ * {days} {binges} {min} {late} {off} を使える
+ */
+export function lawVars(kind: LawKind, p: LawParams): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const [k, v] of Object.entries(p)) vars[k] = String(v);
+  if (kind === 'weekday' && p.d !== 'stable' && p.d != null) vars.d = t(DOW_JA[Number(p.d)] ?? '');
+  if (kind === 'weekday' && p.kcal != null) vars.kcal = Number(p.kcal).toLocaleString();
+  if (kind === 'binge_trigger' && p.label != null) vars.x = t(String(p.label));
+  return vars;
+}
+
+/** {k} を差し込む（t()の変数展開と同じ規則。未知の {k} はそのまま残す） */
+export function fillVars(s: string, vars: Record<string, string>): string {
+  let out = s;
+  for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(v);
+  return out;
+}
+
+/** 未発見シルエットに薄く見せる「種類のヒント」（リモートの hint があればそれを優先） */
 export function lawKindHint(kind: LawKind): string {
+  const ov = remoteLawText(kind);
+  if (ov?.hint) { const h = pickL10n(ov.hint); if (h) return h; }
+  return lawKindHintBuiltin(kind);
+}
+
+function lawKindHintBuiltin(kind: LawKind): string {
   switch (kind) {
     case 'food_up': return t('食べものと翌日の体重のこと');
     case 'food_safe': return t('体に優しい食べもののこと');
@@ -98,8 +146,22 @@ export function lawKindHint(kind: LawKind): string {
   }
 }
 
-/** kind＋生値 → 一人称の発見文。保存済みの法則もこれで毎回組み立て直す */
+/**
+ * kind＋生値 → 一人称の発見文。保存済みの法則もこれで毎回組み立て直す。
+ * リモートの文言（title / sub）があれば、それに生値を差し込んで優先する。
+ * 片方だけの差し替えも可（無い側は同梱の文言）
+ */
 export function lawText(kind: LawKind, p: LawParams): { title: string; sub: string } {
+  const base = lawTextBuiltin(kind, p);
+  const ov = remoteLawText(kind, lawVariant(kind, p));
+  if (!ov || (!ov.title && !ov.sub)) return base;
+  const vars = lawVars(kind, p);
+  const title = ov.title ? fillVars(pickL10n(ov.title), vars) : '';
+  const sub = ov.sub ? fillVars(pickL10n(ov.sub), vars) : '';
+  return { title: title || base.title, sub: sub || base.sub };
+}
+
+function lawTextBuiltin(kind: LawKind, p: LawParams): { title: string; sub: string } {
   switch (kind) {
     case 'food_up':
       return {

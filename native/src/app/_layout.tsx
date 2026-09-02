@@ -18,11 +18,15 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
 import { installCrashReporter } from '@/lib/crash';
+import { loadRemoteContentCache, startRemoteContentSync } from '@/lib/remoteContent';
 
 installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モジュール読込時に一度だけ）
 
 export default function RootLayout() {
   useEffect(() => { setLocaleChangeHandler(reregisterAll); }, []);
+  // リモートコンテンツ（読み物・バッジ・法則の文言）: まず前回のキャッシュで即時に反映し、
+  // 認証が確立したら remote_content を読み直す（RLSが認証ユーザー限定のため）＋24時間ごと
+  useEffect(() => { loadRemoteContentCache(); }, []);
   // 通知タップ→クイック入力（bodylog://log?quick=1）
   useEffect(() => attachNotificationTapRouting((url) => { Linking.openURL(url).catch(() => {}); }), []);
   useEffect(() => { loadAvatar(); }, []);   // 保存済みのアイコンを反映
@@ -56,6 +60,7 @@ export default function RootLayout() {
   // 起動ごとに通知を組み直す（smartの単発14日ぶんの補充を兼ねる）。
   // 「今日すでに記録があるか」をRLS越しに見るため、認証が確立してから
   useEffect(() => { if (ready && authed) reregisterAll(); }, [ready, authed]);
+  useEffect(() => { if (ready && authed) startRemoteContentSync(); }, [ready, authed]);
 
   return (
     // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿

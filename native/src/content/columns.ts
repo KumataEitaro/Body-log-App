@@ -8,6 +8,8 @@ export type Column = {
   minutes: number;   // 読了目安
   body: string;      // **太字** と ・箇条書き が使える
   sources: { label: string; url: string }[];
+  publishedAt?: string;   // 'YYYY-MM-DD'。リモート配信の記事が持つ（一覧の並び順と「NEW」判定）。同梱は無し
+  remote?: boolean;       // true=リモート配信（lib/remoteContent）で届いた記事
 };
 
 export const COLUMNS: Column[] = [
@@ -376,14 +378,44 @@ BodyLogが総カロリーだけでなくP/F/Cと食材の内訳まで記録す�
   },
 ];
 
+/**
+ * リモート配信の読み物（多言語オブジェクト）→ 表示言語で解決した Column。
+ * 読了目安が無ければ本文の長さから概算する（600字/分）
+ */
+export function columnFromRemote(r: import('@/lib/remoteContent').RemoteReading, locale: string): Column {
+  const { pickL10n } = require('@/lib/remoteContent') as typeof import('@/lib/remoteContent');
+  const body = pickL10n(r.body, locale);
+  return {
+    id: r.id,
+    emoji: r.emoji ?? '📖',
+    title: pickL10n(r.title, locale),
+    lead: pickL10n(r.lead, locale),
+    minutes: r.minutes ?? Math.max(1, Math.round(body.length / 600)),
+    body,
+    sources: r.sources ?? [],
+    publishedAt: r.publishedAt,
+    remote: true,
+  };
+}
+
 // 表示用のコラム一覧を返す。英語圏では英語版、それ以外は日本語版（フォールバック）。
 // 他言語を足すときは columns.<code>.ts を作り、ここに1行足すだけでよい。
+// リモート配信（lib/remoteContent）の記事は id で統合する: 同idなら同梱を上書き（文言差し替え）、
+// 新idなら追加。対象言語（langs）が指定された記事は、その言語で表示中のときだけ出す。
+// 並びは公開日の新しい順（日付を持たない同梱記事は従来の順で後ろ）。
 export function getColumns(): Column[] {
   // 循環importを避けるため、参照は関数内で行う
   const { getLocale } = require('@/lib/i18n') as typeof import('@/lib/i18n');
-  if (getLocale() === 'en') {
+  const locale = getLocale();
+  let base: Column[] = COLUMNS;
+  if (locale === 'en') {
     const { COLUMNS_EN } = require('./columns.en') as typeof import('./columns.en');
-    return COLUMNS_EN;
+    base = COLUMNS_EN;
   }
-  return COLUMNS;
+  const { getRemoteContent, mergeById, sortReadingsByDate } = require('@/lib/remoteContent') as typeof import('@/lib/remoteContent');
+  const remote = getRemoteContent().readings
+    .filter((r) => !r.langs || r.langs.length === 0 || r.langs.includes(locale))
+    .map((r) => columnFromRemote(r, locale));
+  if (remote.length === 0) return base;
+  return sortReadingsByDate(mergeById(base, remote));
 }

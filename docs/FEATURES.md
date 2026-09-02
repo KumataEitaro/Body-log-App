@@ -20,6 +20,8 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
 - セッション取得が遅れても2.5秒で必ず画面が開くフェイルセーフ
 - 未ログインなら自動で /login へ、ログイン済みでログイン画面にいたら自動で食事タブへ
 - 起動時に言語・単位・テーマ・アイコン・よく使う順の実績・ダイエット目的を復元
+- リモートコンテンツ（読み物・バッジ・法則文言）: 起動直後に前回のキャッシュを反映し、認証確立後に
+  `remote_content` を読み直す（＋24時間ごと）。詳細は「リモートコンテンツ」節
 - 未捕捉のJS例外／Promise拒否を自前のクラッシュレポートとして送信（1分1件までの連投ガード）
 - 描画中の例外でアプリが落ちないアプリ全体のエラー受け皿（「画面の表示に失敗しました」＋再読み込み）
 - 言語・テーマを変えるとツリーごと作り直して即時に全画面へ反映（テーマはパレット世代 `themeGeneration()` をキーにする）
@@ -293,7 +295,7 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   消費の出どころを **3段階の優先順位** に固定（lib/stepsKcal.ts `resolveBurnKcal`・純関数・jest 8件）:
   1. ヘルスケア実測（アクティブエネルギー）が >0 → それ。ラベル「消費（運動）」＋副「アクティブ（ヘルスケア実測）」「うちアプリ記録ぶん Nkcal」
   2. 実測が0/取れないが歩数 >0 → **歩数からの推定**。ラベル「消費（歩数から推定）」＋副「歩数からの推定（およそ）」
-     （アプリ記録があれば「ほかにアプリ記録ぶん Nkcal」）＋注記「歩数からの推定はおよその値です（歩幅・速度で変わります）。
+     （アプリ記録があれば「ほかに、このアプリで記録した運動 Nkcal」）＋注記「歩数からの推定はおよその値です（歩幅・速度で変わります）。
      Apple Watchが無いと実測が無いことがあるため、歩数から出しています」
   3. どちらも無し → アプリ記録（logs adj）のみ。ラベル「消費（記録）」（従来表示）
 - 歩数→kcalの推定式 `estimateStepsKcal(steps, weightKg) = steps × 0.0005 × weightKg`（1万歩・70kgで350kcal）。
@@ -780,6 +782,12 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
   retro=trueで区別して「過去の記録から獲得しました」を添える。
   ③既存ユーザーの初回移行（seen無し・獲得履歴あり）はfirstEver扱いにしないので、
   本物の獲得を1回取り落とさない。判定は純関数でテスト済み（badgeUnlocks.test.ts・8件）
+- **獲得条件の宣言的DSL（2026-09-02・feat/remote-content）**: 30種のうち23種は
+  `when: [{ metric, op, value }]`（単一 or AND配列）で書き、`evaluateDeclarativeBadge`（lib/remoteContent）で
+  判定する。DSLで書けない7種（phoenix・weekend4・week_promise・fullday・nolate7・goal50・goal100）だけ
+  コード判定。リモート配信のバッジ（`remote_content` kind='badges'）は同梱と id で統合され、
+  同じ評価ループ→planBadgeUnlocks を通るので**遡及通知がそのまま働く**（jestで固定）。
+  アイコンは Lucide 名の許可リスト（components/BadgeIcon `BADGE_ICONS`）で解決し、無い名前は Award
 - 未読バッジ（bl-badges-unseen）は実績ページを開くまで残り、食事タブの🔥チップと
   設定の「実績」行に赤丸で出る。ページを開いた時点で未読と帯（bl-badges-banner）を同時に消化
 - 評価の2.5秒後に★レビュー依頼の判定が走る（条件を満たす初回だけ・詳細は
@@ -807,6 +815,10 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 - id は翻訳非依存の生値（'food_up:ラーメン' 等）。図鑑は id→発見日＋生値で永続化
   （AsyncStorage 'bl-laws'）し、文章は表示のたびに現在の言語で組み立て直す。
   一度見つかった法則は条件から外れても図鑑に残る（＝コレクション）
+- **文言のリモート差し替え（2026-09-02・feat/remote-content）**: 発見文 title・根拠 sub・未発見ヒント hint を
+  `remote_content` kind='laws_text'（id は 'kind' または 'kind:variant'。weekday:stable / sleep_factor:long 等）で
+  上書きできる。生値は {food} {kg} {n} {d} {kcal} {x} {lift} {pct} {days} {binges} {min} {late} {off} で差し込む。
+  **法則の種類の追加は検出ロジック（コード）なので要アップデート**（文言だけがOTA）
 - 新規発見の祝祭オーバーレイ（スプリング＋触覚「新しい法則を発見！」・実績ページと同じ流儀）
   →新カードはFadeInDownで先頭へ。祝祭は法則ごとに一度きり（'bl-laws-seen'）
 - 未発見はシルエット枠（「？」＋種類のヒントだけ薄く見せる）。ヘッダーに埋まり具合 n/total
@@ -944,6 +956,33 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 - 対象が画面に無い機能は紙芝居カード（components/GuideArt.tsx のミニ図解24種・実UIの雰囲気を模したモック）
 - 章内進捗（章名＋n/m＋スプリングバー）／ステップ中は常設スキップ／
   章の完了で小さな祝祭カード（スケールイン・全章読了で締めの一言）／AIコーチのステップは自動デモ再生（タイプ演出）
+
+## リモートコンテンツ（読み物・バッジ・法則文言のOTA配信・2026-09-02・feat/remote-content）
+- 目的: 読み物・バッジ・法則図鑑の文言を**アプリのアップデート無し**で足す／差し替える。
+  App Store規約上「コードを含む機能」はOTA不可なので、**宣言的データとして表現できるものだけ**をリモート化:
+  - 読み物 … 純テキスト＝完全にリモート化（タイトル・リード・本文・出典・公開日・対象言語 langs）
+  - バッジ … 名前・説明・アイコン名・カテゴリはデータ。獲得条件は**宣言的DSL**
+    `{ metric, op, value }`（単一 or AND配列。metricは lib/remoteContent `BADGE_METRICS` の13種）
+  - 法則 … 検出は統計計算＝コードなので**新しい法則の追加は要アップデート**。図鑑の文言だけ差し替え可
+- 配信元: Supabase `remote_content`（**supabase/migration-30.sql・ユーザー実行待ち**）。
+  id text pk / kind ('readings'|'badges'|'laws_text') / version int / payload jsonb `{items:[…]}` /
+  published_at / min_app_version。RLS: 全認証ユーザーがselect可・書き込みポリシー無し（service roleのみ＝
+  管理者がSQL Editorで直接insert）。テーブルが空でも無くてもアプリは同梱データだけで動く
+- 取得と反映（native/src/lib/remoteContent.ts）: ルートレイアウトで起動直後にキャッシュ
+  （AsyncStorage 'bl-remote-content'）を反映→認証確立後に全行を読み直し→24時間ごとに再取得。
+  失敗時は前回キャッシュ、無ければ同梱のみ。`min_app_version` より古いアプリは行を無視
+  （数値の桁で比較。開発ビルド '1.0-test' 等の解釈不能な版は「最新扱い」）
+- マージ規則: 同梱＋リモートを **item の id で統合**（同idは上書き＝文言差し替え／新idは追加）。
+  同kindの複数行は version昇順→published_at昇順に適用（後勝ち）。解釈できない項目
+  （必須キー欠け・未知cat・未知metric）はその項目だけ捨てる。未知kindの行は無視
+- i18n: payload内の文言は `{ja:'…', en:'…'}` の多言語オブジェクト（文字列1本でも可）。
+  t()は通さず `pickL10n` で 表示言語→ja→en→最初の値 の順にフォールバック
+- 接続先: 読み物一覧（content/columns `getColumns` が統合・公開日の新しい順・同梱は後ろ。
+  ColumnReaderで公開30日以内＆未読に「NEW」ピル）／バッジ（achievements `badgeDefs` が統合・
+  同じ評価ループと遡及通知）／法則文言（laws `lawText` / `lawKindHint` がリモートを優先）
+- 管理手順: **docs/REMOTE-CONTENT.md**（insertテンプレ・payload例・min_app_versionの決め方・戻し方）
+- テスト: `src/__tests__/remoteContent.test.ts`（22件: DSL評価・マージ・フォールバック・バージョン比較・
+  バッジ統合＋遡及通知・読み物統合・法則文言差し替え）
 
 ## 横断機能
 - i18n 11言語（キー=日本語原文・フォールバック・通知文言も再登録・AI回答言語も連動・DBはcanon名）
