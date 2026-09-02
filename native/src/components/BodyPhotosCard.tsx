@@ -26,7 +26,10 @@ function b64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-export default function BodyPhotosCard() {
+export default function BodyPhotosCard({ autoCaptureKey }: {
+  /** 値が入って（変わって）いたら、その回だけカメラを即起動する（食事タブの＋シート「体の写真」からの着地用ノンス） */
+  autoCaptureKey?: string;
+} = {}) {
   const [photos, setPhotos] = useState<PhotoView[]>([]);
   const [targetBf, setTargetBf] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,6 +53,13 @@ export default function BodyPhotosCard() {
     setPhotos(withUrls);
   }, []);
   useEffect(() => { load(); }, [load]);
+  // ＋シートからの「すぐ撮影」。ページ遷移のアニメーションが落ち着いてからカメラを出す
+  useEffect(() => {
+    if (!autoCaptureKey) return;
+    const h = setTimeout(() => { pick(true).catch(() => {}); }, 350);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCaptureKey]);
 
   async function pick(fromCamera: boolean) {
     const perm = fromCamera

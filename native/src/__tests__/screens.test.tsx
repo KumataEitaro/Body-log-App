@@ -13,7 +13,6 @@ import LoginScreen from '../app/login';
 import InteractiveChart from '../components/InteractiveChart';
 import GoalPanel from '../components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard } from '../components/LiftingProgress';
-import QuickLogFab from '../components/QuickLogFab';
 import { GuideProvider } from '../components/GuideTour';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import MenstrualCycleCard from '@/components/MenstrualCycleCard';
@@ -64,11 +63,10 @@ describe('components smoke', () => {
     expect(tree.toJSON()).toBeTruthy();
     await act(async () => { tree.unmount(); });
   });
-  it('GoalPanel(両モード)・筋トレ3カード・QuickLogFab がレンダリングできる', async () => {
+  it('GoalPanel(両モード)・筋トレ3カード がレンダリングできる', async () => {
     for (const el of [
       <GoalPanel key="w" mode="weight" />, <GoalPanel key="t" mode="training" />,
       <LiftKpiCard key="k" />, <LiftCalendarCard key="c" />, <LiftChartCard key="l" />,
-      <QuickLogFab key="q" />,
     ]) {
       // データ空のときは仕様としてnullを返すカードがあるため、
       // ここでの検証は「例外なくマウント/レンダーできること」のみ

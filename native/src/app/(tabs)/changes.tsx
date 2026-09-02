@@ -19,7 +19,8 @@ import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft, Flame } from 'lucide-re
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line, Rect } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
-import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation, useLocalSearchParams } from 'expo-router';
+import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
 import { BackHandler } from 'react-native';
 import { AppState } from 'react-native';
 import { CalendarDays, FlaskConical, Footprints, PersonStanding, Dumbbell, Gauge } from 'lucide-react-native';
@@ -868,7 +869,8 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
-      case 'photos': return <BodyPhotosCard />;
+      // 食事タブの＋シート「体の写真」から来たときは、開いた瞬間にカメラを立ち上げる（autoCaptureKey=ノンス）
+      case 'photos': return <BodyPhotosCard autoCaptureKey={photoShootTs} />;
       // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
       case 'vitals': return <VitalsCard width={winW - 60} />;
       // 生理周期（migration-28未適用でも空状態で成立する）。保存・削除のたびに帯を貼り直す
@@ -1057,6 +1059,17 @@ export default function ChangesScreen() {
     detailTx.value = 0;   // 前回スワイプ途中の位置が残らないようにする
     setDetailKey(key);
   }
+  // 食事タブの＋シート「体の写真」から（/changes?open=photos&shoot=1&ts=…）:
+  // 体写真の詳細ページを開き、BodyPhotosCard に「すぐ撮影」を伝える（既存のカメラ→体脂肪率→保存の流れに乗せる）
+  const { open: openParam, shoot: shootParam, ts: openTs } = useLocalSearchParams<{ open?: string; shoot?: string; ts?: string }>();
+  const [photoShootTs, setPhotoShootTs] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (openParam !== 'photos') return;
+    detailTx.value = 0;
+    setDetailKey('photos');
+    if (shootParam === '1') setPhotoShootTs(openTs ?? String(Date.now()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, shootParam, openTs]);
 
   // ===== 詳細ページのヘルスケア式ヘッダー（A-8残） =====
   // 数値系の主要ページ（body=体重・health=歩数）だけ、タイトル直下に
@@ -1163,12 +1176,12 @@ export default function ChangesScreen() {
     );
   }
 
-  const headerJSX = (
-    <>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        {/* ⚙は固定配置のHeaderGear（右余白38で衝突回避） */}
-        <Text style={s.pageTitle}>{t('概要')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginRight: 38 }}>
+  // タイトル行は上端に貼り付く（食事・運動タブと共通の TabHeader。⚙は固定配置のHeaderGear＝右余白38で衝突回避）
+  const stickyHeaderJSX = (
+    <TabHeader
+      title={t('概要')}
+      right={(
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           {editing ? (
             <>
               <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
@@ -1181,7 +1194,11 @@ export default function ChangesScreen() {
             <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>{t('≡ 並べ替え')}</Text></Pressable>
           )}
         </View>
-      </View>
+      )}
+    />
+  );
+  const headerJSX = (
+    <>
       {editing && <Text style={s.editHint}>{t('行を長押し→そのままドラッグで並び替え。「完了」で保存します')}</Text>}
       {/* きょうのハイライト（B-16）: セクション見出しより上の最上部に1枚だけ。
           並び替え中は非表示（ドラッグの視界を邪魔しない）。lawsは図鑑へ、他は詳細ページへ */}
@@ -1203,7 +1220,8 @@ export default function ChangesScreen() {
         // ===== スケルトンローディング =====
         // 初回ロード中（rowsが空でロード完了前）だけ、メニュー行の骨組みを5本見せる。
         // 空白よりも「ここに行リストが出る」ことが先に伝わり、体感の待ちが短くなる
-        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
+        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 24 }]} stickyHeaderIndices={STICKY_FIRST}>
+          {stickyHeaderJSX}
           {headerJSX}
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={s.skelRow}>
@@ -1225,9 +1243,11 @@ export default function ChangesScreen() {
           onHide={hideCard}
           ghostLabel={(k) => CARD_LABELS()[k] ?? k}
           header={headerJSX}
+          stickyHeader={stickyHeaderJSX}
           onEnterEdit={() => setEditing(true)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-          contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+          // 上端の余白はスティッキーヘッダー自身が持つ（insets.top）ので、ここは 0
+          contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 24 }]}
           onScroller={(fn) => guide.registerScroller('/changes', fn)}
         />
       ) : (
@@ -1270,7 +1290,8 @@ export default function ChangesScreen() {
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
-      <StatusBarMask />
+      {/* 一覧はスティッキーヘッダーがステータスバー領域を覆う。詳細ページ（戻る行の構成）だけ従来の下敷きを使う */}
+      {detailKey != null && <StatusBarMask />}
       <HeaderGear guideKey="gear" />
     </View>
   );
@@ -1279,7 +1300,6 @@ export default function ChangesScreen() {
 const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingBottom: 24 },   // 下端はinsets.bottom（タブバー高さ込み）を描画側で足す
   h: { ...HEAD.section, color: C.ink, marginBottom: 12 },
-  pageTitle: { ...HEAD.page, color: C.ink },
   topSegWrap: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   topSeg: { flex: 1, backgroundColor: C.panel, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   h2Row: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
