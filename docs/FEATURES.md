@@ -866,7 +866,7 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 - 中核バリュープロポジション「あなたの体の取扱説明書」の実体。貯まった記録から見つかった
   「あなただけの法則」を1枚ずつのカードとして図鑑に収集する（B-6）。全て端末内ローカル分析
   （サーバ送信なし）。入口は概要タブのメニュー行「あなたの法則」（サマリー=最新の法則の一文）
-- 法則8種（既存の分析ライブラリの結果を一人称の発見文に翻訳。新しい統計は発明しない）:
+- 法則8種（既存の分析ライブラリの結果を一人称の発見文に翻訳。新しい統計は発明しない）＋インサイト・エンジン系9種（下記）:
   - food_up/food_safe: 食材×翌日体重（insights.foodWeightEffects・効果±0.3kg以上＆
     サンプル3日以上のみ・各上位2件）「あなたは「ラーメン」の翌日、体重が増えやすい（平均+0.6kg）」
   - weekday: 崩れやすい曜日（weekdayRhythm）／全曜日安定なら安定の法則
@@ -880,6 +880,27 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
     差30分以上＆各群5日以上で「あなたは21時以降に食べた日、睡眠が平均{n}分短い/長い」。
     睡眠の読取はrefreshLaws（fetchLawInput）で1回だけ・hk無し環境（Expo Go/Android）は
     このkindだけ静かにスキップ（jestテスト済み: laws.test.ts）
+- **インサイト・エンジン（2026-09-02・feat/insights-engine・docs/INSIGHTS-ENGINE.md §1〜§3・§6・§8）**:
+  - `lib/features.ts` 日次特徴量ストア: 1日=1行の派生値（食: intake/over/binge(+800 or 2,500超)/protein_g/meal_count/
+    late_eating/time_slots 8区分、食材: wheat_g/rice_g/chicken_g/salmon_g/fish_g/dairy_g/sugar_drink（`content/foodTags.ts` の
+    辞書マッチ＋分量推定）、体: weight/weight_delta7/mood/mood_avg3、睡眠: sleep_h/sleep_debt5(Σmax(0,7h−sleep)直近5日)/deep_min/rem_min、
+    動: steps/active_kcal/lift_volume_kg/lift_sessions/e1rm_delta/pr、周期: cycle_day/water_window（生理周期ON時のみ））。
+    AsyncStorage 'bl-day-features' に15分TTLでキャッシュ・睡眠ステージだけ差分読取（1日=1クエリのため直近2日＋未取得日のみ・14日/回上限）。
+    `buildDayFeatures(90)` は coach タブ表示時と refreshLaws で温まる。保存後は `invalidateDayFeatures()`（配線はE2）
+  - `lib/correlate.ts` 相関エンジン（純関数）: ラグ付きSpearman（`spearmanSignificant` は t≥2.1 の近似p<.05）・条件付きリスク比
+    （両群≥4日・条件なし群0回はHaldane補正で5倍上限）・多要素ルール `mineRules`（アプリオリ流: 支持度≥6の因子だけ組み合わせ、
+    リフト≥1.5、部分集合よりリフトが上がる組だけ採択、上位集合が採択されたら単独は畳む）。安全弁 n<14→空。
+    出力 `Insight { id, kind, factors, outcome, effect, n, confidence, text, evidenceKey }`
+  - 法則9種追加（sleep_debt_binge / mood_lag_binge / wheat_vs_rice_mood / salmon_master / chicken_heavy / lift_sleep /
+    lift_protein_pr / lift_mood / multi_binge）。採択基準・文言例・evidenceKey の表は INSIGHTS-ENGINE.md §3.1。
+    chicken_heavy は病名を出さない（「たんぱく源が偏っています。魚・卵・大豆も混ぜると栄養の幅が広がります」）。
+    multi_binge は mineRules 上位3件（2因子以上）を動的に法則化、id は因子キーの組で決定的
+  - §6 AI相談: `laws.coachInsightsBlock()`（法則上位3件の文言＋直近7日の特徴量サマリ〔睡眠平均・気分平均・歩数平均・
+    目安超過日数・食べすぎ日数・トレ日数〕・600字上限・キャッシュのみ読む）を coach.tsx が `insights` として送り、
+    /api/coach が dataBlock 末尾に付ける（制御文字除去・600字で切る）
+  - §8 気づきアラート（判定のみ・UI配線はE2）: `evaluateAlerts(today, recent, insights)` → `Alert{id,tone,factors,text,ruleId}`、
+    `suppressAlerts`（同idは1日1回・3日連続で出たら4日目は休む）。n<14の法則からは出さない。ポジティブ側（7h睡眠→トレの伸び）も返す
+  - jest: foodTags / features / correlate（Spearman・リスク比・ルール採択・アラート・抑制）/ laws（エンジン系）
 - id は翻訳非依存の生値（'food_up:ラーメン' 等）。図鑑は id→発見日＋生値で永続化
   （AsyncStorage 'bl-laws'）し、文章は表示のたびに現在の言語で組み立て直す。
   一度見つかった法則は条件から外れても図鑑に残る（＝コレクション）

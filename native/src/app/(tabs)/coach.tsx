@@ -29,6 +29,8 @@ import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '
 import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
 import { useReduceMotion } from '@/lib/motion';
+import { coachInsightsBlock } from '@/lib/laws';
+import { buildDayFeatures } from '@/lib/features';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean; upgrade?: boolean };
 
@@ -113,6 +115,9 @@ export default function CoachScreen() {
   // セッション制: 「新しい相談を始める」から次に始めるまでが1セッション（使用回数はセッション開始時のみ1消費）。
   // IDは端末生成のUUID。永続化しない＝アプリ再起動で自然に新セッションになる
   const sessionIdRef = useRef<string>(newSessionId());
+  // インサイト・エンジン §6: 送信時に「法則の上位3件＋直近7日の特徴量」を添えるため、日次特徴量の
+  // キャッシュをタブ表示時に温めておく（送信時はキャッシュしか読まない＝相談が遅くならない）
+  useEffect(() => { buildDayFeatures(90).catch(() => {}); }, []);
   function newSession() {
     sessionIdRef.current = newSessionId();
     setMsgs([]);
@@ -193,8 +198,12 @@ export default function CoachScreen() {
     setInput('');
     setBusy(true);
     try {
+      // §6: 本人の法則＋直近7日の特徴量サマリ（端末内で組む・600字上限）。サーバが dataBlock 末尾に載せる。
+      // 取れなくても相談は止めない（空文字＝従来どおり）
+      let insights = '';
+      try { insights = await coachInsightsBlock(); } catch { /* 従来どおり */ }
       const { ok, json } = await apiPost<{ ok: boolean; answer?: string; action?: CoachAction | null; error?: string; code?: string }>(
-        '/api/coach', { question, history, lang: apiLang(), sessionId: sessionIdRef.current });
+        '/api/coach', { question, history, lang: apiLang(), sessionId: sessionIdRef.current, insights });
       if (!ok || !json?.ok || !json.answer) {
         // code:'plan_limit'（本日のセッション上限）はアップグレード導線つきで案内する
         setMsgs((m) => [...m, {
