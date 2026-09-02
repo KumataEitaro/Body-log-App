@@ -9,7 +9,8 @@
 //   ・「きょうの動き」は1段小さく（順番は不変）。日付ストリップの行はスクロールしても上端に固定
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState, Linking } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import TabHeader from '@/components/TabHeader';
 import { healthAvailable, requestHealthAuth, linkHealth, ensureHealthAuth, activeEnergyAuthState, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import { useHealthLinkState, useHealthVersion } from '@/lib/healthStore';
 import { activeKcalGoalBonus, useActiveKcalToGoal } from '@/lib/activeKcal';
@@ -24,7 +25,6 @@ import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 import { ClipboardList, Timer, Footprints, Target, Flame, Activity, Dumbbell, ChevronRight, Plus } from 'lucide-react-native';
 import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
-import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import ReorderableCards from '@/components/ReorderableCards';
 import HeaderGear from '@/components/HeaderGear';
@@ -188,6 +188,12 @@ export default function TrainingScreen() {
     }).catch(() => {});
   }, []);
   const [actSheet, setActSheet] = useState(false);
+  // 食事タブの＋シート「運動」から（/training?open=activity&ts=…）: 「運動を記録する」シートが開いた状態で着地する。
+  // ts は同じ選択を続けて選んでも毎回開き直すためのノンス
+  const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
+  useEffect(() => {
+    if (openParam === 'activity') setActSheet(true);
+  }, [openParam, openTs]);
   const [actSaving, setActSaving] = useState(false);
   const [myWeight, setMyWeight] = useState<number>(60);
   useEffect(() => {
@@ -359,29 +365,27 @@ export default function TrainingScreen() {
     router.push({ pathname: '/lift-session', params: { date: viewDate } } as never);
   }
 
-  // ===== 固定ヘッダー（見出し＋日付ストリップ）: ScrollView の stickyHeaderIndices で上端に固定 =====
-  // 下を流れるカードを隠すため背景色を持ち、ステータスバーぶんの余白もここに含める
+  // ===== 固定ヘッダー（見出し＋日付ストリップ）: 食事・概要タブと共通の TabHeader（stickyHeaderIndices で上端に固定） =====
+  // ステータスバー領域は TabHeader 自身の paddingTop（insets.top）で覆う（StatusBarMask は重ねない）
   const stickyJSX = (
-    <View style={[s.sticky, { paddingTop: insets.top + 8 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 38 }}>
-        <Text style={[s.pageTitle, { marginBottom: 0 }]}>{t('運動')}</Text>
-        {editing ? (
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-              <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
-            </Pressable>
-            <Pressable onPress={resetLayout} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
-            <Pressable onPress={orderCtl.finishEditing} style={s.doneBtn2} hitSlop={8}>
-              <Text style={s.doneBtn2T}>{t('完了')}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
-            <DateStrip value={viewDate} onChange={setViewDate} />
+    <TabHeader
+      title={t('運動')}
+      right={editing ? (
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
+            <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
           </Pressable>
-        )}
-      </View>
-    </View>
+          <Pressable onPress={resetLayout} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
+          <Pressable onPress={orderCtl.finishEditing} style={s.doneBtn2} hitSlop={8}>
+            <Text style={s.doneBtn2T}>{t('完了')}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
+          <DateStrip value={viewDate} onChange={setViewDate} />
+        </Pressable>
+      )}
+    />
   );
 
   // ===== ヘッダー（固定部の下・スクロールする部分: 編集ヒント・未同期チップ・メッセージ） =====
@@ -725,7 +729,7 @@ export default function TrainingScreen() {
     <AddCardSheet visible={addOpen} onClose={() => setAddOpen(false)} hidden={hiddenCards} labels={EX_LABELS()}
                   onShow={cards.show} shownKeys={visibleOrder} />
 
-    <StatusBarMask />
+    {/* ステータスバー領域はスティッキーヘッダー（TabHeader）が覆うので StatusBarMask は置かない */}
     <HeaderGear />
     </View>
   );
@@ -733,15 +737,12 @@ export default function TrainingScreen() {
 
 const s = themed(() => ({
   scroll: { paddingHorizontal: SPACE.screen, paddingBottom: 24 },   // 上端の余白は固定ヘッダーが持つ。下端はinsets.bottomを描画側で足す
-  // 固定ヘッダー（見出し＋日付ストリップ）。下を流れるカードを隠すため背景色を持つ
-  sticky: { backgroundColor: C.bg, paddingBottom: 10 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn2: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   doneBtn2T: { color: '#fff', fontSize: 13, fontWeight: '800' },   // アクセント塗り面の上の白文字は固定色
   editBtn: { borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.panel },
   editBtnT: { fontSize: 13, fontWeight: '800', color: C.sub },
   editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
-  pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 12 },
   mvAuthLink: { fontSize: 11.5, fontWeight: '800', color: C.accentInk, marginTop: 6, lineHeight: 15 },
   mvAuthHint: { fontSize: 11.5, color: C.amber, fontWeight: '600', lineHeight: 16, marginTop: 8 },
   // きょうの動きカード（2026-09-02 1段小さく: 大数字 25→20・カード余白 16→12・チャート高 44→32）

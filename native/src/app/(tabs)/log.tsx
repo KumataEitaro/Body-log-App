@@ -1,18 +1,29 @@
-// 食事タブ（Phase 1コア）: ヒーロー・今日のフィード・AI解析コンポーザー・マイ食品チップ・体重クイック入力
+// 食事タブ（Phase 1コア）: ヒーロー・今日のフィード・＋ボタン→入力シート（AI解析・マイ食品・写真）・体重クイック入力
 // ロジックはWeb版のlib/*をそのまま移植して使用（データ・計算式は完全互換）
+//
+// 【入力の構成（2026-09-02 再設計）】
+// 以前は画面下に固定の入力ドック（テキスト・カメラ・ライブラリ・送信）が常駐していたが、
+// 「テキストボックスを下に固定する意味がなくなってきた」（熊田さん）ため廃止。
+// Appleヘルスケアと同じく、右下の＋ボタン → 何を記録するか（食事／運動／体の写真／体重）→
+// 食事なら入力方法（マイ食品／テキスト／写真を選ぶ／撮影）を選び、pageSheet の入力シートで
+// 解析→トレイ→✓保存まで済ませる。ドックにあった機能（テキスト・写真・食べた時間チップ・トレイ・
+// 残量ストリップ・マイ食品チップ・音声ヒント・外食おすすめ）はすべて入力シートの中に移した。
+// バーコード読み取りは食品DBを持たないため置かない（AddFoodSheet の補助経路だけ残る）
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Pencil, History, Camera, Images, Weight, Activity, ChevronDown, ArrowUp, Smile, Sparkles, UtensilsCrossed } from 'lucide-react-native';
+import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, UtensilsCrossed, X } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
-import BarcodeScanner from '@/components/BarcodeScanner';
-import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import DateStrip from '@/components/DateStrip';
+import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
+import PlusFab from '@/components/PlusFab';
+import PlusSheet, { type PlusAction } from '@/components/PlusSheet';
+import { FoodName, ItemsTitle, PfcInline, KcalCell } from '@/components/FoodRowText';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import AddFoodSheet, { type MyFoodDraft } from '@/components/AddFoodSheet';
@@ -21,15 +32,12 @@ import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion }
 import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
 import * as Haptics from 'expo-haptics';
-import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout';
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL, PFC_SHORT } from '@/lib/pfcAdvice';
 import { pfcColors } from '@/lib/theme';
 import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
-import { Keyboard } from 'react-native';
-import { useKeyboardVisible } from '@/lib/useKeyboardVisible';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -41,7 +49,7 @@ import {
   claimOnce, releaseClaim, loadJobs, saveJobs, readPhotoPayloads, type ParseJob,
 } from '@/lib/parseJobs';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
+import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed, sheetTopPad } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
 import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal, useStepsOfDay } from '@/lib/activeKcal';
@@ -69,7 +77,6 @@ import { skipTodayReminder, scheduleFirstLawNotification } from '@/lib/notify';
 import { getFirstRunFlag } from '@/lib/firstrun';
 import { checkFirstLawUnlock, consumeFirstLawBanner } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
-import StatusBarMask from '@/components/StatusBarMask';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
@@ -90,7 +97,7 @@ import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal
 import { dailyAllowance, overLevel, balanceOf, balanceFill, type BalanceDay, type Balance } from '@/lib/deficit';
 import { useKcalAdjust } from '@/lib/kcalAdjust';
 import { t, apiLang } from '@/lib/i18n';
-import { useReduceMotion, useCountUp } from '@/lib/motion';
+import { useCountUp } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
 import { setDayStatus } from '@/lib/dayStatus';
@@ -108,6 +115,13 @@ const LOG_LABELS = (): Record<string, string> => ({
 });
 
 type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
+
+// 入力シートの開き方（＋シートの2段目で選んだ入力方法）。'tray' は「前の食事↺」「書き換える」
+// 「AIの献立」のようにトレイへ直接積む経路で、テキスト欄にフォーカスせずトレイを見せる
+type InputMode = 'text' | 'myfood' | 'library' | 'camera' | 'tray';
+const INPUT_MODE_LABEL = (): Record<InputMode, string> => ({
+  text: t('テキストで入力'), myfood: t('マイ食品'), library: t('写真を選ぶ'), camera: t('撮影する'), tray: t('確認して保存'),
+});
 
 function timeJST(iso: string): string {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
@@ -189,8 +203,8 @@ const bs = themed(() => ({
 export default function LogScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  // 削除のUndoスナックバー。インプットドックの上に重なる位置に出す（ドック高より少し上）
-  const undoBar = useUndoSnackbar(insets.bottom + 96);
+  // 削除のUndoスナックバー。右下の＋ボタン（56px）と重ならない高さに出す
+  const undoBar = useUndoSnackbar(insets.bottom + 80);
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -212,8 +226,12 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
-  // バーコード照会中の行（AIを使わない端末→OFF直の問い合わせ。数秒で終わるので永続化しない）
-  const [pendingTexts, setPendingTexts] = useState<{ id: number; text: string }[]>([]);
+  // ===== ＋ボタン → 2段シート → 入力シート =====
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [inputOpen, setInputOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>('text');
+  // 「撮影する／写真を選ぶ」で開いたとき、入力シートが出きってからピッカーを起動するための予約
+  const pendingPick = useRef<'camera' | 'library' | null>(null);
   // AI解析の送信ジョブ。送信の瞬間に端末（bl-parse-jobs）へ書き、トレイに反映できたら消す。
   // アプリを閉じても残るので、次にこの画面を開いたときに未完了ぶんを自動で再送する
   const [jobs, setJobs] = useState<ParseJob[]>([]);
@@ -228,11 +246,9 @@ export default function LogScreen() {
   const [aiDietFlags, setAiDietFlags] = useState<Record<string, DietLevel>>({});
   // 聞き返しに「1/4玉」とだけ返しても文脈が繋がるように、直前のやりとりを覚えておく
   const parseHistory = useRef<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const pendingSeq = useRef(0);
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
   const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
-  const [inputH, setInputH] = useState(40);   // 1行から始めて最大5行まで自動で伸びる
 
   // マイ食品の並び順（保存済み順とサーバーの食品一覧をマージ・新規は末尾）
   useEffect(() => {
@@ -252,7 +268,6 @@ export default function LogScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const wInputRef = useRef<TextInput>(null);   // 体重クイック入力（スタートチェックリストからの誘導先）
-  const kbVisible = useKeyboardVisible();
   // iOS HIG標準「タブ再選択で先頭へ」: 食事タブ表示中にもう一度「食事」をタップ→最上部へ
   const navigation = useNavigation();
   useEffect(() => {
@@ -263,36 +278,59 @@ export default function LogScreen() {
 
   useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
 
-  // 入力ドックのパルス発光（画面を開いた瞬間に「ここが入力欄」と分かるように）。
-  // 以前はborderColor/shadowOpacityを直接補間していたが、色はネイティブ駆動できず
-  // 常時60fpsのJS負荷になっていた。全開の縁を重ねてopacityだけ動かす方式に変更
-  const glow = useRef(new Animated.Value(0)).current;
-  const reduceMotion = useReduceMotion();
-  useEffect(() => {
-    if (reduceMotion) { glow.setValue(0.4); return; }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(glow, { toValue: 1, duration: 1250, useNativeDriver: true }),
-      Animated.timing(glow, { toValue: 0, duration: 1250, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [glow, reduceMotion]);
   function toggleFoodsView() {
     const v = foodsView === 'row' ? 'grid' : 'row';
     setFoodsView(v);
     AsyncStorage.setItem('bl-foods-view', v).catch(() => {});
   }
 
-  // ウィジェット/ディープリンク（bodylog://log?quick=1）→ ドックに即フォーカス
+  // ===== 入力シートの開閉 =====
+  // ＋シート（PlusSheet）は透過のボトムシート、入力シートは pageSheet。iOSは表示中のModalの
+  // 兄弟として別のModalを出せないため、PlusSheet が閉じ切ってから onAction が届く（PlusSheet側で保証）
+  function openInput(mode: InputMode) {
+    setInputMode(mode);
+    setMsg(null);
+    pendingPick.current = mode === 'camera' || mode === 'library' ? mode : null;
+    setInputOpen(true);
+  }
+  function closeInput() { setInputOpen(false); }
+  // シートが出きった瞬間: 写真経路なら即ピッカー、テキストなら即キーボード（autoFocusの取りこぼし対策）
+  function onInputShown() {
+    const p = pendingPick.current;
+    pendingPick.current = null;
+    if (p === 'camera') takePhoto();
+    else if (p === 'library') pickPhotos();
+    else if (inputMode === 'text') setTimeout(() => inputRef.current?.focus(), 60);
+  }
+  // ＋シートの1段目/2段目で選んだ行動の振り分け。運動・体の写真は既存の画面へ渡す
+  function onPlusAction(a: PlusAction) {
+    switch (a) {
+      case 'meal:text': openInput('text'); break;
+      case 'meal:myfood': openInput('myfood'); break;
+      case 'meal:library': openInput('library'); break;
+      case 'meal:camera': openInput('camera'); break;
+      // 運動: 運動タブへ移り、「運動を記録する」（種目を選ぶ→時間ダイアル）のシートが開いた状態で着地
+      // （training.tsx が open=activity を受ける。筋トレは運動タブの「筋トレを記録する」から全画面へ）
+      case 'exercise':
+        router.navigate({ pathname: '/training', params: { open: 'activity', ts: String(Date.now()) } } as never);
+        break;
+      // 体の写真: 概要タブの体写真ページを開き、既存のカメラ→体脂肪率→保存の流れへ（changes.tsx が open=photos を受ける）
+      case 'bodyphoto':
+        router.navigate({ pathname: '/changes', params: { open: 'photos', shoot: '1', ts: String(Date.now()) } } as never);
+        break;
+    }
+  }
+
+  // ウィジェット/ディープリンク・通知タップ（bodylog://log?quick=1）→ 「食事 › テキストで入力」を直接開く
   const { quick } = useLocalSearchParams<{ quick?: string }>();
   useEffect(() => {
-    if (quick) setTimeout(() => inputRef.current?.focus(), 400);
+    if (quick) setTimeout(() => openInput('text'), 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quick]);
 
   // 初回ガイドツアー: 未実施なら自動起動（完了/スキップでbl-guide-doneが立つ）
   const guide = useGuide();
   const heroTarget = useGuideTarget('hero');
-  const dockTarget = useGuideTarget('dock');
   const scrollYNow = useRef(0);
   useGuideScroller('/log', useCallback((delta: number) => {
     scrollRef.current?.scrollTo({ y: Math.max(0, scrollYNow.current + delta), animated: true });
@@ -308,7 +346,7 @@ export default function LogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [introDone]);
 
-  // 起動時の時差入場（Withings風）: ヘッダー→ヒーロー→カード→ドックの順にフェード＋スライドイン
+  // 起動時の時差入場（Withings風）: ヘッダー→ヒーロー→カード→＋ボタンの順にフェード＋スライドイン
   const enterV = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
   useEffect(() => {
     if (!introDone) return;
@@ -376,7 +414,10 @@ export default function LogScreen() {
     setRecentMeals(meals);
   }, [viewDate]);
 
-  useEffect(() => { load(); }, [load]);
+  // 表示日が変わったとき＋この画面に戻ってきたときに読み直す（useFocusEffect は初回フォーカス時にも走るので
+  // マウント時の useEffect と二重にしない）。以前は [viewDate] だけだったため、運動タブで運動を記録して
+  // 戻っても dayLogs が古いまま＝「運動を入れたのに消費kcalが目標に反映されない」ように見えた（2026-09-02 βFB）
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // ===== 目安・ヒーロー計算（Web版と同一ロジック） =====
   const summary = summarizeDay(dayLogs);
@@ -403,8 +444,13 @@ export default function LogScreen() {
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
   const todayEvent = events.find((e) => e.date === today) ?? null;
   // 1日に食べられる量 = max(維持 − 必要赤字/日 + 手動調整, BMR)。目標画面の「結論」と同じ関数（lib/deficit.ts）。
-  // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する
-  const planIntakeBase = profile ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust) : 0;
+  // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する。
+  // 第5引数＝target に含まれている運動ぶん（アプリ記録の EX_ADD＋adj と、アクティブ反映の上乗せ）。
+  // BMR下限は運動抜きの土台にだけ掛かり、運動ぶんは必ずその上に乗る（lib/deficit.ts の説明のとおり。
+  // これが無いと赤字が大きい日に運動を記録しても目標が1kcalも動かなかった）
+  const planIntakeBase = profile
+    ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)
+    : 0;
   const goalKcal = plan && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
@@ -479,47 +525,7 @@ export default function LogScreen() {
     setPhotos((prev) => [...prev, ...list].slice(0, 4));
   }
 
-  // ===== バーコード→公式DB（Open Food Facts）: ヒットで品目をトレイに直接積む =====
-  // 端末→OFF直の照会なのでAI枠は消費しない。未ヒットは成分表示写真（AI読み取り）へ案内する
-  const [scanOpen, setScanOpen] = useState(false);
-
-  async function scannedBarcode(jan: string) {
-    const pid = ++pendingSeq.current;
-    setPendingTexts((p) => [...p, { id: pid, text: t('バーコードを照会中…') }]);
-    try {
-      const fd = await lookupBarcode(jan);
-      if (!fd) {
-        // 未ヒット: 既存のカメラ撮影（成分表示→AI解析）へ1タップで進める
-        Alert.alert(
-          t('データベースに見つかりませんでした。成分表示の写真を撮ると正確に読み取れます。'), '',
-          [
-            { text: t('成分表示を撮る'), onPress: () => takePhoto() },
-            { text: t('キャンセル'), style: 'cancel' },
-          ],
-        );
-        return;
-      }
-      // 1品として投入。qtyは「1個」既定・内容量が取れたら1個ぶんのkcalを計算、
-      // 取れなければ100gあたり（qty=100g。分量編集のg再計算がそのまま効く）
-      const name = fd.brand ? `${fd.brand} ${fd.name}` : fd.name;
-      const pkg = packageNutrition(fd);
-      const item: FoodItem = pkg
-        ? { name, qty: t('1個（{g}g）', { g: pkg.g }), kcal: pkg.kcal, p: pkg.p, f: pkg.f, c: pkg.c }
-        : fd.serving && fd.serving.p != null && fd.serving.f != null && fd.serving.c != null
-          ? { name, qty: fd.serving.size ? t('1個（{size}）', { size: fd.serving.size }) : t('1個'), kcal: fd.serving.kcal, p: fd.serving.p, f: fd.serving.f, c: fd.serving.c }
-          : { name, qty: '100g', kcal: fd.per100g.kcal, p: fd.per100g.p, f: fd.per100g.f, c: fd.per100g.c };
-      setParsed((p2) => ({
-        items: [...(p2?.items ?? []), item],
-        weight: p2?.weight ?? null, waist: p2?.waist ?? null,
-        ex: p2?.ex ?? null, adj: p2?.adj ?? 0, mood: p2?.mood ?? null,
-      }));
-      setMsg({ ok: true, text: t('公式データベースの値でトレイに入れました。量を調整して✓保存してください。') });
-    } finally {
-      setPendingTexts((p) => p.filter((x) => x.id !== pid));
-    }
-  }
-
-  // ===== ボトムドックからの送信: AI解析→トレイに積む（保存は✓保存で確定・連投可） =====
+  // ===== 入力シートからの送信: AI解析→トレイに積む（保存は✓保存で確定・連投可） =====
   const canSend = chat.trim().length > 0 || photos.length > 0;
 
   // ジョブ一覧の更新は必ずここを通す（画面・現在値・端末の3つを同時に合わせる）
@@ -801,14 +807,17 @@ export default function LogScreen() {
     // 元の記録の時刻を「食べた時間」の既定にする（置き換え保存で時刻が「いま」にずれない）
     setMealTime(hmJST(l.at));
     editingDateRef.current = viewDate;
-    setMsg({ ok: true, text: t('下のトレイに戻しました。直して✓保存すると置き換わります。') });
+    // トレイは入力シートの中にあるので、シートを開いて見せる（テキスト欄にはフォーカスしない）
+    openInput('tray');
+    setMsg({ ok: true, text: t('トレイに戻しました。直して✓保存すると置き換わります。') });
   }
 
-  // 編集をやめる（記録は元のまま残る）
+  // 編集をやめる（記録は元のまま残る）。シートも閉じてフィードへ戻す
   function cancelEdit() {
     setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null); setMealTime(null);
     editingDateRef.current = null;
     setMsg(null);
+    closeInput();
   }
 
   // 記録から1品目だけを取り除く（合計は残りから再計算される）。
@@ -848,18 +857,17 @@ export default function LogScreen() {
       weight: p2?.weight ?? null, waist: p2?.waist ?? null,
       ex: p2?.ex ?? null, adj: p2?.adj ?? 0, mood: p2?.mood ?? null,
     }));
+    openInput('tray');
     setMsg({ ok: true, text: t('AIの献立をトレイに入れました。量を調整して✓保存してください。') });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []));
 
+  // 「前の食事をもう一度」↺: 品目をトレイへ積み、入力シートを開いて確認→✓保存へ
   function reuseMeal(m: RecentMeal) {
     const items = [...(parsed?.items ?? []), ...m.items];
     setParsed((p) => ({ items, weight: p?.weight ?? null, waist: p?.waist ?? null, ex: p?.ex ?? null, adj: p?.adj ?? 0, mood: p?.mood ?? null }));
-    setMsg({ ok: true, text: t('下のトレイに入れました。内容を確認して✓保存してください。') });
-  }
-
-  function titleOfItems(items: FoodItem[]): string {
-    const names = items.slice(0, 3).map((it) => (it.qty && it.qty !== '×1' ? `${it.name} ${it.qty}` : it.name)).join('、');
-    return names + (items.length > 3 ? t(' ほか{n}品', { n: items.length - 3 }) : '');
+    openInput('tray');
+    setMsg({ ok: true, text: t('トレイに入れました。内容を確認して✓保存してください。') });
   }
 
   // トレイの内容を確定保存（成功したかを返す: セット同時登録の文言出し分けに使う）
@@ -888,6 +896,8 @@ export default function LogScreen() {
       const savedKcal = items.length > 0 ? Math.round(sumItems(items).kcal) : 0;
       setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null); setMealTime(null);
       editingDateRef.current = null;
+      // 保存できたら入力シートを閉じてフィードへ戻す（残量が数え下がる瞬間と新しい行が見える）
+      closeInput();
       await load();
       setMsg(delFailed
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
@@ -913,25 +923,33 @@ export default function LogScreen() {
     }
   }
 
-  async function saveWeight() {
+  // 体重の保存本体（体重カードと＋シートの「体重」の両方から呼ぶ）。
+  // 戻り値: null=成功／文字列=エラー文（＋シートは自分の中に出す・カードは画面のメッセージ欄へ）
+  async function saveWeightValue(text: string): Promise<string | null> {
     // 入力は表示単位（kg/lb）。DBは常にkgで保存する
-    const w = displayToKg(Number(wWeight), units.weight);
-    if (!uid || !(w > 20 && w < 300)) { setMsg({ ok: false, text: t('体重の値を確認してください。') }); return; }
+    const w = displayToKg(Number(text), units.weight);
+    if (!uid || !(w > 20 && w < 300)) return t('体重の値を確認してください。');
     // G8: 前回から±15%以上ずれた値は誤入力の可能性が高い。保存前に一度だけ確かめる
-    if (!(await confirmOutlierWeight(latestWeight, w))) return;
+    if (!(await confirmOutlierWeight(latestWeight, w))) return '';   // 本人が取り消した＝メッセージ無し
     setSaving(true);
     try {
-      await supabase.from('logs').insert({
+      const { error } = await supabase.from('logs').insert({
         user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
         weight: Math.round(w * 10) / 10, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
       });
+      if (error) return t('保存に失敗しました。もう一度お試しください。');
       await syncEntriesForDate(uid, today);
-      setWWeight('');
       await load();
       setMsg({ ok: true, text: t('体重 {w} を記録しました。', { w: fmtWeight(w) }) });
+      return null;
     } finally {
       setSaving(false);
     }
+  }
+  async function saveWeight() {
+    const err = await saveWeightValue(wWeight);
+    if (err !== null) { if (err) setMsg({ ok: false, text: err }); return; }
+    setWWeight('');
   }
 
   // ===== 週間・月間の収支（ヒーロー直下のカード） =====
@@ -962,7 +980,8 @@ export default function LogScreen() {
       const d = shiftDate(today, -i);
       const r = byDate.get(d);
       const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) : 0);
-      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust) });
+      // 第5引数＝その日の運動ぶん（maintenance − 土台）。ヒーローの目標と同じく、運動ぶんはBMR下限の上に乗せる
+      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust, maintenance - base) });
     }
     out.push({ date: today, intake: summary.intake == null ? null : Math.round(summary.intake), maintenance: target, allowance: goalKcal });
     return out;
@@ -1113,13 +1132,13 @@ export default function LogScreen() {
     const wd = [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
     return t('{m}/{d}({w})', { m: mm, d: dd, w: wd[new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay()] });
   }
-  // 「くわしく記録する」: その日へ移動して通常の入力ドック（つぶやき/写真/バーコード）で
-  // 品目まで入れられるようにする。手軽さ（±0/食べすぎたの2択）はそのまま残す
+  // 「くわしく記録する」: その日へ移動して入力シート（テキスト）を開き、品目まで入れられるようにする。
+  // 手軽さ（±0/食べすぎたの2択）はそのまま残す
   function backfillDetail() {
     if (!backfill) return;
     setViewDate(backfill.date);
     setBackfill(null); // 詳しく書きにいくので帯は畳む（未記録のままなら次回起動でまた出る）
-    setTimeout(() => inputRef.current?.focus(), 400);
+    setTimeout(() => openInput('text'), 300);
   }
   const [backfillBusy, setBackfillBusy] = useState(false);
   const [backfillMore, setBackfillMore] = useState(false);
@@ -1293,44 +1312,131 @@ export default function LogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagedP, stagedF, stagedC]);
 
-  // キーボード追従はKAVをやめreanimatedのUIスレッド追従に（βフィードバック 2026-09-02:
-  // 日本語IMEの候補バーが1打鍵ごとに高さを変え、KAVの再レイアウトで画面全体が揺れる＋
-  // タブバー高さぶん過剰に持ち上がってドック下に無駄な空白が出ていた）
-  const kb = useAnimatedKeyboard();
-  const dockLift = useAnimatedStyle(() => ({
-    // 端末下端からの持ち上げ量。ドック自体が insets.bottom を持っているのでその分は相殺
-    transform: [{ translateY: -Math.max(kb.height.value - insets.bottom, 0) }],
-  }));
+  // ===== マイ食品チップ（入力シートの中） =====
+  // タップ=トレイへ・−で減・長押しドラッグで並び替え。▦/▬で1行スクロール⇄全展開。
+  // 先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
+  // 長押しで削除→Undoスナックバー）。セットは常に先頭固定＝並び替えの保存対象は単品だけ。
+  // 「マイ食品」から開いたときは選ぶのが目的なので常に全展開にする（1行スクロールで探させない）
+  const chipsGrid = foodsView === 'grid' || inputMode === 'myfood';
+  const myFoodsSection = (myFoods.length > 0 || myMeals.length > 0) ? (() => {
+    const mealChipEl = (m: MyMeal) => (
+      <Pressable key={m.id} style={s.mealChip}
+                 onPress={() => tapMeal(m)}
+                 onLongPress={() => deleteMealNow(m)} delayLongPress={450}>
+        <UtensilsCrossed size={13} color={C.teal} />
+        <Text style={s.mealChipT} numberOfLines={1}>{m.name}</Text>
+      </Pressable>
+    );
+    const chipEl = (fd: MyFood) => {
+      const cnt = parsed ? servingCount(parsed.items, fd) : null;
+      return (
+        <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
+          <Pressable onPress={() => tapFood(fd)} onLongPress={() => quickSaveFood(fd)} delayLongPress={450} style={s.chipMain}>
+            <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
+              {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
+            </Text>
+          </Pressable>
+          {cnt != null && (
+            <Pressable onPress={() => decFood(fd)} style={s.chipMinus} hitSlop={4}>
+              <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17 }}>−</Text>
+            </Pressable>
+          )}
+        </View>
+      );
+    };
+    const orderedFoods = foodsOrder.map((id) => myFoods.find((f) => f.id === id)).filter(Boolean) as MyFood[];
+    return (
+      /* 案内（SpotlightTip）のハイライト対象。ScrollViewの外側のViewに付ける */
+      <View style={s.sheetSection} ref={chipsRef} collapsable={false}>
+        <View style={s.sheetSectionHead}>
+          <Text style={s.sheetSectionT}>{t('マイ食品')}</Text>
+          <Text style={s.sheetSectionSub} numberOfLines={1}>{t('タップでトレイへ・長押しで即記録')}</Text>
+          {inputMode !== 'myfood' && (
+            <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
+              <Text style={s.viewToggleT}>{foodsView === 'row' ? '▦' : '▬'}</Text>
+            </Pressable>
+          )}
+        </View>
+        {!chipsGrid ? (
+          <ReorderableChips
+            order={[...myMeals.map((m) => `meal:${m.id}`), ...foodsOrder]}
+            // 並び替えの永続化はマイ食品のidだけ（セットは次の描画で先頭に戻る）
+            onOrderChange={(next) => persistFoodsOrder(next.filter((id) => !id.startsWith('meal:')))}
+            renderChip={(id) => {
+              if (id.startsWith('meal:')) {
+                const m = myMeals.find((x) => `meal:${x.id}` === id);
+                return m ? mealChipEl(m) : null;
+              }
+              const fd = myFoods.find((f) => f.id === id);
+              return fd ? chipEl(fd) : null;
+            }}
+          />
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
+        )}
+      </View>
+    );
+  })() : null;
+
+  // マイ食品（セット）の登録シート（記録行の長押しメニュー／✓保存の長押しから。
+  // alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う）。
+  // 透過Modalなので、入力シート（pageSheet）が開いている間はその**内側**で、閉じている間はルートで描く
+  // （iOSは表示中のModalの兄弟として別のModalを出せない）。同時に2つはマウントされない
+  const saveMealSheetEl = (
+    <SaveMealSheet
+      visible={mealDraft != null} uid={uid} items={mealDraft?.items ?? []}
+      onClose={() => setMealDraft(null)}
+      onSaved={async (name) => {
+        const alsoSave = mealDraft?.alsoSave === true;
+        setMealDraft(null);
+        setMyMeals(await listMyMeals());
+        if (alsoSave) {
+          const ok = await save();   // 失敗時はsave()側のエラーメッセージを残す（トレイも残る）
+          if (ok) setMsg({ ok: true, text: t('保存して、マイ食品「{name}」にも登録しました。', { name }) });
+        } else {
+          setMsg({ ok: true, text: t('マイ食品「{name}」を登録しました。＋ → 食事 → マイ食品から1タップで呼び出せます。', { name }) });
+        }
+      }}
+    />
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
         ref={scrollRef}
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8 }]}
+        // 上端の余白はスティッキーヘッダー自身が持つ（insets.top）。下端は＋ボタン（56px）の下を通れるぶん空ける
+        contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 84 }]}
+        stickyHeaderIndices={STICKY_FIRST}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         onScroll={(e) => { scrollYNow.current = e.nativeEvent.contentOffset.y; }}
         scrollEventThrottle={32}
       >
-        <Animated.View style={[s.brandRow, enter[0], { justifyContent: 'space-between', marginRight: 38 }]}>
-          <Text style={s.pageTitle}>{t('食事')}</Text>
-          {editing ? (
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-                <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
-              </Pressable>
-              <Pressable onPress={() => setEditing(false)} style={s.doneBtn} hitSlop={8}>
-                <Text style={s.doneBtnT}>{t('完了')}</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
-              <DateStrip value={viewDate} onChange={setViewDate} />
-            </Pressable>
+        {/* タイトル＋日付ストリップは上端に貼り付く（「日付は下にスクロールしても固定表示」）。
+            日付ストリップ長押しでカード編集モード（隠し操作）は従来どおり */}
+        <TabHeader
+          title={t('食事')}
+          right={(
+            <Animated.View style={enter[0]}>
+              {editing ? (
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
+                    <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
+                  </Pressable>
+                  <Pressable onPress={() => setEditing(false)} style={s.doneBtn} hitSlop={8}>
+                    <Text style={s.doneBtnT}>{t('完了')}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable onLongPress={() => setEditing(true)} delayLongPress={450}>
+                  <DateStrip value={viewDate} onChange={setViewDate} />
+                </Pressable>
+              )}
+            </Animated.View>
           )}
-        </Animated.View>
+        />
 
         {/* 🔥ストリーク常設チップ（タップで実績ページへ） */}
         <StreakChip />
@@ -1483,8 +1589,8 @@ export default function LogScreen() {
           <StartChecklist
             editing={editing}
             onHide={() => cards.hide('checklist')}
-            onFocusInput={() => inputRef.current?.focus()}
-            onTakePhoto={takePhoto}
+            onFocusInput={() => openInput('text')}
+            onTakePhoto={() => openInput('camera')}
             onFocusWeight={() => wInputRef.current?.focus()}
             refreshKey={dayLogs.length}
           />
@@ -1612,53 +1718,51 @@ export default function LogScreen() {
         <Animated.View style={[s.card, enter[2]]}>
           <MinusBadge editing={editing} onPress={() => cards.hide('feed')} />
           <Text style={s.h2}>{t('今日の記録')}<Text style={s.h2sub}>{t('— {n}件', { n: dayLogs.length })}</Text></Text>
-          {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。下から1回分ずつ記録しましょう。')}</Text>}
-          {dayLogs.map((l) => (
+          {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。右下の＋から1回分ずつ記録しましょう。')}</Text>}
+          {dayLogs.map((l) => {
+            const items = (l.items ?? []) as FoodItem[];
+            return (
             <View key={l.id}>
+            {/* 記録行のタイポグラフィは components/FoodRowText.tsx に集約（品名15/700・量12.5/600・
+                PFCラベル色＋数値・kcal右寄せ固定幅）。トレイの品目行とまったく同じ階層で読める */}
             <Pressable style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
                        onPress={() => {
                          // 品目が2つ以上あるときだけ展開する意味がある
-                         const n = ((l.items ?? []) as FoodItem[]).length;
-                         if (n >= 2) setOpenLog((cur) => (cur === l.id ? null : l.id));
+                         if (items.length >= 2) setOpenLog((cur) => (cur === l.id ? null : l.id));
                        }}
                        onLongPress={() => confirmDeleteLog(l)} delayLongPress={450}>
               <Text style={s.feedTime}>{timeJST(l.at)}</Text>
-              {moodLevelOf(l) == null && <Text style={{ fontSize: 15, marginRight: 2 }}>{logIcon(l)}</Text>}
+              {moodLevelOf(l) == null && <Text style={s.feedIcon}>{logIcon(l)}</Text>}
               <View style={{ flex: 1 }}>
                 {moodLevelOf(l) != null
                   ? <MoodInline level={moodLevelOf(l)!} />
-                  : <Text style={[s.feedTitle, { flex: 0 }]} numberOfLines={2}>{logTitle(l)}</Text>}
+                  : items.length > 0
+                    ? <ItemsTitle items={items} />
+                    : <Text style={s.feedTitle} numberOfLines={2}>{logTitle(l)}</Text>}
                 {l.kcal != null && l.p != null && (
-                  <Text style={s.feedPfc}>
-                    <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(Number(l.p))}
-                    {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(Number(l.f ?? 0))}
-                    {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(Number(l.c ?? 0))}
-                  </Text>
+                  <PfcInline p={Number(l.p)} f={Number(l.f ?? 0)} c={Number(l.c ?? 0)} />
                 )}
               </View>
-              {l.kcal != null && <Text style={s.feedKcal}>{Math.round(Number(l.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>}
+              {l.kcal != null && <KcalCell kcal={Number(l.kcal)} />}
             </Pressable>
 
             {/* 展開: 品目ごとに栄養素を出し、1品だけ消せるようにする
                 （1回の食事というまとまりは保ったまま、中身を個別に扱う） */}
-            {openLog === l.id && ((l.items ?? []) as FoodItem[]).map((it, ix) => (
+            {openLog === l.id && items.map((it, ix) => (
               <View key={`${l.id}-${ix}`} style={s.itemRow}>
-                <Text style={s.itemName} numberOfLines={1}>
-                  {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''}
-                </Text>
-                <Text style={s.itemPfc}>
-                  <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(Number(it.p) || 0)}
-                  {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(Number(it.f) || 0)}
-                  {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(Number(it.c) || 0)}
-                </Text>
-                <Text style={s.itemKcal}>{Math.round(Number(it.kcal) || 0)}</Text>
+                <View style={{ flex: 1 }}>
+                  <FoodName name={it.name} qty={it.qty} />
+                  <PfcInline p={Number(it.p) || 0} f={Number(it.f) || 0} c={Number(it.c) || 0} />
+                </View>
+                <KcalCell kcal={Number(it.kcal) || 0} unit={false} />
                 <Pressable onPress={() => deleteOneItem(l, ix)} hitSlop={10}>
                   <Text style={s.itemX}>×</Text>
                 </Pressable>
               </View>
             ))}
             </View>
-          ))}
+            );
+          })}
           {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
         </Animated.View>
         )}
@@ -1684,14 +1788,14 @@ export default function LogScreen() {
                 {recentMeals.map((m) => (
                   <View key={m.id} style={[s.feedRow, { alignItems: 'center' }]}>
                     <Text style={s.feedTime}>{m.date.slice(5).replace('-', '/')}</Text>
-                    <Text style={s.feedTitle} numberOfLines={2}>{titleOfItems(m.items)}</Text>
-                    <Text style={s.feedKcal}>{Math.round(Number(m.kcal)).toLocaleString()}<Text style={s.feedU}> kcal</Text></Text>
+                    <View style={{ flex: 1 }}><ItemsTitle items={m.items} /></View>
+                    <KcalCell kcal={Number(m.kcal)} />
                     <Pressable style={s.reuseBtn} hitSlop={6} onPress={() => reuseMeal(m)}>
                       <Text style={s.reuseBtnT}>↺</Text>
                     </Pressable>
                   </View>
                 ))}
-                <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
+                <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺でトレイに入り、入力シートが開きます。品目を×で外して量を調整してから✓保存してください。')}</Text>
               </>
             )}
           </View>
@@ -1723,371 +1827,345 @@ export default function LogScreen() {
         <View style={{ height: 16 }} />
       </ScrollView>
 
-      {/* ===== ボトム固定インプットドック（LINE風・キーボードに吸い付く） ===== */}
-      <Reanimated.View style={dockLift}>
-      <Animated.View style={[s.dockWrap, { paddingBottom: insets.bottom + 8 }, enter[3]]} ref={dockTarget} collapsable={false}>
-        {/* いつの記録か（常時表示）: 過去日に書いていることへの気づき（今日以外はアンバー強調）。
-            時刻は本人がトレイの「食べた時間」チップで選んだときだけ薄く添える
-            （「いま」はDB側のnow()で決まるので出さない＝嘘の時刻を見せない） */}
-        <Text style={[s.dockDate, !isViewToday && s.dockDatePast]}>
-          {t('{date} の記録', { date: dateLabelOf(viewDate) })}
-          {parsed != null && mealTimeResolved !== MEAL_TIME_NOW && (
-            <Text style={s.dockTime}>{'  '}{mealTimeResolved}</Text>
-          )}
-        </Text>
-        {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る */}
-        {profile != null && (() => {
-          const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
-          const pvLeft = left - addK;
-          return (
-            <View style={s.preview}>
-              <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
-                {parsed ? t('追加後 ') : ''}{pvLeft >= 0 ? t('残り {n}kcal', { n: pvLeft.toLocaleString() }) : t('{n}kcal 超過', { n: (-pvLeft).toLocaleString() })}
+      {/* ===== 右下の＋ボタン（唯一の入力の入口。旧・下部固定ドックは 2026-09-02 に廃止） =====
+          起動時の時差入場の最後（enter[3]）で浮かび上がる。トレイに書きかけがあれば件数バッジ */}
+      <Animated.View style={[StyleSheet.absoluteFill, enter[3]]} pointerEvents="box-none">
+        <PlusFab onPress={() => { setMsg(null); setPlusOpen(true); }} badge={parsed?.items.length ?? 0} />
+      </Animated.View>
+
+      {/* 1段目「食事／運動／体の写真／体重」→ 2段目（食事: 入力方法4つ・体重: シート内で保存） */}
+      <PlusSheet
+        visible={plusOpen} onClose={() => setPlusOpen(false)} onAction={onPlusAction}
+        onSaveWeight={saveWeightValue}
+        weightUnit={units.weight}
+        weightPlaceholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
+      />
+
+      {/* ===== 入力シート（pageSheet）: 旧ドックの機能はすべてここに集約 =====
+          上から: ヘッダー（食事 › 入力方法・いつの記録か・×）→ 残量ストリップ（常設）→
+          スクロール領域（メッセージ・書き換え中バナー・トレイ・量調整・マイ食品）→ 下端のコンポーザー
+          （写真サムネ・複数行テキスト・🎤/カメラ/ライブラリ/外食おすすめ・↑送信）。
+          キーボードは KeyboardAvoidingView（pageSheet の中なら日本語IMEの候補バーで揺れる旧問題は起きにくい＝
+          シート全体が持ち上がるだけで、下に固定ドックがあった頃のタブバー分の過剰リフトは無い） */}
+      <Modal visible={inputOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeInput} onShow={onInputShown}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetWrap}>
+          <View style={[s.sheetHead, { paddingTop: sheetTopPad(14) }]}>
+            <View style={{ flex: 1 }}>
+              {/* 前の選択を見せる（「食事 › テキストで入力」）。＋シートの2段目で選んだ入力方法がそのまま見出しになる */}
+              <Text style={s.sheetCrumb} numberOfLines={1}>
+                <Text style={s.sheetCrumbPrev}>{t('食事')} › </Text>{INPUT_MODE_LABEL()[inputMode]}
               </Text>
-              {macros && (
-                <View style={s.previewBars}>
-                  {([
-                    ['P', eatenP, stagedP, macros.p, pfcColors().p],
-                    ['F', eatenF, stagedF, macros.f, pfcColors().f],
-                    ['C', eatenC, stagedC, macros.c, pfcColors().c],
-                  ] as const).map(([ab, eat2, stg, tgt2, col2]) => {
-                    const leftG = tgt2 - eat2 - stg;
-                    return (
-                      <View key={ab} style={s.previewBarCol}>
-                        <Text style={[s.previewBarAb, { color: leftG < 0 ? C.coral : col2 }]}>{ab}</Text>
-                        <LiveBar eaten={eat2} staged={stg} target={tgt2} color={col2} pulse={pulse} height={5} />
-                        <Text style={[s.previewBarV, leftG < 0 && { color: C.coral, fontWeight: '800' }]}>
-                          {leftG >= 0 ? `${leftG}g` : `+${-leftG}g`}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
+              {/* いつの記録か（過去日はアンバー）。時刻は本人が「食べた時間」を選んだときだけ添える
+                  （「いま」はDB側のnow()で決まるので出さない＝嘘の時刻を見せない） */}
+              <Text style={[s.sheetDate, !isViewToday && s.sheetDatePast]}>
+                {t('{date} の記録', { date: dateLabelOf(viewDate) })}
+                {parsed != null && mealTimeResolved !== MEAL_TIME_NOW && (
+                  <Text style={s.sheetTime}>{'  '}{mealTimeResolved}</Text>
+                )}
+              </Text>
             </View>
-          );
-        })()}
-        {photos.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }} keyboardShouldPersistTaps="handled">
-            {photos.map((p, i) => (
-              <View key={i} style={s.thumbWrap}>
-                <Image source={{ uri: p.uri }} style={s.thumb} />
-                <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
-                  <Text style={{ color: C.panel, fontSize: 13, fontWeight: '800' }}>×</Text>
-                </Pressable>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-        {/* マイ食品チップ（タップ=トレイへ・−で減・長押しドラッグで並び替え。1行⇄全展開切替可）
-            先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
-            長押しで削除→Undoスナックバー）。セットは常に先頭固定＝並び替えの保存対象は単品だけ */}
-        {(myFoods.length > 0 || myMeals.length > 0) && (() => {
-          const mealChipEl = (m: MyMeal) => (
-            <Pressable key={m.id} style={s.mealChip}
-                       onPress={() => tapMeal(m)}
-                       onLongPress={() => deleteMealNow(m)} delayLongPress={450}>
-              <UtensilsCrossed size={13} color={C.teal} />
-              <Text style={s.mealChipT} numberOfLines={1}>{m.name}</Text>
+            <Pressable onPress={closeInput} hitSlop={10} style={s.sheetClose} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
+              <X size={ICON.lg} color={C.sub} strokeWidth={ICON.stroke} />
             </Pressable>
-          );
-          /* 案内のハイライト対象。ScrollViewの外側のViewに付ける */
-          const chipEl = (fd: MyFood) => {
-            const cnt = parsed ? servingCount(parsed.items, fd) : null;
+          </View>
+
+          {/* 残量ストリップ（常設）: 入力欄を見た瞬間に「あと何kcal・PFC残」が必ず目に入る（旧ドックから移植） */}
+          {profile != null && (() => {
+            const addK = parsedTotal ? Math.round(parsedTotal.kcal) : 0;
+            const pvLeft = left - addK;
             return (
-              <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
-                <Pressable onPress={() => tapFood(fd)} onLongPress={() => quickSaveFood(fd)} delayLongPress={450} style={s.chipMain}>
-                  <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
-                    {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
-                  </Text>
-                </Pressable>
-                {cnt != null && (
-                  <Pressable onPress={() => decFood(fd)} style={s.chipMinus} hitSlop={4}>
-                    <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17 }}>−</Text>
-                  </Pressable>
+              <View style={s.preview}>
+                <Text style={[s.previewMain, pvLeft < 0 && { color: C.coral }]}>
+                  {parsed ? t('追加後 ') : ''}{pvLeft >= 0 ? t('残り {n}kcal', { n: pvLeft.toLocaleString() }) : t('{n}kcal 超過', { n: (-pvLeft).toLocaleString() })}
+                </Text>
+                {macros && (
+                  <View style={s.previewBars}>
+                    {([
+                      ['P', eatenP, stagedP, macros.p, pfcColors().p],
+                      ['F', eatenF, stagedF, macros.f, pfcColors().f],
+                      ['C', eatenC, stagedC, macros.c, pfcColors().c],
+                    ] as const).map(([ab, eat2, stg, tgt2, col2]) => {
+                      const leftG = tgt2 - eat2 - stg;
+                      return (
+                        <View key={ab} style={s.previewBarCol}>
+                          <Text style={[s.previewBarAb, { color: leftG < 0 ? C.coral : col2 }]}>{ab}</Text>
+                          <LiveBar eaten={eat2} staged={stg} target={tgt2} color={col2} pulse={pulse} height={5} />
+                          <Text style={[s.previewBarV, leftG < 0 && { color: C.coral, fontWeight: '800' }]}>
+                            {leftG >= 0 ? `${leftG}g` : `+${-leftG}g`}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 )}
               </View>
             );
-          };
-          const orderedFoods = foodsOrder.map((id) => myFoods.find((f) => f.id === id)).filter(Boolean) as MyFood[];
-          return (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }} ref={chipsRef} collapsable={false}>
-              {foodsView === 'row' ? (
-                <View style={{ flex: 1 }}>
-                  <ReorderableChips
-                    order={[...myMeals.map((m) => `meal:${m.id}`), ...foodsOrder]}
-                    // 並び替えの永続化はマイ食品のidだけ（ミールは次の描画で先頭に戻る）
-                    onOrderChange={(next) => persistFoodsOrder(next.filter((id) => !id.startsWith('meal:')))}
-                    renderChip={(id) => {
-                      if (id.startsWith('meal:')) {
-                        const m = myMeals.find((x) => `meal:${x.id}` === id);
-                        return m ? mealChipEl(m) : null;
-                      }
-                      const fd = myFoods.find((f) => f.id === id);
-                      return fd ? chipEl(fd) : null;
-                    }}
-                  />
+          })()}
+
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.sheetScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+            {msg?.upgrade && (
+              <Pressable onPress={() => { closeInput(); router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never); }} hitSlop={8}
+                style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: -4, marginBottom: 8 }, pressed && { opacity: 0.7 }]}>
+                <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+              </Pressable>
+            )}
+
+            {/* 「マイ食品」から開いたときは選ぶのが目的なので、チップ一覧を先頭に */}
+            {inputMode === 'myfood' && myFoodsSection}
+
+            {editingId != null && (
+              <View style={s.editBanner}>
+                <Text style={s.editBannerT}>{t('✏️ 記録を書き換え中')}</Text>
+                <Pressable onPress={cancelEdit} hitSlop={8}>
+                  <Text style={s.editBannerCancel}>{t('やめる')}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* ステージングトレイ: チップ/AI解析の結果はここに積まれ、✓保存で初めてDBに書かれる */}
+            {(parsed != null || jobs.length > 0 || aiNote != null) && (
+              <View style={s.tray}>
+                {aiNote && (
+                  <View style={s.aiNoteRow}>
+                    <Sparkles size={ICON.xs} color={C.teal} />
+                    <View style={{ flex: 1 }}>
+                      {!!aiNote.reply && <Text style={s.aiNoteT}>{aiNote.reply}</Text>}
+                      {aiNote.assumptions.map((a) => (
+                        <Text key={a} style={s.aiNoteSub} numberOfLines={2}>・{a}</Text>
+                      ))}
+                      {aiNote.questions.length > 0 && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                          {aiNote.questions.map((q) => (
+                            <Pressable key={q} style={s.aiQChip} onPress={() => inputRef.current?.focus()}>
+                              <Text style={s.aiQChipT} numberOfLines={2}>{q}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                    <Pressable hitSlop={8} onPress={() => setAiNote(null)}><Text style={s.trayX}>×</Text></Pressable>
+                  </View>
+                )}
+                {/* 食事の制約の警告行（§5）。トレイ上部・保存は止めない・免責を毎回添える */}
+                <DietWarnRow alerts={dietAlerts} />
+                {/* 食べた時間（§4）: 「いま」（今日だけ）／候補5つ／⏱で15分刻みのピッカー。
+                    選んだ時刻が logs.at に入る＝食べる時間帯の分析と特徴量が「保存した時刻」ではなく
+                    「食べた時刻」を見られるようになる。過去日は「いま」を出さず12:00を仮置き */}
+                {parsed != null && (() => {
+                  const isPreset = mealTimeResolved === MEAL_TIME_NOW || MEAL_TIME_PRESETS.includes(mealTimeResolved);
+                  const chip = (key: string, label: string, on: boolean, onPress: () => void) => (
+                    <Pressable key={key} style={[s.timeChip, on && s.timeChipOn]} onPress={onPress} hitSlop={4}>
+                      <Text style={[s.timeChipT, on && s.timeChipTOn]}>{label}</Text>
+                    </Pressable>
+                  );
+                  return (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.timeRow}>
+                      {isViewToday && chip('now', t('いま'), mealTimeResolved === MEAL_TIME_NOW, () => setMealTime(MEAL_TIME_NOW))}
+                      {MEAL_TIME_PRESETS.map((hm) => chip(hm, hm, mealTimeResolved === hm, () => setMealTime(hm)))}
+                      {chip('pick', isPreset ? t('⏱ 時刻を選ぶ') : `⏱ ${mealTimeResolved}`, !isPreset, openTimePicker)}
+                    </ScrollView>
+                  );
+                })()}
+
+                {/* 品目行（フィードと同じタイポグラフィ: 品名15/700・量12.5/600・PFCラベル色＋数値・kcal右寄せ固定幅）。
+                    以前は横スクロールのチップだったが、全画面のシートになって縦に並べられるので
+                    「何を・どれだけ・栄養は」を1行で読める記録行の形に統一した。タップで注目（量調整）・×で外す */}
+                {parsed?.items.map((it, i) => {
+                  const on = focusItem === i;
+                  const dlv = dietLevelByName.get(it.name) ?? null;
+                  return (
+                    <Pressable key={i} onPress={() => setFocusItem(on ? null : i)}
+                               style={[s.trayRow, on && s.trayRowOn, dlv === 'high' && s.trayRowDietHigh, dlv === 'maybe' && s.trayRowDietMaybe]}>
+                      {dlv && <DietMark level={dlv} />}
+                      <View style={{ flex: 1 }}>
+                        <FoodName name={it.name} qty={it.qty} />
+                        <PfcInline p={it.p} f={it.f} c={it.c} />
+                      </View>
+                      <KcalCell kcal={it.kcal} />
+                      <Pressable hitSlop={8} onPress={() => removeTrayItem(i)} style={s.trayRowX}><Text style={s.trayX}>×</Text></Pressable>
+                    </Pressable>
+                  );
+                })}
+
+                {/* 品目以外のチップ（体重・運動レベル・解析中/失敗の送信）。横に並べる */}
+                {(parsed?.weight != null || (parsed?.ex && parsed.ex !== 'オフ') || jobs.length > 0) && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: 6 }}>
+                    {parsed?.weight != null && (
+                      <View style={s.trayChip}>
+                        <Weight size={ICON.xs} color={C.sub} />
+                        <Text style={s.trayChipT}>{parsed.weight}kg</Text>
+                        <Pressable hitSlop={8} onPress={() => setParsed((p) => (p && (p.items.length > 0 || p.ex) ? { ...p, weight: null } : null))}>
+                          <Text style={s.trayX}>×</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    {parsed?.ex && parsed.ex !== 'オフ' && (
+                      <View style={s.trayChip}>
+                        <Activity size={ICON.xs} color={C.sub} />
+                        <Text style={s.trayChipT}>{parsed.ex}</Text>
+                      </View>
+                    )}
+                    {/* AI解析の送信ジョブ。解析中は待ち時間を、失敗は理由と次の一手（再試行/破棄）を
+                        同じ位置に出す。黙って消えることが無いので「送れたのか」が常に分かる */}
+                    {jobs.map((j) => (j.state === 'failed' ? (
+                      <View key={j.id} style={[s.trayChip, s.trayChipFail]}>
+                        <View style={{ flexShrink: 1 }}>
+                          <Text style={s.trayFailT} numberOfLines={1}>{t('解析に失敗しました')}</Text>
+                          {/* なぜ失敗したか（再試行が効くかどうかの判断材料）と、どの送信だったか */}
+                          {!!j.error && <Text style={s.trayFailSub} numberOfLines={3}>{j.error}</Text>}
+                          <Text style={s.trayFailWhat} numberOfLines={1}>{j.text || t('（写真）')}</Text>
+                        </View>
+                        <Pressable hitSlop={8} onPress={() => retryJob(j)}>
+                          <Text style={s.trayRetryT}>{t('再試行')}</Text>
+                        </Pressable>
+                        <Pressable hitSlop={8} onPress={() => discardJob(j)}>
+                          <Text style={s.trayDropT}>{t('破棄')}</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View key={j.id} style={[s.trayChip, isSlow(j, nowMs) && s.trayChipWide]}>
+                        <ActivityIndicator size="small" color={C.teal} />
+                        <View style={{ flexShrink: 1, marginLeft: 4 }}>
+                          <Text style={s.trayChipT} numberOfLines={1}>{j.text || t('（写真）')}</Text>
+                          {isSlow(j, nowMs) && (
+                            <Text style={s.trayWaitT} numberOfLines={2}>{t('混み合っています…そのまま離れてOK')}</Text>
+                          )}
+                        </View>
+                      </View>
+                    )))}
+                  </ScrollView>
+                )}
+
+                {parsed != null && (
+                  <View style={s.trayActions}>
+                    <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
+                    {/* ✓保存の長押し=保存してマイ食品（セット）にも登録（書き換え中は保存の意味が変わるため出さない） */}
+                    <Pressable style={s.traySave} onPress={save} disabled={saving} delayLongPress={450}
+                               onLongPress={() => {
+                                 if (!editingId && !saving && parsed.items.length > 0) setMealDraft({ items: parsed.items, alsoSave: true });
+                               }}>
+                      {saving ? <ActivityIndicator color="#fff" /> : (
+                        <Text style={s.traySaveT}>{editingId ? t('✓ 書き換える') : t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+            {/* 食事の制約（§6-4）: 警告が出ていないときも必ず出す常設表記。
+                沈黙を「対象なし」と誤読させないための最後の砦なので、条件を足して隠さない */}
+            {dietOn && parsed != null && <DietSilenceNote />}
+            {/* 量調整ポップ（トレイ直下にインライン展開・Modal不使用）: 品目行のタップで開き、
+                倍率チップ1タップでその品のkcal/PFCを再計算する。もう一度行を押すと閉じる */}
+            {parsed != null && focusItem != null && parsed.items[focusItem] != null && (
+              <View style={s.adjustPop}>
+                <Text style={s.adjustName} numberOfLines={1}>
+                  {t('「{name}」の量を補正', { name: parsed.items[focusItem].name })}
+                  <Text style={s.adjustHint}>  {t('半分だけ食べたら ×0.5')}</Text>
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 7 }}>
+                  {MULT_STEPS.map((mv) => {
+                    const on = Math.abs(currentMult(parsed.items[focusItem]) - mv) < 0.001;
+                    return (
+                      <Pressable key={mv} style={[s.multChip, on && s.multChipOn]} onPress={() => adjustFocused(mv)}>
+                        <Text style={[s.multChipT, on && s.multChipTOn]}>×{mv}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-              ) : (
-                <ScrollView style={{ flex: 1, maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
-                </ScrollView>
+              </View>
+            )}
+
+            {inputMode !== 'myfood' && myFoodsSection}
+
+            {/* 何も無いときの一言（テキスト/写真経路の初回）。トレイもマイ食品も無い空白を放置しない */}
+            {parsed == null && jobs.length === 0 && aiNote == null && myFoods.length === 0 && myMeals.length === 0 && (
+              <Text style={s.sheetEmpty}>{t('「バナナと卵2個」のように書くか、写真を送ると、AIがカロリーとPFCを出してトレイに載せます。')}</Text>
+            )}
+          </ScrollView>
+
+          {/* ===== コンポーザー（下端）: 写真サムネ・複数行テキスト・補助ボタン・↑送信 ===== */}
+          <View style={[s.composer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            {photos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
+                {photos.map((p, i) => (
+                  <View key={i} style={s.thumbWrap}>
+                    <Image source={{ uri: p.uri }} style={s.thumb} />
+                    <Pressable style={s.thumbX} hitSlop={6} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
+                      <Text style={{ color: C.panel, fontSize: 13, fontWeight: '800' }}>×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TextInput
+              ref={inputRef} multiline
+              style={s.composerInput}
+              placeholder={t('ここをタップして食事を入力…')} placeholderTextColor={C.sub}
+              value={chat} onChangeText={setChat}
+            />
+            <View style={s.composerBar}>
+              {/* 音声入力（1500人監査Later群「入力が遅い層への救済」）: キーボードのマイクへの道しるべ */}
+              <VoiceHintButton onFocusInput={() => inputRef.current?.focus()} />
+              {/* カメラ1本で料理も成分表示も（AIが読み分ける）。ライブラリは複数選択 */}
+              <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
+              <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
+              {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
+                  「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
+              {profile != null && (
+                <MenuAdvisor
+                  remainingKcal={left}
+                  pRemain={macros ? Math.round(macros.p) - eatenP : null}
+                  onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
+                />
               )}
-              <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
-                <Text style={s.viewToggleT}>{foodsView === 'row' ? '▦' : '▬'}</Text>
+              <View style={{ flex: 1 }} />
+              <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}
+                         accessibilityRole="button" accessibilityLabel={t('送信')}>
+                <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
               </Pressable>
             </View>
-          );
-        })()}
-        {/* ステージングトレイ: チップ/AI解析の結果はここに積まれ、✓保存で初めてDBに書かれる */}
-        {editingId != null && (
-          <View style={s.editBanner}>
-            <Text style={s.editBannerT}>{t('✏️ 記録を書き換え中')}</Text>
-            <Pressable onPress={cancelEdit} hitSlop={8}>
-              <Text style={s.editBannerCancel}>{t('やめる')}</Text>
-            </Pressable>
           </View>
-        )}
-        {(parsed != null || pendingTexts.length > 0 || jobs.length > 0 || aiNote != null) && (
-          <View style={s.tray}>
-            <View style={{ flex: 1 }}>
-            {aiNote && (
-              <View style={s.aiNoteRow}>
-                <Sparkles size={ICON.xs} color={C.teal} />
-                <View style={{ flex: 1 }}>
-                  {!!aiNote.reply && <Text style={s.aiNoteT}>{aiNote.reply}</Text>}
-                  {aiNote.assumptions.map((a) => (
-                    <Text key={a} style={s.aiNoteSub} numberOfLines={2}>・{a}</Text>
-                  ))}
-                  {aiNote.questions.length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
-                      {aiNote.questions.map((q) => (
-                        <Pressable key={q} style={s.aiQChip} onPress={() => inputRef.current?.focus()}>
-                          <Text style={s.aiQChipT} numberOfLines={2}>{q}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </View>
-                <Pressable hitSlop={8} onPress={() => setAiNote(null)}><Text style={s.trayX}>×</Text></Pressable>
-              </View>
-            )}
-            {/* 食事の制約の警告行（§5）。トレイ上部・保存は止めない・免責を毎回添える */}
-            <DietWarnRow alerts={dietAlerts} />
-            {/* 食べた時間（§4）: 「いま」（今日だけ）／候補5つ／⏱で15分刻みのピッカー。
-                選んだ時刻が logs.at に入る＝食べる時間帯の分析と特徴量が「保存した時刻」ではなく
-                「食べた時刻」を見られるようになる。過去日は「いま」を出さず12:00を仮置き */}
-            {parsed != null && (() => {
-              const isPreset = mealTimeResolved === MEAL_TIME_NOW || MEAL_TIME_PRESETS.includes(mealTimeResolved);
-              const chip = (key: string, label: string, on: boolean, onPress: () => void) => (
-                <Pressable key={key} style={[s.timeChip, on && s.timeChipOn]} onPress={onPress} hitSlop={4}>
-                  <Text style={[s.timeChipT, on && s.timeChipTOn]}>{label}</Text>
-                </Pressable>
-              );
-              return (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.timeRow}>
-                  {isViewToday && chip('now', t('いま'), mealTimeResolved === MEAL_TIME_NOW, () => setMealTime(MEAL_TIME_NOW))}
-                  {MEAL_TIME_PRESETS.map((hm) => chip(hm, hm, mealTimeResolved === hm, () => setMealTime(hm)))}
-                  {chip('pick', isPreset ? t('⏱ 時刻を選ぶ') : `⏱ ${mealTimeResolved}`, !isPreset, openTimePicker)}
-                </ScrollView>
-              );
-            })()}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {parsed?.items.map((it, i) => {
-                const on = focusItem === i;
-                const dlv = dietLevelByName.get(it.name) ?? null;
-                return (
-                  <Pressable key={i} style={[s.trayChip, on && s.trayChipOn,
-                                             dlv === 'high' && s.trayChipDietHigh, dlv === 'maybe' && s.trayChipDietMaybe]}
-                             onPress={() => setFocusItem(on ? null : i)}>
-                    {dlv && <View style={{ marginRight: 4 }}><DietMark level={dlv} /></View>}
-                    <View style={{ flexShrink: 1 }}>
-                      <Text style={s.trayChipT} numberOfLines={1}>
-                        {it.name}{it.qty && it.qty !== '×1' ? ` ${it.qty}` : ''} <Text style={{ color: C.sub, fontSize: 11 }}>{Math.round(it.kcal)}kcal</Text>
-                      </Text>
-                      <Text style={s.trayChipPfc}>
-                        <Text style={{ color: pfcColors().p }}>P</Text> {Math.round(it.p)}
-                        {'  '}<Text style={{ color: pfcColors().f }}>F</Text> {Math.round(it.f)}
-                        {'  '}<Text style={{ color: pfcColors().c }}>C</Text> {Math.round(it.c)}
-                      </Text>
-                    </View>
-                    <Pressable hitSlop={8} onPress={() => removeTrayItem(i)}><Text style={s.trayX}>×</Text></Pressable>
-                  </Pressable>
-                );
-              })}
-              {parsed?.weight != null && (
-                <View style={s.trayChip}>
-                  <Weight size={ICON.xs} color={C.sub} />
-                  <Text style={s.trayChipT}>{parsed.weight}kg</Text>
-                  <Pressable hitSlop={8} onPress={() => setParsed((p) => (p && (p.items.length > 0 || p.ex) ? { ...p, weight: null } : null))}>
-                    <Text style={s.trayX}>×</Text>
-                  </Pressable>
-                </View>
-              )}
-              {parsed?.ex && parsed.ex !== 'オフ' && (
-                <View style={s.trayChip}>
-                  <Activity size={ICON.xs} color={C.sub} />
-                  <Text style={s.trayChipT}>{parsed.ex}</Text>
-                </View>
-              )}
-              {pendingTexts.map((pt) => (
-                <View key={`p${pt.id}`} style={s.trayChip}>
-                  <ActivityIndicator size="small" color={C.teal} />
-                  <Text style={[s.trayChipT, { marginLeft: 4 }]} numberOfLines={1}>{pt.text}</Text>
-                </View>
-              ))}
-              {/* AI解析の送信ジョブ。解析中は待ち時間を、失敗は理由と次の一手（再試行/破棄）を
-                  同じ位置に出す。黙って消えることが無いので「送れたのか」が常に分かる */}
-              {jobs.map((j) => (j.state === 'failed' ? (
-                <View key={j.id} style={[s.trayChip, s.trayChipFail]}>
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={s.trayFailT} numberOfLines={1}>{t('解析に失敗しました')}</Text>
-                    {/* なぜ失敗したか（再試行が効くかどうかの判断材料）と、どの送信だったか */}
-                    {!!j.error && <Text style={s.trayFailSub} numberOfLines={3}>{j.error}</Text>}
-                    <Text style={s.trayFailWhat} numberOfLines={1}>{j.text || t('（写真）')}</Text>
-                  </View>
-                  <Pressable hitSlop={8} onPress={() => retryJob(j)}>
-                    <Text style={s.trayRetryT}>{t('再試行')}</Text>
-                  </Pressable>
-                  <Pressable hitSlop={8} onPress={() => discardJob(j)}>
-                    <Text style={s.trayDropT}>{t('破棄')}</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View key={j.id} style={[s.trayChip, isSlow(j, nowMs) && s.trayChipWide]}>
-                  <ActivityIndicator size="small" color={C.teal} />
-                  <View style={{ flexShrink: 1, marginLeft: 4 }}>
-                    <Text style={s.trayChipT} numberOfLines={1}>{j.text || t('（写真）')}</Text>
-                    {isSlow(j, nowMs) && (
-                      <Text style={s.trayWaitT} numberOfLines={2}>{t('混み合っています…そのまま離れてOK')}</Text>
-                    )}
-                  </View>
-                </View>
-              )))}
-            </ScrollView>
-            </View>
-            {parsed != null && (
-              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                <Pressable onPress={clearTray} hitSlop={8}><Text style={s.trayClearT}>{t('破棄')}</Text></Pressable>
-                {/* ✓保存の長押し=保存してマイ食品（セット）にも登録（書き換え中は保存の意味が変わるため出さない） */}
-                <Pressable style={s.traySave} onPress={save} disabled={saving} delayLongPress={450}
-                           onLongPress={() => {
-                             if (!editingId && !saving && parsed.items.length > 0) setMealDraft({ items: parsed.items, alsoSave: true });
-                           }}>
-                  {saving ? <ActivityIndicator color="#fff" /> : (
-                    <Text style={s.traySaveT}>{editingId ? t('✓ 書き換える') : t('✓ 保存')}{parsedTotal && parsed.items.length > 0 ? ` ${Math.round(parsedTotal.kcal).toLocaleString()}kcal` : ''}</Text>
-                  )}
-                </Pressable>
-              </View>
-            )}
-          </View>
-        )}
-        {/* 食事の制約（§6-4）: 警告が出ていないときも必ず出す常設表記。
-            沈黙を「対象なし」と誤読させないための最後の砦なので、条件を足して隠さない */}
-        {dietOn && parsed != null && <DietSilenceNote />}
-        {/* 量調整ポップ（トレイ直下にインライン展開・Modal不使用）: 品目チップのタップで開き、
-            倍率チップ1タップでその品のkcal/PFCを再計算する。もう一度チップを押すと閉じる */}
-        {parsed != null && focusItem != null && parsed.items[focusItem] != null && (
-          <View style={s.adjustPop}>
-            <Text style={s.adjustName} numberOfLines={1}>
-              {t('「{name}」の量を補正', { name: parsed.items[focusItem].name })}
-              <Text style={s.adjustHint}>  {t('半分だけ食べたら ×0.5')}</Text>
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 6, marginTop: 7 }}>
-              {MULT_STEPS.map((mv) => {
-                const on = Math.abs(currentMult(parsed.items[focusItem]) - mv) < 0.001;
-                return (
-                  <Pressable key={mv} style={[s.multChip, on && s.multChipOn]} onPress={() => adjustFocused(mv)}>
-                    <Text style={[s.multChipT, on && s.multChipTOn]}>×{mv}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        )}
-        <View style={s.dock}>
-          {/* 発光レイヤ: 全開の縁と影を重ね、opacityだけをネイティブで往復させる */}
-          <Animated.View pointerEvents="none" style={[s.dockGlow, { opacity: glow }]} />
-          {/* 通常時=「ここが入力欄」のペンサイン / キーボード表示中=しまうボタン */}
-          {kbVisible ? (
-            <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
-              <ChevronDown color={C.teal} size={ICON.xl} strokeWidth={ICON.stroke} />
-            </Pressable>
-          ) : (
-            <View style={s.pencilBadge}>
-              <Pencil color={C.teal} size={ICON.md} strokeWidth={ICON.stroke} />
-            </View>
-          )}
-          <TextInput
-            ref={inputRef} multiline
-            style={[s.dockInput, { height: Math.max(40, Math.min(132, inputH)) }]}
-            placeholder={t('ここをタップして食事を入力…')} placeholderTextColor={C.sub}
-            value={chat} onChangeText={setChat}
-            onContentSizeChange={(e) => setInputH(e.nativeEvent.contentSize.height + 14)}
-          />
-          {/* 文字を打ち始めたら補助アイコンを畳み、テキストに全幅を渡す（LINE式）。
-              5個のアイコンが同じ行にいると入力幅が半分になり、10文字弱で不自然に
-              改行していた（βフィードバック 2026-09-02）。キーボードを閉じれば全部戻る */}
-          {!(kbVisible && chat.trim().length > 0) && (<>
-          {/* 音声入力（1500人監査Later群「入力が遅い層への救済」）: キーボードのマイクへの
-              道しるべ。初回だけ使い方を案内し、以後は入力欄にフォーカスするだけ */}
-          <VoiceHintButton onFocusInput={() => inputRef.current?.focus()} />
-          {/* カメラ1本に統合（βフィードバック 2026-09-02: 成分表示ボタンも結局カメラが
-              開くだけで体験が同一＝ややこしい）。料理も成分表示も同じ撮影でAIが読み分ける。
-              長押し＝バーコードスキャン（旧・成分表示ボタンから引き継ぎ） */}
-          <DockIconButton Icon={Camera} onPress={takePhoto} onLongPress={() => setScanOpen(true)}
-                          disabled={photos.length >= 4} guideKey="dockCamera" />
-          <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
-          {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
-              「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
-          {profile != null && (
-            <MenuAdvisor
-              remainingKcal={left}
-              pRemain={macros ? Math.round(macros.p) - eatenP : null}
-              onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
-            />
-          )}
-          </>)}
-          <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}>
-            <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
-          </Pressable>
-        </View>
-      </Animated.View>
-      </Reanimated.View>
 
-      {/* 食べた時間のピッカー（15分刻み）。iOSはスピナー＋「決定」、Androidは端末のダイアログで即確定 */}
-      <Modal visible={timePickerOpen} transparent animationType="fade" onRequestClose={() => setTimePickerOpen(false)}>
-        <Pressable style={s.timeBack} onPress={() => setTimePickerOpen(false)}>
-          <Pressable style={s.timeCard} onPress={() => {}}>
-            <Text style={s.timeTitle}>{t('食べた時間')}</Text>
-            <DateTimePicker
-              locale={apiLang()}
-              value={timeDraft} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              minuteInterval={MEAL_TIME_STEP_MIN}
-              onChange={(ev, d) => {
-                if (Platform.OS !== 'ios') {
-                  // Androidはダイアログの「OK」で確定・戻るで取り消し（イベント1回で閉じる）
-                  setTimePickerOpen(false);
-                  if (ev.type === 'set' && d) commitTime(d);
-                  return;
-                }
-                if (d) setTimeDraft(d);
-              }}
-            />
-            {Platform.OS === 'ios' && (
-              <View style={s.timeBtns}>
-                <Pressable style={s.timeBtnGhost} onPress={() => setTimePickerOpen(false)} hitSlop={6}>
-                  <Text style={s.timeBtnGhostT}>{t('キャンセル')}</Text>
-                </Pressable>
-                <Pressable style={s.timeBtn} onPress={() => { commitTime(timeDraft); setTimePickerOpen(false); }} hitSlop={6}>
-                  <Text style={s.timeBtnT}>{t('決定')}</Text>
-                </Pressable>
-              </View>
-            )}
-          </Pressable>
-        </Pressable>
+          {/* 食べた時間のピッカー（15分刻み）。iOSはスピナー＋「決定」、Androidは端末のダイアログで即確定。
+              入力シート（pageSheet）の内側に置く: iOSは表示中のModalの兄弟に別のModalを出せない */}
+          <Modal visible={timePickerOpen} transparent animationType="fade" onRequestClose={() => setTimePickerOpen(false)}>
+            <Pressable style={s.timeBack} onPress={() => setTimePickerOpen(false)}>
+              <Pressable style={s.timeCard} onPress={() => {}}>
+                <Text style={s.timeTitle}>{t('食べた時間')}</Text>
+                <DateTimePicker
+                  locale={apiLang()}
+                  value={timeDraft} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  minuteInterval={MEAL_TIME_STEP_MIN}
+                  onChange={(ev, d) => {
+                    if (Platform.OS !== 'ios') {
+                      // Androidはダイアログの「OK」で確定・戻るで取り消し（イベント1回で閉じる）
+                      setTimePickerOpen(false);
+                      if (ev.type === 'set' && d) commitTime(d);
+                      return;
+                    }
+                    if (d) setTimeDraft(d);
+                  }}
+                />
+                {Platform.OS === 'ios' && (
+                  <View style={s.timeBtns}>
+                    <Pressable style={s.timeBtnGhost} onPress={() => setTimePickerOpen(false)} hitSlop={6}>
+                      <Text style={s.timeBtnGhostT}>{t('キャンセル')}</Text>
+                    </Pressable>
+                    <Pressable style={s.timeBtn} onPress={() => { commitTime(timeDraft); setTimePickerOpen(false); }} hitSlop={6}>
+                      <Text style={s.timeBtnT}>{t('決定')}</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </Pressable>
+            </Pressable>
+          </Modal>
+          {/* ✓保存の長押しからのセット登録は、シートの内側でだけ描く（同じ理由） */}
+          {saveMealSheetEl}
+        </KeyboardAvoidingView>
       </Modal>
-      {/* 削除のUndoスナックバー（ドックの上に重ねる。触れない領域は素通し） */}
+      {/* 削除のUndoスナックバー（＋ボタンの上に重ねる。触れない領域は素通し） */}
       {undoBar.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
@@ -2095,7 +2173,8 @@ export default function LogScreen() {
       />
       <SpotlightTip
         visible={suggest != null}
-        targetRef={myFoods.length > 0 ? chipsRef : undefined}
+        // チップは入力シートの中にあるので、シートが開いているときだけハイライトする（閉じていれば中央カード）
+        targetRef={inputOpen && myFoods.length > 0 ? chipsRef : undefined}
         title={t('{name}をよく食べるようですね', { name: suggest?.name ?? '' })}
         text={t('直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。', { days: suggest?.days ?? 0 })}
         primaryLabel={t('登録してみる')}
@@ -2139,28 +2218,12 @@ export default function LogScreen() {
         onClose={() => setFoodDraft(null)}
         onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に登録しました。下のチップから1タップで足せます。') }); }}
       />
-      {/* マイ食品（セット）の登録シート（記録行の長押しメニュー/✓保存の長押しから。
-          alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う） */}
-      <SaveMealSheet
-        visible={mealDraft != null} uid={uid} items={mealDraft?.items ?? []}
-        onClose={() => setMealDraft(null)}
-        onSaved={async (name) => {
-          const alsoSave = mealDraft?.alsoSave === true;
-          setMealDraft(null);
-          setMyMeals(await listMyMeals());
-          if (alsoSave) {
-            const ok = await save();   // 失敗時はsave()側のエラーメッセージを残す（トレイも残る）
-            if (ok) setMsg({ ok: true, text: t('保存して、マイ食品「{name}」にも登録しました。', { name }) });
-          } else {
-            setMsg({ ok: true, text: t('マイ食品「{name}」を登録しました。入力欄の上のチップから1タップで呼び出せます。', { name }) });
-          }
-        }}
-      />
-      {/* バーコードスキャナ（読み取り成功で即クローズ→公式DB照会→トレイ投入） */}
-      <BarcodeScanner visible={scanOpen} onClose={() => setScanOpen(false)} onScanned={scannedBarcode} />
+      {/* マイ食品（セット）の登録シート: 記録行の長押しメニューから（入力シートが閉じているとき）。
+          入力シートが開いている間は、その内側で同じ要素を描く（上の saveMealSheetEl） */}
+      {!inputOpen && saveMealSheetEl}
       {/* おかえりフロー: 発火判定はコンポーネント内で完結（マウント直後のみ→既存Modalと競合しない） */}
       <ComebackSheet onSaved={load} />
-      <StatusBarMask />
+      {/* ステータスバー領域はスティッキーヘッダー（TabHeader）が覆うので StatusBarMask は置かない */}
       <HeaderGear />
     </View>
   );
@@ -2168,7 +2231,6 @@ export default function LogScreen() {
 
 const s = themed(() => ({
   scroll: { padding: SPACE.screen },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   // B-7: 最初の法則の帯（今日のひとこと帯と同じ「帯」の文法・アクセント面で一段目立たせる）
   lawBand: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -2178,11 +2240,9 @@ const s = themed(() => ({
   lawBandT: { flex: 1, fontSize: 13, fontWeight: '800', color: C.ink, lineHeight: 18 },
   lawBandGo: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   lawBandX: { fontSize: 17, color: C.faint, fontWeight: '700', paddingHorizontal: 2 },
-  brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
   doneBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   doneBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  pageTitle: { ...HEAD.page, color: C.ink },
   hero: {
     backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
@@ -2211,22 +2271,19 @@ const s = themed(() => ({
   positiveFactor: { fontSize: 13, color: C.sub, lineHeight: 19 },
   h2sub: { fontWeight: '400', color: C.sub },
   mutedT: { fontSize: 15, color: C.sub, lineHeight: 21 },
-  // 展開した品目行。記録行より一段内側に置き、従属関係を見せる
+  // 展開した品目行。記録行より一段内側に置き、従属関係を見せる（文字の階層は FoodRowText と共通）
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 6, paddingLeft: 48, paddingRight: 2,
-    borderTopWidth: 0.5, borderTopColor: C.line,
+    paddingVertical: 8, paddingLeft: 48, paddingRight: 2,
+    borderTopWidth: 1, borderTopColor: C.hairline,
   },
-  itemName: { flex: 1, fontSize: 15, color: C.ink },
-  itemPfc: { fontSize: 11, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  itemKcal: { fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'], minWidth: 34, textAlign: 'right' },
   itemX: { fontSize: 17, fontWeight: '800', color: C.coral, paddingHorizontal: 4 },
-  feedRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 7, borderTopWidth: 0.5, borderTopColor: C.line, gap: 8 },
-  feedTime: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, paddingTop: 2, fontVariant: ['tabular-nums'] },
-  feedTitle: { flex: 1, fontSize: 15, color: C.ink, lineHeight: 21 },
-  feedPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 2, fontVariant: ['tabular-nums'] },
-  feedKcal: { fontSize: 15, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
-  feedU: { fontSize: 11, color: C.faint },
+  // 記録行（2026-09-02 視認性）: 上下12・区切りは C.hairline。品名/量/PFC/kcal は components/FoodRowText.tsx
+  feedRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.hairline, gap: 8 },
+  feedTime: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, paddingTop: 3, fontVariant: ['tabular-nums'] },
+  feedIcon: { fontSize: 15, marginRight: 2, paddingTop: 1 },
+  // 品目内訳の無い行（体重・運動・概算・メモ）の見出し。品名と同じ 15/700
+  feedTitle: { fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
   msg: { fontSize: 15, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
   ta: {
     minHeight: 88, maxHeight: 180, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line,
@@ -2279,13 +2336,35 @@ const s = themed(() => ({
   chipBtnT: { fontSize: 13, fontWeight: '700', color: C.sub },
   reuseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   reuseBtnT: { color: C.panel, fontSize: 17, fontWeight: '800' },  // ink地（ダーク=明色）に追従
-  dockWrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg, borderTopWidth: 0.5, borderTopColor: C.line },
-  // 「いつの記録か」の常設表示。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
-  dockDate: { fontSize: 11, fontWeight: '700', color: C.faint, paddingHorizontal: 6, marginBottom: 3, fontVariant: ['tabular-nums'] },
-  dockDatePast: { color: C.amber, fontWeight: '800' },  // 生HEX禁止（ダーク対応はCトークン経由）
+  // ===== 入力シート（pageSheet） =====
+  sheetWrap: { flex: 1, backgroundColor: C.bg },
+  sheetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: SPACE.screen, paddingBottom: 8 },
+  // 前の選択を含む見出し（「食事 › テキストで入力」）。前段は補助色で一段引く
+  sheetCrumb: { fontSize: 20, fontWeight: '800', color: C.ink },
+  sheetCrumbPrev: { color: C.sub, fontWeight: '700' },
+  // 「いつの記録か」（旧ドック最上部から移植）。過去日はアンバーで気づかせる（DateStripの過去表現と同系色）
+  sheetDate: { fontSize: 12, fontWeight: '700', color: C.faint, marginTop: 2, fontVariant: ['tabular-nums'] },
+  sheetDatePast: { color: C.amber, fontWeight: '800' },  // 生HEX禁止（ダーク対応はCトークン経由）
   // 選んだ「食べた時間」を日付に薄く添える（本人が選んだ時刻なので出してよい・「いま」は出さない）
-  dockTime: { color: C.faint, fontWeight: '700' },
-  // 食べた時間チップ列（トレイ上部・警告行の下・品目チップの上）
+  sheetTime: { color: C.faint, fontWeight: '700' },
+  sheetClose: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: C.chipBg },
+  sheetScroll: { paddingHorizontal: SPACE.screen, paddingTop: 6, paddingBottom: 16 },
+  sheetSection: { marginTop: 4, marginBottom: 10 },
+  sheetSectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  sheetSectionT: { fontSize: 15, fontWeight: '800', color: C.ink },
+  sheetSectionSub: { flex: 1, fontSize: 11, fontWeight: '600', color: C.faint },
+  sheetEmpty: { fontSize: 13, color: C.sub, lineHeight: 19, marginTop: 8 },
+  // 下端のコンポーザー（旧ドック本体）。面は C.panel、上に薄い区切り
+  composer: {
+    backgroundColor: C.panel, borderTopWidth: 1, borderTopColor: C.hairline,
+    paddingHorizontal: SPACE.screen, paddingTop: 10,
+  },
+  composerInput: {
+    minHeight: 44, maxHeight: 132, fontSize: 17, fontWeight: '600', color: C.ink,
+    paddingVertical: 8, paddingHorizontal: 4, textAlignVertical: 'top',
+  },
+  composerBar: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  // 食べた時間チップ列（トレイ上部・警告行の下・品目行の上）
   timeRow: { marginBottom: 6 },
   timeChip: {
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.chip, marginRight: 5,
@@ -2303,26 +2382,11 @@ const s = themed(() => ({
   timeBtnGhostT: { fontSize: 15, fontWeight: '800', color: C.sub },
   timeBtn: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   timeBtnT: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  dock: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 4,
-    backgroundColor: C.panel, borderWidth: 2.5, borderColor: C.accentBorder, borderRadius: 18,
-    paddingHorizontal: 9, paddingVertical: 8,
-    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.12, elevation: 8,
-  },
-  dockGlow: {
-    position: 'absolute', top: -2.5, left: -2.5, right: -2.5, bottom: -2.5,
-    borderWidth: 2.5, borderColor: C.teal, borderRadius: 18,
-    shadowColor: C.teal, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.25,
-  },
-  dockIconBtn: { padding: 4 },
-  dockIcon: { fontSize: 21 },
-  dockInput: { flex: 1, fontSize: 17, fontWeight: '600', color: C.ink, paddingVertical: 7, paddingHorizontal: 4 },
-  pencilBadge: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center', marginBottom: 1 },
-  dockSend: { backgroundColor: C.teal, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  dockSendT: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  dockSend: { backgroundColor: C.teal, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
-  preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, paddingBottom: 7, gap: 8 },
+  // 残量ストリップ（シート上部・常設）
+  preview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACE.screen, paddingBottom: 8, gap: 8, borderBottomWidth: 1, borderBottomColor: C.hairline },
   aiNoteRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 6,
     paddingBottom: 6, marginBottom: 6, borderBottomWidth: 0.5, borderBottomColor: C.line,
@@ -2334,20 +2398,29 @@ const s = themed(() => ({
     maxWidth: '100%',
   },
   aiQChipT: { fontSize: 12, color: C.accentInk, fontWeight: '700' },
+  // ステージングトレイ（入力シートの中・縦積み）
   tray: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
-    borderRadius: RADIUS.tile, paddingHorizontal: 8, paddingVertical: 7, marginBottom: 7,
+    borderRadius: RADIUS.tile, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8,
   },
+  // 品目行（フィードの記録行と同じ文字階層。面は C.panel、注目中はアクセント縁）
+  trayRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.input,
+    paddingVertical: 10, paddingHorizontal: 10, marginTop: 6,
+  },
+  trayRowOn: { borderColor: C.teal, borderWidth: 1.5 },
+  // 食事の制約（B-18・§5）: high=赤縁＋⚠️ / maybe=アンバーの縁。塗りは変えず縁だけ（責め色で埋めない）
+  trayRowDietHigh: { borderColor: C.coral, borderWidth: 1.5 },
+  trayRowDietMaybe: { borderColor: C.amber },
+  trayRowX: { paddingLeft: 4 },
+  trayActions: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'flex-end', marginTop: 10 },
   trayChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.chip,
     paddingHorizontal: 10, paddingVertical: 5, marginRight: 6, maxWidth: 190,
   },
   trayChipT: { fontSize: 13, fontWeight: '700', color: C.ink },
-  // 食事の制約（B-18・§5）: high=赤縁＋⚠️ / maybe=アンバーの点。塗りは変えず縁だけ（責め色で埋めない）
-  trayChipDietHigh: { borderColor: C.coral, borderWidth: 1.5 },
-  trayChipDietMaybe: { borderColor: C.amber },
   // 混雑時の待ち文言（解析中チップの中に添える）。文言のぶんチップを広げる
   trayChipWide: { maxWidth: 260 },
   trayWaitT: { fontSize: 12, fontWeight: '600', color: C.sub, marginTop: 1 },
@@ -2365,11 +2438,9 @@ const s = themed(() => ({
   },
   editBannerT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
-  trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
-  trayChipPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
   trayX: { fontSize: 15, fontWeight: '800', color: C.coral, marginLeft: 2 },
-  traySave: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 13, paddingVertical: 9 },
-  traySaveT: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  traySave: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 18, paddingVertical: 11, minWidth: 150, alignItems: 'center' },
+  traySaveT: { color: '#fff', fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   trayClearT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   previewMain: { fontSize: 13, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   previewBars: { flexDirection: 'row', gap: 10, flex: 1, alignItems: 'center', marginLeft: 10 },
