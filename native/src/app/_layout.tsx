@@ -19,6 +19,7 @@ import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
 import { installCrashReporter } from '@/lib/crash';
 import { loadRemoteContentCache, startRemoteContentSync } from '@/lib/remoteContent';
+import { loadHealthLink, startHealthAutoSync } from '@/lib/health';
 
 installCrashReporter();   // 未捕捉例外を自前のcrash_reportsへ（モジュール読込時に一度だけ）
 
@@ -40,6 +41,8 @@ export default function RootLayout() {
 
   // 言語・単位の設定を起動時に読み込む（未設定なら端末言語に追従）
   useEffect(() => { loadLocale(); loadUnits(); loadTheme(); }, []);
+  // ヘルスケア連携フラグ（'bl-health-linked'）を先に読む＝各画面の「連携する」ボタンの出し分けに使う
+  useEffect(() => { loadHealthLink(); }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -61,6 +64,10 @@ export default function RootLayout() {
   // 「今日すでに記録があるか」をRLS越しに見るため、認証が確立してから
   useEffect(() => { if (ready && authed) reregisterAll(); }, [ready, authed]);
   useEffect(() => { if (ready && authed) startRemoteContentSync(); }, [ready, authed]);
+  // ヘルスケア自動同期: 連携済みなら変更購読＋バックグラウンド配信を開始し、体重の差分を取り込む。
+  // 未連携・Android・Expo Go では内部で no-op。バックグラウンド起床（HealthKit配信）でも
+  // ここを通るので、起こされた回で体重の取り込みまで済む（通知は出さない）
+  useEffect(() => { if (ready && authed) startHealthAutoSync().catch(() => {}); }, [ready, authed]);
 
   return (
     // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿

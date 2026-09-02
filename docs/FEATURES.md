@@ -10,7 +10,9 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   ローカル通知（通知チャンネル登録済み・アクションボタン含む）・Google SSO・メールログイン・
   11言語・テーマ・実績/ステッカー・ディープリンク（bodylog://）
 - **出ないもの（iOS専用）**:
-  - ヘルスケア連携（HealthKit）— 歩数・Apple Watchワークアウト取込・体重自動取込は非表示（将来Health Connect検討）
+  - ヘルスケア連携（HealthKit）— 歩数・Apple Watchワークアウト取込・体重自動取込は非表示（将来Health Connect検討）。
+    `healthAvailable()` が `Platform.OS!=='ios'` で常に false＝購読・背景配信・体重取込は全て no-op。
+    設定の「ヘルスケア連携」行・概要メニューの「歩数・睡眠」行も出さない（「ヘルスケア」の文言自体が現れない）
   - Appleでサインイン — iOSのみ表示
   - 課金UI — `EXPO_PUBLIC_RC_ANDROID_KEY` を設定するまで全機能が「未課金」扱いで非表示
 
@@ -394,7 +396,9 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   内訳は「歩いたぶん（推定）+Nkcal を目標に上乗せしています」と（推定）を付けて実測と同じ顔をさせない。
   ③（アプリ記録のみ）は目標側にadjとしてすでに入っているので上乗せに渡さない（二重計上しない）。
   ※食事タブのヒーロー（log.tsx `useActiveKcal`）は実測のみで、歩数推定へのフォールバックは未対応（log.tsx側で要追加）
-- 未連携時は「ヘルスケアと連携する」リンク（TestFlight版のみ・Expo Goは案内）
+- 未連携（`healthLinkState()==='unlinked'`）のときだけ「ヘルスケアと連携する」リンク（TestFlight版のみ・Expo Goは案内）。
+  一度連携したら二度と出ない（連携済みでその日の歩数が無いときは「—」）。歩数・時間帯別・週バーは
+  ヘルスケアの変更イベント（`useHealthVersion()`）で自動的に読み直す（→「ヘルスケア連携（自動同期）」節）
 - 目標収支への逆算1行: 超過時「あと約N歩（はや歩きM分）で帳尻が合います」／
   目標内「あとNkcal食べられます」／目的=増量(bulk)は意味を反転（不足=「あとNkcal食べる」・
   超過=「増量ノルマ達成💪」）／目標未設定は設定への誘い文
@@ -416,9 +420,11 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
 - 記録ボタンに「約Nkcal消費」をリアルタイム表示→当日の残量へ自動上乗せ
 - 種目選択シート（7カテゴリ・チェック式・METs値と記録ありバッジ・最低1つガード）
 
-### ヘルスケア取込
+### ヘルスケア取込（ワークアウト・手動のまま）
 - 直近30日のワークアウト一覧（個別選択・取込済み自動スキップ・件数報告）
-- 未許可時はiOS設定の場所を案内
+- 未許可時はiOS設定の場所を案内。連携済みなら許可ダイアログは出ない（`ensureHealthAuth`）
+- ワークアウトは自動取込の対象外（勝手に運動記録を増やすと、アプリに手で記録した運動との
+  二重計上を本人が制御できないため。体重・歩数・睡眠・アクティブkcalは自動）
 
 ### レストタイマー
 - 筋トレ保存で自動開始＋常設カードからいつでも手動起動
@@ -463,6 +469,57 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
 ### その他
 - 「目標を記録しましょう」導線カード＋運動目標編集シート（並び替え対象外のフッター）
 - クイック記録FAB／引っ張って更新（編集中は停止）／カード並び替え・表示・非表示（概要タブと同一操作）
+
+## ヘルスケア連携（自動同期・2026-09-02・feat/health-autosync）
+
+「いたるところで『ヘルスケアと連携する』が出る」「一度連携したら全項目を自動で取り込んでほしい」
+「定時ではなく、ヘルスケア側の数値が変わったきっかけで更新」（熊田さん要望）への実装。
+
+### 連携状態は1か所（native/src/lib/health.ts `healthLinkState()`／lib/healthLink.ts 純関数）
+- `'unavailable' | 'unlinked' | 'linked'`。linked = AsyncStorage `'bl-health-linked'`='1'
+  （初回の `requestAuthorization` が成功した時点で立て、以後は恒久。iOSは許可/拒否をアプリに教えないので
+  「ダイアログを一度出した」＝連携済み、と定義。拒否した人は「連携を見直す（iOS設定を開く）」で直す）
+- 起動時 `_layout` で `loadHealthLink()` → ストア（lib/healthStore.ts・useSyncExternalStore）へ。
+  各画面は `useHealthLinkState()` で **unlinked のときだけ** 連携ボタンを出す。連携ボタンの全数:
+  ①運動タブ「きょうの動き」歩数スタットの「ヘルスケアと連携する」 ②概要「歩数・睡眠」詳細の
+  「ヘルスケアと連携する」（旧「ヘルスケアから読み込む」） ③設定「ヘルスケア連携」シートの1ボタン。
+  それ以外（WeekStepsBar・VitalsCard・食事タブのヒーロー等）にボタンは無い（読み取りのみ）
+- **READ_TYPES に型を足したとき**: 起動時 `reauthIfNeeded()` が `getRequestStatusForAuthorization` を見て
+  shouldRequest(1) なら `requestAuthorization` を自動で再呼び出し（iOSは追加した型ぶんだけダイアログを出す・
+  ユーザー操作不要・unnecessary/unknown では何もしない＝毎回出る事故を防ぐ）
+
+### 変更イベント駆動の同期（lib/health.ts `startHealthAutoSync`）
+- 前景: `subscribeToChanges(identifier, cb)`（@kingstinct/react-native-healthkit v14 `src/utils/subscribeToChanges.ts`・
+  HKObserverQuery）を READ_TYPES 5種すべてに起動時に登録。コールバックで
+  該当キャッシュ無効化（`invalidateActiveEnergyCache`・activeKcal.ts の歩数キャッシュは世代比較で失効）→
+  `bumpHealthVersion(kind)`。各画面は `useHealthVersion()` を既存の読み込み effect の依存に足すだけ
+  （運動タブ loadHealth/loadHourly・概要 readActivity・食事タブ useActiveKcal/useStepsOfDay）。定時ポーリング無し
+- 背景: `configureBackgroundTypes([歩数, アクティブkcal, 体重, 睡眠], hourly)`（同 `src/specs/CoreModule.nitro.ts`・
+  types と frequency を UserDefaults に保存し、コールドローンチ時に config plugin が AppDelegate へ差し込む
+  `BackgroundDeliveryManager.setupBackgroundObservers()` が HKObserverQuery＋`enableBackgroundDelivery` を再登録）。
+  **hourly（2）を選び immediate は避ける**: 歩数のように数分おきに書かれる型で immediate は電池を食い、
+  審査でも起床の必要性を問われやすい。体重・睡眠は1日1〜2回しか変わらないので hourly で十分
+- バックグラウンド起床時は `_layout` の `startHealthAutoSync` が走り「キャッシュ更新＋体重の自動取り込み」まで。通知は出さない
+- entitlement: app.json `ios.entitlements` に `com.apple.developer.healthkit` と
+  `com.apple.developer.healthkit.background-delivery: true` を明示（plugin も既定で付与）。
+  **Codemagic は自動署名（ASC APIキー）なので capability 追加は再ビルドのみで通る**（手動プロファイル不要）。
+  旧ビルドでは `configureBackgroundTypes` が失敗しうるが catch して前景購読だけで動く
+- Android: `healthAvailable()` が false → 全て no-op
+
+### 体重の自動取り込み（lib/health.ts `importWeightsAuto`・規則は lib/healthLink.ts `decideWeightImport`）
+- 連携済みなら **確認なしで自動**（起動時＋体重の変更イベント時・直近7日の差分）
+- 書き先は logs に `source_id='hk:bm:<日付>'` の1行（1日1値・更新で上書き・text は空）→ `syncEntriesForDate`
+  で entries.weight へ。entries を直接書かないのは、次の食事記録の summarizeDay で消えてしまうため
+- 優先規則: ①20〜300kg外・NaNは捨てる ②同日に手入力（source_id が hk: でない体重ログ）がある日は、
+  設定「体重は手入力を優先」ONなら触らない／OFFなら **HealthKitの計測時刻が手入力より新しいときだけ上書き**
+  （同時刻は手入力を残す） ③既に同じサンプル（同時刻・同値）を取り込んであれば書かない ④それ以外は取り込む
+- source_id 列が無い旧DB（v17未適用）は既存の `importWeights`（entriesを直接・既存値尊重）へフォールバック
+- 純関数のテスト: native/src/lib/__tests__/healthLink.test.ts（16件）
+
+### 実機でしか確認できないこと
+- HKObserverQuery のコールバック頻度（iOSがまとめて鳴らす）・バックグラウンド起床の実際の間隔
+- 追加型ぶんの再許可ダイアログが「起動時に1回だけ」出ること
+- 拒否後の「連携を見直す」から設定アプリのヘルスケア項目へ辿れること
 
 ## 相談タブ（/(tabs)/coach）
 - ウェルカムUI＋日替わりクイック質問2×2（タップで即送信）
@@ -617,7 +674,9 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   全曜日目標内なら「どの曜日も安定しています」・記録14日未満はプレースホルダ・
   メニュー行の要約は「金曜日に崩れやすい」式）
 - 食材とあなたの体の傾向（食材×翌日体重の比較上位各3件）
-- 歩数・睡眠（ヘルスケアから直近7日）。詳細の上部に、①週間歩数目標の週プログレス
+- 歩数・睡眠（ヘルスケアから直近7日）。連携済みなら開いた時点で自動で読み（「読み込む」ボタン無し）、
+  ヘルスケアの変更イベントごとに読み直す。未連携のときだけ「ヘルスケアと連携する」ボタン。
+  Androidはメニュー・⊕シートともにこの行自体を出さない。詳細の上部に、①週間歩数目標の週プログレス
   （B-15・設定時のみ・「きょうの動き」と同一のWeekStepsBar）②「昨夜の睡眠」（B-14a・
   ヘルスケアの円グラフ相当）: 合計時間の大表示＋ステージ横帯（SVG横スタックバー・
   深い/コア/レム=C.tealの濃淡3段＋覚醒=淡coral・各ラベルと時間。lib/health.ts
@@ -721,7 +780,11 @@ iOSアプリの全画面・全機能の棚卸し（2026-08-26時点・v1.0.11相
   「最後の食事から5時間後」の単発通知を予約し直す（食べている限り鳴らない）。
   着地が21:30以降〜翌7:00前なら予約しない。タップでクイック入力へ直行
 - 週1体写真・チートデイ前日・言語変更/起動時に自動再登録
-- ヘルスケア連携（過去90日の体重取込・用途明示）
+- ヘルスケア連携（iOSのみ表示・Androidは行ごと出さない）: 行のサブは状態表示
+  「連携中・最終同期 HH:MM」（未連携は「体重・歩数・睡眠・消費kcalを自動で取り込む」）。
+  シートは連携済みなら **状態＋「体重は手入力を優先」トグル（'bl-health-prefer-manual-weight'・既定OFF）＋
+  「連携を見直す（iOS設定を開く）」＋「過去90日の体重をいま取り込む」（任意）**、
+  未連携なら「ヘルスケアと連携する」1ボタン（→ `ensureHealthAuth`＝初回連携→自動同期開始）。用途明示の文言は維持
 - アクティブカロリーを目標に反映する（データ・連携／2026-09-01・**既定OFF**・
   AsyncStorage 'bl-active-kcal-to-goal'）: ヘルスケア連携行の直下のトグル。
   サブ文言でトレードオフを正直に説明「ONにすると、歩いた分だけ『あと食べられる量』が増えます。

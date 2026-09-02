@@ -36,6 +36,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { readActiveEnergyCached, healthAvailable, readActivitySummary, type HealthDaySummary } from './health';
+import { healthStoreState, useHealthVersion } from './healthStore';
 
 /** 「アクティブカロリーを目標に反映する」の保存キー（設定画面と各タブで共有・未設定=OFF） */
 export const ACTIVE_KCAL_TO_GOAL_KEY = 'bl-active-kcal-to-goal';
@@ -80,6 +81,8 @@ export function useActiveKcalToGoal(): boolean {
  */
 export function useActiveKcal(date: string): number | null {
   const [kcal, setKcal] = useState<number | null>(null);
+  // ヘルスケア側で値が変わったら（HKObserverQuery→healthStore）世代が進み、ここが再実行される
+  const ver = useHealthVersion();
   useEffect(() => {
     let alive = true;
     if (!healthAvailable()) { setKcal(null); return; }
@@ -89,7 +92,7 @@ export function useActiveKcal(date: string): number | null {
       setKcal(days.find((d) => d.date === date)?.kcal ?? 0);
     }).catch(() => {});
     return () => { alive = false; };
-  }, [date]);
+  }, [date, ver]);
   return kcal;
 }
 
@@ -100,19 +103,21 @@ export function useActiveKcal(date: string): number | null {
 // Apple Watchが無い人は運動タブでは推定が出るのにヒーローの上乗せは0のまま、という食い違いが出る。
 // 歩数の読み取りは readActivitySummary（歩数＋睡眠＋アクティブ）しか無く lib/health.ts は
 // 触れないので、ここで15分キャッシュして画面遷移ごとの HealthKit 問い合わせを抑える。
+// ヘルスケア側の変更イベント（healthStore.version）でTTL内でも捨てる（health.ts の activeCache と同じ流儀）
 const STEPS_TTL_MS = 15 * 60 * 1000;
-let stepsCache: { at: number; data: HealthDaySummary[] | null } | null = null;
+let stepsCache: { at: number; ver: number; data: HealthDaySummary[] | null } | null = null;
 let stepsInflight: Promise<HealthDaySummary[] | null> | null = null;
 
 /** 直近14日の日別サマリー（キャッシュ付き・同時呼び出しは1本に合流）。非対応環境・失敗はnull */
 async function readStepsCached(): Promise<HealthDaySummary[] | null> {
   const now = Date.now();
-  if (stepsCache && now - stepsCache.at < STEPS_TTL_MS) return stepsCache.data;
+  const ver = healthStoreState().version;
+  if (stepsCache && stepsCache.ver === ver && now - stepsCache.at < STEPS_TTL_MS) return stepsCache.data;
   if (stepsInflight) return stepsInflight;
   stepsInflight = (async () => {
     const r = await readActivitySummary(14);
     const data = 'error' in r ? null : r;
-    stepsCache = { at: Date.now(), data };
+    stepsCache = { at: Date.now(), ver, data };
     return data;
   })().finally(() => { stepsInflight = null; });
   return stepsInflight;
@@ -124,6 +129,7 @@ async function readStepsCached(): Promise<HealthDaySummary[] | null> {
  */
 export function useStepsOfDay(date: string): number | null {
   const [steps, setSteps] = useState<number | null>(null);
+  const ver = useHealthVersion();   // ヘルスケアの変更イベントで再読込
   useEffect(() => {
     let alive = true;
     if (!healthAvailable()) { setSteps(null); return; }
@@ -133,6 +139,6 @@ export function useStepsOfDay(date: string): number | null {
       setSteps(days.find((d) => d.date === date)?.steps ?? 0);
     }).catch(() => {});
     return () => { alive = false; };
-  }, [date]);
+  }, [date, ver]);
   return steps;
 }

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import { healthAvailable, requestHealthAuth, activeEnergyAuthState, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { healthAvailable, requestHealthAuth, linkHealth, ensureHealthAuth, activeEnergyAuthState, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
+import { useHealthLinkState, useHealthVersion } from '@/lib/healthStore';
 import { activeKcalGoalBonus, useActiveKcalToGoal } from '@/lib/activeKcal';
 import { resolveBurnKcal, stepsForKcal } from '@/lib/stepsKcal';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -168,17 +169,22 @@ export default function TrainingScreen() {
     setHealthDays(r);
     return r;
   }, []);
-  useEffect(() => { loadHealth(); }, [loadHealth]);
+  // ヘルスケアの変更イベント（HKObserverQuery→healthStore）で世代が進むたびに読み直す＝
+  // 定時ポーリングなしで「ヘルスケア側の数値が変わったきっかけで更新」になる
+  const healthVer = useHealthVersion();
+  const healthLink = useHealthLinkState();
+  useEffect(() => { loadHealth(); }, [loadHealth, healthVer]);
   // 時間帯別の歩数（0-23時・ヘルスケア式バー）。HealthKitが無い環境ではnullのまま＝出さない
   const [hourlySteps, setHourlySteps] = useState<number[] | null>(null);
   const loadHourly = useCallback(async (date: string) => {
     if (!healthAvailable()) return;
     setHourlySteps(await readHourlySteps(date));
   }, []);
-  useEffect(() => { loadHourly(viewDate); }, [viewDate, loadHourly]);
+  useEffect(() => { loadHourly(viewDate); }, [viewDate, loadHourly, healthVer]);
+  // 「ヘルスケアと連携する」（未連携のときだけ出る唯一の入口）。以後は自動同期なので二度と出ない
   async function connectHealth() {
     if (!healthAvailable()) { setMsg({ ok: false, text: t('歩数の自動表示はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
-    if (await requestHealthAuth()) { await loadHealth(); loadHourly(viewDate); }
+    if (await linkHealth()) { await loadHealth(); loadHourly(viewDate); }
   }
   const dayOfView = healthDays?.find((d) => d.date === viewDate) ?? null;
   const stepsOfView = dayOfView?.steps ?? null;
@@ -304,7 +310,8 @@ export default function TrainingScreen() {
     if (!healthAvailable()) { setMsg({ ok: false, text: t('ヘルスケア取込はTestFlight版でのみ使えます（Expo Goでは動きません）。') }); return; }
     setHkOpen(true); setHkBusy(true); setHkMsg(''); setHkList([]);
     try {
-      if (!(await requestHealthAuth())) { setHkMsg(t('ヘルスケアへのアクセスが許可されませんでした。iOSの設定 > プライバシー > ヘルスケア から許可できます。')); return; }
+      // 連携済みならダイアログは出ない（ensureHealthAuth は未連携のときだけ初回連携を行う）
+      if (!(await ensureHealthAuth())) { setHkMsg(t('ヘルスケアへのアクセスが許可されませんでした。iOSの設定 > プライバシー > ヘルスケア から許可できます。')); return; }
       const r = await listWorkouts(30);
       if ('error' in r) { setHkMsg(r.error); return; }
       setHkList(r);
@@ -673,10 +680,13 @@ export default function TrainingScreen() {
                 <View style={s.mvLblRow}><Footprints size={13} color={C.sub} /><Text style={s.mvLbl}>{t('歩数')}</Text></View>
                 {stepsOfView != null ? (
                   <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>{stepsOfView.toLocaleString()}<Text style={s.mvUnit}> {t('歩')}</Text></Text>
-                ) : (
+                ) : healthLink === 'unlinked' ? (
+                  // 未連携のときだけ。連携済み（読み込み中・その日の歩数なし）は「—」で、ボタンは二度と出さない
                   <Pressable onPress={connectHealth} hitSlop={6}>
                     <Text style={s.mvLink}>{t('ヘルスケアと連携する')}</Text>
                   </Pressable>
+                ) : (
+                  <Text style={s.mvVal} maxFontSizeMultiplier={1.3}>—</Text>
                 )}
               </View>
             </View>
