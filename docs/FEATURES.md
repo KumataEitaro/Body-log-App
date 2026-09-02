@@ -800,7 +800,9 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 - 「今週」ブロック（B-13 ソフト週目標）: 月曜起点の今週の記録日数を「今週 4/5日」で表示＋
   月〜日の7ドット（記録日=teal塗り・未来=枠のみ・過去の未記録=薄地）。週目標達成で
   「今週の約束は守れました 🎉」の祝いトーン。目標は設定の「記録の週目標」（既定=毎日）
-- ストーリー用ステッカー作成ハブ（ストリーク/今日の食事/最新の運動/自己ベスト）＋
+- ストーリー用ステッカー作成ハブ（**自己ベストのみ**・2026-09-02 feat/law-articles で共有スコープを
+  「バッジ・筋トレ実績（PR）・体重変化グラフ」の3種に限定。ストリーク/今日の食事/最新の運動のチップは外した。
+  バッジはバッジ詳細シートと祝祭から共有。体重変化グラフのステッカーは未実装）＋
   「アプリを紹介する」（2026-09-02・feat/invite・無彩色チップ＝ステッカー作成と別種の操作）
 - バッジ30種を4カテゴリ（継続／記録／体重／運動）の見出しで区切ってグリッド表示。
   カテゴリ内は「獲得済み→未獲得」の順（集めた棚が上に来る）。
@@ -866,17 +868,47 @@ AI_LIMITS_ENABLED=false（課金眠らせ中）の間は判定ごと眠ってお
 - 新規発見の祝祭オーバーレイ（スプリング＋触覚「新しい法則を発見！」・実績ページと同じ流儀）
   →新カードはFadeInDownで先頭へ。祝祭は法則ごとに一度きり（'bl-laws-seen'）
 - 未発見はシルエット枠（「？」＋種類のヒントだけ薄く見せる）。ヘッダーに埋まり具合 n/total
-- 発見済みカードの共有アイコン→透過ステッカー（DISCOVERY・白/黒2トーン・ShareStickerのlaw型）
+- **カード全体タップ → 解説記事 /law-detail**（2026-09-02・feat/law-articles・E1b）。カードの共有アイコンは
+  外した（熊田さん: 「法則をストーリーに乗せる意味はない」。ShareStickerのlaw型も削除）
 - 王冠ゲーティング: gated('laws')のとき最新3枚だけ通常表示、4枚目以降は半透明＋👑＋
-  「スタンダードで図鑑のすべてが開きます」→タップで /paywall?src=laws。
+  「スタンダードで図鑑のすべてが開きます」。タップすると記事ページへ行き、そこで②〜⑦が
+  「スタンダードで開きます」のカード1枚に置き換わる（→ /paywall?src=law-detail）。
   課金基盤が無効なビルドでは全開放（現在の実運用）
+
+### 法則の解説記事（/law-detail・content/evidence.ts・2026-09-02 feat/law-articles）
+- docs/INSIGHTS-ENGINE.md §0（Appleヘルスケア「心肺機能」記事の7節）をそのまま採用した全画面記事。
+  遷移パラメータは kind・p（生値JSON）・at・locked。記事側は `lawText(kind,p)` で見出しを再構成するので
+  図鑑ストアの再読込が要らない（lib/laws.ts は触っていない）
+- 節構成: ①あなたのデータ（生値からの大数字＋根拠の一言。timeslot だけ帯グラフ。laws.ts は系列を返さない
+  ため数値要約のみ）②これは何を意味するか ③科学的背景（段落末に [n] の出典番号）④あなたができること
+  （チェック風3行）⑤医療機関に相談する目安（該当記事のみ・アンバー枠）⑥注意（記事固有＋共通3点:
+  相関≠因果／個人差／医療機器ではない）⑦出典（タップで expo-web-browser でPubMed/DOIを開く）。
+  節番号は表示する節だけで振る。見出し段・余白は概要詳細（changes.tsx h2Row/detailVal）と揃え、フォントは11以上
+- **エビデンス・カタログ content/evidence.ts**: `evidenceKey → LawArticle` のマップ。キーは 'kind' または
+  'kind:variant'（weekday:stable だけ専用記事。sleep_factor の long/short は1記事で両方向を扱う）。
+  既存8種ぶんを収録。出典は **WebSearchで実在を確認できた査読論文・メタ分析・公的ガイドラインのみ**
+  （PubMed/DOI/厚労省の https URL。Spiegel 2004・Greer 2013・Al Khatib 2017メタ・Haedt-Matt & Keel 2011メタ・
+  Polivy & Herman 1985・Adam & Epel 2007・Leidy 2015・Kreitzman 1992・He 2001・Orsama 2014・Racette 2008・
+  Haines 2003・Wing & Phelan 2005・Burke 2011・Byrne 2003・McHill 2017・Garaulet 2013・Vujović 2022・
+  Crispim 2011・St-Onge 2016・Iao 2021・厚労省 睡眠ガイド2023・食事摂取基準2025）。「最新の研究では」等の
+  煽りは禁止（jestで固定）。本文は長文のため t() を通さず `{ja,en}`（他言語は ja→en フォールバック＝pickL10n）
+- **未登録キーは FALLBACK_ARTICLE（準備中）**: 注意＋一般的な行動3つだけの汎用記事。並行セッション（E1a）が
+  増やす LawKind は INSIGHTS-ENGINE.md §3 末尾の表の evidenceKey で E1c に追記する
+- **リモート差し替え**: `remote_content` kind='laws_text' の行に `article`（meaning/science/actions/seeDoctor/
+  caution/sources・節ごとの部分上書き・seeDoctor:'' で同梱の目安を消す・出典は https のみ受理）を持たせると
+  上書きされる（lib/remoteContent `validateLawArticle`）。未登録 kind でもリモートに記事があれば準備中にならない
+- テスト: `src/__tests__/evidence.test.ts`（全kind/variantに記事・7節の整合・出典URLがhttpsかつ
+  PubMed/DOI/mhlw・参照が出典に含まれる・煽り禁止・フォールバック・リモート上書き）
 - B-7 Day12「最初の法則」: 記録日数（entries/logsのdistinct date）が12日に到達し、かつ
   法則が1つ以上ある状態を初検出したら、①当日21:05（過ぎていれば翌日21:05）にローカル通知を
   1回だけ予約（タップで bodylog://laws → 図鑑へ直行）②食事タブに一度きりの帯
   「あなたの最初の法則が見つかりました → 見にいく」（タップ/×で消化）。'bl-day12-done'で一度きり
 
 ## 共有ステッカー（Strava式）
-- 文字・数字・小ロゴだけの背景透過PNG（DAY STREAK/PERSONAL BEST/ACHIEVEMENT UNLOCKED/TODAY/WORKOUT/DISCOVERY〔法則〕）
+- 文字・数字・小ロゴだけの背景透過PNG。**2026-09-02（feat/law-articles）に共有スコープを「バッジ・筋トレ実績（PR）・
+  体重変化グラフ」の3種に限定**: 現在の StickerData は PERSONAL BEST（pr）と ACHIEVEMENT UNLOCKED（badge）の2種。
+  DISCOVERY〔法則〕は除外（熊田さん「法則をストーリーに乗せる意味はない」→法則は解説記事へ）、
+  DAY STREAK / TODAY / WORKOUT も同時に外した。体重変化グラフのステッカーは未実装（追って kind:'weight'）
 - 白/黒2トーン切替＋実プレビュー／クリップボードコピー（IGで長押しペースト）／写真に透過保存
 - 日付ラインとBodyLogerワードマーク刷り込み
 - **アプリ名の署名（2026-09-02・feat/invite）**: ワードマーク（○チェックの小マーク＋「BodyLoger」）を

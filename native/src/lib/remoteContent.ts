@@ -85,12 +85,29 @@ export type RemoteBadge = {
   when: BadgeCondition | BadgeCondition[];
 };
 
+/** 解説記事の出典1件（content/evidence.ts の EvidenceSource と同じ形。url は https のみ受け付ける） */
+export type RemoteEvidenceSource = { authors: string; title: string; journal: string; year: number; url: string };
+
+/**
+ * 法則の解説記事（law-detail・E1b）のリモート差し替え。節ごとに部分上書きできる
+ * （無い節は同梱のまま）。science の refs は **この記事の sources の1始まりの番号**
+ */
+export type RemoteLawArticle = {
+  meaning?: L10n;                                   // ②これは何を意味するか
+  science?: { text: L10n; refs?: number[] }[];      // ③科学的背景（段落＋出典番号）
+  actions?: L10n[];                                 // ④できること（3つ）
+  seeDoctor?: L10n;                                 // ⑤受診の目安（空文字で「同梱の目安を消す」）
+  caution?: L10n;                                   // ⑥記事固有の注意
+  sources?: RemoteEvidenceSource[];                 // ⑦出典
+};
+
 /** 法則の文言1件。id は 'kind' または 'kind:variant'（weekday:stable / sleep_factor:long 等） */
 export type RemoteLawText = {
   id: string;
   title?: L10n;                  // 発見文。{food} {kg} {n} {d} {kcal} {x} {lift} {pct} {days} {binges} {min} {late} {off} を差し込める
   sub?: L10n;                    // 根拠の一言
   hint?: L10n;                   // 未発見シルエットのヒント（variant無しのidにだけ効く）
+  article?: RemoteLawArticle;    // 解説記事（law-detail）。id は evidenceKey（'kind' または 'kind:variant'）
 };
 
 /** remote_content の1行 */
@@ -216,8 +233,46 @@ export function validateLawText(x: unknown): RemoteLawText | null {
   if (isL10n(o.title)) out.title = o.title as L10n;
   if (isL10n(o.sub)) out.sub = o.sub as L10n;
   if (isL10n(o.hint)) out.hint = o.hint as L10n;
-  if (!out.title && !out.sub && !out.hint) return null;
+  const article = validateLawArticle(o.article);
+  if (article) out.article = article;
+  if (!out.title && !out.sub && !out.hint && !out.article) return null;
   return out;
+}
+
+/** 解説記事の検証。解釈できる節だけ残し、1節も無ければ null。出典は https の URL を持つものだけ */
+export function validateLawArticle(x: unknown): RemoteLawArticle | null {
+  if (typeof x !== 'object' || x == null) return null;
+  const o = x as Record<string, unknown>;
+  const out: RemoteLawArticle = {};
+  if (isL10n(o.meaning)) out.meaning = o.meaning as L10n;
+  if (Array.isArray(o.science)) {
+    const paras = o.science.flatMap((p) => {
+      if (typeof p !== 'object' || p == null) return [];
+      const q = p as Record<string, unknown>;
+      if (!isL10n(q.text)) return [];
+      const refs = Array.isArray(q.refs) ? q.refs.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1) : [];
+      return [{ text: q.text as L10n, refs }];
+    });
+    if (paras.length > 0) out.science = paras;
+  }
+  if (Array.isArray(o.actions)) {
+    const acts = o.actions.filter(isL10n) as L10n[];
+    if (acts.length > 0) out.actions = acts;
+  }
+  // seeDoctor は空文字も「同梱の目安を消す」意図として通す（isL10nは空文字を弾くため別扱い）
+  if (o.seeDoctor === '' || isL10n(o.seeDoctor)) out.seeDoctor = o.seeDoctor as L10n;
+  if (isL10n(o.caution)) out.caution = o.caution as L10n;
+  if (Array.isArray(o.sources)) {
+    const srcs = o.sources.flatMap((r) => {
+      if (typeof r !== 'object' || r == null) return [];
+      const q = r as Record<string, unknown>;
+      if (!isStr(q.authors) || !isStr(q.title) || !isStr(q.journal) || !isStr(q.url) || typeof q.year !== 'number') return [];
+      if (!/^https:\/\//.test(q.url)) return [];
+      return [{ authors: q.authors, title: q.title, journal: q.journal, year: q.year, url: q.url }];
+    });
+    if (srcs.length > 0) out.sources = srcs;
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /**

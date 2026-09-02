@@ -10,19 +10,20 @@ import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { Flame } from 'lucide-react-native';
 import { badgeIconOf } from '@/components/BadgeIcon';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
-// ステッカーに載せる内容（種類ごとに1画面で完結する最小の情報だけ）
+// ステッカーに載せる内容（種類ごとに1画面で完結する最小の情報だけ）。
+// 共有スコープは **バッジ・筋トレ実績（自己ベスト）・体重変化グラフ** の3種に限定
+// （docs/INSIGHTS-ENGINE.md §5・2026-09-02）。
+//  ・'law'（法則）は除外: 熊田さん「法則をストーリーに乗せる意味はない」。法則はカードをタップして
+//    解説記事（app/law-detail.tsx）で「健康への視座と科学的裏付け」を読むものになった
+//  ・'streak' / 'today' / 'workout' も同時に外した: 「見せて自慢する」対象を実績（バッジ・PR）に絞る
+//  ・体重変化グラフのステッカーは未実装（追って kind:'weight' として追加する）
 export type StickerData =
-  | { kind: 'streak'; days: number }
   | { kind: 'pr'; name: string; kg: number; date: string }
-  | { kind: 'today'; kcal: number; left: number; p: number; f: number; c: number }
-  | { kind: 'workout'; label: string; kcal: number; minutes: number; km?: number | null }
-  | { kind: 'badge'; id: string; name: string }
-  | { kind: 'law'; title: string; sub: string };
+  | { kind: 'badge'; id: string; name: string };
 
 type Tone = 'light' | 'dark'; // light=白文字（暗い写真用） dark=黒文字（明るい写真用）
 
@@ -55,15 +56,6 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
   return (
     <View style={{ alignItems: 'center', paddingVertical: 12, paddingHorizontal: 18 }}>
       <Text style={[st.dateLine, { color: toneSub(tone) }]}>{dateLine}</Text>
-      {data.kind === 'streak' && (
-        <>
-          <Flame size={44} color={col} fill={col} />
-          <Stat label="" value={String(data.days)} unit="" tone={tone} big />
-          <Text style={[st.label, { color: col, marginTop: -4 }]}>DAY STREAK</Text>
-          <Rule tone={tone} />
-          <Text style={[st.tagline, { color: toneSub(tone) }]}>{t('毎日の記録、続いてます')}</Text>
-        </>
-      )}
       {data.kind === 'pr' && (
         <>
           <Text style={[st.label, { color: toneSub(tone) }]}>PERSONAL BEST</Text>
@@ -78,38 +70,6 @@ function StickerBody({ data, tone }: { data: StickerData; tone: Tone }) {
           <Text style={[st.prName, { color: col, marginTop: 4 }]}>{data.name}</Text>
           <Rule tone={tone} />
           <Text style={[st.label, { color: toneSub(tone) }]}>ACHIEVEMENT UNLOCKED</Text>
-        </>
-      )}
-      {data.kind === 'today' && (
-        <>
-          <Text style={[st.label, { color: toneSub(tone) }]}>TODAY</Text>
-          <Stat label={t('摂取')} value={data.kcal.toLocaleString()} unit="kcal" tone={tone} big />
-          <View style={{ flexDirection: 'row', gap: 18 }}>
-            <Stat label="P" value={`${Math.round(data.p)}g`} tone={tone} />
-            <Stat label="F" value={`${Math.round(data.f)}g`} tone={tone} />
-            <Stat label="C" value={`${Math.round(data.c)}g`} tone={tone} />
-          </View>
-          {data.left > 0 && <Text style={[st.label, { color: toneSub(tone) }]}>{t('あと{n}kcal 食べられる', { n: data.left.toLocaleString() })}</Text>}
-        </>
-      )}
-      {data.kind === 'workout' && (
-        <>
-          <Text style={[st.label, { color: toneSub(tone) }]}>WORKOUT</Text>
-          <Text style={[st.prName, { color: col }]}>{data.label}</Text>
-          <View style={{ flexDirection: 'row', gap: 18 }}>
-            {data.km != null && data.km > 0 && <Stat label={t('距離')} value={data.km.toFixed(2)} unit="km" tone={tone} big />}
-            <Stat label={t('消費')} value={data.kcal.toLocaleString()} unit="kcal" tone={tone} big={data.km == null || data.km <= 0} />
-          </View>
-          <Stat label={t('時間')} value={`${data.minutes}`} unit={t('分')} tone={tone} />
-        </>
-      )}
-      {data.kind === 'law' && (
-        <>
-          {/* 法則図鑑（B-6）: 発見文そのものが主役。数字の大写しではなく文章を中央に置く */}
-          <Text style={[st.label, { color: toneSub(tone) }]}>DISCOVERY</Text>
-          <Text style={[st.lawTitle, { color: col }]}>{data.title}</Text>
-          <Rule tone={tone} />
-          <Text style={[st.tagline, { color: toneSub(tone) }]}>{data.sub}</Text>
         </>
       )}
       {/* アプリ名の署名（feat/invite）。
@@ -225,8 +185,6 @@ const st = themed(() => ({
   unit: { fontSize: 14, fontWeight: '700' },
   tagline: { fontSize: 11.5, fontWeight: '600' },
   prName: { fontSize: 19, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
-  // 法則ステッカー: 文章が主役なので折り返し前提の中央寄せ（幅は写真に載せて邪魔にならない程度）
-  lawTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', lineHeight: 24, maxWidth: 240, marginTop: 6 },
   newPill: { backgroundColor: '#ff4d42', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4 },
   newPillT: { fontSize: 10.5, fontWeight: '900', color: '#fff', letterSpacing: 2.5 },
   // 署名（右下の落款）。alignSelf:'flex-end' で本文の中央寄せを崩さずに右へ寄せる
