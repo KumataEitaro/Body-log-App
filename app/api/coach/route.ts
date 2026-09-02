@@ -48,6 +48,11 @@ export async function POST(req: Request) {
   const sleep: { date: string; min: number }[] = Array.isArray(bodyRaw.sleep)
     ? bodyRaw.sleep.filter((s: { date?: unknown; min?: unknown }) => typeof s?.date === 'string' && typeof s?.min === 'number' && s.min > 0).slice(0, 7)
     : [];
+  // インサイト・エンジン §6（native/src/lib/laws.ts coachInsightsBlock）: 端末内で見つけた「本人の法則」の上位3件と
+  // 直近7日の特徴量サマリ。端末内分析なのでクライアントが添えてくる。制御文字を落として600字で切る（プロンプト肥大の防止）
+  const insights = typeof (bodyRaw as { insights?: unknown }).insights === 'string'
+    ? String((bodyRaw as { insights: string }).insights).replace(/[^\S\n]+/g, ' ').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim().slice(0, 600)
+    : '';
 
   // セッションID（native生成のUUID）。同じIDの間は「ひと続きの相談」＝往復しても消費しない
   const sessionIdRaw = String((bodyRaw as { sessionId?: unknown }).sessionId ?? '').trim().toLowerCase();
@@ -200,7 +205,10 @@ export async function POST(req: Request) {
     (sleep.length > 0
       ? `睡眠(ヘルスケア実測): ${sleep.map((s) => `${s.date.slice(5)}=${Math.round(s.min / 6) / 10}h`).join(' ')}（平均${Math.round(sleep.reduce((a, s) => a + s.min, 0) / sleep.length / 6) / 10}h）\n`
       : '睡眠: データなし\n') +
-    `直近7日の日別:\n${dayLines || '（記録なし）'}`;
+    `直近7日の日別:\n${dayLines || '（記録なし）'}` +
+    // 本人の法則（端末内分析）。コーチはこれを引いて答える（例:「睡眠不足が5時間たまると翌日に食べすぎる傾向があるので…」）。
+    // 相関であって因果ではない旨は見出しに含めてある（断定・診断の口調にさせない）
+    (insights ? `\n${insights}` : '');
 
   const historyBlock = history.length
     ? '\n【これまでの会話】\n' + history.map((h) => `${h.role === 'user' ? '本人' : 'コーチ'}: ${String(h.text).slice(0, 200)}`).join('\n')

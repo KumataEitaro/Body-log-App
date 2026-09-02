@@ -23,6 +23,9 @@ import { hadComeback } from './achievements';
 import { slotOf } from './itemLog';
 import { healthAvailable, readActivitySummary } from './health';
 import { weekdayRhythm } from '@/components/WeekdayHeatmapCard';
+import { buildDayFeatures, readCachedDayFeatures, summarizeRecent, type DayFeature } from './features';
+import { mineRules, riskRatio, conditionLabel, MIN_DAYS as ENGINE_MIN_DAYS } from './correlate';
+import { PROTEIN_PER_KG_DEFAULT } from './goal';
 
 // ===== 型 =====
 
@@ -35,7 +38,17 @@ export type LawKind =
   | 'timeslot'       // 食べる時間帯の偏り（夜シェア・slotOf）
   | 'recover'        // お守り: 食べすぎ後に体重が戻るまでの日数（analyzeBinge.after）
   | 'comeback'       // 復帰パターン: 途切れてもまた30日つないだ（hadComeback）
-  | 'sleep_factor';  // 21時以降に食べた日は当夜の睡眠が短い/長い（B-14b・HealthKitの睡眠×食事時刻）
+  | 'sleep_factor'   // 21時以降に食べた日は当夜の睡眠が短い/長い（B-14b・HealthKitの睡眠×食事時刻）
+  // ---- インサイト・エンジン（docs/INSIGHTS-ENGINE.md §3・lib/features.ts の日次特徴量 × lib/correlate.ts）----
+  | 'sleep_debt_binge'    // 睡眠負債5h以上の日〜翌日に食べすぎが◯倍（リスク比）
+  | 'mood_lag_binge'      // 気分3日平均が低い日の k日後に食べすぎが◯倍（ラグ1〜3のリスク比・最大のもの）
+  | 'wheat_vs_rice_mood'  // 小麦中心の日 vs 米中心の日で翌日の気分が◯違う
+  | 'salmon_master'       // 30日でサーモン◯g（週◯回）— 良い面と多様性の視座
+  | 'chicken_heavy'       // 30日で鶏肉◯kg・魚が少ない — たんぱく源の偏り（病名は出さない）
+  | 'lift_sleep'          // 7h以上寝た日のトレはボリューム±◯%
+  | 'lift_protein_pr'     // たんぱく質が目標に届いた週は自己ベスト更新が◯倍
+  | 'lift_mood'           // トレした日の気分は平均±◯
+  | 'multi_binge';        // 多要素ルール（mineRules 上位3件を動的に法則化。id は因子の組で決定的）
 
 // 文章生成に使う生値（数値・食材名など）。翻訳せずにこのまま保存する
 export type LawParams = Record<string, string | number>;
@@ -60,10 +73,34 @@ export type LawInput = {
   // 日別の睡眠時間（HealthKit readActivitySummary由来・「起きた日」に計上）。
   // entriesに睡眠列は無いためHealthKitが唯一のソース。hk無し環境では未指定/空＝sleep_factorはスキップ
   sleepDays?: { date: string; sleepH: number }[];
+  // 日次特徴量（lib/features.ts・昇順・密）。エンジン系の法則はこれだけを見る。未指定/14日未満ならスキップ
+  features?: DayFeature[];
+  // たんぱく質目標（体重1kgあたりg。goals.protein_per_kg。未指定なら既定2.0）— lift_protein_pr の「目標」
+  proteinPerKg?: number | null;
 };
 
 // 図鑑の「未発見枠」を出すための全種類リスト（表示順）
-export const LAW_KINDS: LawKind[] = ['food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback', 'sleep_factor'];
+export const LAW_KINDS: LawKind[] = [
+  'food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback', 'sleep_factor',
+  'sleep_debt_binge', 'mood_lag_binge', 'multi_binge', 'wheat_vs_rice_mood', 'lift_sleep', 'lift_protein_pr', 'lift_mood',
+  'salmon_master', 'chicken_heavy',
+];
+
+// ===== エンジン系の閾値（correlate.ts の安全弁に加えて、法則として口に出す最低ライン） =====
+const ENGINE_MIN_LIFT = 1.5;        // 「◯倍起きやすい」は1.5倍以上のときだけ（bingeAnalysis の1.4よりわずかに厳しく）
+const ENGINE_MIN_GROUP = 4;         // リスク比の両群の最低日数
+const MOOD_GROUP_MIN = 5;           // 気分の群比較: 各群5日以上
+const MOOD_MIN_DIFF = 0.5;          // 気分差（5段階）0.5未満は法則と呼ばない
+const LIFT_MOOD_MIN_DIFF = 0.4;     // トレ日の気分差は0.4以上（トレ効果は文献上も小〜中程度なので少し緩く）
+const LIFT_GROUP_MIN = 4;           // トレ日の群比較: 各群4日以上
+const LIFT_VOL_MIN_PCT = 10;        // ボリューム差10%未満は日々の揺れ
+const SALMON_MIN_DAYS = 4;          // 30日で4日以上（週1回相当）食べていれば「サーモン好き」
+const CHICKEN_HEAVY_G = 2000;       // 30日で2kg以上（≒毎日70g）
+const CHICKEN_FISH_RATIO = 0.25;    // かつ魚が鶏の1/4未満なら「偏り」
+const PR_WEEKS_MIN = 6;             // 週単位の比較は6週以上のトレ週があるときだけ
+const PR_GROUP_MIN = 2;             // 各群2週以上
+const PROTEIN_MET_RATIO = 0.9;      // 「目標に届いた」＝週平均が目標の9割以上（毎日ぴったりは現実的でない）
+const MULTI_TOP = 3;                // 多要素ルールは上位3件まで図鑑に載せる
 
 const STORE_KEY = 'bl-laws';         // { [id]: { at, kind, p } } 一度見つけた法則の永続化
 const SEEN_KEY = 'bl-laws-seen';     // string[] 祝祭を見せ終わったid（freshの判定に使う）
@@ -95,6 +132,9 @@ const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
 export function lawVariant(kind: LawKind, p: LawParams): string {
   if (kind === 'weekday') return p.d === 'stable' ? 'stable' : 'default';
   if (kind === 'sleep_factor') return p.dir === 'long' ? 'long' : 'short';
+  // エンジン系で向きのある種類: wheat_vs_rice_mood → 'wheat_low' | 'rice_low'、lift_sleep / lift_mood → 'up' | 'down'
+  if (kind === 'wheat_vs_rice_mood') return p.dir === 'rice_low' ? 'rice_low' : 'wheat_low';
+  if (kind === 'lift_sleep' || kind === 'lift_mood') return p.dir === 'down' ? 'down' : 'up';
   return 'default';
 }
 
@@ -116,7 +156,13 @@ export function lawVars(kind: LawKind, p: LawParams): Record<string, string> {
   if (kind === 'weekday' && p.d !== 'stable' && p.d != null) vars.d = t(DOW_JA[Number(p.d)] ?? '');
   if (kind === 'weekday' && p.kcal != null) vars.kcal = Number(p.kcal).toLocaleString();
   if (kind === 'binge_trigger' && p.label != null) vars.x = t(String(p.label));
+  // 多要素ルール: 因子キー 'a+b' → 「ラベル」「ラベル」（correlate.conditionLabel で現在の言語に）
+  if (kind === 'multi_binge' && p.f != null) vars.a = multiFactorText(String(p.f));
   return vars;
+}
+
+function multiFactorText(f: string): string {
+  return f.split('+').filter(Boolean).map((k) => `「${conditionLabel(k)}」`).join('');
 }
 
 /** {k} を差し込む（t()の変数展開と同じ規則。未知の {k} はそのまま残す） */
@@ -143,6 +189,15 @@ function lawKindHintBuiltin(kind: LawKind): string {
     case 'recover': return t('立ち直りの早さのこと');
     case 'comeback': return t('途切れたあとのこと');
     case 'sleep_factor': return t('夜食と睡眠のこと');
+    case 'sleep_debt_binge': return t('睡眠不足と食べすぎのこと');
+    case 'mood_lag_binge': return t('気分の波と食べすぎのこと');
+    case 'wheat_vs_rice_mood': return t('主食と翌日の気分のこと');
+    case 'salmon_master': return t('よく食べる魚のこと');
+    case 'chicken_heavy': return t('たんぱく源のバランスのこと');
+    case 'lift_sleep': return t('睡眠とトレの手応えのこと');
+    case 'lift_protein_pr': return t('たんぱく質と自己ベストのこと');
+    case 'lift_mood': return t('トレと気分のこと');
+    case 'multi_binge': return t('いくつかの条件が重なる日のこと');
   }
 }
 
@@ -206,6 +261,59 @@ function lawTextBuiltin(kind: LawKind, p: LawParams): { title: string; sub: stri
           ? t('あなたは21時以降に食べた日、睡眠が平均{n}分長い', { n: Number(p.min) })
           : t('あなたは21時以降に食べた日、睡眠が平均{n}分短い', { n: Number(p.min) }),
         sub: t('食べた日{a}日・食べなかった日{b}日の睡眠から', { a: Number(p.late), b: Number(p.off) }),
+      };
+    // ---- インサイト・エンジン（§3）。文言は「〜のとき〜が起きやすい」。断定・因果・診断の語は使わない ----
+    case 'sleep_debt_binge':
+      return {
+        title: t('あなたは睡眠不足が5時間たまると、その日から翌日にかけて食べすぎが{x}倍起きやすい', { x: String(p.x) }),
+        sub: t('睡眠データのある{n}日の傾向から（該当{h}日）', { n: Number(p.n), h: Number(p.h) }),
+      };
+    case 'mood_lag_binge':
+      return {
+        title: t('あなたは気分が3日つづけて落ちると、{k}日後に食べすぎが{x}倍起きやすい', { k: Number(p.k), x: String(p.x) }),
+        sub: t('気分と食事の記録{n}日ぶんの傾向から', { n: Number(p.n) }),
+      };
+    case 'wheat_vs_rice_mood':
+      return {
+        title: p.dir === 'rice_low'
+          ? t('あなたは米中心の日の翌日、気分が平均{d}低い（小麦中心の日と比べて）', { d: String(p.d) })
+          : t('あなたは小麦中心の日の翌日、気分が平均{d}低い（米中心の日と比べて）', { d: String(p.d) }),
+        sub: t('小麦中心{a}日・米中心{b}日の翌日の気分から', { a: Number(p.a), b: Number(p.b) }),
+      };
+    case 'salmon_master':
+      return {
+        title: t('あなたはこの30日でサーモンを約{g}g（週{w}回）食べている', { g: Number(p.g).toLocaleString(), w: String(p.w) }),
+        sub: t('オメガ3の摂り方として良い流れ。魚の種類を変えると栄養の幅も広がる'),
+      };
+    case 'chicken_heavy':
+      // 病名・プリン体の話はここでは出さない（詳細記事側 E1b に委ねる）
+      return {
+        title: t('あなたはこの30日で鶏肉を約{kg}kg食べている', { kg: String(p.kg) }),
+        sub: t('たんぱく源が偏っています。魚・卵・大豆も混ぜると栄養の幅が広がります'),
+      };
+    case 'lift_sleep':
+      return {
+        title: p.dir === 'down'
+          ? t('あなたは7時間以上寝た日のトレは、ボリュームが平均{pct}%少ない', { pct: Number(p.pct) })
+          : t('あなたは7時間以上寝た日のトレは、ボリュームが平均{pct}%多い', { pct: Number(p.pct) }),
+        sub: t('7時間以上の日{a}回・未満の日{b}回のトレから', { a: Number(p.a), b: Number(p.b) }),
+      };
+    case 'lift_protein_pr':
+      return {
+        title: t('あなたはたんぱく質が目標に届いた週、自己ベスト更新が{x}倍起きやすい', { x: String(p.x) }),
+        sub: t('トレした{n}週の記録から（目標の9割以上を「届いた」と数える）', { n: Number(p.n) }),
+      };
+    case 'lift_mood':
+      return {
+        title: p.dir === 'down'
+          ? t('あなたはトレした日の気分が、平均{d}低い', { d: String(p.d) })
+          : t('あなたはトレした日の気分が、平均{d}高い', { d: String(p.d) }),
+        sub: t('トレした日{a}日・しなかった日{b}日の気分から', { a: Number(p.a), b: Number(p.b) }),
+      };
+    case 'multi_binge':
+      return {
+        title: t('あなたは{a}がそろった日、食べすぎが{x}倍起きやすい', { a: multiFactorText(String(p.f)), x: String(p.x) }),
+        sub: t('該当{h}日を含む{n}日の記録から（相関であり、原因とは限りません）', { h: Number(p.h), n: Number(p.n) }),
       };
   }
 }
@@ -319,7 +427,163 @@ export function detectLaws(input: LawInput): Law[] {
     }
   } catch { /* 同上 */ }
 
+  // --- インサイト・エンジン（§3）。日次特徴量が14日以上あるときだけ ---
+  try {
+    if (input.features && input.features.length >= ENGINE_MIN_DAYS) {
+      out.push(...detectEngineLaws(input.features, today, input.proteinPerKg ?? PROTEIN_PER_KG_DEFAULT));
+    }
+  } catch { /* 同上 */ }
+
   return out;
+}
+
+// ===== インサイト・エンジン系の検出（純関数・テスト対象） =====
+
+const avgOf = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/**
+ * 日次特徴量から §3 の法則を検出する。features は昇順・密（features.ts が保証）。
+ * それぞれの採択基準は correlate.ts の安全弁（n≥14・両群≥4）に加えて、上の ENGINE_* 定数。
+ */
+export function detectEngineLaws(features: DayFeature[], today: string, proteinPerKg: number): Law[] {
+  const out: Law[] = [];
+  const f = features;
+  const n = f.length;
+
+  // --- sleep_debt_binge: 睡眠負債≥5h の日 t について、t または t+1 に食べすぎ ---
+  // 「起きた日」に睡眠が計上されるので、負債が5hに達した朝から2日間を結果の窓にする。
+  // 結果が分からない（摂取未記録）日は除外。両群≥4日・リスク比≥1.5
+  try {
+    const rr = riskRatio(f,
+      (d) => (d.sleep_debt5 == null ? null : d.sleep_debt5 >= 5),
+      (d, i) => {
+        const nx = f[i + 1];
+        if (d.intake == null && (nx == null || nx.intake == null)) return null;
+        return d.binge || (nx != null && nx.binge);
+      }, ENGINE_MIN_GROUP);
+    if (rr && rr.withHits >= 2 && rr.rr >= ENGINE_MIN_LIFT) {
+      out.push(makeLaw('sleep_debt_binge', 'sleep_debt_binge', { x: r1(rr.rr), n: rr.n, h: rr.withHits }, today));
+    }
+  } catch { /* ベストエフォート */ }
+
+  // --- mood_lag_binge: 気分3日平均≤2.5 の k日後（k=1..3）に食べすぎ。最も倍率の高い k を採る ---
+  try {
+    let best: { k: number; rr: number; n: number; hits: number } | null = null;
+    for (let k = 1; k <= 3; k++) {
+      const rr = riskRatio(f,
+        (_d, i) => { const p = f[i - k]; return p?.mood_avg3 == null ? null : p.mood_avg3 <= 2.5; },
+        (d) => (d.intake == null ? null : d.binge), ENGINE_MIN_GROUP);
+      if (rr && rr.withHits >= 2 && rr.rr >= ENGINE_MIN_LIFT && (!best || rr.rr > best.rr)) best = { k, rr: rr.rr, n: rr.n, hits: rr.withHits };
+    }
+    if (best) out.push(makeLaw('mood_lag_binge', 'mood_lag_binge', { k: best.k, x: r1(best.rr), n: best.n }, today));
+  } catch { /* 同上 */ }
+
+  // --- wheat_vs_rice_mood: 小麦中心の日 vs 米中心の日で、翌日の気分を比べる ---
+  // 中心＝その主食が100g以上で、もう一方より多い。翌日に気分の記録がある日だけ。各群≥5日・差≥0.5
+  try {
+    const wheat: number[] = []; const rice: number[] = [];
+    for (let i = 0; i + 1 < n; i++) {
+      const d = f[i]; const nx = f[i + 1];
+      if (!d.recorded || nx.mood == null) continue;
+      if (d.wheat_g >= 100 && d.wheat_g > d.rice_g) wheat.push(nx.mood);
+      else if (d.rice_g >= 100 && d.rice_g > d.wheat_g) rice.push(nx.mood);
+    }
+    if (wheat.length >= MOOD_GROUP_MIN && rice.length >= MOOD_GROUP_MIN) {
+      const diff = avgOf(rice) - avgOf(wheat);   // 正＝小麦の日のほうが低い
+      if (Math.abs(diff) >= MOOD_MIN_DIFF) {
+        out.push(makeLaw('wheat_vs_rice_mood', 'wheat_vs_rice_mood',
+          { dir: diff > 0 ? 'wheat_low' : 'rice_low', d: r1(Math.abs(diff)), a: wheat.length, b: rice.length }, today));
+      }
+    }
+  } catch { /* 同上 */ }
+
+  // --- salmon_master / chicken_heavy: 直近30日の食材合計 ---
+  try {
+    const last30 = f.slice(-30);
+    const salmonDays = last30.filter((d) => d.salmon_g > 0).length;
+    const salmonG = last30.reduce((a, d) => a + d.salmon_g, 0);
+    if (salmonDays >= SALMON_MIN_DAYS) {
+      out.push(makeLaw('salmon_master', 'salmon_master', { g: Math.round(salmonG / 10) * 10, w: r1(salmonDays / (last30.length / 7)), days: salmonDays }, today));
+    }
+    const chickenG = last30.reduce((a, d) => a + d.chicken_g, 0);
+    const fishG = last30.reduce((a, d) => a + d.fish_g, 0);
+    if (chickenG >= CHICKEN_HEAVY_G && fishG < chickenG * CHICKEN_FISH_RATIO) {
+      out.push(makeLaw('chicken_heavy', 'chicken_heavy', { kg: r1(chickenG / 1000), g: Math.round(chickenG), fish: Math.round(fishG) }, today));
+    }
+  } catch { /* 同上 */ }
+
+  // --- lift_sleep: トレした日を「その朝の睡眠≥7h」で分け、ボリュームの平均を比べる。各群≥4回・差≥10% ---
+  try {
+    const good: number[] = []; const short: number[] = [];
+    for (const d of f) {
+      if (d.lift_sessions === 0 || d.sleep_h == null || d.lift_volume_kg <= 0) continue;
+      (d.sleep_h >= 7 ? good : short).push(d.lift_volume_kg);
+    }
+    if (good.length >= LIFT_GROUP_MIN && short.length >= LIFT_GROUP_MIN) {
+      const pct = Math.round(((avgOf(good) - avgOf(short)) / avgOf(short)) * 100);
+      if (Math.abs(pct) >= LIFT_VOL_MIN_PCT) {
+        out.push(makeLaw('lift_sleep', 'lift_sleep', { dir: pct < 0 ? 'down' : 'up', pct: Math.abs(pct), a: good.length, b: short.length }, today));
+      }
+    }
+  } catch { /* 同上 */ }
+
+  // --- lift_protein_pr: 週ごとに「たんぱく質の週平均 ≥ 目標×0.9」と「その週に自己ベスト更新があった」を比べる ---
+  // 目標＝直近の体重 × proteinPerKg（goals.protein_per_kg・既定2.0）。トレした週だけ数える。週≥6・各群≥2
+  try {
+    const weeks = new Map<string, { p: number[]; lift: boolean; pr: boolean; w: number | null }>();
+    let lastW: number | null = null;
+    for (const d of f) {
+      if (d.weight != null) lastW = d.weight;
+      const wk = weekStartOf(d.date);
+      const b = weeks.get(wk) ?? { p: [], lift: false, pr: false, w: null };
+      if (d.protein_g != null && d.protein_g > 0) b.p.push(d.protein_g);
+      if (d.lift_sessions > 0) b.lift = true;
+      if (d.pr) b.pr = true;
+      b.w = lastW;
+      weeks.set(wk, b);
+    }
+    const rows = [...weeks.values()].filter((w) => w.lift && w.p.length >= 3 && w.w != null);
+    if (rows.length >= PR_WEEKS_MIN) {
+      const rr = riskRatio(rows, (w) => avgOf(w.p) >= (w.w as number) * proteinPerKg * PROTEIN_MET_RATIO, (w) => w.pr, PR_GROUP_MIN);
+      if (rr && rr.withHits >= 2 && rr.rr >= ENGINE_MIN_LIFT) {
+        out.push(makeLaw('lift_protein_pr', 'lift_protein_pr', { x: r1(rr.rr), n: rr.n }, today));
+      }
+    }
+  } catch { /* 同上 */ }
+
+  // --- lift_mood: トレした日 vs しなかった日（記録がある日）の気分。各群≥5日・差≥0.4 ---
+  try {
+    const on: number[] = []; const off: number[] = [];
+    for (const d of f) {
+      if (!d.recorded || d.mood == null) continue;
+      (d.lift_sessions > 0 ? on : off).push(d.mood);
+    }
+    if (on.length >= MOOD_GROUP_MIN && off.length >= MOOD_GROUP_MIN) {
+      const diff = avgOf(on) - avgOf(off);
+      if (Math.abs(diff) >= LIFT_MOOD_MIN_DIFF) {
+        out.push(makeLaw('lift_mood', 'lift_mood', { dir: diff < 0 ? 'down' : 'up', d: r1(Math.abs(diff)), a: on.length, b: off.length }, today));
+      }
+    }
+  } catch { /* 同上 */ }
+
+  // --- multi_binge: 多要素ルールの上位3件（correlate.mineRules・事前に分かる条件だけ）。id は因子の組で決定的 ---
+  try {
+    const rules = mineRules(f, 'binge', { minSupport: 6, minLift: ENGINE_MIN_LIFT, maxFactors: 3, top: MULTI_TOP })
+      .filter((r) => r.factors.length >= 2);   // 単独因子は sleep_debt_binge 等の専用法則に任せる
+    for (const r of rules) {
+      const key = r.factors.join('+');
+      out.push(makeLaw(`multi_binge:${key}`, 'multi_binge', { f: key, x: r1(r.effect), n: r.n, h: r.hits ?? 0 }, today));
+    }
+  } catch { /* 同上 */ }
+
+  return out;
+}
+
+// 週の起点（月曜）。trend.ts / changes.tsx と同じ定義
+function weekStartOf(d: string): string {
+  const dt = new Date(d + 'T00:00:00');
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 // ===== 永続化（一度見つけた法則は消えても図鑑に残る） =====
@@ -451,13 +715,66 @@ async function fetchLawInput(): Promise<LawInput | null> {
     }
   } catch { /* 睡眠はベストエフォート */ }
 
+  // 日次特徴量（エンジン系の法則用）。15分キャッシュがあるので、ここでの読取はふだん増えない。
+  // たんぱく質目標は goals.protein_per_kg（列が無い/未設定なら既定2.0）
+  let features: DayFeature[] | undefined;
+  let proteinPerKg: number | null = null;
+  try {
+    const [feat, goalRes] = await Promise.all([
+      buildDayFeatures(90),
+      supabase.from('goals').select('protein_per_kg').maybeSingle(),
+    ]);
+    features = feat.length > 0 ? feat : undefined;
+    const g = goalRes.data as { protein_per_kg?: number | null } | null;
+    proteinPerKg = g?.protein_per_kg != null && Number(g.protein_per_kg) > 0 ? Number(g.protein_per_kg) : null;
+  } catch { /* 特徴量はベストエフォート（無ければエンジン系の法則だけ出ない） */ }
+
   return {
     today, days,
     itemDays: buildItemDays(logs.map((r) => ({ date: r.date, items: r.items }))),
     weights, itemHours,
     recordedDates: [...recorded].sort(),
     sleepDays,
+    features, proteinPerKg,
   };
+}
+
+// ===== §6 AI相談への注入（coach.tsx → /api/coach の dataBlock 末尾） =====
+
+const COACH_BLOCK_MAX = 600;   // 文字数上限（プロンプトを太らせない）
+
+/**
+ * 「見つかっている法則の上位3件（文言）＋直近7日の特徴量サマリ」を1つのテキストにする。
+ * サーバ側の dataBlock は日本語で組まれているので、ここも見出しは日本語固定（コーチが読む文書であり UI ではない）。
+ * 法則の title は表示言語で組まれる（コーチはその言語で答えるので齟齬は出ない）。
+ * 通信も HealthKit も触らない（相談の送信を遅くしない）。キャッシュが無ければ法則だけ、それも無ければ空文字
+ */
+export async function coachInsightsBlock(): Promise<string> {
+  const lines: string[] = [];
+  try {
+    const store = await readStore();
+    const top = Object.entries(store).sort((a, b) => (a[1].at > b[1].at ? -1 : 1)).slice(0, 3);
+    if (top.length > 0) {
+      lines.push('【本人の法則（端末内の相関分析・因果ではない）】');
+      for (const [, v] of top) lines.push('・' + lawText(v.kind, v.p).title);
+    }
+  } catch { /* 図鑑が読めなければ法則は省く */ }
+  try {
+    const rows = await readCachedDayFeatures();
+    if (rows.length > 0) {
+      const s = summarizeRecent(rows, 7);
+      const parts: string[] = [];
+      if (s.sleepAvg != null) parts.push(`睡眠平均${s.sleepAvg}h`);
+      if (s.moodAvg != null) parts.push(`気分平均${s.moodAvg}/5`);
+      if (s.stepsAvg != null) parts.push(`歩数平均${s.stepsAvg.toLocaleString()}`);
+      parts.push(`目安超過${s.overDays}日`);
+      if (s.bingeDays > 0) parts.push(`食べすぎ${s.bingeDays}日`);
+      if (s.liftDays > 0) parts.push(`トレ${s.liftDays}日`);
+      lines.push(`直近7日の特徴量: ${parts.join('・')}（記録${s.recordedDays}/${s.days}日）`);
+    }
+  } catch { /* サマリ無しでも法則だけ渡す */ }
+  const text = lines.join('\n');
+  return text.length > COACH_BLOCK_MAX ? text.slice(0, COACH_BLOCK_MAX - 1) + '…' : text;
 }
 
 /**
