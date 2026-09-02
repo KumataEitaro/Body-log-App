@@ -136,6 +136,12 @@ workflows:
           ENT="native/ios/BodyLog/BodyLog.entitlements"
           if [ -f "$ENT" ]; then
             plutil -remove aps-environment "$ENT" 2>/dev/null && echo "aps-environment removed" || echo "aps-environment not present (ok)"
+            # Associated Domains（ログインのパスワード自動入力をWebと共有）は、App ID側でcapabilityを有効化し
+            # Team IDをAASAに埋めた後に ENABLE_ASSOCIATED_DOMAINS=true で点灯する（docs/LOGIN-AUTOFILL.md）。
+            # 未設定のまま宣言だけ残すと自動署名が古いプロファイルを再利用して必ず失敗する（2026-09-02のビルド失敗）。
+            if [ "$ENABLE_ASSOCIATED_DOMAINS" != "true" ]; then
+              plutil -remove com.apple.developer.associated-domains "$ENT" 2>/dev/null && echo "associated-domains removed (ENABLE_ASSOCIATED_DOMAINS != true)" || echo "associated-domains not present (ok)"
+            fi
             plutil -p "$ENT"
           fi
       - name: Add widget extension target (ENABLE_WIDGET=true のみ)
