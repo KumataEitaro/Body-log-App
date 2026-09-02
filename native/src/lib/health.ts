@@ -37,6 +37,27 @@ export async function requestHealthAuth(): Promise<boolean> {
   } catch { return false; }
 }
 
+/**
+ * アクティブエネルギーの読み取り許可を「まだ聞いていない」か。
+ * iOSは読み取りの許可/拒否を（プライバシー保護のため）アプリに教えない。
+ * 分かるのは HKAuthorizationRequestStatus だけ:
+ *   shouldRequest = まだダイアログを出していない（READ_TYPESに型を足した後の既存ユーザーがここ）
+ *   unnecessary   = すでに聞いた（許可・拒否のどちらかは不明。拒否なら再ダイアログは出ない）
+ * 戻り値: 'ask'=再要求すればダイアログが出る／'asked'=もう出ない（設定アプリへ案内）／null=判定不能
+ */
+export async function activeEnergyAuthState(): Promise<'ask' | 'asked' | null> {
+  if (!hk) return null;
+  try {
+    const st = await hk.getRequestStatusForAuthorization({
+      toRead: ['HKQuantityTypeIdentifierActiveEnergyBurned'] as unknown as readonly never[],
+    });
+    // enum: 0=unknown 1=shouldRequest 2=unnecessary（@kingstinct/react-native-healthkit v14）
+    if (Number(st) === 1) return 'ask';
+    if (Number(st) === 2) return 'asked';
+    return null;
+  } catch { return null; }
+}
+
 function dateKeyJST(d: Date): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(d); // YYYY-MM-DD
 }
