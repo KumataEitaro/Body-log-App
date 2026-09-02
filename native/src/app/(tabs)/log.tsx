@@ -1515,7 +1515,7 @@ export default function LogScreen() {
             )}
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 22, marginTop: 10 }}>
               <Pressable onPress={backfillDetail} hitSlop={8} disabled={backfillBusy}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' }}>{t('くわしく記録する')}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' }}>{t('くわしく記録する')}</Text>
               </Pressable>
               <Pressable onPress={backfillSnooze} hitSlop={8}>
                 <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('あとで')}</Text>
@@ -1702,7 +1702,7 @@ export default function LogScreen() {
           // 上限到達（429 plan_limit）→ kindに応じた文脈見出しつきペイウォールへ（src=limit_*）
           <Pressable onPress={() => router.push(`/paywall?src=limit_${msg.kind ?? 'text'}` as never)} hitSlop={8}
             style={({ pressed }) => [{ alignSelf: 'flex-start', marginTop: 4, marginBottom: 6 }, pressed && { opacity: 0.7 }]}>
-            <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+            <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
           </Pressable>
         )}
 
@@ -2176,7 +2176,7 @@ const s = themed(() => ({
     borderRadius: RADIUS.tile, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
   },
   lawBandT: { flex: 1, fontSize: 13, fontWeight: '800', color: C.ink, lineHeight: 18 },
-  lawBandGo: { fontSize: 13, fontWeight: '800', color: C.teal },
+  lawBandGo: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   lawBandX: { fontSize: 17, color: C.faint, fontWeight: '700', paddingHorizontal: 2 },
   brand: { fontSize: 21, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
   addBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.teal, alignItems: 'center', justifyContent: 'center' },
@@ -2191,21 +2191,21 @@ const s = themed(() => ({
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 17, color: C.sub, fontWeight: '600' },
   // アクティブぶんの上乗せ内訳（目標が増えた理由の1行）。増加は良い知らせなのでアクセント色
-  heroActive: { fontSize: 12, fontWeight: '800', color: C.teal, marginTop: 4 },
+  heroActive: { fontSize: 12, fontWeight: '800', color: C.accentInk, marginTop: 4 },
   hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
   metaT: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   // 目標の数字はタップできることが分かるよう濃く・下線。「目標を調整 ›」はアクセント色の小さな導線
   metaGoalN: { fontWeight: '800', color: C.ink, textDecorationLine: 'underline' },
-  metaAdjust: { fontSize: 12, fontWeight: '800', color: C.teal },
+  metaAdjust: { fontSize: 12, fontWeight: '800', color: C.accentInk },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   // 気づきアラート（§8）: 統合カードの見出し行・×・解説リンク・ポジティブ側の控えめな面
   alertHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
   alertX: { fontSize: 20, lineHeight: 22, color: C.faint, paddingHorizontal: 4 },
   alertNote: { fontSize: 11, color: C.faint, lineHeight: 16, marginTop: 4 },
-  alertLink: { fontSize: 13, fontWeight: '700', color: C.teal, textDecorationLine: 'underline' },
+  alertLink: { fontSize: 13, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
   positiveCard: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12 },
   positiveTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
   positiveFactor: { fontSize: 13, color: C.sub, lineHeight: 19 },
@@ -2243,7 +2243,7 @@ const s = themed(() => ({
     backgroundColor: C.accentBadge, borderWidth: 1.5, borderColor: C.accentBorder,
     borderRadius: RADIUS.chip, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, maxWidth: 180,
   },
-  mealChipT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  mealChipT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   // 量調整ポップ（トレイ直下のインライン展開）
   adjustPop: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.accentBorder,
@@ -2257,7 +2257,7 @@ const s = themed(() => ({
   },
   multChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
   multChipT: { fontSize: 13, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  multChipTOn: { color: C.teal },
+  multChipTOn: { color: C.accentInk },
   chipMain: { paddingVertical: 9, paddingLeft: 13, paddingRight: 11 },
   chipMinus: { paddingVertical: 9, paddingHorizontal: 12, borderLeftWidth: 1.5, borderLeftColor: C.line },
   chipT: { fontSize: 13, fontWeight: '700', color: C.sub },
@@ -2293,7 +2293,7 @@ const s = themed(() => ({
   },
   timeChipOn: { borderColor: C.teal, backgroundColor: C.accentBadge },
   timeChipT: { fontSize: 12, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
-  timeChipTOn: { color: C.teal },
+  timeChipTOn: { color: C.accentInk },
   // 時刻ピッカー（DateStripの月カレンダーと同じ「透過背景＋角丸カード」の文法）
   timeBack: { flex: 1, backgroundColor: rgba(C.ink, 0.35), justifyContent: 'center', padding: 24 },
   timeCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
@@ -2333,7 +2333,7 @@ const s = themed(() => ({
     backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 5,
     maxWidth: '100%',
   },
-  aiQChipT: { fontSize: 12, color: C.teal, fontWeight: '700' },
+  aiQChipT: { fontSize: 12, color: C.accentInk, fontWeight: '700' },
   tray: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: C.accentBadge, borderWidth: 1, borderColor: C.accentBorder,
@@ -2357,13 +2357,13 @@ const s = themed(() => ({
   trayFailT: { fontSize: 13, fontWeight: '800', color: C.coral },
   trayFailSub: { fontSize: 11, fontWeight: '600', color: C.sub, marginTop: 1 },
   trayFailWhat: { fontSize: 11, fontWeight: '700', color: C.ink, marginTop: 1 },
-  trayRetryT: { fontSize: 13, fontWeight: '800', color: C.teal, textDecorationLine: 'underline' },
+  trayRetryT: { fontSize: 13, fontWeight: '800', color: C.accentInk, textDecorationLine: 'underline' },
   trayDropT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: C.accentBadge, borderRadius: RADIUS.tile, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6,
   },
-  editBannerT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  editBannerT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   editBannerCancel: { fontSize: 13, fontWeight: '800', color: C.sub, textDecorationLine: 'underline' },
   trayChipOn: { borderColor: C.teal, borderWidth: 1.5, backgroundColor: C.accentBadge },
   trayChipPfc: { fontSize: 11, fontWeight: '800', color: C.sub, marginTop: 1, fontVariant: ['tabular-nums'] },
@@ -2371,7 +2371,7 @@ const s = themed(() => ({
   traySave: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingHorizontal: 13, paddingVertical: 9 },
   traySaveT: { color: '#fff', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
   trayClearT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
-  previewMain: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  previewMain: { fontSize: 13, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   previewBars: { flexDirection: 'row', gap: 10, flex: 1, alignItems: 'center', marginLeft: 10 },
   previewBarCol: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   previewBarAb: { fontSize: 11, fontWeight: '900', width: 10, textAlign: 'center' },
