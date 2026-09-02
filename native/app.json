@@ -22,7 +22,11 @@
       "usesAppleSignIn": true,
       "associatedDomains": [
         "webcredentials:bodylog-orcin.vercel.app"
-      ]
+      ],
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true
+      }
     },
     "android": {
       "package": "com.gotcha.bodylog.rn",

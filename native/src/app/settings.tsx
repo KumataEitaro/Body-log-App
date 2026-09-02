@@ -44,7 +44,9 @@ import { DietDisclaimerPanel, DietConsentCheck, dietModeLabel, dietModeSub } fro
 // iOSはandroid_rippleを無視するため分岐不要
 const ripple = () => ({ color: rgba(C.teal, 0.14), borderless: false as const });
 import { mifflinBMR } from '@/lib/calc';
-import { healthAvailable, requestHealthAuth, importWeights } from '@/lib/health';
+import { healthAvailable, ensureHealthAuth, importWeights, openHealthSettings, getPreferManualWeight, setPreferManualWeight, loadPreferManualWeight } from '@/lib/health';
+import { useHealthLinkState, useHealthLastSync } from '@/lib/healthStore';
+import { formatLastSync } from '@/lib/healthLink';
 import { unseenBadgeCount } from '@/lib/achievements';
 import { shareInvite } from '@/lib/invite';
 import StatusBarMask from '@/components/StatusBarMask';
@@ -129,6 +131,13 @@ export default function SettingsScreen() {
   // 名前変更中の行（行がその場でTextInputに変わる。単品・セットのどちらも同じUI）
   const [renameEdit, setRenameEdit] = useState<{ kind: 'food' | 'set'; id: string; name: string } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
+  // ヘルスケア連携の状態表示（連携中・最終同期）と「体重は手入力を優先」トグル
+  const healthLink = useHealthLinkState();
+  const healthLastSync = useHealthLastSync();
+  const lastSyncLabel = formatLastSync(healthLastSync);
+  const [preferManualW, setPreferManualW] = useState(getPreferManualWeight());
+  useEffect(() => { loadPreferManualWeight().then(setPreferManualW).catch(() => {}); }, []);
+  function togglePreferManualW(on: boolean) { setPreferManualW(on); setPreferManualWeight(on).catch(() => {}); }
   const [couponOpen, setCouponOpen] = useState(false); // クーポンコード入力（プラン行の隣の入口）
   const [feedbackOpen, setFeedbackOpen] = useState(false); // ご意見・不具合の報告（サポート節の入口）
   const [busy, setBusy] = useState(false);
@@ -338,7 +347,8 @@ export default function SettingsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      if (!(await requestHealthAuth())) { setMsg({ ok: false, text: t('ヘルスケアへのアクセスが許可されませんでした。') }); return; }
+      // 連携済みならダイアログは出ない。未連携ならここが初回連携になる（以後は自動同期）
+      if (!(await ensureHealthAuth())) { setMsg({ ok: false, text: t('ヘルスケアへのアクセスが許可されませんでした。') }); return; }
       const res = await importWeights(uid, 90);
       if ('error' in res) { setMsg({ ok: false, text: res.error }); return; }
       setMsg({ ok: true, text: res.imported > 0 ? t('体重を {n} 日分 取り込みました。「概要」タブのグラフに反映されます。', { n: res.imported }) : t('新しく取り込める体重データはありませんでした。') });
@@ -632,10 +642,18 @@ export default function SettingsScreen() {
       {/* データ・連携 */}
       <Text style={s.groupLabel}>{t('データ・連携')}</Text>
       <View style={s.group}>
-        <Row icon={<HeartPulse color={C.teal} size={ICON.xl} />} label={t('ヘルスケア連携')}
-             sub={healthAvailable() ? '体重の取込（Apple ヘルスケア）' : t('TestFlight版で有効になります')}
-             onPress={() => openSheet('health')} />
-        <View style={s.sep} />
+        {/* ヘルスケア行はiOSだけ（AndroidにHealthKitは無い。「ヘルスケア」の文言自体を出さない）。
+            連携済みは状態表示（連携中・最終同期）。ボタンではなく状態＋見直し導線 */}
+        {Platform.OS === 'ios' && (
+          <>
+            <Row icon={<HeartPulse color={C.teal} size={ICON.xl} />} label={t('ヘルスケア連携')}
+                 sub={healthLink === 'linked'
+                   ? (lastSyncLabel ? t('連携中・最終同期 {t}', { t: lastSyncLabel }) : t('連携中・全項目を自動で取り込みます'))
+                   : healthLink === 'unlinked' ? t('体重・歩数・睡眠・消費kcalを自動で取り込む') : t('TestFlight版で有効になります')}
+                 onPress={() => openSheet('health')} />
+            <View style={s.sep} />
+          </>
+        )}
         {/* アクティブカロリーの目標反映（既定OFF）。
             表示（運動タブの実測kcal）は連携すれば常に出るが、目標を増やすかは別問題。
             トレードオフを隠さずサブ文言で正直に伝え、本人に選ばせる */}
@@ -1035,11 +1053,31 @@ export default function SettingsScreen() {
         <SheetHeader title={"⌚ " + t("ヘルスケア連携")} />
         {!healthAvailable() ? (
           <Text style={s.note}>{t('この機能はTestFlight版で有効になります（Expo Goプレビューでは利用できません）。')}</Text>
+        ) : healthLink === 'linked' ? (
+          <>
+            {/* 連携済み: 状態の表示＋見直し導線。ここに「連携する」ボタンは出さない（一度連携したら恒久） */}
+            <Text style={s.note}>{lastSyncLabel ? t('連携中・最終同期 {t}', { t: lastSyncLabel }) : t('連携中・全項目を自動で取り込みます')}</Text>
+            <Text style={[s.note, { marginTop: 8 }]}>{t('体重・歩数・睡眠・消費kcalは、ヘルスケア側の数値が変わったタイミングで自動的に取り込まれます（定時ではなく変更のたび）。データは機能提供のみに使用し、広告等には一切使用しません。')}</Text>
+            <View style={[s.notifRow, { paddingHorizontal: 0, marginTop: 10 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.notifLabel}>{t('体重は手入力を優先')}</Text>
+                <Text style={s.notifSub}>{t('OFFのときは、同じ日に手入力があってもヘルスケアの計測が新しければそちらに置き換えます')}</Text>
+              </View>
+              <Switch value={preferManualW} onValueChange={togglePreferManualW} trackColor={{ true: C.teal }} />
+            </View>
+            <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={openHealthSettings}>
+              <Text style={s.btnPrimaryT}>{t('連携を見直す（iOS設定を開く）')}</Text>
+            </Pressable>
+            <Pressable style={{ marginTop: 14, alignItems: 'center' }} onPress={healthImportWeights} disabled={busy}>
+              {busy ? <ActivityIndicator color={C.teal} /> : <Text style={[s.note, { color: C.teal, fontWeight: '700' }]}>{t('過去90日の体重をいま取り込む')}</Text>}
+            </Pressable>
+          </>
         ) : (
           <>
-            <Text style={s.note}>{t('Appleヘルスケアから体重を取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。')}</Text>
+            {/* 未連携: ここが初回連携の入口（ensureHealthAuth→linkHealth）。成功後は上の表示に切り替わる */}
+            <Text style={s.note}>{t('一度連携すると、体重・歩数・睡眠・消費kcalを自動で取り込みます。データは機能提供のみに使用し、広告等には一切使用しません。歩数・睡眠は「概要」タブで見られます。')}</Text>
             <Pressable style={[s.btnPrimary, { marginTop: 14 }]} onPress={healthImportWeights} disabled={busy}>
-              {busy ? <ActivityIndicator color={C.panel} /> : <Text style={s.btnPrimaryT}>{t('体重を取り込む（過去90日）')}</Text>}
+              {busy ? <ActivityIndicator color={C.panel} /> : <Text style={s.btnPrimaryT}>{t('ヘルスケアと連携する')}</Text>}
             </Pressable>
           </>
         )}

@@ -1,7 +1,7 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,7 +46,8 @@ import GoalPanel from '@/components/GoalPanel';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import LiftHistoryCard from '@/components/LiftHistoryCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { healthAvailable, requestHealthAuth, readActivitySummary, readSleepStages, type HealthDaySummary, type SleepStages } from '@/lib/health';
+import { healthAvailable, linkHealth, readActivitySummary, readSleepStages, type HealthDaySummary, type SleepStages } from '@/lib/health';
+import { useHealthLinkState, useHealthVersion } from '@/lib/healthStore';
 import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
@@ -417,11 +418,14 @@ export default function ChangesScreen() {
     setDayDetail((data as DayDetail) || []);
   }
 
-  // 歩数・睡眠サマリー（ヘルスケア）— ログデータの置き場は設定ではなくこのタブ
-  async function loadActivity() {
+  // 歩数・睡眠サマリー（ヘルスケア）— ログデータの置き場は設定ではなくこのタブ。
+  // 連携済みなら自動で読む（ボタン無し）。未連携のときだけ「ヘルスケアと連携する」を出し、
+  // 押されたら linkHealth（許可→フラグ→自動同期開始）→そのまま読み込む
+  const healthLink = useHealthLinkState();
+  const healthVer = useHealthVersion();
+  const readActivity = useCallback(async () => {
     setHealthBusy(true); setHealthMsg(null);
     try {
-      if (!(await requestHealthAuth())) { setHealthMsg(t('ヘルスケアへのアクセスが許可されませんでした。')); return; }
       const res = await readActivitySummary(7);
       if ('error' in res) { setHealthMsg(res.error); return; }
       setActivity(res);
@@ -429,7 +433,13 @@ export default function ChangesScreen() {
       // 昨夜の睡眠（今朝起きたぶん）のステージ内訳。ステージが無い端末はnull＝従来表示のまま
       try { setSleepStages(await readSleepStages(todayJST())); } catch { /* ステージは飾り */ }
     } finally { setHealthBusy(false); }
+  }, []);
+  async function loadActivity() {
+    if (healthLink !== 'linked' && !(await linkHealth())) { setHealthMsg(t('ヘルスケアへのアクセスが許可されませんでした。')); return; }
+    await readActivity();
   }
+  // 連携済み: 画面表示時＋ヘルスケアの変更イベントごとに自動で読み直す（ユーザー操作なし）
+  useEffect(() => { if (healthLink === 'linked') readActivity(); }, [healthLink, healthVer, readActivity]);
 
   const today = todayJST();
 
@@ -799,9 +809,14 @@ export default function ChangesScreen() {
             );
           })()}
           {activity === null ? (
-            <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
-              <Text style={s.actBtnT}>{healthBusy ? '読み込み中…' : t('ヘルスケアから読み込む')}</Text>
-            </Pressable>
+            // 未連携のときだけ連携ボタン。連携済みは自動で読むので、読み込み中の一言だけ
+            healthLink === 'unlinked' ? (
+              <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
+                <Text style={s.actBtnT}>{healthBusy ? t('読み込み中…') : t('ヘルスケアと連携する')}</Text>
+              </Pressable>
+            ) : (
+              <Text style={s.note}>{healthBusy ? t('読み込み中…') : t('ヘルスケアのデータを待っています')}</Text>
+            )
           ) : (
             <>
               {activity.map((a) => (
@@ -878,10 +893,12 @@ export default function ChangesScreen() {
   // 増量目的でないときはbulkguardをメニューにも⊕シートにも出さない（並び順は保持）。
   // cyclesも同様: 切替経験なし（サイクル1つ以下）またはテーブル未作成（periods=null）なら出さない
   // 生理周期は設定でONにした人にだけ出す（既定OFF＝記録しない人の画面には現れない）
+  // 歩数・睡眠（ヘルスケア）はiOS専用。AndroidにはHealthKitが無いのでメニューにも⊕シートにも出さない
   const unavailable = [
     ...(purpose === 'bulk' ? [] : ['bulkguard']),
     ...((periods?.length ?? 0) >= 2 ? [] : ['cycles']),
     ...(cycleOn ? [] : ['cycle']),
+    ...(Platform.OS === 'ios' ? [] : ['health']),
   ];
   const hidden = hiddenAll;
   // 描画は常にセクション正規化した並びを使う（保存値がセクションを跨いでいても壊れない）
