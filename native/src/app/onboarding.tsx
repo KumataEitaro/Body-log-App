@@ -168,7 +168,7 @@ export default function Onboarding() {
                              style={({ pressed }) => [s.purposeCard, on && s.purposeCardOn, pressed && { transform: [{ scale: 0.98 }] }]}
                              onPress={() => { Haptics.selectionAsync().catch(() => {}); setPurpose(pu.key as PurposeKey); }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.purposeT, on && { color: C.teal }]}>{t(pu.label)}</Text>
+                      <Text style={[s.purposeT, on && { color: C.accentInk }]}>{t(pu.label)}</Text>
                       <Text style={s.purposeD}>{t(pu.desc)}</Text>
                     </View>
                     <Text style={s.purposeCoef}>P {pu.p} / F {pu.f} g/kg</Text>

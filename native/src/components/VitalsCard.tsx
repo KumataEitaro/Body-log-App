@@ -273,7 +273,7 @@ const s = themed(() => ({
   bodyT: { color: C.ink, fontWeight: '700' },
   advice: { fontSize: 12.5, color: C.amber, lineHeight: 18, marginTop: 10, fontWeight: '700' },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: C.accentBorder, borderRadius: 999, paddingVertical: 10, backgroundColor: C.accentSoft },
-  addT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  addT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   legend: { flexDirection: 'row', gap: 12, marginTop: 4, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 3 },

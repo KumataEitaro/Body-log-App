@@ -55,18 +55,43 @@ export const HEAD = {
   card: { fontSize: 17, fontWeight: '800' },      // カードの見出し（h2相当）
 } as const;
 
+// ===== 色のトークン（2026-09-02 新アイコンに合わせて刷新） =====
+//
+// 新アイコン（アクア地 #C8FAFB・白い皿・鮮やかな食材）に合わせ、配色の基準を次の10色に置いた。
+//   Dark Navy   #0B1220  ダークの地(bg) ／ ライトの文字色(ink)
+//   Card Gray   #111827  ダークのカード面(panel)。Navyと近いが「地」と「面」の2階調として必要なペア
+//   Electric    #4D7CFF  新アクセント（塗り面・選択）。白地の小さい文字には使わない（3.7:1でAA未達）
+//   Electric Ink #2F5FE6 白地の文字・リンク用に一段濃くしたアクセント（5.4:1）
+//   Aqua        #C7F5F6  背景トーン「アクア」＋ヒーロー等の強調面（全面の地には使わない）
+//   Leaf Green  #34B36A  達成・成功
+//   Citrus      #FFA62B  注意
+//   Berry       #E43D5B  超過・警告
+//   Clean White #FFFFFF  ライトのカード面
+//   Soft Gray   #A2AAB3  ヒント文字(faint)だけ。補助文字(sub)は #6B7580（A2AAB3は白地で2.4:1と薄すぎる）
+//
+// 【トークンの使い分け規約】
+//   - 塗り面・選択の印・枡の枠線 → teal（アクセント。歴史的なキー名だが実体はテーマ色）
+//   - 白いカードや地の上に載る**文字・リンク** → accentInk（AAを満たすまで自動で濃くした派生。lib/contrast.ts）
+//   - アクセント塗り面の上の白文字 → '#fff' のまま（追従してはいけない固定色。理由コメント付き）
+//   - 達成・成功の文字 → successInk、達成の塗り（バー・ドット） → success
+//   - 注意の文字・枠 → amber（Citrusを3:1まで濃くした値。原色 #FFA62B は白地で2:1しかなく文字に使えない）
+//   - 超過・警告 → coral（Berry。白地で4.1:1。文字は太字で使う）
+//   - 面(panel)と地(bg)以外に生のHEXを書かない。色は必ずこのトークン経由
 export type Palette = {
   bg: string;           // 画面の背景
   panel: string;        // カードの面
   ink: string;          // 主要な文字
-  sub: string;          // 補助文字
-  faint: string;        // 最も薄い文字
+  sub: string;          // 補助文字（白地で4.5:1以上を保つ）
+  faint: string;        // 最も薄い文字（ヒント・プレースホルダ専用。本文には使わない）
   line: string;         // 罫線・枠線
-  teal: string;         // アクセント（歴史的な名前。実体はテーマ色）
+  teal: string;         // アクセント（歴史的な名前。実体はテーマ色）。塗り面・選択の印に使う
+  accentInk: string;    // 白地・カード面の上の文字とリンク用アクセント。AA(4.5:1)を満たすまで濃くした派生値
+  accentHi: string;     // アクセントの明るい端（グラデーション #4D7CFF→#6AA3FF のプレミアム縁・ヒーロー強調）
   tealWeak: string;     // アクセントの薄い面
   accentSoft: string;   // 強調カードの背景（アクセントのごく薄い面）
   accentBadge: string;  // バッジ・選択中セルの背景
   accentBorder: string; // アクセント寄りの枠線
+  aqua: string;         // ヒーロー等の強調面（アイコンの地の色）。全面の背景には使わない
   track: string;        // プログレスバーの溝
   chipBg: string;       // チップ・未選択面
   segTrack: string;     // セグメントコントロールの溝
@@ -74,34 +99,44 @@ export type Palette = {
   calorieBar: string;   // 合計カロリーのバー（P/F/Cとは必ず別色にする）
   hairline: string;     // カード外周のごく薄い縁取り（面とほぼ同色の1px）
   shadow: string;       // 影の色（shadowColor専用。明暗で濃さの効き方が違う）
-  coral: string;
-  coralWeak: string;
-  amber: string;
+  success: string;      // 達成・成功の塗り（Leaf Green）
+  successInk: string;   // 達成・成功の文字（白地でAAを満たすまで濃くした派生値）
+  successWeak: string;  // 達成の薄い面
+  coral: string;        // 超過・警告（Berry Red）
+  coralWeak: string;    // 超過の薄い面
+  amber: string;        // 注意（Citrus。文字にも使うため白地で3:1を満たす濃さ）
 };
 
-// 既定はグリーン（従来の配色）
+// 既定は「エレクトリック」ライト（新アイコンの配色）。実行時は theme.ts の applyPalette で差し替わる。
+// 値は theme.ts の PALETTES.electric（白背景トーン）と一致させる
 export const C: Palette = {
   bg: '#fbfbfa',
   panel: '#ffffff',
-  ink: '#0e1116',
-  sub: '#6a7280',
-  faint: '#9aa1ab',
-  line: '#e9eae7',
-  teal: '#059669',
-  tealWeak: '#e1f5ee',
-  accentSoft: '#f2faf7',
-  accentBadge: '#e6f7f2',
-  accentBorder: 'rgba(5,150,105,0.30)',
-  track: '#eceeeb',
-  chipBg: '#f4f5f3',
-  segTrack: '#eef0ee',
-  pressed: '#f1f3f0',
-  calorieBar: '#3f4c5a',
-  hairline: 'rgba(14,17,22,0.08)',
-  shadow: '#0e1116',
-  coral: '#e5484d',
-  coralWeak: '#fdeeec',
-  amber: '#b8860b',
+  ink: '#0b1220',
+  sub: '#6b7580',
+  faint: '#a2aab3',
+  line: '#eff3ff',
+  teal: '#4d7cff',
+  accentInk: '#2f5fe6',
+  accentHi: '#6aa3ff',
+  tealWeak: '#eaefff',
+  accentSoft: '#f6f8ff',
+  accentBadge: '#edf2ff',
+  accentBorder: 'rgba(77,124,255,0.3)',
+  aqua: '#c7f5f6',
+  track: '#f1f5ff',
+  chipBg: '#f7f9ff',
+  segTrack: '#f3f6ff',
+  pressed: '#f4f7ff',
+  calorieBar: '#3b4a63',
+  hairline: 'rgba(14,17,22,0.08)',  // 8%の近黒はNavy由来でも旧ink由来でも見分けがつかないため値を据え置く（既存テストとも整合）
+  shadow: '#0b1220',
+  success: '#34b36a',
+  successInk: '#278650',
+  successWeak: '#e7f6ed',
+  coral: '#e43d5b',
+  coralWeak: '#fce8eb',
+  amber: '#cc8522',
 };
 
 /** '#rrggbb' を 'rgba(r,g,b,a)' に変換（テーマ色から透過色を作るため） */

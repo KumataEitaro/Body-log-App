@@ -61,7 +61,7 @@ export default function WeekStepsBar({ days, today, goal }: {
     <View style={s.wrap}>
       <View style={s.head}>
         <Text style={s.label}>{t('歩数の週目標')}</Text>
-        <Text style={[s.val, done && { color: C.teal }]}>
+        <Text style={[s.val, done && { color: C.successInk }]}>
           {t('今週 {n} / {g}歩', { n: steps.toLocaleString(), g: goal.toLocaleString() })}
           {done ? ' 🎉' : ''}
         </Text>

@@ -381,7 +381,7 @@ export function LiftChartCard() {
             {exercises.map((n) => (
               <Pressable key={n} style={s.listRow} onPress={() => setSelEx(n)}>
                 <Text style={[s.listT, n === activeEx && { color: C.ink, fontWeight: '800' }]}>{n}</Text>
-                {n === activeEx && <Text style={{ color: C.teal, fontWeight: '800' }}>✓</Text>}
+                {n === activeEx && <Text style={{ color: C.accentInk, fontWeight: '800' }}>✓</Text>}
               </Pressable>
             ))}
           </View>
@@ -391,7 +391,7 @@ export function LiftChartCard() {
         </Pressable>
       </View>
       {verdict && (
-        <Text style={[s.verdict, { color: verdict.trend === 'down' ? C.amber : C.teal }]}>
+        <Text style={[s.verdict, { color: verdict.trend === 'down' ? C.amber : C.successInk }]}>
           {verdict.trend === 'up' && t('💪 ボリューム上昇中（直近 {v}kg·回・平均比 +{p}%）', { v: verdict.lastVolume.toLocaleString(), p: verdict.pct })}
           {verdict.trend === 'flat' && t('➡️ ボリューム維持（平均比 {p}%）。減量中の維持は十分な成果', { p: `${verdict.pct > 0 ? '+' : ''}${verdict.pct}` })}
           {verdict.trend === 'down' && t('⚠️ ボリューム低下（平均比 {p}%）。赤字が深すぎるサインかも。たんぱく質と睡眠を確認', { p: verdict.pct })}
@@ -486,7 +486,7 @@ const s = themed(() => ({
   weekNote: { fontSize: 11, fontWeight: '400', color: C.faint },
   // 連続記録の強調はアンバー。ダークでは明るいアンバーへ入れ替わる必要があるのでトークンで
   streak: { fontSize: 13, fontWeight: '800', color: C.amber },
-  earnT: { fontSize: 13, fontWeight: '700', color: C.teal, marginTop: 2, lineHeight: 19 },
+  earnT: { fontSize: 13, fontWeight: '700', color: C.accentInk, marginTop: 2, lineHeight: 19 },
   balRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   balLabel: { width: 38, fontSize: 13, fontWeight: '700', color: C.sub, fontVariant: ['tabular-nums'] },
   balTrack: { flex: 1, height: 14, borderRadius: 7, backgroundColor: C.bg, flexDirection: 'row', overflow: 'hidden' },

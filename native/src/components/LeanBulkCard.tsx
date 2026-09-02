@@ -165,11 +165,11 @@ const s = themed(() => ({
   sub: { fontSize: 12, color: C.faint, marginTop: 2 },
   advice: { fontSize: 14, color: C.ink, lineHeight: 21, marginTop: 10 },
   liftRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  liftT: { fontSize: 13, fontWeight: '700', color: C.teal },
+  liftT: { fontSize: 13, fontWeight: '700', color: C.accentInk },
   goalBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2,
     marginTop: 12, borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
     borderRadius: 999, paddingVertical: 10,
   },
-  goalBtnT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  goalBtnT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
 }));

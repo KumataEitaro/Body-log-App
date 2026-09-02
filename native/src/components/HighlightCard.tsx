@@ -126,7 +126,7 @@ const s = themed(() => ({
     width: 36, height: 36, borderRadius: 18, backgroundColor: C.accentBadge,
     alignItems: 'center', justifyContent: 'center',
   },
-  label: { fontSize: 11, fontWeight: '800', color: C.teal, letterSpacing: 0.3 },
+  label: { fontSize: 11, fontWeight: '800', color: C.accentInk, letterSpacing: 0.3 },
   title: { fontSize: 15.5, fontWeight: '800', color: C.ink, marginTop: 2 },
   body: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginTop: 2 },
   go: { fontSize: 21, color: C.faint, fontWeight: '600', marginLeft: 2 },

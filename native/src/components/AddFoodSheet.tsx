@@ -383,7 +383,7 @@ const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
-  close: { fontSize: 15, fontWeight: '700', color: C.teal },
+  close: { fontSize: 15, fontWeight: '700', color: C.accentInk },
   note: { fontSize: 13, color: C.sub, marginTop: 6, marginBottom: 6, lineHeight: 18 },
   label: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 14, marginBottom: 5 },
   input: {
@@ -393,7 +393,7 @@ const s = themed(() => ({
   multi: { minHeight: 88, lineHeight: 23 },
   hint: { fontSize: 12, color: C.sub, marginTop: 6, lineHeight: 17 },
   msg: { fontSize: 13, fontWeight: '700', marginTop: 12, lineHeight: 18 },
-  link: { color: C.teal, fontWeight: '700', fontSize: 14 },
+  link: { color: C.accentInk, fontWeight: '700', fontSize: 14 },
   // 解析結果の品目一覧
   itemsBox: {
     marginTop: 12, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
@@ -414,7 +414,7 @@ const s = themed(() => ({
     paddingTop: 10, paddingBottom: 4, borderTopWidth: 1, borderTopColor: C.line, marginTop: 2,
   },
   totalT: { fontSize: 13, fontWeight: '800', color: C.sub },
-  totalV: { fontSize: 14, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  totalV: { fontSize: 14, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   // 手入力の折り畳み
   fold: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 22, paddingVertical: 6 },
   foldT: { fontSize: 14, fontWeight: '800', color: C.sub },
@@ -426,5 +426,5 @@ const s = themed(() => ({
     backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
     borderRadius: RADIUS.input, paddingVertical: 11,
   },
-  helperT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  helperT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
 }));

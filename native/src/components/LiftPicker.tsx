@@ -144,7 +144,7 @@ const s = themed(() => ({
     width: 22, height: 22, borderRadius: 11, backgroundColor: C.teal,
     alignItems: 'center', justifyContent: 'center',
   },
-  addT: { flex: 1, fontSize: 15, fontWeight: '700', color: C.teal },
+  addT: { flex: 1, fontSize: 15, fontWeight: '700', color: C.accentInk },
   bwToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 4, marginBottom: 4 },
   bwBox: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   bwBoxOn: { backgroundColor: C.teal, borderColor: C.teal },
@@ -157,7 +157,7 @@ const s = themed(() => ({
   },
   rowT: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   bwTag: {
-    fontSize: 11, fontWeight: '800', color: C.teal, backgroundColor: C.accentBadge,
+    fontSize: 11, fontWeight: '800', color: C.accentInk, backgroundColor: C.accentBadge,
     borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
   },
   arrow: { fontSize: 21, color: C.faint },

@@ -239,7 +239,7 @@ const s = themed(() => ({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' },
   h2: { fontSize: 17, fontWeight: '800', color: C.ink },
   h2sub: { fontSize: 13, fontWeight: '400', color: C.sub },
-  bfNow: { fontSize: 13, fontWeight: '800', color: C.teal, fontVariant: ['tabular-nums'] },
+  bfNow: { fontSize: 13, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   note: { fontSize: 13, color: C.sub, lineHeight: 18 },
   cmpLabel: { fontSize: 11, fontWeight: '700', color: C.sub, marginBottom: 4 },
   cmpImg: { width: '100%', aspectRatio: 3 / 4, borderRadius: 14, backgroundColor: C.bg },
@@ -262,7 +262,7 @@ const s = themed(() => ({
     borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
     borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8,
   },
-  aiBtnT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  aiBtnT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   saveBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   cancelT: { fontSize: 13, fontWeight: '700', color: C.sub, textDecorationLine: 'underline' },
   addBtn: {

@@ -150,7 +150,7 @@ const s = themed(() => ({
     position: 'absolute', left: 0, right: 0, height: ITEM_H,
     backgroundColor: C.panel, opacity: 0.72,
   },
-  hint: { fontSize: 13, fontWeight: '700', color: C.teal, textAlign: 'center', marginTop: 8 },
+  hint: { fontSize: 13, fontWeight: '700', color: C.accentInk, textAlign: 'center', marginTop: 8 },
   cancel: {
     flex: 1, borderWidth: 1.5, borderColor: C.line, borderRadius: 999,
     paddingVertical: 13, alignItems: 'center', backgroundColor: C.panel,

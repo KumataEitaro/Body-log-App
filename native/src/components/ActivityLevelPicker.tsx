@@ -29,7 +29,7 @@ export default function ActivityLevelPicker({ value, onChange }: { value: number
       {ACTIVITY_LEVELS.map((a) => (
         <Pressable key={a.v} style={[s.card, sel === a.v && s.on]} onPress={() => onChange(a.v)}>
           <View style={{ flex: 1 }}>
-            <Text style={[s.t, sel === a.v && { color: C.teal }]}>{a.t}</Text>
+            <Text style={[s.t, sel === a.v && { color: C.accentInk }]}>{a.t}</Text>
             <Text style={s.d}>{a.d}</Text>
           </View>
           <View style={[s.radio, sel === a.v && s.radioOn]}>

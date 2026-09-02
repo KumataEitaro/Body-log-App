@@ -406,7 +406,7 @@ const s = themed(() => ({
   planName: { ...HEAD.sub, color: C.ink },
   // 「誰のためのプランか」の1行（社会的証明ではなく価値の言語化）
   planLead: { fontSize: 12.5, color: C.sub, marginTop: 2, marginBottom: 8 },
-  planLeadHero: { color: C.teal, fontWeight: '700' },
+  planLeadHero: { color: C.accentInk, fontWeight: '700' },
   // 価格オプション行（月額/年額の同時提示。選択中はアクセント縁）
   priceOpt: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
@@ -420,7 +420,7 @@ const s = themed(() => ({
   radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.teal },
   priceOptLabel: { fontSize: 14, fontWeight: '700', color: C.sub },
   priceOptPrice: { fontSize: 16, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
-  priceOptSub: { fontSize: 11.5, color: C.teal, fontWeight: '700', marginTop: 1 },
+  priceOptSub: { fontSize: 11.5, color: C.accentInk, fontWeight: '700', marginTop: 1 },
   trialNote: { fontSize: 11.5, color: C.sub, marginTop: 6, lineHeight: 16 },
   featRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
   featT: { fontSize: 13.5, color: C.ink, flex: 1 },
@@ -429,10 +429,10 @@ const s = themed(() => ({
   ctaOn: { backgroundColor: C.teal, borderColor: C.teal },
   ctaHero: { paddingVertical: 14, borderRadius: RADIUS.tile },
   ctaOff: { opacity: 0.5 },
-  ctaT: { fontSize: 15, fontWeight: '700', color: C.teal },
+  ctaT: { fontSize: 15, fontWeight: '700', color: C.accentInk },
   ctaTOn: { color: '#fff' },
   ctaTHero: { fontSize: 16, fontWeight: '800' },
   liteNote: { fontSize: 12, color: C.sub, lineHeight: 18, marginTop: 2, marginBottom: 4 },
-  link: { fontSize: 13, color: C.teal, fontWeight: '600' },
+  link: { fontSize: 13, color: C.accentInk, fontWeight: '600' },
   legal: { fontSize: 11.5, color: C.sub, lineHeight: 17, marginTop: 20 },
 }));

@@ -104,5 +104,5 @@ const s = themed(() => ({
     padding: 14, marginBottom: 12,
   },
   compactT: { flex: 1, fontSize: 13, color: C.sub, fontWeight: '600' },
-  retryT: { fontSize: 13, color: C.teal, fontWeight: '800', textDecorationLine: 'underline' },
+  retryT: { fontSize: 13, color: C.accentInk, fontWeight: '800', textDecorationLine: 'underline' },
 }));

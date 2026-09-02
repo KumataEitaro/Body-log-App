@@ -201,7 +201,7 @@ const s = themed(() => ({
   bodyT: { color: C.ink, fontWeight: '700' },
   avg: { fontSize: 12.5, color: C.sub, fontWeight: '700', marginTop: 8, fontVariant: ['tabular-nums'] },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderWidth: 1.5, borderColor: C.accentBorder, borderRadius: RADIUS.chip, paddingVertical: 10, backgroundColor: C.accentSoft },
-  addT: { fontSize: 13, fontWeight: '800', color: C.teal },
+  addT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   note: { fontSize: 11.5, color: C.faint, lineHeight: 17, marginTop: 8 },
   // ---- 入力シート（VitalsCardと同じ作り） ----
   backdrop: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: rgba(C.ink, 0.45) },

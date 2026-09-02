@@ -348,7 +348,7 @@ export default function CoachScreen() {
                 {m.upgrade && (
                   <Pressable hitSlop={8} style={{ alignSelf: 'flex-start', marginBottom: 8, marginTop: -2 }}
                              onPress={() => router.push('/paywall?src=limit_coach' as never)}>
-                    <Text style={{ color: C.teal, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
+                    <Text style={{ color: C.accentInk, fontWeight: '700', fontSize: 14 }}>{t('プランを見る →')}</Text>
                   </Pressable>
                 )}
                 {/* 目標変更の提案アクションカード（承認制） */}
@@ -503,7 +503,7 @@ const s = themed(() => ({
     borderWidth: 1.5, borderColor: C.accentBorder, backgroundColor: C.accentSoft,
     borderRadius: RADIUS.chip, paddingVertical: 10, paddingHorizontal: 18,
   },
-  moreBtnT: { fontSize: 15, fontWeight: '800', color: C.teal },
+  moreBtnT: { fontSize: 15, fontWeight: '800', color: C.accentInk },
   quickCard: {
     width: '46%', backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: RADIUS.panel,
     paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center', gap: 6,
@@ -521,9 +521,9 @@ const s = themed(() => ({
   actionLabel: { fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
   actionBtn: { backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 9, paddingHorizontal: 16 },
   actionAlt: { borderWidth: 1.5, borderColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: C.panel },
-  actionAltT: { color: C.teal, fontSize: 13, fontWeight: '800' },
+  actionAltT: { color: C.accentInk, fontSize: 13, fontWeight: '800' },
   actionBtnT: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  actionDone: { color: C.teal, fontSize: 13, fontWeight: '800', marginTop: 8 },
+  actionDone: { color: C.accentInk, fontSize: 13, fontWeight: '800', marginTop: 8 },
   // 食事タブの入力ドック（log.tsxのs.dock）と同じ見た目（角丸18・アクセント縁・teal影）
   inRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 6,
@@ -552,7 +552,7 @@ const s = themed(() => ({
   },
   gateBannerT: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink, lineHeight: 17 },
   disclaimer: { fontSize: 11, color: C.faint, marginTop: 5 },
-  presetLink: { fontSize: 11, color: C.teal, fontWeight: '800', marginTop: 5 },
+  presetLink: { fontSize: 11, color: C.accentInk, fontWeight: '800', marginTop: 5 },
   pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 10, marginLeft: 2 },
   histBtn: {
     position: 'absolute', right: 54, zIndex: 30,

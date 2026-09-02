@@ -69,7 +69,7 @@ export function Chip({ label, selected, onPress, onLongPress, tone = 'teal', lea
     : tone === 'outline' ? s.chipOnOutline
     : s.chipOnTeal;
   const onText = !selected ? null
-    : tone === 'outline' ? { color: C.teal }
+    : tone === 'outline' ? { color: C.accentInk }
     : tone === 'ink' ? { color: C.panel }  // ink地はダークで明色になるため背景トークンで反転吸収
     : { color: '#fff' };                    // teal地はダークでも十分濃い（darkPaletteForで+12%明るいだけ）ので白のまま
   return (

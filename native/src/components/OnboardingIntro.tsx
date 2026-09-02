@@ -165,7 +165,7 @@ const v = themed(() => ({
   bubbleUser: { backgroundColor: C.ink, borderRadius: 18, borderBottomRightRadius: 4, paddingHorizontal: 16, paddingVertical: 10, alignSelf: 'flex-end' },
   bubbleUserT: { color: C.panel, fontSize: 14.5, fontWeight: '600' },  // ink地（ダーク=明色）に追従
   bubbleAi: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 18, borderTopLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'flex-start' },
-  bubbleAiLabel: { fontSize: 11, fontWeight: '800', color: C.teal, letterSpacing: 0.5 },
+  bubbleAiLabel: { fontSize: 11, fontWeight: '800', color: C.accentInk, letterSpacing: 0.5 },
   bubbleAiT: { fontSize: 13.5, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
   iconRow: { flexDirection: 'row', gap: 8 },
   iconChip: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, alignItems: 'center', justifyContent: 'center' },

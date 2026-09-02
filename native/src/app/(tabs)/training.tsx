@@ -587,7 +587,7 @@ export default function TrainingScreen() {
       )}
 
       {/* 操作結果のメッセージ（どのカードの操作もここに出す） */}
-      {msg && <Text style={[s.msg, { marginTop: 0, marginBottom: 10, color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
+      {msg && <Text style={[s.msg, { marginTop: 0, marginBottom: 10, color: msg.ok ? C.successInk : C.coral }]}>{msg.text}</Text>}
     </>
   );
 
@@ -613,14 +613,14 @@ export default function TrainingScreen() {
           // 増量目的では収支の意味が逆になる（不足が課題・超過が達成）
           line = over < 0
             ? { text: t('増量ノルマまで あと{n}kcal 食べる', { n: (-over).toLocaleString() }), color: C.amber }
-            : { text: t('今日の増量ノルマ達成💪'), color: C.teal };
+            : { text: t('今日の増量ノルマ達成💪'), color: C.successInk };
         } else if (over > 0) {
           // 歩数への逆算は消費推定と同じ係数（lib/stepsKcal.ts）＝表示の数字と往復しても食い違わない
           const steps = stepsForKcal(over, myWeight);
           const min = Math.max(5, Math.round(over / walkKcalMin / 5) * 5);
           line = { text: t('食べすぎぶんは あと約{s}歩（はや歩き{m}分）で帳尻が合います', { s: steps.toLocaleString(), m: min }), color: C.amber };
         } else {
-          line = { text: t('収支は目標内。あと{n}kcal食べられます', { n: (-over).toLocaleString() }), color: C.teal };
+          line = { text: t('収支は目標内。あと{n}kcal食べられます', { n: (-over).toLocaleString() }), color: C.successInk };
         }
         const last7 = (healthDays ?? []).slice(-7);
         const maxSteps = Math.max(1, ...last7.map((d) => d.steps));
@@ -720,7 +720,7 @@ export default function TrainingScreen() {
                   return (
                     <View key={d.date} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
                       <View style={[s.mvBar, { height: 6 + Math.round(34 * (d.steps / maxSteps)) }, on && { backgroundColor: C.teal }]} />
-                      <Text style={[s.mvBarL, on && { color: C.teal, fontWeight: '800' }]}>{wd[dow]}</Text>
+                      <Text style={[s.mvBarL, on && { color: C.accentInk, fontWeight: '800' }]}>{wd[dow]}</Text>
                     </View>
                   );
                 })}
@@ -776,7 +776,7 @@ export default function TrainingScreen() {
                          onLongPress={() => saveVisible(visibleIds.filter((x) => x !== a.id))}
                          delayLongPress={450}>
                 <Text style={{ fontSize: 21 }}>{a.e}</Text>
-                <Text style={[s.actChipT, actId === a.id && { color: C.teal }]} numberOfLines={1}>
+                <Text style={[s.actChipT, actId === a.id && { color: C.accentInk }]} numberOfLines={1}>
                   {activityName(a.id)}
                 </Text>
               </Pressable>
@@ -784,7 +784,7 @@ export default function TrainingScreen() {
             {/* 種目を足す入口。長押しで隠せることもここで伝える */}
             <Pressable style={[s.actChip, s.actChipAdd]} onPress={() => setPickerOpen(true)}>
               <Text style={{ fontSize: 21 }}>＋</Text>
-              <Text style={[s.actChipT, { color: C.teal }]}>{t('種目を選ぶ')}</Text>
+              <Text style={[s.actChipT, { color: C.accentInk }]}>{t('種目を選ぶ')}</Text>
             </Pressable>
           </View>
           <Text style={[s.muted, { marginTop: 10, marginBottom: 4 }]}>{t('時間')}</Text>
@@ -935,7 +935,7 @@ export default function TrainingScreen() {
               {t('前回: {name} {rec}（{date}）', {
                 name: first.name.trim(), rec: prev.text, date: prev.date.slice(5).replace('-', '/'),
               })}
-              {diff != null && diff > 0 && <Text style={{ color: C.teal, fontWeight: '800' }}>{' '}{t('→ +{n}kg 更新💪', { n: diff })}</Text>}
+              {diff != null && diff > 0 && <Text style={{ color: C.accentInk, fontWeight: '800' }}>{' '}{t('→ +{n}kg 更新💪', { n: diff })}</Text>}
               {diff != null && diff < 0 && <Text style={{ color: C.sub }}>{' '}{t('→ {n}kg', { n: diff })}</Text>}
             </Text>
           );
@@ -1158,7 +1158,7 @@ const s = themed(() => ({
   editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
   pageTitle: { ...HEAD.page, color: C.ink, marginBottom: 12 },
   // 消費カロリーの読み取り許可への導線（スタット内の小さなリンク）と、設定アプリへの案内文
-  mvAuthLink: { fontSize: 11.5, fontWeight: '800', color: C.teal, marginTop: 6, lineHeight: 15 },
+  mvAuthLink: { fontSize: 11.5, fontWeight: '800', color: C.accentInk, marginTop: 6, lineHeight: 15 },
   mvAuthHint: { fontSize: 11.5, color: C.amber, fontWeight: '600', lineHeight: 16, marginTop: 8 },
   // きょうの動きカード
   mvRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
@@ -1167,7 +1167,7 @@ const s = themed(() => ({
   mvLbl: { fontSize: 12, fontWeight: '700', color: C.sub },
   mvVal: { fontSize: 25, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
   mvUnit: { fontSize: 13, fontWeight: '700', color: C.sub },
-  mvLink: { fontSize: 14, fontWeight: '800', color: C.teal, textDecorationLine: 'underline', paddingVertical: 6 },
+  mvLink: { fontSize: 14, fontWeight: '800', color: C.accentInk, textDecorationLine: 'underline', paddingVertical: 6 },
   // スタット内の副表示（実測の出どころ・アプリ記録ぶん）。主の数字を邪魔しない小ささに留める
   mvStatSub: { fontSize: 11, fontWeight: '700', color: C.sub, marginTop: 2, lineHeight: 15 },
   mvNote: { fontSize: 11.5, color: C.faint, lineHeight: 16, marginTop: 8 },
@@ -1193,7 +1193,7 @@ const s = themed(() => ({
   segBtnT: { fontSize: 15, fontWeight: '800', color: C.sub },
   actGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   actPickUsed: {
-    fontSize: 11, fontWeight: '800', color: C.teal,
+    fontSize: 11, fontWeight: '800', color: C.accentInk,
     backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 6, paddingVertical: 2,
   },
   tDial: { justifyContent: 'center', alignItems: 'center' },
@@ -1207,9 +1207,9 @@ const s = themed(() => ({
   },
   restOptOn: { borderColor: C.teal, backgroundColor: C.accentBadge, borderWidth: 1.5 },
   restOptT: { fontSize: 13, fontWeight: '800', color: C.sub },
-  restOptTOn: { color: C.teal },
+  restOptTOn: { color: C.accentInk },
   actHint: { fontSize: 11, color: C.faint, marginTop: 6 },
-  actDone: { fontSize: 15, fontWeight: '800', color: C.teal },
+  actDone: { fontSize: 15, fontWeight: '800', color: C.accentInk },
   actGroupT: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
   actPickRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -1237,7 +1237,7 @@ const s = themed(() => ({
   hkSub: { fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 18 },
   hkMsg: { fontSize: 13, fontWeight: '600', color: C.sub, marginTop: 16, textAlign: 'center' },
   hkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line },
-  hkCheck: { fontSize: 17, color: C.teal },
+  hkCheck: { fontSize: 17, color: C.accentInk },
   hkDate: { width: 44, fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
   hkName: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink },
   hkMeta: { fontSize: 13, color: C.sub, fontVariant: ['tabular-nums'] },
@@ -1262,7 +1262,7 @@ const s = themed(() => ({
     borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12,
   },
   restIdleT: { fontSize: 13, fontWeight: '700', color: C.sub },
-  restIdleStart: { fontSize: 13, fontWeight: '800', color: C.teal },
+  restIdleStart: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   goalRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line,
@@ -1273,7 +1273,7 @@ const s = themed(() => ({
   goalRowSub: { fontSize: 11.5, color: C.sub, marginTop: 1 },
   goalRowGo: { fontSize: 22, color: C.faint, fontWeight: '300' },
   restL: { fontSize: 13, fontWeight: '800', color: C.ink },
-  restN: { fontSize: 21, fontWeight: '900', color: C.teal, fontVariant: ['tabular-nums'] },
+  restN: { fontSize: 21, fontWeight: '900', color: C.accentInk, fontVariant: ['tabular-nums'] },
   restHint: { fontSize: 11, color: C.sub },
   prevRef: { fontSize: 13, color: C.sub, marginTop: 4, lineHeight: 18 },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
@@ -1297,7 +1297,7 @@ const s = themed(() => ({
   muted: { fontSize: 15, color: C.sub },
   bwNoteMuted: { fontSize: 13, color: C.faint, fontWeight: '600', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   favRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 },
-  bwNote: { fontSize: 13, color: C.teal, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
+  bwNote: { fontSize: 13, color: C.accentInk, fontWeight: '700', marginTop: 2, marginBottom: 2, paddingLeft: 2 },
   // 未同期チップ（圏外保存の積み残し）。責め色にしない・控えめに
   syncChip: {
     flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
