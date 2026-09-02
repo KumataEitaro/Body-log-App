@@ -16,7 +16,6 @@ import {
   ScrollView, Modal,
 } from 'react-native';
 import Svg, { Rect, Mask } from 'react-native-svg';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
 import { useRouter } from 'expo-router';
 import { Hand, PartyPopper, CheckCircle2, ChevronRight, X } from 'lucide-react-native';
@@ -437,11 +436,12 @@ function CoachDemoPanel({ title, text, onNext, H, progress }: {
   title: string; text: string; onNext: () => void; H: number; progress?: ReactNode;
 }) {
   const Q = t('最近ちょっと停滞気味かも。食事に何か問題ある？');
+  // デモ回答も全文を t() に通す（以前は前半3行が日本語のまま英語UIに混ざっていた・2026-09-02 自己監査）
   const A =
-    '直近7日の記録を見ると、気になる傾向が2つあります。\n\n' +
-    '・炭水化物が平均96g/日と、目標160gの6割しか取れていません。糖質が少なすぎると筋グリコーゲンが枯れて、トレ後半で力が出ない・体重が水分で乱高下する原因になります\n' +
-    '・一方、たんぱく質は平均132g（体重×1.6g）でしっかり確保できています💪\n' +
-    '・摂取カロリーは平均1,690kcalで目標−70kcal。ペース自体は悪くありません\n\n' +
+    t('直近7日の記録を見ると、気になる傾向が2つあります。') + '\n\n' +
+    t('・炭水化物が平均96g/日と、目標160gの6割しか取れていません。糖質が少なすぎると筋グリコーゲンが枯れて、トレ後半で力が出ない・体重が水分で乱高下する原因になります') + '\n' +
+    t('・一方、たんぱく質は平均132g（体重×1.6g）でしっかり確保できています💪') + '\n' +
+    t('・摂取カロリーは平均1,690kcalで目標−70kcal。ペース自体は悪くありません') + '\n\n' +
     t('おすすめは「トレする日だけ白米を150g（+250kcal）足す」こと。週の収支はまだ赤字のままなので、減量ペースを崩さずパフォーマンスだけ取り戻せます。まずは次のトレ日に試してみましょう。');
   const [qLen, setQLen] = useState(0);
   const [phase, setPhase] = useState<'typing' | 'thinking' | 'answer'>('typing');

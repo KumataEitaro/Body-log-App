@@ -9,6 +9,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
 import { usePurpose } from '@/lib/purpose';
+import { deleteConfirmMatches } from '@/lib/guard';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
@@ -427,7 +428,7 @@ export default function SettingsScreen() {
 
   // マイ食品の削除（単品・セット共通。設定側はUndoバーが無いので確認ダイアログ）
   function removeEntry(e: FoodEntry) {
-    Alert.alert(`「${e.name}」を削除しますか？`, t('入力画面のチップから消えます（過去の記録は変わりません）。'), [
+    Alert.alert(t('「{name}」を削除しますか？', { name: e.name }), t('入力画面のチップから消えます（過去の記録は変わりません）。'), [
       { text: t('キャンセル'), style: 'cancel' },
       {
         text: t('削除する'), style: 'destructive',
@@ -470,7 +471,7 @@ export default function SettingsScreen() {
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   function confirmDelete() {
-    if (delConfirm !== '削除') return;
+    if (!deleteConfirmMatches(delConfirm)) return;
     Alert.alert(
       t('アカウントを完全に削除しますか？'),
       t('記録・写真・目標・マイ食品のすべてが削除されます。この操作は取り消せません。'),
@@ -1224,8 +1225,8 @@ export default function SettingsScreen() {
         <Text style={s.note}>{t('アカウントと全データ（記録・写真・目標・マイ食品）を完全に削除します。この操作は取り消せません。')}</Text>
         <Text style={s.label}>{t('確認のため「削除」と入力')}</Text>
         <TextInput style={s.input} value={delConfirm} onChangeText={setDelConfirm} placeholder={t('削除')} placeholderTextColor={C.faint} />
-        <Pressable style={[s.btnDanger, { marginTop: 14 }, delConfirm !== '削除' && { opacity: 0.4 }]}
-                   onPress={confirmDelete} disabled={busy || delConfirm !== '削除'}>
+        <Pressable style={[s.btnDanger, { marginTop: 14 }, !deleteConfirmMatches(delConfirm) && { opacity: 0.4 }]}
+                   onPress={confirmDelete} disabled={busy || !deleteConfirmMatches(delConfirm)}>
           {busy ? <ActivityIndicator color={C.panel} /> : <Text style={s.btnPrimaryT}>{t('アカウントを完全に削除する')}</Text>}
         </Pressable>
         {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}

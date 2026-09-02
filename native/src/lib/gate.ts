@@ -10,7 +10,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { purchasesAvailable, currentPlan, higherPlan } from './purchases';
-import { isUnlimited } from './calc';
+import { isUnlimited, AI_LIMITS_ENABLED } from './calc';
 
 // ゲート対象の機能キー。画面を足すたびにここへ追加する（文字列unionで拡張）
 // 'diet'（食事の制約・B-18）は「AI判定・自由記述・メニュー判定」だけをゲートする。
@@ -107,6 +107,20 @@ export type Gate = {
 // スタンダード以上で解放されるプランか（新ティア: 全ゲート機能ともstandard解放で統一）
 const STANDARD_UP = new Set(['standard', 'premium']);
 
+/**
+ * 王冠を出すかの判定（純関数・jest lib/__tests__/gate.test.ts で固定）。
+ *  ・active（RCキー設定済みビルド）でなければ出さない
+ *  ・**プラン上限が点火していない（AI_LIMITS_ENABLED=false）間も出さない**。サーバーが全機能を
+ *    無料で通している状態で王冠を出すと「課金すれば開く」という嘘になる（2026-09-02 自己監査）。
+ *    広告枠（AdSlot / shouldShowAd）はこの判定を通さない＝「広告なし」は上限と無関係に本当の差だから
+ *  ・管理者（UNLIMITED_EMAILS）は常に開放
+ *  ・plan が standard 未満（null/'free'/'lite'）ならロック
+ */
+export function isGated(active: boolean, unlimitedUser: boolean, planName: string | null, limitsOn: boolean = AI_LIMITS_ENABLED): boolean {
+  if (!active || !limitsOn || unlimitedUser) return false;
+  return !STANDARD_UP.has(planName ?? 'free');
+}
+
 /** 王冠ゲーティングの判定。各画面はこれ1つで「王冠を出すか」を決められる */
 export function useGate(): Gate {
   // RCキー未設定ビルドでは即false（ビルド定数なのでアプリ起動中に変わらない）
@@ -120,7 +134,7 @@ export function useGate(): Gate {
     plan: active ? p : null,
     // 新ティア: ゲート機能はすべて「standard未満（null/'free'/'lite'）でロック」に統一。
     // UNLIMITED_EMAILS（管理者）は常に開放。feature別の必要プランが生まれたらここで出し分ける
-    gated: (_feature: GatedFeature) => active && !unlimited && !STANDARD_UP.has(p ?? 'free'),
+    gated: (_feature: GatedFeature) => isGated(active, unlimited, p),
   };
 }
 

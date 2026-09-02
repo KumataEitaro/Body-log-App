@@ -6,7 +6,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { View, Text, Pressable, Modal, Dimensions, Animated, Easing } from 'react-native';
 import { C, RADIUS, SPACE, themed } from '@/lib/ui';
-import { t } from '@/lib/i18n';
 
 type Rect = { x: number; y: number; w: number; h: number };
 

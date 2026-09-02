@@ -65,7 +65,7 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
     const perm = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { setMsg(fromCamera ? 'カメラの許可が必要です。' : t('写真の許可が必要です。')); return; }
+    if (!perm.granted) { setMsg(fromCamera ? t('カメラの許可が必要です。') : t('写真の許可が必要です。')); return; }
     const res = fromCamera
       // quality:1 は最大解像度のまま。このあと1080pxへ縮小するので落として構わない
       ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
@@ -219,7 +219,7 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? '撮り直す' : t('今週の写真を撮る')}
+          <OptionButton style={{ flex: 1 }} label={daysSince != null && daysSince < 7 ? t('撮り直す') : t('今週の写真を撮る')}
                         leading={<Camera size={16} color={C.panel} strokeWidth={2.2} />} onPress={() => pick(true)} />
           <OptionButton variant="tonal" label={t('選ぶ')}
                         leading={<ImagePlus size={16} color={C.ink} strokeWidth={2.2} />} onPress={() => pick(false)} />

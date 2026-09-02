@@ -51,7 +51,7 @@ export function MoodInline({ level, size = 18 }: { level: 1 | 2 | 3 | 4 | 5; siz
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
       <MoodFace level={level} size={size} color={C.teal} />
       <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.ink }}>{t('気分')}</Text>
-      <Text style={{ fontSize: 10, letterSpacing: 2.5, color: C.accentInk }}>
+      <Text style={{ fontSize: 11, letterSpacing: 2.5, color: C.accentInk }}>
         {'●'.repeat(level)}
         <Text style={{ color: C.line }}>{'●'.repeat(5 - level)}</Text>
       </Text>

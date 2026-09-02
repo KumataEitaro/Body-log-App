@@ -55,3 +55,17 @@ export function confirmOutlierWeight(prev: number | null | undefined, next: numb
     );
   });
 }
+
+/**
+ * アカウント削除の確認語が入力されたか。
+ * 表示ラベル「確認のため「削除」と入力」は各言語へ翻訳されるため、比較も翻訳後の語（t('削除')）で
+ * 行う。日本語の原文「削除」はどの言語でも常に受け付ける。
+ * 以前は原文との完全一致だけだったので、英語UIで placeholder どおり "Delete" と打っても
+ * ボタンが有効にならない行き止まりだった（2026-09-02 自己監査）。
+ */
+export function deleteConfirmMatches(input: string, localizedWord: string = t('削除')): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const v = norm(input);
+  if (!v) return false;
+  return v === norm('削除') || v === norm(localizedWord);
+}

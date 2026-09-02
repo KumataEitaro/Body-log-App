@@ -469,7 +469,7 @@ export default function CoachScreen() {
             value={histQ} onChangeText={setHistQ} returnKeyType="search" clearButtonMode="while-editing"
           />
           {histGroups.length === 0 ? (
-            <Text style={s.histEmpty}>{hist.length === 0 ? 'まだ相談履歴がありません。' : t('該当する履歴が見つかりません。')}</Text>
+            <Text style={s.histEmpty}>{hist.length === 0 ? t('まだ相談履歴がありません。') : t('該当する履歴が見つかりません。')}</Text>
           ) : (
             <ScrollView style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
               {histGroups.map((g) => (

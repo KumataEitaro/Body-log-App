@@ -1,6 +1,6 @@
 // 安全ガードの判定式（G1: BMI下限・減量ペース / G8: 体重の外れ値）。
 // 閾値は健康リスクの境界そのものなので、式の退行をテストで固定する。
-import { bmiFloorKg, weeklyLossPace, isOutlierWeight } from '../guard';
+import { bmiFloorKg, weeklyLossPace, isOutlierWeight, deleteConfirmMatches } from '../guard';
 
 describe('bmiFloorKg（BMI18.5の下限体重）', () => {
   it('170cmなら53.5kg前後になる', () => {
@@ -37,5 +37,20 @@ describe('isOutlierWeight（前回から±15%以上）', () => {
     expect(isOutlierWeight(60, 69)).toBe(true);      // +15%
     expect(isOutlierWeight(60, 51)).toBe(true);      // -15%
     expect(isOutlierWeight(52.8, 528)).toBe(true);   // 桁の打ち間違い
+  });
+});
+
+describe('deleteConfirmMatches（アカウント削除の確認語）', () => {
+  it('日本語の原文「削除」はどの言語でも通る', () => {
+    expect(deleteConfirmMatches('削除', 'Delete')).toBe(true);
+  });
+  it('翻訳後の確認語（英語UIなら Delete）も通る。前後の空白と大文字小文字は無視', () => {
+    expect(deleteConfirmMatches('Delete', 'Delete')).toBe(true);
+    expect(deleteConfirmMatches('  delete ', 'Delete')).toBe(true);
+  });
+  it('空・別の語は通らない', () => {
+    expect(deleteConfirmMatches('', 'Delete')).toBe(false);
+    expect(deleteConfirmMatches('   ', 'Delete')).toBe(false);
+    expect(deleteConfirmMatches('さくじょ', 'Delete')).toBe(false);
   });
 });

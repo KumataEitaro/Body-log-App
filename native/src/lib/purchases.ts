@@ -4,6 +4,7 @@
 // 間は、そのプラットフォームでは全機能が安全に「未課金」を返す。
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
+import { t } from './i18n';
 
 export type Plan = 'free' | 'lite' | 'standard' | 'premium';
 const RANK: Record<string, number> = { lite: 1, standard: 2, premium: 3 };
@@ -158,7 +159,7 @@ export async function purchase(offer: Offer): Promise<Plan | null> {
   } catch (e) {
     const err = e as { userCancelled?: boolean; message?: string };
     if (err?.userCancelled) return null;
-    throw new Error(err?.message || '購入に失敗しました。');
+    throw new Error(err?.message || t('購入に失敗しました。'));
   }
 }
 

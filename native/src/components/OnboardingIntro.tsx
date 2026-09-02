@@ -43,7 +43,7 @@ function VisualTalk() {
             <Sparkles size={13} color={C.teal} />
             <Text style={v.bubbleAiLabel}>{t('AIが数えました')}</Text>
           </View>
-          <Text style={v.bubbleAiT}>親子丼 720kcal ・ P38 F21 C89</Text>
+          <Text style={v.bubbleAiT}>{t('親子丼 720kcal ・ P38 F21 C89')}</Text>
         </View>
       </Float>
       <Float delay={600}>
