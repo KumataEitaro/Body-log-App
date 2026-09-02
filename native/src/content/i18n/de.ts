@@ -1791,4 +1791,9 @@ export const DE: Record<string, string> = {
   "タップするとアプリ内ブラウザで論文ページ（PubMed / DOI）を開きます。": "Tippen, um die Studienseite (PubMed / DOI) im In-App-Browser zu öffnen.",
   "解説記事を開く": "Artikel öffnen",
   "解説を読む": "Erklärung lesen",
+  "歩いたぶん（推定） +{n}kcal": "Vom Gehen (geschätzt) +{n}kcal",
+  "いま": "Jetzt",
+  "⏱ 時刻を選ぶ": "⏱ Uhrzeit wählen",
+  "食べた時間": "Uhrzeit der Mahlzeit",
+  "決定": "Fertig",
 };

@@ -35,7 +35,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { readActiveEnergyCached, healthAvailable } from './health';
+import { readActiveEnergyCached, healthAvailable, readActivitySummary, type HealthDaySummary } from './health';
 
 /** 「アクティブカロリーを目標に反映する」の保存キー（設定画面と各タブで共有・未設定=OFF） */
 export const ACTIVE_KCAL_TO_GOAL_KEY = 'bl-active-kcal-to-goal';
@@ -91,4 +91,48 @@ export function useActiveKcal(date: string): number | null {
     return () => { alive = false; };
   }, [date]);
   return kcal;
+}
+
+// ===== 歩数（食事タブのヒーロー用・運動タブと同じ3段階のための材料） =====
+// 運動タブ「きょうの動き」は lib/stepsKcal.ts resolveBurnKcal で
+//   ① 実測>0 → 実測 ／ ② 実測0で歩数>0 → 歩数から推定 ／ ③ どちらも無し → 記録のみ
+// の3段階にしている。食事タブの「歩いたぶん +Nkcal」も同じ3段階に揃えないと、
+// Apple Watchが無い人は運動タブでは推定が出るのにヒーローの上乗せは0のまま、という食い違いが出る。
+// 歩数の読み取りは readActivitySummary（歩数＋睡眠＋アクティブ）しか無く lib/health.ts は
+// 触れないので、ここで15分キャッシュして画面遷移ごとの HealthKit 問い合わせを抑える。
+const STEPS_TTL_MS = 15 * 60 * 1000;
+let stepsCache: { at: number; data: HealthDaySummary[] | null } | null = null;
+let stepsInflight: Promise<HealthDaySummary[] | null> | null = null;
+
+/** 直近14日の日別サマリー（キャッシュ付き・同時呼び出しは1本に合流）。非対応環境・失敗はnull */
+async function readStepsCached(): Promise<HealthDaySummary[] | null> {
+  const now = Date.now();
+  if (stepsCache && now - stepsCache.at < STEPS_TTL_MS) return stepsCache.data;
+  if (stepsInflight) return stepsInflight;
+  stepsInflight = (async () => {
+    const r = await readActivitySummary(14);
+    const data = 'error' in r ? null : r;
+    stepsCache = { at: Date.now(), data };
+    return data;
+  })().finally(() => { stepsInflight = null; });
+  return stepsInflight;
+}
+
+/**
+ * その日の歩数（ヘルスケア）。連携なし・非対応環境・読み取り失敗はnull、
+ * 読めたが記録が無い日は0（resolveBurnKcal は 0 を「歩数なし」として③へ落とす）
+ */
+export function useStepsOfDay(date: string): number | null {
+  const [steps, setSteps] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!healthAvailable()) { setSteps(null); return; }
+    readStepsCached().then((days) => {
+      if (!alive) return;
+      if (days == null) { setSteps(null); return; }
+      setSteps(days.find((d) => d.date === date)?.steps ?? 0);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [date]);
+  return steps;
 }

@@ -1791,4 +1791,9 @@ export const VI: Record<string, string> = {
   "タップするとアプリ内ブラウザで論文ページ（PubMed / DOI）を開きます。": "Nhấn để mở trang nghiên cứu (PubMed / DOI) bằng trình duyệt trong ứng dụng.",
   "解説記事を開く": "Mở bài viết giải thích",
   "解説を読む": "Đọc giải thích",
+  "歩いたぶん（推定） +{n}kcal": "Đi bộ (ước tính) +{n}kcal",
+  "いま": "Bây giờ",
+  "⏱ 時刻を選ぶ": "⏱ Chọn giờ",
+  "食べた時間": "Thời gian ăn",
+  "決定": "Xác nhận",
 };

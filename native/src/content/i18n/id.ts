@@ -1791,4 +1791,9 @@ export const ID: Record<string, string> = {
   "タップするとアプリ内ブラウザで論文ページ（PubMed / DOI）を開きます。": "Ketuk untuk membuka halaman jurnal (PubMed / DOI) di peramban dalam aplikasi.",
   "解説記事を開く": "Buka artikel penjelasan",
   "解説を読む": "Baca penjelasan",
+  "歩いたぶん（推定） +{n}kcal": "Dari jalan kaki (est.) +{n}kcal",
+  "いま": "Sekarang",
+  "⏱ 時刻を選ぶ": "⏱ Pilih waktu",
+  "食べた時間": "Waktu makan",
+  "決定": "Selesai",
 };
