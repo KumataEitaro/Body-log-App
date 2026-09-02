@@ -131,3 +131,10 @@ curl -s "https://app-site-association.cdn-apple.com/a/v1/bodylog-orcin.vercel.ap
 したがってアプリ側の実装は「**OSに正しくフィールドの意味を伝え、適切なタイミングで
 自動入力を促す**」までに留めている。`pickSavedAccount()` がやっているのも
 「入力欄を空にしてフォーカスし直す」だけで、パスワードには一切触れていない。
+
+
+## ビルドの点灯スイッチ（2026-09-02追記）
+
+Codemagicの自動署名は既存プロファイルを再利用するため、App IDにAssociated Domainsを付ける前に宣言だけ残すと「Provisioning profile doesn't include the Associated Domains capability」で必ず落ちる。そのため codemagic.yaml は **ENABLE_ASSOCIATED_DOMAINS=true が無い限り entitlement を除去**する。
+
+手順（この順）: ①App ID で Associated Domains にチェック→Save ②Apple Developer → Profiles で「bodylog rn appstore 2」を削除（自動署名が新規作成する） ③AASAの TEAMID を実値に置換→デプロイ ④Codemagic の環境変数グループ rc に ENABLE_ASSOCIATED_DOMAINS=true を追加 → 再ビルド。
