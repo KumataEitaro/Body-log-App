@@ -105,7 +105,10 @@ async function hasLogToday(): Promise<boolean> {
 /** 設定（モード・時刻）を保存して通知を組み直す。falseなら権限なし */
 export async function setDailyReminderPrefs(mode: DailyReminderMode, hour: number): Promise<boolean> {
   await AsyncStorage.multiSet([[MODE_KEY, mode], [TIME_KEY, `${hour}:00`], ['bl-notif-daily', mode === 'off' ? '0' : '1']]).catch(() => {});
-  return applyDailyReminder();
+  const ok = await applyDailyReminder();
+  // 週次レビュー（日曜21:00）は記録リマインダーのモードに従う。offにした瞬間に取り消す
+  await scheduleWeeklyReviewNotification().catch(() => {});
+  return ok;
 }
 
 /** いまの設定どおりに通知を組み直す（起動時・言語変更時・設定変更時に呼ぶ） */
@@ -244,6 +247,78 @@ export async function rescheduleMealGapReminder(lastMealAt: Date): Promise<void>
   } catch { /* Expo Go等では黙って諦める */ }
 }
 
+// ===== 週次レビュー（日曜21:00・docs/STRATEGY.md §6週末 / §7 N4） =====
+//
+// 【なぜ日曜21:00の1件だけなのか】
+// 週の振り返りは「終わった週」に対してしか意味を持たない。日曜の夜は週が事実上
+// 終わっていて、かつ翌週の予定を考える時間帯でもあるので、来週の目標を1つ受け取るのに
+// いちばん素直な瞬間になる。
+//
+// 【月曜の朝には出さない】
+// 月曜は「今週」が始まってしまっているため、通知から開くと画面の見出しが
+// 『今週』なのに中身は先週、という混乱が起きる（週の切り替わりを跨いだ振り返りは
+// 通知にしない）。月曜以降に開きたい人のために、概要タブの「週のふりかえり」行が
+// 常設の入口として残っている＝通知は"きっかけ"だけを担い、導線は二重に持たない。
+//
+// 【条件】記録リマインダーが off 以外のときだけ（通知そのものを止めている人には出さない）。
+// 1週1回だけ（bl-weekly-notified:<その日曜が属する週の月曜>）。
+
+const WEEKLY_REVIEW_ID_KEY = 'bl-notif-weekly-review-id';  // 予約中の通知ID
+const WEEKLY_REVIEW_DONE = 'bl-weekly-notified:';          // + 週キー（'1'=その週はもう積んだ）
+
+/** 「次の日曜21:00」。日曜の21:00を過ぎていれば翌週の日曜（純関数・テスト対象） */
+export function nextWeeklyReviewAt(now: Date): Date {
+  const d = new Date(now.getTime());
+  d.setHours(21, 0, 0, 0);
+  const toSunday = (7 - d.getDay()) % 7;      // getDay: 0=日曜
+  d.setDate(d.getDate() + toSunday);
+  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 7);
+  return d;
+}
+
+/** その日が属する週の月曜（achievements.weekKey と同じ定義。1週1回の記録キーに使う） */
+function weekKeyOf(d: Date): string {
+  const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+/** 予約中の週次レビュー通知を取り消す（リマインダーOFF時・積み直しの前） */
+export async function cancelWeeklyReviewNotification(): Promise<void> {
+  try {
+    const id = await AsyncStorage.getItem(WEEKLY_REVIEW_ID_KEY);
+    if (id) {
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      await AsyncStorage.removeItem(WEEKLY_REVIEW_ID_KEY).catch(() => {});
+    }
+  } catch { /* Expo Go等では黙って諦める */ }
+}
+
+/** 次の日曜21:00に週次レビューの通知を1件だけ積む（起動ごと・設定変更ごとに呼ぶ） */
+export async function scheduleWeeklyReviewNotification(): Promise<boolean> {
+  try {
+    const { mode } = await getDailyReminderPrefs();
+    if (mode === 'off') { await cancelWeeklyReviewNotification(); return true; }
+    const cur = await Notifications.getPermissionsAsync();
+    if (!cur.granted) return false;
+    const at = nextWeeklyReviewAt(new Date());
+    const wk = weekKeyOf(at);
+    // 1週1回: その週ぶんを一度積んだら、起動を繰り返しても二重に積まない
+    if ((await AsyncStorage.getItem(WEEKLY_REVIEW_DONE + wk)) === '1') return true;
+    await cancelWeeklyReviewNotification();
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: t('今週のふりかえりができました'),
+        body: t('体重の変化と、来週の目標を1つだけ用意しました。1分で読めます。'),
+        data: { url: 'bodylog://weekly-review' },   // タップで週次レビュー画面へ
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
+    });
+    await AsyncStorage.multiSet([[WEEKLY_REVIEW_ID_KEY, id], [WEEKLY_REVIEW_DONE + wk, '1']]).catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
 // ===== Day12「最初の法則」（B-7） =====
 
 /** 最初の法則の通知を21:05に1回だけ予約する（当日を過ぎていれば翌日）。
@@ -374,6 +449,8 @@ export async function reregisterAll(): Promise<void> {
     if (mode !== 'off') await applyDailyReminder();
     const kv = await AsyncStorage.multiGet(['bl-notif-weekly']);
     if (kv[0]?.[1] === '1') await setWeeklyPhotoReminder(true);
+    // 週次レビュー（日曜21:00・1週1回）。起動ごとに次の日曜ぶんを補充する
+    await scheduleWeeklyReviewNotification().catch(() => {});
   } catch { /* 失敗しても既存の通知が残るだけ */ }
 }
 
