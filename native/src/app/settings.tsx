@@ -23,7 +23,7 @@ import AddFoodSheet from '@/components/AddFoodSheet';
 import { renameMyFood, deleteMyFood } from '@/lib/foods';
 import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
-import { BellRing, FileText, Droplet } from 'lucide-react-native';
+import { BellRing, FileText, Droplet, Bug } from 'lucide-react-native';
 import { shareMedicalReport } from '@/lib/medicalReport';
 import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
@@ -52,12 +52,14 @@ import { unseenBadgeCount } from '@/lib/achievements';
 import { shareInvite } from '@/lib/invite';
 import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
+import * as Clipboard from 'expo-clipboard';
+import { readBootErrors, clearBootErrors, formatBootErrors, type BootError } from '@/lib/boot';
 
 // マイ食品（単品）の一覧行。items は複数食材をAIで合算した登録の内訳（migration-31・列が無いDBでは undefined）
 type MyFoodLite = { id: string; name: string; kcal: number; items?: unknown; created_at?: string | null };
 // 管理シートの統合一覧: 単品（my_foods）とセット（my_meals）を同じリストに並べる。count=品目数（単品はnull）
 type FoodEntry = { kind: 'food' | 'set'; id: string; name: string; kcal: number; count: number | null; createdAt: string };
-type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goal' | 'columns' | 'diet';
+type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goal' | 'columns' | 'diet' | 'boot';
 
 // テーマ変更でルートのツリーが作り直されるとき、次のマウントで開き直すシート。
 // モジュール変数なので再マウントをまたいで残り、読んだ直後に消す（通常の初回マウントでは null）
@@ -267,6 +269,15 @@ export default function SettingsScreen() {
     unseenBadgeCount().then((n) => { if (alive) setUnseenBadges(n); }).catch(() => {});
     return () => { alive = false; };
   }, []));
+  // 起動時のエラー記録（lib/boot.ts）。Androidの起動クラッシュはスタックトレースが
+  // 手に入らないことがあるため、「どの初期化がコケたか」を本人の画面から読めるようにする。
+  // 開くたびに読み直す（前回の起動ぶんが残っている）
+  const [bootErrors, setBootErrors] = useState<BootError[]>([]);
+  const [bootCopied, setBootCopied] = useState(false);
+  const reloadBootErrors = useCallback(() => {
+    readBootErrors().then(setBootErrors).catch(() => {});
+  }, []);
+  useEffect(() => { reloadBootErrors(); }, [reloadBootErrors]);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [foodFormOpen, setFoodFormOpen] = useState(false);
   const avatar = useAvatar();
@@ -814,6 +825,19 @@ export default function SettingsScreen() {
       <Pressable style={s.deleteLink} onPress={() => openSheet('delete')} hitSlop={6}>
         <Text style={s.deleteLinkT}>{t('アカウントを削除する')}</Text>
       </Pressable>
+
+      {/* 開発者向け（最下部・目立たせない）: 起動時に失敗した初期化処理の記録。
+          Androidの起動クラッシュはPlayのリリース前レポートが出ない経路だとスタックトレースが
+          手に入らない。「どの初期化がコケたか」が端末に残っていれば、次に落ちても本人の画面から
+          原因が読めてコピーして送れる（docs/ANDROID.md「起動クラッシュの調査手順」）。
+          記録が0件のときも行は残す＝「見る場所がある」ことを覚えてもらうため */}
+      <Pressable style={s.bootLink} onPress={() => { reloadBootErrors(); setBootCopied(false); openSheet('boot'); }} hitSlop={6}>
+        <Text style={s.bootLinkT}>
+          {bootErrors.length > 0
+            ? t('起動時のエラー記録（{n}件）', { n: bootErrors.length })
+            : t('起動時のエラー記録')}
+        </Text>
+      </Pressable>
     </ScrollView>
 
     {/* ===== プロフィール編集モーダル ===== */}
@@ -1257,6 +1281,48 @@ export default function SettingsScreen() {
         </ScrollView>
       </View>
     </Modal>
+    {/* ===== 起動時のエラー記録（開発者向け・docs/ANDROID.md） =====
+        起動時の初期化（言語・テーマ・通知・ヘルスケア…）は safeBoot() で1つずつ独立に
+        受け止めており、失敗はここに残る。トレースが取れないストア配布ビルドで
+        「どの初期化がコケたか」を本人が読んで送れる、唯一の窓口 */}
+    <Modal visible={sheet === 'boot'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
+      <View style={s.sheetBody}>
+        <SheetHeader icon={<Bug size={ICON.lg} color={C.sub} />} title={t('起動時のエラー記録')} />
+        <Text style={s.note}>
+          {t('アプリの起動時に失敗した初期化処理の記録です（最大20件）。ここに何か出ていても、記録は失われていません。不具合の報告に貼り付けてください。')}
+        </Text>
+        {bootErrors.length === 0 ? (
+          <Text style={[s.note, { marginTop: 16 }]}>{t('記録はありません（起動時のエラーは検出されていません）。')}</Text>
+        ) : (
+          <>
+            <ScrollView style={s.bootBox} contentContainerStyle={{ padding: 12, gap: 10 }}>
+              {bootErrors.map((e, i) => (
+                <View key={`${e.name}-${e.at}-${i}`}>
+                  <Text style={s.bootName}>
+                    {e.name}{(e.count ?? 1) > 1 ? t('（{n}回）', { n: e.count ?? 1 }) : ''}
+                  </Text>
+                  <Text style={s.bootMsg}>{e.message}</Text>
+                  <Text style={s.bootAt}>{e.at}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <OptionButton
+              style={{ marginTop: 14 }}
+              label={bootCopied ? t('コピーしました') : t('内容をコピーする')}
+              onPress={() => {
+                Clipboard.setStringAsync(formatBootErrors(bootErrors))
+                  .then(() => setBootCopied(true))
+                  .catch(() => {});
+              }}
+            />
+            <Pressable style={s.deleteLink} onPress={() => { clearBootErrors().then(reloadBootErrors).catch(() => {}); }} hitSlop={6}>
+              <Text style={s.deleteLinkT}>{t('記録を消す')}</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </Modal>
+
     <NotificationCenter visible={noticeOpen} onClose={() => { setNoticeOpen(false); todo.refresh(); }} />
     {/* クーポンコード入力（成功時はシート内で祝祭＋gateキャッシュ更新まで完結する） */}
     <CouponSheet visible={couponOpen} onClose={() => setCouponOpen(false)} />
@@ -1369,6 +1435,16 @@ const s = themed(() => ({
   logoutT: { color: C.sub, fontSize: 15, fontWeight: '800' },
   deleteLink: { alignItems: 'center', marginTop: 18 },
   deleteLinkT: { color: C.coral, fontSize: 15, fontWeight: '700' },
+  // 起動時のエラー記録（開発者向け・最下部。faintで「普段は見なくていい」ことを見た目で示す）
+  bootLink: { alignItems: 'center', marginTop: 26 },
+  bootLinkT: { color: C.faint, fontSize: 12, fontWeight: '600' },
+  bootBox: {
+    maxHeight: 380, marginTop: 14, backgroundColor: C.panel,
+    borderRadius: RADIUS.tile, borderWidth: 1, borderColor: C.line,
+  },
+  bootName: { fontSize: 13, fontWeight: '800', color: C.coral },
+  bootMsg: { fontSize: 12, color: C.ink, marginTop: 2, lineHeight: 17 },
+  bootAt: { fontSize: 11, color: C.faint, marginTop: 2 },
   // モーダル
   sheetBody: { flex: 1, backgroundColor: C.bg, padding: 18, paddingTop: sheetTopPad(18) },
   sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },

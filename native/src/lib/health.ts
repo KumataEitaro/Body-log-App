@@ -13,6 +13,7 @@ import {
   type HealthLinkState,
 } from './healthLink';
 import { setHealthLinkState, setHealthLastSync, bumpHealthVersion, healthStoreState } from './healthStore';
+import { jstYmd, jstHour } from './jst';
 
 type HK = typeof import('@kingstinct/react-native-healthkit');
 
@@ -166,7 +167,7 @@ export async function activeEnergyAuthState(): Promise<'ask' | 'asked' | null> {
 }
 
 function dateKeyJST(d: Date): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(d); // YYYY-MM-DD
+  return jstYmd(d.getTime()); // YYYY-MM-DD（Intl非依存・lib/jst.ts の理由コメント参照）
 }
 
 // 体重の過去分をヘルスケア→entriesへ取込（日ごとの最終値・既存の体重は上書きしない）
@@ -280,13 +281,11 @@ export async function importWorkouts(uid: string, items: HKWorkout[]): Promise<{
   return { imported, skipped };
 }
 
-// 現在のJST時（0-23）。時間帯別チャートで「未来の時間帯」を空にする判定に使う
+// 現在のJST時（0-23）。時間帯別チャートで「未来の時間帯」を空にする判定に使う。
+// hourCycle: 'h23' はHermes（Android）のIntlで RangeError になり得たため自前計算へ移した
 export function jstHourNow(): number {
-  try {
-    return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
-  } catch {
-    return new Date().getHours(); // Intl不調時は端末ローカル時で近似
-  }
+  const h = jstHour(Date.now());
+  return Number.isFinite(h) ? h : new Date().getHours(); // 計算不能時は端末ローカル時で近似
 }
 
 // その日の歩数を時間帯別（0-23時・JST）にバケツ分け（ヘルスケア式の棒グラフ用）。
@@ -301,9 +300,8 @@ export async function readHourlySteps(date: string): Promise<number[] | null> {
       filter: { date: { startDate: start, endDate: end } },
     });
     const out: number[] = new Array(24).fill(0);
-    const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: 'numeric', hourCycle: 'h23' });
     for (const s of samples) {
-      const h = Number(fmt.format(new Date(s.startDate)));
+      const h = jstHour(new Date(s.startDate).getTime());
       if (h >= 0 && h < 24) out[h] += Number(s.quantity);
     }
     return out.map((v) => Math.round(v));

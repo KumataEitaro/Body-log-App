@@ -1,5 +1,6 @@
 // カロリーモデル v5（トラッカーからの移植）
 // 目安kcal = BMR × 生活係数 + 運動追加kcal + 補正kcal
+import { jstYmd } from './jst';
 
 export const EX_LEVELS = ['オフ', '軽い', '通常', '高', '特大'] as const;
 export type ExLevel = (typeof EX_LEVELS)[number];
@@ -35,8 +36,13 @@ export function isUnlimited(email?: string | null): boolean {
 }
 
 // JSTの今日 (YYYY-MM-DD)
+// Intl.DateTimeFormat（'sv-SE' + timeZone: 'Asia/Tokyo'）から自前の純関数へ移した。
+// AndroidのHermesはIntlの有無・対応範囲が環境依存で、undefined や RangeError になり得る。
+// todayJST() は起動直後の通知再登録や記録画面の描画から呼ばれるため、ここが throw すると
+// 「Androidだけ起動直後に落ちる」形になる。JSTは1951年以降UTC+9固定でDSTが無いので、
+// タイムゾーンDBを使わずに厳密に同じ結果が出せる（lib/jst.ts）
 export function todayJST(): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
+  return jstYmd(Date.now());
 }
 
 // Mifflin-St Jeor

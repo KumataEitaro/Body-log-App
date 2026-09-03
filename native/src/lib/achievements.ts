@@ -211,7 +211,13 @@ export function badgeDefs(): Badge[] {
 // id→カテゴリの対応（メダルの色相に使う。翻訳を伴わないので一度作れば使い回せる。
 // リモート定義が届いて集合が変わったら作り直す）
 let catCache: Record<string, BadgeCat> | null = null;
-onRemoteContentChange(() => { catCache = null; });
+// モジュール評価時に走る唯一の副作用。ここが throw すると achievements.ts を import した
+// 画面が丸ごと読み込めず、ErrorBoundaryより手前で落ちる（Androidの起動クラッシュ調査で
+// 「トップレベル副作用は全部包む」と決めた・docs/ANDROID.md）。購読が張れなくても
+// 失うのは「リモート定義が届いたときのキャッシュ破棄」だけで、バッジ自体は同梱定義で出る
+try {
+  onRemoteContentChange(() => { catCache = null; });
+} catch { /* 購読できなくても同梱定義でバッジは出る */ }
 export function badgeCatOf(id: string): BadgeCat {
   if (!catCache) {
     catCache = {};
