@@ -127,3 +127,93 @@ Supabase→Googleの認可ページを開き、`bodylog://auth-callback` に戻�
   （署名者に `Android Debug` が含まれていたらビルドを落とす＝デバッグ署名の .aab を二度と外に出さない）
 - 鍵は Codemagic の `android_signing: [bodylog_keystore]` が渡す環境変数
   `CM_KEYSTORE_PATH` / `CM_KEYSTORE_PASSWORD` / `CM_KEY_ALIAS` / `CM_KEY_PASSWORD`
+
+## 起動クラッシュの調査手順（2026-09-03・versionCode 119 で発生）
+
+Android版の初回インストール（1.1.0 / versionCode 119）で「BodyLogが繰り返し停止しています」が
+出た。iOSは正常。**内部テストトラックではPlayのリリース前レポートが生成されず**、
+Android vitals も反映待ちで、スタックトレースが一切手に入らないところから始まった。
+
+### なぜ「原因を当てにいかない」のか
+
+トレースが無い状態で1箇所ずつ直しても、当たったかどうかが分からない（ビルド〜配布〜
+インストールで1周が長い）。そこで方針を変えた:
+
+> **原因を当てるのではなく、落ちない構造にして、原因を端末に記録させる。**
+
+起動時の初期化（言語・単位・テーマ・アイコン・よく使う順・目的・読み物キャッシュ・
+通知・ヘルスケア）はどれも「失敗しても画面は出せる」性質のもので、1つの失敗で
+レンダリングまで止める理由が無い。`lib/boot.ts` の `safeBoot()` で1つずつ独立に
+受け止め、失敗は端末に残す（実装は `src/app/_layout.tsx`）。
+
+### 1. まず端末で「起動時のエラー記録」を見る
+
+アプリが起動できるなら、これが最速で確実:
+
+**マイページ（設定）を一番下までスクロール → 「起動時のエラー記録」**
+
+- 実体は AsyncStorage の `bl-boot-errors`（最大20件・新しい順・同じ内容は回数で畳む）
+- 1件ごとに **どの初期化か（name）／メッセージ／時刻／回数** が出る
+  - name は `_layout.tsx` の `safeBoot('...')` に渡した名前
+    （`loadLocale` `loadTheme` `reregisterAll` `startHealthAutoSync` `auth.subscribe` `supabase.env` など）
+- 「内容をコピーする」でクリップボードに入るので、そのまま報告に貼れる
+- 記録があれば、次の起動から5秒後に Supabase の `crash_reports` へも送られる
+  （`boot-errors` という name で1件。送信済みでも端末の表示は消えない）
+
+### 2. 実機が手元にあるなら logcat が一番早い
+
+`safeBoot` は必ず `console.warn('[boot:<name>]', message)` も出すので、
+USBデバッグを有効にした端末をつないで:
+
+```sh
+adb logcat -c                                   # 一度クリアしてからアプリを起動する
+adb logcat "*:S" ReactNative:V ReactNativeJS:V AndroidRuntime:E   # JS例外とネイティブ例外
+adb logcat | grep -i "boot:"                    # safeBootが記録した初期化の失敗だけ
+adb logcat --buffer=crash                        # 直近のネイティブクラッシュ（tombstone）
+```
+
+JSの例外なら `ReactNativeJS`、Java/Kotlin側なら `AndroidRuntime: FATAL EXCEPTION` に出る。
+**JS例外が一切出ずに `AndroidRuntime` だけが出るなら、JSに到達する前のネイティブ初期化**
+（AdMobのApp ID・ネイティブモジュールのリンク・リソース）を疑う。
+
+### 3. Play Console でトレースを出す（内部テストでは出ない）
+
+- **リリース前レポート（Pre-launch report）は「クローズドテスト」以上でしか生成されない。**
+  内部テストのままでは何回上げても出ない
+  → Play Console → **テスト → クローズドテスト → 新しいトラックを作成** → 同じ .aab を
+    アップロード → 数十分〜数時間で「リリース前レポート → 安定性」にクラッシュの
+    スタックトレースと端末ごとの結果が出る（Googleの実機ファームで自動起動される）
+- **Android vitals**（品質 → Android vitals → クラッシュとANR）は
+  実ユーザーの端末からの収集なので、インストール数が少ないと反映まで数時間〜1日かかる。
+  期間フィルタを「過去24時間」、バージョンを versionCode で絞る
+- 自分の端末で再現できたなら **Play Console のクラッシュ収集を待たずに 1〜2 の方法**が速い
+
+### 4. コードを触るときの決まり（再発防止）
+
+- **モジュール評価時（トップレベル）の副作用は必ず try/catch で包むか `useEffect` へ移す。**
+  ここが throw すると ErrorBoundary もクラッシュ計測も間に合わず、JSバンドルの
+  読み込み中に死ぬ＝「起動直後に落ちる」になる。現在包んであるのは4箇所:
+  `_layout.tsx` の `installCrashReporter()` / `login.tsx` の
+  `WebBrowser.maybeCompleteAuthSession()` / `LaunchIntro.tsx` の
+  `SplashScreen.preventAutoHideAsync()` / `achievements.ts` の `onRemoteContentChange()`
+  - 全数確認: `grep -rnE "^[a-zA-Z_$][a-zA-Z0-9_$.]*\(" native/src --include=*.ts --include=*.tsx | grep -v __tests__`
+- **`.catch()` だけでは足りない。** `await` より前の throw（ネイティブモジュール未リンク等）は
+  同期例外として飛ぶので `try` でも包む
+- **起動時の初期化を足したら `safeBoot('名前', fn)` で包む。** 名前がそのまま
+  「起動時のエラー記録」に出るので、関数名と揃えておく
+- **iOS専用モジュールは動的 require ＋ `Platform.OS` の二重ガード。**
+  現在このやり方で守っているのは `@kingstinct/react-native-healthkit`（lib/health.ts）と
+  `react-native-google-mobile-ads`（components/AdBannerView.tsx）
+- **`Intl` に依存しない。** AndroidのHermesはIntlの有無・対応範囲がエンジンのビルドフラグ
+  依存で、`Intl` 自体が undefined／`timeZone`・`hourCycle` が RangeError になり得る。
+  JSTの日付・時刻は `lib/jst.ts`（UTC+9固定の純関数）を使う。
+  ロケール依存の整形が本当に必要な箇所（paywall の通貨表示）だけ try/catch 付きで残してある
+
+### 5. 起動時にどれだけのモジュールが読まれるか（＝疑う範囲）
+
+expo-router はリリースビルド（sync import mode）で **ルート直下の全画面の
+モジュールを起動時に評価する**。つまり未ログインでログイン画面しか見えていなくても、
+`(tabs)/_layout.tsx`・`settings.tsx`・`paywall.tsx`・`laws.tsx` などが読まれ、
+それらが import する lucide-react-native / react-native-svg / react-native-view-shot /
+expo-print / expo-camera / react-native-purchases / AdMob まで全部モジュール評価される。
+**「ログイン画面しか出ていないのだから関係ない」という切り分けは成立しない。**
