@@ -62,6 +62,7 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed, sheetTopPad } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
+import { jstHmFromIso } from '@/lib/jst';
 import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal, useStepsOfDay } from '@/lib/activeKcal';
 import { resolveBurnKcal } from '@/lib/stepsKcal';
 import {
@@ -136,8 +137,10 @@ const INPUT_MODE_LABEL = (): Record<InputMode, string> => ({
   text: t('テキストで入力'), myfood: t('マイ食品'), library: t('写真を選ぶ'), camera: t('撮影する'), tray: t('確認して保存'),
 });
 
+// Intl.DateTimeFormat から自前の純関数へ（lib/jst.ts）。AndroidのHermesでは Intl 自体が
+// 無い・timeZoneが未対応なことがあり、記録画面の描画中に throw すると画面ごと落ちる
 function timeJST(iso: string): string {
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return jstHmFromIso(iso);
 }
 
 function shiftDate(d: string, n: number): string {

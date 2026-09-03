@@ -127,3 +127,152 @@ Supabase→Googleの認可ページを開き、`bodylog://auth-callback` に戻�
   （署名者に `Android Debug` が含まれていたらビルドを落とす＝デバッグ署名の .aab を二度と外に出さない）
 - 鍵は Codemagic の `android_signing: [bodylog_keystore]` が渡す環境変数
   `CM_KEYSTORE_PATH` / `CM_KEYSTORE_PASSWORD` / `CM_KEY_ALIAS` / `CM_KEY_PASSWORD`
+
+## 起動クラッシュの調査手順（2026-09-03・versionCode 119 で発生）
+
+Android版の初回インストール（1.1.0 / versionCode 119）で「BodyLogが繰り返し停止しています」が
+出た。iOSは正常。**内部テストトラックではPlayのリリース前レポートが生成されず**、
+Android vitals も反映待ちで、スタックトレースが一切手に入らないところから始まった。
+
+### なぜ「原因を当てにいかない」のか
+
+トレースが無い状態で1箇所ずつ直しても、当たったかどうかが分からない（ビルド〜配布〜
+インストールで1周が長い）。そこで方針を変えた:
+
+> **原因を当てるのではなく、落ちない構造にして、原因を端末に記録させる。**
+
+起動時の初期化（言語・単位・テーマ・アイコン・よく使う順・目的・読み物キャッシュ・
+通知・ヘルスケア）はどれも「失敗しても画面は出せる」性質のもので、1つの失敗で
+レンダリングまで止める理由が無い。`lib/boot.ts` の `safeBoot()` で1つずつ独立に
+受け止め、失敗は端末に残す（実装は `src/app/_layout.tsx`）。
+
+### 1. まず端末で「起動時のエラー記録」を見る
+
+アプリが起動できるなら、これが最速で確実:
+
+**マイページ（設定）を一番下までスクロール → 「起動時のエラー記録」**
+
+- 実体は AsyncStorage の `bl-boot-errors`（最大20件・新しい順・同じ内容は回数で畳む）
+- 1件ごとに **どの初期化か（name）／メッセージ／時刻／回数** が出る
+  - name は `_layout.tsx` の `safeBoot('...')` に渡した名前
+    （`loadLocale` `loadTheme` `reregisterAll` `startHealthAutoSync` `auth.subscribe` `supabase.env` など）
+- 「内容をコピーする」でクリップボードに入るので、そのまま報告に貼れる
+- 記録があれば、次の起動から5秒後に Supabase の `crash_reports` へも送られる
+  （`boot-errors` という name で1件。送信済みでも端末の表示は消えない）
+
+### 2. 実機が手元にあるなら logcat が一番早い
+
+`safeBoot` は必ず `console.warn('[boot:<name>]', message)` も出すので、
+USBデバッグを有効にした端末をつないで:
+
+```sh
+adb logcat -c                                   # 一度クリアしてからアプリを起動する
+adb logcat "*:S" ReactNative:V ReactNativeJS:V AndroidRuntime:E   # JS例外とネイティブ例外
+adb logcat | grep -i "boot:"                    # safeBootが記録した初期化の失敗だけ
+adb logcat --buffer=crash                        # 直近のネイティブクラッシュ（tombstone）
+```
+
+JSの例外なら `ReactNativeJS`、Java/Kotlin側なら `AndroidRuntime: FATAL EXCEPTION` に出る。
+**JS例外が一切出ずに `AndroidRuntime` だけが出るなら、JSに到達する前のネイティブ初期化**
+（AdMobのApp ID・ネイティブモジュールのリンク・リソース）を疑う。
+
+### 3. Play Console でトレースを出す（内部テストでは出ない）
+
+- **リリース前レポート（Pre-launch report）は「クローズドテスト」以上でしか生成されない。**
+  内部テストのままでは何回上げても出ない
+  → Play Console → **テスト → クローズドテスト → 新しいトラックを作成** → 同じ .aab を
+    アップロード → 数十分〜数時間で「リリース前レポート → 安定性」にクラッシュの
+    スタックトレースと端末ごとの結果が出る（Googleの実機ファームで自動起動される）
+- **Android vitals**（品質 → Android vitals → クラッシュとANR）は
+  実ユーザーの端末からの収集なので、インストール数が少ないと反映まで数時間〜1日かかる。
+  期間フィルタを「過去24時間」、バージョンを versionCode で絞る
+- 自分の端末で再現できたなら **Play Console のクラッシュ収集を待たずに 1〜2 の方法**が速い
+
+### 4. コードを触るときの決まり（再発防止）
+
+- **モジュール評価時（トップレベル）の副作用は必ず try/catch で包むか `useEffect` へ移す。**
+  ここが throw すると ErrorBoundary もクラッシュ計測も間に合わず、JSバンドルの
+  読み込み中に死ぬ＝「起動直後に落ちる」になる。現在包んであるのは4箇所:
+  `_layout.tsx` の `installCrashReporter()` / `login.tsx` の
+  `WebBrowser.maybeCompleteAuthSession()` / `LaunchIntro.tsx` の
+  `SplashScreen.preventAutoHideAsync()` / `achievements.ts` の `onRemoteContentChange()`
+  - 全数確認: `grep -rnE "^[a-zA-Z_$][a-zA-Z0-9_$.]*\(" native/src --include=*.ts --include=*.tsx | grep -v __tests__`
+- **`.catch()` だけでは足りない。** `await` より前の throw（ネイティブモジュール未リンク等）は
+  同期例外として飛ぶので `try` でも包む
+- **起動時の初期化を足したら `safeBoot('名前', fn)` で包む。** 名前がそのまま
+  「起動時のエラー記録」に出るので、関数名と揃えておく
+- **iOS専用モジュールは動的 require ＋ `Platform.OS` の二重ガード。**
+  現在このやり方で守っているのは `@kingstinct/react-native-healthkit`（lib/health.ts）と
+  `react-native-google-mobile-ads`（components/AdBannerView.tsx）
+- **`Intl` に依存しない。** JSTの日付・時刻は `lib/jst.ts`（UTC+9固定の純関数）を使う。
+  ロケール依存の整形が本当に必要な箇所（paywall の通貨表示）だけ try/catch 付きで残してある
+  - 事実確認: RN 0.86 の hermes-android は `-DHERMES_ENABLE_INTL=True` でビルドされている
+    （`node_modules/react-native/ReactAndroid/hermes-engine/build.gradle.kts`）。
+    **つまり `Intl` は Android にも存在する**ので、「Intlが無くて落ちた」というのは
+    今回の真因ではない可能性が高い（正直に書いておく）
+  - それでも外した理由: Hermesの実装は android.icu への薄いブリッジで Apple の ICU とは別物、
+    オプションの組み合わせで RangeError になる報告があり（`hourCycle` 等）、
+    有効かどうかがエンジンのビルドフラグ次第＝アプリ側から保証できない。
+    保証できない依存を保証できる純関数に置き換えられるなら、そのほうが安い
+
+### 5. 起動時にどれだけのモジュールが読まれるか（＝疑う範囲）
+
+expo-router はリリースビルド（sync import mode）で **ルート直下の全画面の
+モジュールを起動時に評価する**。つまり未ログインでログイン画面しか見えていなくても、
+`(tabs)/_layout.tsx`・`settings.tsx`・`paywall.tsx`・`laws.tsx` などが読まれ、
+それらが import する lucide-react-native / react-native-svg / react-native-view-shot /
+expo-print / expo-camera / react-native-purchases / AdMob まで全部モジュール評価される。
+**「ログイン画面しか出ていないのだから関係ない」という切り分けは成立しない。**
+
+### 6. ネイティブモジュールのAndroid対応（2026-09-03 全数点検の結果）
+
+`native/package.json` の依存を1つずつ「Androidの実装があるか」「守れているか」で見た結果。
+判定方法は各パッケージの `expo-module.config.json` の `platforms` と `android/` ディレクトリの有無。
+
+**Androidにネイティブ実装が無いもの（3つ）**
+
+| モジュール | 状態 | 対処 |
+|---|---|---|
+| `@kingstinct/react-native-healthkit` | `android/` 無し（iOS専用） | ✅ `lib/health.ts` が動的 require ＋ `Platform.OS !== 'ios'` の二重ガード。JS側もパッケージが自前で「Androidならモックを返す」実装（`lib/commonjs/healthkit.js`）。config plugin は `withEntitlementsPlist` / `withInfoPlist` だけなので **androidのprebuildには一切影響しない**（app.json の plugins に置いたままで安全） |
+| `expo-glass-effect` | `platforms: ["apple"]` | ✅ `src/` のどこからも import していない（未使用の依存）。Androidでは autolink もされない |
+| `expo-symbols` | `platforms: ["apple"]` | ⚠️ `src/` から直接は使っていないが、**expo-router の Android版ネイティブタブが内部で import する**（`native-tabs/utils/materialIconConverter.android.js` → `unstable_getMaterialSymbolSourceAsync`）。Androidで評価されるのは `build/index.js` → `materialImageSource` / `SymbolView` の2つで、どちらもネイティブモジュール（`requireNativeModule('SymbolModule')`）を触らず **expo-font の `renderToImageAsync` でMaterial Symbolsフォントを画像化するだけ**。フォントは `@expo-google-fonts/material-symbols`（expo-symbolsの推移依存・インストール済み）。＝落ちない。ただし `md` アイコン名が辞書に無ければ**アイコンが出ないだけ**（例外にはならない） |
+
+**Androidに実装はあるが挙動が違う／確認したもの**
+
+- `expo-notifications`: チャンネル登録（`ensureAndroidChannel`）は `Platform.OS !== 'android'` で早期returnし、
+  全体が try/catch。**`setNotificationChannelAsync` は POST_NOTIFICATIONS 権限を要求しない**ので、
+  Android 13+ で未許可のまま起動しても throw しない。`reregisterAll` 全体も try/catch ＋ `safeBoot`
+- `react-native-google-mobile-ads`: 動的 require で守られ、`TestIds` は `ads` が非nullのときだけ参照
+  （`bannerUnitId(m, ...)` の引数経由）。`ensureAdsInit()` は無料プランの端末で1回だけ、try/catch＋`.catch()`。
+  **App IDは prebuild 後の AndroidManifest に
+  `com.google.android.gms.ads.APPLICATION_ID = ca-app-pub-3319916143033433~9006783518` として
+  正しく書き込まれることを実際に prebuild して確認済み**（未設定だと Google Mobile Ads SDK が
+  `Application.onCreate` で例外を投げてJSに到達する前に落ちるので、ここは実物で確認する価値がある）。
+  `DELAY_APP_MEASUREMENT_INIT = true` も入る
+- `expo-store-review`: 動的 import ＋ `isAvailableAsync()` で守っている（`lib/reviewPrompt.ts`）
+- `expo-print` / `expo-sharing` / `expo-media-library` / `expo-camera` / `expo-image-picker`:
+  すべてAndroid実装あり。起動時には呼ばれない（受診レポート・共有・バーコードのユーザー操作起点）
+- `react-native-svg` / `react-native-reanimated`(+`react-native-worklets`) / `react-native-screens` /
+  `react-native-safe-area-context` / `react-native-gesture-handler`: Android実装あり。
+  新アーキ（`newArchEnabled=true`）対応版が入っている
+- `@react-native-community/datetimepicker`: Android実装あり＋app.jsonのpluginsにも登録済み
+- `expo-router/unstable-native-tabs`: Androidは `NativeTabsView.android.js` があり、
+  `react-native-screens` の `TabsContainer.kt` が **自前で `ContextThemeWrapper(..., Theme_Material3_DayNight_NoActionBar)`**
+  を掛けている。つまり prebuild が生成する `AppTheme`（`Theme.AppCompat.DayNight.NoActionBar`）でも
+  BottomNavigationView のインフレートは落ちない（Materialテーマ必須の古典的クラッシュには当たらない）
+- `@expo/ui`: Android実装あり（Jetpack Compose）だが `src/` からは未使用。
+  未使用のまま autolink されるので、**将来ビルドサイズやCompose依存の衝突を疑うときは
+  最初に外す候補**（今回は起動クラッシュの原因になる経路が無い）
+
+**prebuild の生成物で確認したこと**（`npx expo prebuild --platform android --no-install`）
+
+- `gradle.properties`: `newArchEnabled=true` / `hermesEnabled=true` / `edgeToEdgeEnabled=true` /
+  `reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64`（ABIの取りこぼしなし）
+- **R8/minify は無効**（`android.enableMinifyInReleaseBuilds` 未設定＝false）。
+  ＝難読化でリフレクション参照が消えて落ちる、という定番の原因は今回は該当しない
+- `AndroidManifest.xml`: `enableOnBackInvokedCallback="false"`（predictiveBackGestureEnabled:false が効いている）、
+  ディープリンク `bodylog://` 登録済み、通知アイコン/色のmeta-data 登録済み
+- `MainApplication.kt` / `MainActivity.kt` はテンプレート素のまま（手が入っていない）
+- ⚠️ `expo-dev-client` が `dependencies` にあるため、リリース用のマニフェストにも
+  `SYSTEM_ALERT_WINDOW`（dev menuの浮遊ボタン用）が載る。Playの権限表示に出るので、
+  気になるなら `devDependencies` へ移す（起動クラッシュとは無関係）

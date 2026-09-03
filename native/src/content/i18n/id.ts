@@ -2197,4 +2197,11 @@ export const ID: Record<string, string> = {
   "今日は少し多めになります。1日の超過は週の合計で吸収できる範囲です。": "Hari ini agak berlebih. Kelebihan satu hari masih bisa tertutupi oleh total mingguan.",
   "今日は多めになります。今週は{w}kcalの赤字なので、明日から数日かけて戻していけます。": "Hari ini cukup berlebih. Minggu ini masih defisit {w}kcal, jadi bisa disesuaikan perlahan dalam beberapa hari ke depan.",
   "今日は多めになります。明日から数日かけて戻していけば、週の合計では追いつけます。": "Hari ini cukup berlebih. Kalau disesuaikan perlahan dalam beberapa hari ke depan, total mingguan masih bisa terkejar.",
+  "起動時のエラー記録（{n}件）": "Log error saat memulai ({n})",
+  "起動時のエラー記録": "Log error saat memulai",
+  "アプリの起動時に失敗した初期化処理の記録です（最大20件）。ここに何か出ていても、記録は失われていません。不具合の報告に貼り付けてください。": "Ini adalah log inisialisasi yang gagal saat aplikasi dimulai (maks. 20). Jika ada yang muncul di sini, data Anda tetap aman. Silakan tempelkan ini saat melaporkan masalah.",
+  "記録はありません（起動時のエラーは検出されていません）。": "Tidak ada log (tidak ada error saat memulai yang terdeteksi).",
+  "（{n}回）": "({n} kali)",
+  "内容をコピーする": "Salin isi",
+  "記録を消す": "Hapus log",
 };

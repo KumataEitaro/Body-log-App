@@ -2197,4 +2197,11 @@ export const VI: Record<string, string> = {
   "今日は少し多めになります。1日の超過は週の合計で吸収できる範囲です。": "Hôm nay sẽ hơi thừa một chút. Vượt một ngày thì tổng calo cả tuần vẫn bù lại được.",
   "今日は多めになります。今週は{w}kcalの赤字なので、明日から数日かけて戻していけます。": "Hôm nay nạp hơi nhiều rồi. Nhưng tuần này đang thâm hụt {w}kcal, bạn có thể cân bằng lại trong vài ngày tới.",
   "今日は多めになります。明日から数日かけて戻していけば、週の合計では追いつけます。": "Hôm nay nạp hơi nhiều rồi. Chỉ cần vài ngày tới điều chỉnh lại một chút là tổng calo cả tuần sẽ bắt kịp mục tiêu.",
+  "起動時のエラー記録（{n}件）": "Nhật ký lỗi khởi động ({n})",
+  "起動時のエラー記録": "Nhật ký lỗi khởi động",
+  "アプリの起動時に失敗した初期化処理の記録です（最大20件）。ここに何か出ていても、記録は失われていません。不具合の報告に貼り付けてください。": "Đây là nhật ký các lỗi khởi tạo khi mở ứng dụng (tối đa 20 mục). Ngay cả khi có lỗi hiển thị ở đây, dữ liệu của bạn vẫn an toàn. Vui lòng sao chép và dán nội dung này khi báo lỗi.",
+  "記録はありません（起動時のエラーは検出されていません）。": "Không có nhật ký (không phát hiện lỗi khởi động nào).",
+  "（{n}回）": "({n} lần)",
+  "内容をコピーする": "Sao chép nội dung",
+  "記録を消す": "Xóa nhật ký",
 };

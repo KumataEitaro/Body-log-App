@@ -6,8 +6,13 @@ import { Animated, Easing } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { themed } from '@/lib/ui';
 
-// JSがロードされるまでネイティブスプラッシュを保持（失敗しても起動は続行）
-SplashScreen.preventAutoHideAsync().catch(() => {});
+// JSがロードされるまでネイティブスプラッシュを保持（失敗しても起動は続行）。
+// .catch() だけでは「Promiseを返す前の同期throw」（ネイティブモジュール未リンク等）を
+// 拾えないため try でも包む。モジュール評価時の副作用はErrorBoundaryより手前で走るので、
+// ここが throw すると起動ごと落ちる（docs/ANDROID.md「起動クラッシュの調査手順」）
+try {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+} catch { /* スプラッシュが早く消えるだけ */ }
 
 const LaunchCtx = createContext<{ introDone: boolean }>({ introDone: true });
 export const useLaunch = () => useContext(LaunchCtx);

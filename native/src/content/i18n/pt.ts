@@ -2197,4 +2197,11 @@ export const PT: Record<string, string> = {
   "今日は少し多めになります。1日の超過は週の合計で吸収できる範囲です。": "Hoje vai passar um pouco. O total da semana consegue absorver o excesso de um dia.",
   "今日は多めになります。今週は{w}kcalの赤字なので、明日から数日かけて戻していけます。": "Hoje vai passar da meta. Você tem um déficit de {w}kcal nesta semana, então dá para ir compensando nos próximos dias.",
   "今日は多めになります。明日から数日かけて戻していけば、週の合計では追いつけます。": "Hoje vai passar da meta. Compensando aos poucos nos próximos dias, o total da semana volta aos trilhos.",
+  "起動時のエラー記録（{n}件）": "Logs de erros de inicialização ({n})",
+  "起動時のエラー記録": "Logs de erros de inicialização",
+  "アプリの起動時に失敗した初期化処理の記録です（最大20件）。ここに何か出ていても、記録は失われていません。不具合の報告に貼り付けてください。": "Histórico de inicializações com falha ao abrir o app (máx. 20). Se algo aparecer aqui, seus registros não foram perdidos. Copie e cole ao relatar um problema.",
+  "記録はありません（起動時のエラーは検出されていません）。": "Nenhum registro (nenhum erro de inicialização detectado).",
+  "（{n}回）": "({n} vezes)",
+  "内容をコピーする": "Copiar conteúdo",
+  "記録を消す": "Limpar registros",
 };

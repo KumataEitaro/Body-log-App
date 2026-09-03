@@ -12,7 +12,12 @@ import { useTheme } from '@/lib/theme';
 import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
 import { Languages, Check, KeyRound } from 'lucide-react-native';
 
-WebBrowser.maybeCompleteAuthSession();
+// OAuthのリダイレクト受け取り（Web/一部Androidの復帰経路）。
+// モジュール評価時の副作用なのでErrorBoundaryより手前で走る＝ここが throw すると
+// ログイン画面ごと落ちる。ネイティブでは実質no-opだが、必ず包む
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch { /* ネイティブでは未対応・no-opでも問題ない */ }
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
 
 // Apple/Google両方のプロバイダ設定完了（2026-08-26）。両ボタン表示ON。

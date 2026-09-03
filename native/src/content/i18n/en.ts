@@ -2275,4 +2275,11 @@ export const EN: Record<string, string> = {
   "今日は少し多めになります。1日の超過は週の合計で吸収できる範囲です。": "You'll be a bit over today, but a single-day surplus is easily absorbed by your weekly total.",
   "今日は多めになります。今週は{w}kcalの赤字なので、明日から数日かけて戻していけます。": "You'll be over today. With a {w}kcal weekly deficit, you can easily balance it out over the next few days.",
   "今日は多めになります。明日から数日かけて戻していけば、週の合計では追いつけます。": "You'll be over today. Just adjust over the next few days and you'll catch up on your weekly total.",
+  "起動時のエラー記録（{n}件）": "Startup error log ({n})",
+  "起動時のエラー記録": "Startup error log",
+  "アプリの起動時に失敗した初期化処理の記録です（最大20件）。ここに何か出ていても、記録は失われていません。不具合の報告に貼り付けてください。": "This is a log of initialization steps that failed when launching the app (up to 20). Even if something appears here, your data is safe. Please paste this when reporting an issue.",
+  "記録はありません（起動時のエラーは検出されていません）。": "No logs found (no startup errors detected).",
+  "（{n}回）": "({n} times)",
+  "内容をコピーする": "Copy content",
+  "記録を消す": "Clear log",
 };
