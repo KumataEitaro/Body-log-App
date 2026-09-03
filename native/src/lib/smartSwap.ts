@@ -6,9 +6,11 @@
 //
 // 【式】食材A の1食の目安量 gA に含まれる栄養素 X = per100A[X] × gA/100。
 //      候補 B が同じ X を得るのに必要な量 gB = X / per100B[X] × 100、個数 = gB / 1単位の重さ、kcalB = per100B.kcal × gB/100。
-//      減量（cut）: kcalB が kcalA の 70% 以下の候補を kcal の少ない順に最大3件。
-//      増量（bulk）: kcalB が kcalA の 130% 以上の候補を kcal の多い順に最大3件（同じ栄養素をとりながらエネルギーも稼げる）。
-//      どちらも gB ≤ 300g・個数 ≤ 6（「オレンジ12個」のような非現実な対比は出さない）。
+//      候補が1単位に満たないときは両側を整数倍 m = ceil(1単位の重さ / gB) して「候補1単位 ≒ 元m倍」の形に揃える
+//      （オレンジ1個のVC 78mg → 赤パプリカ46g=0.3個 → 4倍 → 「赤パプリカ1個でオレンジ4個ぶん」）。
+//      減量（cut）: kcalB が kcalA×m の 70% 以下の候補を kcal の少ない順に最大3件。
+//      増量（bulk）: kcalB が kcalA×m の 130% 以上の候補を kcal の多い順に最大3件（同じ栄養素をとりながらエネルギーも稼げる）。
+//      どちらも gB ≤ 300g・候補の個数 0.25〜6・元の個数 ≤ 30（「オレンジ40個」のような非現実な対比は出さない）。
 //
 // 【言い方の規約】「◯◯の方が優れている」は禁止。栄養素を限定した効率だけを言う:
 //   「ビタミンCなら、赤パプリカ1個でオレンジ3個ぶん」。FORBIDDEN_WORDS はテストで全出力に対して固定する。
@@ -39,7 +41,8 @@ export const FORBIDDEN_WORDS = ['優れ', '劣', 'ダメ', '悪い', '良い', '
 const CUT_RATIO = 0.7;      // 減量: kcal がこれ以下（70%）の候補だけ
 const BULK_RATIO = 1.3;     // 増量: kcal がこれ以上（130%）の候補だけ
 const MAX_GRAMS = 300;      // 候補の量の上限（1食で現実的な範囲）
-const MAX_UNITS = 6;        // 対比の個数の上限（絵文字×6まで）
+const MAX_UNITS = 6;        // 候補側の個数の上限（絵文字×6まで）
+const MAX_FROM_UNITS = 30;  // 元の側の個数の上限（アーモンド25粒・いちご5個は許す。「オレンジ40個」は出さない）
 const MIN_UNITS = 0.25;     // これ未満の個数は「1/4個」より細かく非現実
 export const MAX_SWAPS = 3;
 
@@ -53,7 +56,9 @@ export function roundUnits(u: number): number {
  * 取れる候補を最大3件。栄養素を指定しなければ from の「得意な栄養素」（signatureNutrient）。
  * from に得意な栄養素が無い（主食・油など）か、候補が無ければ空配列
  */
-export function swapsForFood(from: NutrientFood, opts: { nutrient?: NavNutrient | null; mode?: SwapMode; db?: NutrientFood[] } = {}): Swap[] {
+export type SwapOptions = { nutrient?: NavNutrient | null; mode?: SwapMode; db?: NutrientFood[]; top?: number };
+
+export function swapsForFood(from: NutrientFood, opts: SwapOptions = {}): Swap[] {
   const mode = opts.mode ?? 'cut';
   const nutrient = opts.nutrient ?? signatureNutrient(from);
   if (!nutrient) return [];
@@ -62,29 +67,41 @@ export function swapsForFood(from: NutrientFood, opts: { nutrient?: NavNutrient 
   const amount = nutrientOf(from, nutrient, gA);
   if (amount <= 0) return [];
   const kcalA = kcalOf(from, gA);
-  const fromSide: SwapSide = { food: from, units: roundUnits(gA / from.unit.g), grams: gA, kcal: Math.round(kcalA) };
   const out: Swap[] = [];
   for (const b of db) {
     if (b.id === from.id || b.per100[nutrient] <= 0) continue;
     // 油はビタミンE以外の置き換え先にはしない（大さじ◯杯の油を「置き換え」と呼ぶのは無理がある）
     if (b.cat === 'oil' && nutrient !== 've') continue;
-    const gB = (amount / b.per100[nutrient]) * 100;
+    const gB1 = (amount / b.per100[nutrient]) * 100;
+    // 候補が1単位に満たないときは両側を整数倍して「候補1単位」の形に揃える
+    // （オレンジ1個のVC → 赤パプリカ0.3個 → 4倍して「赤パプリカ1個でオレンジ4個ぶん」。動画の対比と同じ向き）
+    const m = gB1 < b.unit.g ? Math.ceil(b.unit.g / gB1) : 1;
+    const gB = gB1 * m;
+    const gAm = gA * m;
     if (gB > MAX_GRAMS) continue;
     const units = roundUnits(gB / b.unit.g);
-    if (units < MIN_UNITS || units > MAX_UNITS) continue;
+    const fromUnits = roundUnits(gAm / from.unit.g);
+    if (units < MIN_UNITS || units > MAX_UNITS || fromUnits < MIN_UNITS || fromUnits > MAX_FROM_UNITS) continue;
     const kcalB = kcalOf(b, gB);
-    if (mode === 'cut' ? kcalB > kcalA * CUT_RATIO : kcalB < kcalA * BULK_RATIO) continue;
-    out.push({ nutrient, amount, from: fromSide, to: { food: b, units, grams: Math.round(gB), kcal: Math.round(kcalB) } });
+    const kcalAm = kcalA * m;
+    if (mode === 'cut' ? kcalB > kcalAm * CUT_RATIO : kcalB < kcalAm * BULK_RATIO) continue;
+    out.push({
+      nutrient, amount: amount * m,
+      from: { food: from, units: fromUnits, grams: Math.round(gAm), kcal: Math.round(kcalAm) },
+      to: { food: b, units, grams: Math.round(gB), kcal: Math.round(kcalB) },
+    });
   }
-  out.sort((x, y) => (mode === 'cut' ? x.to.kcal - y.to.kcal : y.to.kcal - x.to.kcal));
-  return out.slice(0, MAX_SWAPS);
+  // 候補ごとに倍率 m が違うので、絶対kcalではなく「元に対する比」で並べる（減量: 小さい順／増量: 大きい順）
+  const ratio = (sw: Swap) => sw.to.kcal / Math.max(1, sw.from.kcal);
+  out.sort((x, y) => (mode === 'cut' ? ratio(x) - ratio(y) : ratio(y) - ratio(x)));
+  return out.slice(0, opts.top ?? MAX_SWAPS);
 }
 
 /**
  * 品目名 → 置き換え候補。名前が食材辞書に無ければ空配列（＝該当なし。行を出さない）。
  * 「サラダチキン＋鮭おにぎり」のような複合名は最長一致した1食材で考える
  */
-export function swapsFor(itemName: string, opts: { nutrient?: NavNutrient | null; mode?: SwapMode; db?: NutrientFood[] } = {}): Swap[] {
+export function swapsFor(itemName: string, opts: SwapOptions = {}): Swap[] {
   const from = findFood(itemName, opts.db);
   if (!from) return [];
   return swapsForFood(from, opts);

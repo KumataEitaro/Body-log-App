@@ -342,13 +342,16 @@ export function kcalOf(f: NutrientFood, grams: number): number {
   return (f.per100.kcal * grams) / 100;
 }
 
+/** 得意な栄養素と呼ぶ最低ライン: 1食で1日の目安の15%（ごはん1杯の食物繊維11%・食パン1枚の12%は「得意」と呼ばない） */
+const SIGNATURE_MIN_RATIO = 0.15;
+
 /**
  * その食材の「得意な栄養素」= 1食の目安量で1日の目安に対する充足率が最大の栄養素。
- * 置き換え候補で栄養素の指定が無いときの既定。どの栄養素も5%未満なら null（主食・油など）
+ * 置き換え候補で栄養素の指定が無いときの既定。どの栄養素も15%未満なら null（主食・油など）
  */
 export function signatureNutrient(f: NutrientFood): NavNutrient | null {
   let best: NavNutrient | null = null;
-  let bestRatio = 0.05;
+  let bestRatio = SIGNATURE_MIN_RATIO;
   for (const key of NAV_NUTRIENTS) {
     const ratio = nutrientOf(f, key, f.serving) / NUTRIENT_META[key].ref;
     if (ratio > bestRatio) { best = key; bestRatio = ratio; }

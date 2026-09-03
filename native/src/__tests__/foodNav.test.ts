@@ -38,9 +38,10 @@ describe('栄養DB（content/nutrientDb）', () => {
         const [lo, hi] = NUTRIENT_META[k].range;
         if (p[k] < lo || p[k] > hi) offenders.push(`${f.id}: ${k} ${p[k]}`);
       }
-      // P/F/C のkcal換算が表示kcalから極端に外れていない（打ち間違い検出。海藻・きのこは食物繊維ぶん低く出るので広めに）
+      // P/F/C のkcal換算が表示kcalから極端に外れていない（打ち間違い検出）。
+      // 海藻は八訂で食物繊維・糖アルコールに低いエネルギー換算係数を使うため、炭水化物×4 から大きく下がる＝対象外
       const est = p.p * 4 + p.f * 9 + p.c * 4;
-      if (p.kcal > 30 && Math.abs(est - p.kcal) > Math.max(60, p.kcal * 0.35)) offenders.push(`${f.id}: kcal ${p.kcal} vs PFC換算 ${est}`);
+      if (f.cat !== 'seaweed' && p.kcal > 30 && Math.abs(est - p.kcal) > Math.max(60, p.kcal * 0.35)) offenders.push(`${f.id}: kcal ${p.kcal} vs PFC換算 ${est}`);
       if (f.unit.g <= 0 || f.serving <= 0) offenders.push(`${f.id}: unit/serving`);
       if (typeof f.name !== 'string' && (!f.name.ja || !f.name.en)) offenders.push(`${f.id}: name`);
     }
@@ -96,9 +97,10 @@ describe('栄養DB（content/nutrientDb）', () => {
 });
 
 describe('かしこい置き換え（lib/smartSwap）', () => {
-  it('オレンジ（ビタミンC）→ 赤パプリカ1個でオレンジ4個ぶん。kcal は減る', () => {
-    const sw = swapsFor('オレンジ').find((x) => x.to.food.id === 'red_pepper');
-    expect(sw).toBeDefined();
+  it('オレンジ（ビタミンC）→ 赤パプリカ1個でオレンジ4個ぶん。kcal は減る（比が最小なので先頭）', () => {
+    const list = swapsFor('オレンジ');
+    const sw = list[0];
+    expect(sw?.to.food.id).toBe('red_pepper');
     expect(sw!.nutrient).toBe('vc');
     expect(sw!.to.units).toBe(1);
     expect(sw!.from.units).toBe(4);
@@ -107,8 +109,13 @@ describe('かしこい置き換え（lib/smartSwap）', () => {
     expect(swapKcalDelta(sw!)).toMatch(/^約−\d+kcal$/);
   });
 
-  it('納豆（たんぱく質）→ サラダチキン1個で納豆4パックぶん', () => {
-    const sw = swapsFor('納豆', { nutrient: 'p' }).find((x) => x.to.food.id === 'salad_chicken');
+  it('納豆（たんぱく質）→ サラダチキン1個で納豆4パックぶん（上位3件の外でも式は同じ）', () => {
+    const top3 = swapsFor('納豆', { nutrient: 'p' });
+    expect(top3.length).toBe(3);
+    // 減量の並びは「元に対するkcal比」の小さい順（倍率 m が候補ごとに違うため絶対kcalでは比べない）
+    const ratios = top3.map((x) => x.to.kcal / x.from.kcal);
+    expect(ratios).toEqual([...ratios].sort((a, b) => a - b));
+    const sw = swapsFor('納豆', { nutrient: 'p', top: 50 }).find((x) => x.to.food.id === 'salad_chicken');
     expect(sw).toBeDefined();
     expect(sw!.to.units).toBe(1);
     expect(sw!.from.units).toBe(4);
@@ -131,7 +138,9 @@ describe('かしこい置き換え（lib/smartSwap）', () => {
           else expect(sw.to.kcal).toBeGreaterThanOrEqual(sw.from.kcal * 1.3 - 1);
           expect(sw.to.units).toBeGreaterThanOrEqual(0.25);
           expect(sw.to.units).toBeLessThanOrEqual(6);
-          expect(sw.from.units).toBeLessThanOrEqual(6);
+          expect(sw.from.units).toBeGreaterThanOrEqual(0.25);
+          expect(sw.from.units).toBeLessThanOrEqual(30);   // アーモンド25粒は許す
+          expect(sw.to.grams).toBeLessThanOrEqual(300);
           expect(sw.to.units * 2).toBe(Math.round(sw.to.units * 2));
           expect(sw.to.food.id).not.toBe(f.id);
           // 油はビタミンE以外の置き換え先にならない
@@ -209,7 +218,8 @@ describe('たんぱく源ティア（content/proteinTiers）', () => {
     const cut = tierPromptSummary('cut');
     expect(cut.length).toBeLessThanOrEqual(400);
     expect(cut).toContain('減量向け');
-    expect(cut).toContain('S=鶏むね肉（皮なし）');
+    expect(cut).toContain('S=');
+    expect(cut.split(' / ')[0]).toContain('鶏むね肉（皮なし）');   // 鶏むねは S の並びの中にいる
     expect(cut).toContain('A=');
     expect(cut).toContain('C以下=');
     expect(tierPromptSummary('bulk')).toContain('増量向け');
