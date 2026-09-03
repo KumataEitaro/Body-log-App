@@ -276,6 +276,11 @@ workflows:
         script: |
           cd native
           npx expo prebuild --platform android
+      - name: リリース署名を注入（prebuildのbuild.gradleはreleaseもデバッグ鍵で署名するため）
+        script: |
+          # 2026-09-03: この注入が無いまま作った .aab は Play で
+          # 「デバッグモードで署名されています」と拒否された。詳細は scripts/inject-android-signing.js
+          node scripts/inject-android-signing.js native/android/app/build.gradle
       - name: Build aab
         script: |
           # Codemagicのandroid_signing（上のbodylog_keystore）が有効なら、署名設定は
@@ -283,5 +288,19 @@ workflows:
           cd native/android
           chmod +x gradlew
           ./gradlew bundleRelease
+      - name: 署名の検証（デバッグ署名の.aabを世に出さない最後の砦）
+        script: |
+          set -e
+          AAB=$(ls -t native/android/app/build/outputs/bundle/release/*.aab | head -1)
+          echo "検証対象: $AAB"
+          # apksigner が入っていない環境でも動くよう、まず keytool でメタ情報を見る
+          unzip -p "$AAB" META-INF/*.RSA > /tmp/sig.rsa 2>/dev/null || unzip -p "$AAB" META-INF/*.EC > /tmp/sig.rsa
+          SUBJ=$(keytool -printcert -file /tmp/sig.rsa | grep -m1 "所有者\|Owner")
+          echo "署名者: $SUBJ"
+          if echo "$SUBJ" | grep -qi "Android Debug"; then
+            echo "❌ デバッグ鍵で署名されています。Play にアップロードできません" >&2
+            exit 1
+          fi
+          echo "✅ リリース鍵で署名されています"
     artifacts:
       - native/android/app/build/outputs/**/*.aab
