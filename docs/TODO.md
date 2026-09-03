@@ -65,11 +65,18 @@ https://play.google.com/console → BodyLoger → ダッシュボードの「詳
 - 承諾後、TestFlight → 内部テスト「初期招待」グループへ追加
 - 小澤祥太さんは追加済み（「招待済み」＝TestFlight アプリからインストール待ち）
 
-### A8. 🟢 AdMob: インタースティシャル広告ユニットの作成
-https://apps.admob.com → BodyLoger（iOS / Android 各アプリ）→ 広告ユニット → **インタースティシャル**を作成
-- 発行された ID を Codemagic の環境変数へ:
-  `EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS` / `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID`
-- **未設定のあいだは全画面広告は出ない**（安全側の既定）。手順は docs/ADS.md
+### A8. 🟢 AdMob: インタースティシャルID を Codemagic に登録（ユニットは作成済み）
+AdMob 側のユニット作成は **2026-09-04 に完了**。残るのは環境変数の登録だけ。
+https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables → グループ `rc`
+| 変数名 | 値 |
+|---|---|
+| `EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS` | `ca-app-pub-3319916143033433/9926213590` |
+| `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID` | `ca-app-pub-3319916143033433/5986968582` |
+- Secure（暗号化）は不要。登録後に再ビルドすると焼き込まれる（署名の変更なし）
+- **未設定のあいだは全画面広告は出ない**（安全側の既定）。詳細 docs/ADS.md
+- 実際に広告が出るのは **A9（課金点火）以降**。それまでは表示条件を満たさない
+- あわせて https://apps.admob.com → **お支払い** で支払い情報・税務情報を登録
+  （未登録だと収益が発生しても振り込まれない。広告表示自体は可能）
 
 ### A9. 🟢 課金を点火するとき（3点セットは必ず同時）
 1. `EXPO_PUBLIC_RC_IOS_KEY` / `_ANDROID_KEY` を設定
