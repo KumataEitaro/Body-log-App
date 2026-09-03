@@ -2280,4 +2280,7 @@ export const ES: Record<string, string> = {
   "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Has visto anuncios {n} veces esta última semana. Con Estándar, serían 0.",
   "広告を消す →": "Eliminar anuncios →",
   "広告なしで使えます": "Disponible sin anuncios",
+  "食べるものを、食事タブでそのまま相談": "Consulta qué comer directamente desde la pestaña de comidas",
+  "食べるものを相談する": "Consultar qué comer",
+  "「食べるものを相談する」はスタンダードプランで使えます。": "\"Consultar qué comer\" está disponible en el plan Estándar.",
 };
