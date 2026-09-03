@@ -36,39 +36,23 @@ function textIncludes(tree: ReactTestRenderer, sub: string): boolean {
   return tree.root.findAll((n) => n.type === Text && flat(n.props.children).includes(sub)).length > 0;
 }
 
-describe('＋シート（2段構成）', () => {
-  it('1段目に食事・運動・体の写真・体重の4タイルが出る（ステップ 1/2）', async () => {
+describe('＋シート（食事は直行・体重だけ2段）', () => {
+  it('1段目に食事・運動・体の写真・体重＋「何を食べる？」が出る（段表示は出さない）', async () => {
     const tree = await mount(
       <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />,
     );
-    for (const l of ['食事', '運動', '体の写真', '体重']) expect(tile(tree, l)).toBeTruthy();
-    expect(hasText(tree, '1/2')).toBe(true);
-    // 2段目の入力方法はまだ出ていない
+    for (const l of ['食事', '運動', '体の写真', '体重', '何を食べる？']) expect(tile(tree, l)).toBeTruthy();
+    // 食事は直行になったので「記録する」の下に段は無い（体重だけ2段）
+    expect(hasText(tree, '1/2')).toBe(false);
+    expect(hasText(tree, '2/2')).toBe(false);
+    // 入力方法の選択画面（2段目）は廃止した＝入力シート側にマイ食品・写真アイコンが載っているため
     expect(tile(tree, 'テキストで入力')).toBeUndefined();
+    expect(tile(tree, 'マイ食品')).toBeUndefined();
+    expect(tile(tree, '撮影する')).toBeUndefined();
     await act(async () => { tree.unmount(); });
   });
 
-  it('食事 → 入力方法4タイル（マイ食品・テキスト・写真を選ぶ・撮影する。バーコードは無い）→ ‹ で1段目へ戻る', async () => {
-    const tree = await mount(
-      <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />,
-    );
-    await act(async () => { tile(tree, '食事').props.onPress(); });
-    for (const l of ['マイ食品', 'テキストで入力', '写真を選ぶ', '撮影する']) expect(tile(tree, l)).toBeTruthy();
-    expect(hasText(tree, '2/2')).toBe(true);
-    // バーコードの入口は置かない（食品DBを持たないため）
-    const barcode = tree.root.findAll((n) => n.type === Text && /バーコード/.test(String(n.props.children)));
-    expect(barcode).toHaveLength(0);
-    // 前の選択（記録する › 食事）が見出しに出る
-    expect(textIncludes(tree, '記録する')).toBe(true);
-    expect(textIncludes(tree, '›')).toBe(true);
-    // 戻る
-    await act(async () => { tile(tree, '戻る').props.onPress(); });
-    expect(tile(tree, '運動')).toBeTruthy();
-    expect(tile(tree, 'テキストで入力')).toBeUndefined();
-    await act(async () => { tree.unmount(); });
-  });
-
-  it('入力方法を選ぶと onClose → 閉じ切ってから onAction（meal:text）が1回だけ届く', async () => {
+  it('食事 → 2段目を挟まず onClose → 閉じ切ってから onAction（meal:text）が1回だけ届く', async () => {
     const onClose = jest.fn();
     const onAction = jest.fn();
     let visible = true;
@@ -77,7 +61,7 @@ describe('＋シート（2段構成）', () => {
     );
     const tree = await mount(el());
     await act(async () => { tile(tree, '食事').props.onPress(); });
-    await act(async () => { tile(tree, 'テキストで入力').props.onPress(); });
+    // 1タップで確定する（旧: 食事 → テキストで入力 の2タップ）
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onAction).not.toHaveBeenCalled();      // 閉じる前には呼ばない（iOSのModal兄弟問題）
     visible = false;
