@@ -72,6 +72,7 @@ import { sumItems, type FoodItem } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
 import { listMyMeals, deleteMyMeal, saveMyMeal, type MyMeal } from '@/lib/meals';
 import { applyMult, currentMult, MULT_STEPS } from '@/lib/mealAdjust';
+import { swapsFor, swapLine, emojiText, swapKcalDelta } from '@/lib/smartSwap';
 import SaveMealSheet from '@/components/SaveMealSheet';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
 import { skipTodayReminder, scheduleFirstLawNotification } from '@/lib/notify';
@@ -790,11 +791,14 @@ export default function LogScreen() {
   function confirmDeleteLog(l: DayLog) {
     const items = (l.items as FoodItem[] | null) ?? [];
     const canEdit = items.length > 0 || l.weight != null;
+    const swapTarget = items.map((it) => it.name).find((name) => swapsFor(name, { mode: purposeKey === 'bulk' ? 'bulk' : 'cut' }).length > 0) ?? null;
     Alert.alert(canEdit ? t('この記録をどうしますか？') : t('この記録を削除しますか？'), logTitle(l), [
       { text: t('キャンセル'), style: 'cancel' },
       ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
       // マイ食品（セット）: 品目内訳のある食事だけ登録できる（気分・体重だけの行では出さない）
       ...(items.length > 0 ? [{ text: t('マイ食品に登録'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
+      // 食材ナビ: 品目のどれかに置き換え候補があるときだけ（栄養ランキング図鑑のその品目へ）
+      ...(swapTarget ? [{ text: t('置き換え候補を見る'), onPress: () => router.push({ pathname: '/nutrient-rank', params: { food: swapTarget } } as never) }] : []),
       { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
     ]);
   }
@@ -2158,6 +2162,24 @@ export default function LogScreen() {
                     );
                   })}
                 </View>
+                {/* 食材ナビ「かしこい置き換え」（2026-09-03）: この品目の得意な栄養素を、より少ない（増量なら多い）kcalで
+                    取れる食材があるときだけ1行。「🍊×4 ≒ 🫑×1」の対比＋栄養素を限定した文（lib/smartSwap の規約）。
+                    タップで栄養ランキング図鑑のその品目の置き換え候補へ。ヒーロー直下の調停（logCards）対象外＝トレイ内の行 */}
+                {(() => {
+                  const sw = swapsFor(parsed.items[focusItem].name, { mode: purposeKey === 'bulk' ? 'bulk' : 'cut' })[0];
+                  if (!sw) return null;
+                  const delta = swapKcalDelta(sw);
+                  return (
+                    <Pressable style={({ pressed }) => [s.swapRow, pressed && { opacity: 0.7 }]}
+                               onPress={() => router.push({ pathname: '/nutrient-rank', params: { food: parsed.items[focusItem].name } } as never)}
+                               accessibilityRole="button" accessibilityLabel={t('かしこい置き換え')}>
+                      <Text style={s.swapLabel}>{t('かしこい置き換え')}</Text>
+                      <Text style={s.swapT} numberOfLines={2}>
+                        <Text style={s.swapEmoji}>{emojiText(sw.from)} ≒ {emojiText(sw.to)}</Text>{'  '}{swapLine(sw)}{delta ? `（${delta}）` : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })()}
               </View>
             )}
 
@@ -2400,6 +2422,11 @@ const s = themed(() => ({
   },
   adjustName: { fontSize: 13, fontWeight: '800', color: C.ink },
   adjustHint: { fontSize: 11, fontWeight: '600', color: C.sub },
+  // 食材ナビ「かしこい置き換え」（量調整ポップの下の1行）
+  swapRow: { marginTop: 8, backgroundColor: C.chipBg, borderRadius: RADIUS.input, paddingHorizontal: 10, paddingVertical: 7 },
+  swapLabel: { fontSize: 11, fontWeight: '800', color: C.accentInk, letterSpacing: 0.4 },
+  swapT: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginTop: 2 },
+  swapEmoji: { fontSize: 13, fontWeight: '800', color: C.ink },
   multChip: {
     flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: RADIUS.chip,
     borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel,

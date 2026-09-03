@@ -16,13 +16,14 @@ App Store の規約上、**コードを含む機能は OTA で配れません**�
 | 読み物 | ○ 新記事を丸ごと | ○ 既存記事の文言 | — |
 | バッジ | ○ 名前・説明・アイコン名・カテゴリ＋**条件DSLで書ける獲得条件** | ○ 既存バッジの文言 | DSLで書けない条件（例: 不死鳥＝途切れたあと再30日） |
 | 法則 | × | ○ 図鑑の文言（発見文・根拠・未発見ヒント） | **新しい法則の追加**（検出は統計計算＝コード） |
+| 栄養データ（食材ナビ） | ○ 新しい食材を丸ごと | ○ 既存食材の値・別名・単位 | 栄養素の種類の追加（置き換え・ランキングの軸はコード） |
 
 ## テーブルの形
 
 ```
 remote_content
   id               text  主キー。例 'readings-2026-09-a'（何の配信か分かる名前）
-  kind             text  'readings' | 'badges' | 'laws_text'
+  kind             text  'readings' | 'badges' | 'laws_text' | 'nutrients'（nutrients は migration-32 以降）
   version          int   同kind内の適用順。大きいほど後に適用＝優先（既定1）
   payload          jsonb { "items": [ ... ] }
   published_at     timestamptz 既定 now()
@@ -167,11 +168,65 @@ insert into remote_content (id, kind, version, payload, min_app_version) values 
 
 - **法則そのものの追加（新しい種類）はできません**。検出は統計計算（コード）なのでアプリのアップデートが必要です
 
+## 4. 食材ナビの栄養データを直す／足す（コピペ用・2026-09-03）
+
+前提: `supabase/migration-32.sql` を実行済み（kind に `'nutrients'` を許可）。同梱データは
+`native/src/content/nutrientDb.ts` の `NUTRIENT_DB`（約80品・日本食品標準成分表2020年版（八訂）ベースの目安値）。
+**同じ `id` を書けば値の訂正、新しい `id` なら品目の追加**。「かしこい置き換え」「栄養ランキング」「たんぱく源ティア」の
+すべてがこのデータから計算されるので、値を直せば格付けも自動で直る。
+
+```sql
+insert into remote_content (id, kind, version, payload, min_app_version) values (
+  'nutrients-2026-09-a',                 -- ★ 一意な名前
+  'nutrients',
+  1,
+  $${
+    "items": [
+      {
+        "id": "red_pepper",                -- ★ 同梱と同じ id → 値の差し替え（下の id 一覧）
+        "name": { "ja": "赤パプリカ", "en": "Red bell pepper" },
+        "aliases": ["赤パプリカ", "パプリカ", "赤ピーマン"],   -- 品目名の部分一致に使う別名（長いほど優先）
+        "emoji": "🫑",
+        "cat": "veg",                      -- meat fish egg soy dairy veg fruit grain nuts oil seaweed processed
+        "unit": { "label": { "ja": "個", "en": "pepper" }, "g": 150 },   -- 数える単位と1単位の重さ。大さじ等は "prefix": true
+        "serving": 75,                     -- 1食の目安量（g）
+        "per100": { "kcal": 28, "p": 1.0, "f": 0.2, "c": 7.2,           -- 100gあたり。kcal/p/f/c は必須
+                    "va": 88, "vc": 170, "ve": 4.3, "fe": 0.4, "zn": 0.2, "ca": 7, "k": 210, "fib": 1.6, "n3": 0 }
+      },
+      {
+        "id": "acerola",                   -- ★ 新しい id → 品目の追加
+        "name": { "ja": "アセロラ（果汁10%飲料）", "en": "Acerola drink" },
+        "aliases": ["アセロラ"], "emoji": "🍒", "cat": "fruit",
+        "unit": { "label": { "ja": "杯", "en": "cup" }, "g": 200 }, "serving": 200,
+        "per100": { "kcal": 42, "p": 0.1, "f": 0, "c": 10.5, "vc": 120 }
+      },
+      {
+        "id": "chicken_breast",            -- たんぱく源は tier（性格）を持つとティア表に載る
+        "name": { "ja": "鶏むね肉（皮なし）", "en": "Chicken breast (skinless)" },
+        "aliases": ["鶏むね", "鶏胸", "むね肉"], "emoji": "🍗", "cat": "meat",
+        "unit": { "label": { "ja": "枚", "en": "piece" }, "g": 250 }, "serving": 100,
+        "per100": { "kcal": 105, "p": 23.3, "f": 1.9, "c": 0.1, "k": 370 },
+        "tier": { "ease": 2, "price": 1, "overeat": 1 }   -- 1=良い側（手間が少ない／安い／食べすぎにくい）〜3
+      }
+    ]
+  }$$::jsonb,
+  '1.0.21'                                 -- ★ 食材ナビが入ったビルド以降にだけ配る（古い版は kind を無視するだけ）
+);
+```
+
+- `per100` の微量栄養素は省略可（0 扱い）。**妥当範囲を超える値の品目は丸ごと捨てられる**
+  （100gあたり: p≤85g・va≤15,000µg・vc≤200mg・ve≤60mg・fe≤15mg・zn≤15mg・ca≤1,300mg・k≤7,000mg・fib≤60g・n3≤60g・kcal≤900。
+  `native/src/lib/remoteContent.ts` の `NUTRIENT_RANGE_MAX`）。桁違いの数字を図鑑に載せないための安全弁
+- 同梱の id 一覧: `native/src/content/nutrientDb.ts` の `id:`（例 `chicken_breast` `salad_chicken` `natto` `salmon` `oyster` `red_pepper` `orange`）
+- 栄養素の種類（鉄・ビタミンA…の軸）を増やすのはコード＝要アップデート
+- 反映のタイミングは他の kind と同じ（起動時＋24時間ごと）。ティアの格付け・ランキング・置き換え候補は表示のたびに計算し直す
+
 ---
 
 ## min_app_version の決め方
 
 - 読み物・法則文言: 基本 `null`（全バージョンに配る）
+- 栄養データ（nutrients）: 食材ナビが入ったビルド（feat/food-nav 以降）の版。古い版は未知の kind として無視するので `null` でも実害はない
 - バッジ: 条件DSLの評価器が入ったビルド（feat/remote-content 以降）にだけ配る。
   それより古いアプリは `remote_content` を読まないので実害はないが、**新しい metric を足したときは
   その metric が入ったビルドの版**を書く（古い版はその項目を捨てるだけなので、書かなくても落ちはしない）

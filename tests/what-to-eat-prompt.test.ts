@@ -89,3 +89,22 @@ describe('sanitizeEatPicks', () => {
     expect(sanitizeEatPicks('nope')).toEqual([]);
   });
 });
+
+describe('buildWhatToEatPrompt: たんぱく源ティア（食材ナビ）', () => {
+  it('ティアの要約を渡すと本人の文脈とルール（Sティアを1案・格付けは書かない）が入り、渡さなければ入らない', () => {
+    const p = buildWhatToEatPrompt({ ...base, context: 'convenience', proteinTiers: '減量向けのたんぱく源ティア: S=鶏むね肉（皮なし）・サラダチキン / A=鮭 / C以下=手羽先' });
+    expect(p).toContain('減量向けのたんぱく源ティア: S=鶏むね肉（皮なし）');
+    expect(p).toContain('少なくとも1案はSティアのたんぱく源を主役にする');
+    expect(p).toContain('ティアという言葉や格付けはreasonに書かない');
+    const none = buildWhatToEatPrompt({ ...base, context: 'convenience' });
+    expect(none).not.toContain('ティア');
+  });
+  it('要約は400字で切られ、改行はスペースに畳まれる（プロンプトの行構造を壊さない）', () => {
+    const long = 'S=' + 'あ'.repeat(500) + '\nA=x';
+    const p = buildWhatToEatPrompt({ ...base, context: 'cook', proteinTiers: long });
+    const line = p.split('\n').find((l) => l.startsWith('- S='))!;
+    expect(line).toBeDefined();
+    expect(line.length).toBeLessThanOrEqual(402);
+    expect(p).not.toContain('\nA=x');
+  });
+});

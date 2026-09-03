@@ -9,6 +9,7 @@
 //                DSLで書けない条件（不死鳥＝途切れたあとの再30日 等）はコード側に残る
 //   ・法則     … 検出は統計計算（コード）なので**新しい法則の追加はアップデートが必要**。
 //                図鑑の文言（発見文・根拠・未発見のヒント）だけを差し替えられる
+//   ・栄養データ… 食材ナビ（content/nutrientDb.ts）の品目。値の訂正（同id）と品目の追加（新id）が純データで済む
 //
 // 【配信元】Supabase `remote_content`（supabase/migration-30.sql）。全認証ユーザーがselect可・
 //  書き込みはservice roleのみ（管理者がSQL Editorでinsertする運用。docs/REMOTE-CONTENT.md）。
@@ -36,7 +37,7 @@ const REFRESH_INTERVAL_MS = 24 * 60 * 60_000;   // 24時間ごと
 /** 多言語文言。キーは言語コード（'ja' | 'en' | …）。文字列1本でも受け付ける（＝全言語共通） */
 export type L10n = Record<string, string> | string;
 
-export type RemoteKind = 'readings' | 'badges' | 'laws_text';
+export type RemoteKind = 'readings' | 'badges' | 'laws_text' | 'nutrients';
 
 /** 読み物1件（同梱の Column と同じ形に解決される） */
 export type RemoteReading = {
@@ -110,6 +111,78 @@ export type RemoteLawText = {
   article?: RemoteLawArticle;    // 解説記事（law-detail）。id は evidenceKey（'kind' または 'kind:variant'）
 };
 
+// ===== 食材ナビの栄養データ（kind 'nutrients'・content/nutrientDb.ts と同じ形） =====
+// 型と検証をここに置くのは、nutrientDb.ts が getRemoteContent を import するため（循環を避ける）。
+// nutrientDb.ts は型をここから再輸出して使う
+
+/** 食材ナビが扱う栄養素キー。p 以外は微量栄養素 */
+export const NAV_NUTRIENT_KEYS = ['p', 'va', 'vc', 've', 'fe', 'zn', 'ca', 'k', 'fib', 'n3'] as const;
+export type NavNutrient = (typeof NAV_NUTRIENT_KEYS)[number];
+
+/**
+ * 100gあたりの妥当範囲の上限（成分表で最大級の食品＋余裕）。同梱データのテストとリモートの検証で共有する。
+ * p 85g（かつお節77）／va 15,000µg（鶏レバー14,000）／vc 200mg（赤ピーマン170）／ve 60mg（ひまわり油39）／
+ * fe 15mg（豚レバー13）／zn 15mg（かき14）／ca 1,300mg（ごま1,200）／k 7,000mg（ひじき6,400）／
+ * fib 60g（ひじき52）／n3 60g（えごま油58）
+ */
+export const NUTRIENT_RANGE_MAX: Record<NavNutrient, number> = { p: 85, va: 15000, vc: 200, ve: 60, fe: 15, zn: 15, ca: 1300, k: 7000, fib: 60, n3: 60 };
+
+export type NutrientFoodCat = 'meat' | 'fish' | 'egg' | 'soy' | 'dairy' | 'veg' | 'fruit' | 'grain' | 'nuts' | 'oil' | 'seaweed' | 'processed';
+const NUTRIENT_CATS: NutrientFoodCat[] = ['meat', 'fish', 'egg', 'soy', 'dairy', 'veg', 'fruit', 'grain', 'nuts', 'oil', 'seaweed', 'processed'];
+
+/** 食材1品目（リモート・同梱共通）。詳細は content/nutrientDb.ts のコメント */
+export type RemoteNutrientFood = {
+  id: string;
+  name: L10n;
+  aliases: string[];
+  emoji?: string;
+  cat: NutrientFoodCat;
+  unit: { label: L10n; g: number; prefix?: boolean };
+  serving: number;
+  per100: { kcal: number; p: number; f: number; c: number } & Record<Exclude<NavNutrient, 'p'>, number>;
+  tier?: { ease: 1 | 2 | 3; price: 1 | 2 | 3; overeat: 1 | 2 | 3 };
+};
+
+const isNum0 = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+
+/**
+ * 栄養データ1品目の検証（壊れた項目は捨てる）。
+ * 必須: id・name・unit{label,g>0}・serving>0・per100{kcal,p,f,c}。微量栄養素は無ければ 0。
+ * 100gあたりの値が NUTRIENT_RANGE_MAX を超える項目は桁違いとみなして丸ごと捨てる（誤った数字を図鑑に載せない）
+ */
+export function validateNutrientFood(x: unknown): RemoteNutrientFood | null {
+  if (typeof x !== 'object' || x == null) return null;
+  const o = x as Record<string, unknown>;
+  if (!isStr(o.id) || !isL10n(o.name)) return null;
+  const unit = o.unit as Record<string, unknown> | undefined;
+  if (!unit || !isL10n(unit.label) || !isNum0(unit.g) || unit.g <= 0) return null;
+  if (!isNum0(o.serving) || o.serving <= 0) return null;
+  const p = o.per100 as Record<string, unknown> | undefined;
+  if (!p || !isNum0(p.kcal) || !isNum0(p.p) || !isNum0(p.f) || !isNum0(p.c)) return null;
+  if (p.kcal > 900 || p.p > NUTRIENT_RANGE_MAX.p || p.f > 100 || p.c > 100) return null;
+  const per100: RemoteNutrientFood['per100'] = { kcal: p.kcal, p: p.p, f: p.f, c: p.c, va: 0, vc: 0, ve: 0, fe: 0, zn: 0, ca: 0, k: 0, fib: 0, n3: 0 };
+  for (const key of NAV_NUTRIENT_KEYS) {
+    if (key === 'p') continue;
+    const v = p[key];
+    if (v == null) continue;
+    if (!isNum0(v) || v > NUTRIENT_RANGE_MAX[key]) return null;
+    per100[key] = v;
+  }
+  const out: RemoteNutrientFood = {
+    id: o.id, name: o.name as L10n,
+    aliases: Array.isArray(o.aliases) ? (o.aliases as unknown[]).filter(isStr) : [],
+    emoji: isStr(o.emoji) ? o.emoji : undefined,
+    cat: NUTRIENT_CATS.includes(o.cat as NutrientFoodCat) ? (o.cat as NutrientFoodCat) : 'processed',
+    unit: { label: unit.label as L10n, g: unit.g, prefix: unit.prefix === true },
+    serving: o.serving,
+    per100,
+  };
+  const tr = o.tier as Record<string, unknown> | undefined;
+  const lv = (v: unknown): 1 | 2 | 3 | null => (v === 1 || v === 2 || v === 3 ? v : null);
+  if (tr && lv(tr.ease) && lv(tr.price) && lv(tr.overeat)) out.tier = { ease: lv(tr.ease)!, price: lv(tr.price)!, overeat: lv(tr.overeat)! };
+  return out;
+}
+
 /** remote_content の1行 */
 export type RemoteRow = {
   id: string;
@@ -125,9 +198,10 @@ export type RemoteContent = {
   readings: RemoteReading[];
   badges: RemoteBadge[];
   lawsText: RemoteLawText[];
+  nutrients: RemoteNutrientFood[];   // 食材ナビの栄養データ（content/nutrientDb.ts と id で統合）
 };
 
-export const EMPTY_REMOTE: RemoteContent = { readings: [], badges: [], lawsText: [] };
+export const EMPTY_REMOTE: RemoteContent = { readings: [], badges: [], lawsText: [], nutrients: [] };
 
 // ===== 純関数（テスト対象） =====
 
@@ -319,7 +393,7 @@ export function mergeById<T extends { id: string }>(base: T[], patch: T[]): T[] 
  *  ・解釈できない項目は捨てる（1件の壊れで全体を止めない）
  */
 export function mergeRemoteRows(rows: RemoteRow[] | null | undefined, appVersion: string | null | undefined): RemoteContent {
-  const out: RemoteContent = { readings: [], badges: [], lawsText: [] };
+  const out: RemoteContent = { readings: [], badges: [], lawsText: [], nutrients: [] };
   if (!Array.isArray(rows)) return out;
   const usable = rows
     .filter((r) => r && typeof r === 'object' && versionGte(appVersion, r.min_app_version))
@@ -336,6 +410,9 @@ export function mergeRemoteRows(rows: RemoteRow[] | null | undefined, appVersion
         break;
       case 'laws_text':
         out.lawsText = mergeById(out.lawsText, items.map(validateLawText).filter((x): x is RemoteLawText => x != null));
+        break;
+      case 'nutrients':
+        out.nutrients = mergeById(out.nutrients, items.map(validateNutrientFood).filter((x): x is RemoteNutrientFood => x != null));
         break;
       default:
         break;   // 未知のkindは無視（古いアプリに新しい種類が来ても落ちない）

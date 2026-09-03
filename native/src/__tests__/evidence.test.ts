@@ -31,6 +31,8 @@ const VARIANTS: [string, string][] = [
   // エンジン系の向きのある variant（1記事で両方向）
   ['wheat_vs_rice_mood', 'wheat_low'], ['wheat_vs_rice_mood', 'rice_low'],
   ['lift_sleep', 'up'], ['lift_sleep', 'down'], ['lift_mood', 'up'], ['lift_mood', 'down'],
+  // 食材ナビ（protein_tier）。variant 'swap'（置き換えが言える）/ 'default' は1記事
+  ['protein_tier', 'default'], ['protein_tier', 'swap'],
 ];
 
 const ja = (v: unknown): string => (typeof v === 'string' ? v : (v as Record<string, string>)?.ja ?? '');

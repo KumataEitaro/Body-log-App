@@ -994,6 +994,59 @@ const MULTI_BINGE: LawArticle = {
   sources: [HAEDT_MATT_2011, STEIN_2007, SPIEGEL_2004, AL_KHATIB_2017, POLIVY_HERMAN_1985, HAINES_2003, ADAM_EPEL_2007],
 };
 
+// ----- 食材ナビ（protein_tier）で追加した出典（2026-09-03）。成分表は文部科学省の公式ページ -----
+const MEXT_FOOD_TABLE_2020: EvidenceSource = {
+  authors: '文部科学省 科学技術・学術審議会 資源調査分科会',
+  title: '日本食品標準成分表（八訂）増補2023年',
+  journal: '文部科学省', year: 2023,
+  url: 'https://www.mext.go.jp/a_menu/syokuhinseibun/mext_00001.html',
+};
+const WESTERTERP_2004: EvidenceSource = {
+  authors: 'Westerterp-Plantenga MS, Lejeune MP, Nijs I, van Ooijen M, Kovacs EM',
+  title: 'High protein intake sustains weight maintenance after body weight loss in humans',
+  journal: 'Int J Obes Relat Metab Disord. 28(1):57-64', year: 2004,
+  url: 'https://pubmed.ncbi.nlm.nih.gov/14710168/',
+};
+
+const PROTEIN_TIER: LawArticle = {
+  meaning: {
+    ja: 'たんぱく源の「格付け（ティア）」は、あなたが食べたたんぱく源を、たんぱく質1gあたりのカロリー・脂質の割合・つい量が増えやすいか・調理の手間・価格帯で並べたものです。Aティア以上の割合は「同じたんぱく質を、どれだけ少ないカロリーで取れているか」の目安になります。\nこれはどの食材が良い・悪いという話ではありません。手羽先や豚バラにも役割があります。「同じたんぱく質量を別の食材で取ると、1食でどれだけカロリーが変わるか」を数字で見える形にしただけです。増量が目的の人は、カロリー密度と食べやすさを評価する別の基準で並びます。',
+    en: 'The protein "tier" ranks the protein sources you actually ate by calories per gram of protein, share of fat, how easily portions grow, preparation effort and price. The share of A-tier-or-above shows how few calories you are spending to get your protein. This is not a verdict on foods; chicken wings and pork belly have their place. It simply makes visible how much one meal\'s calories change when the same protein comes from a different source. For people bulking, the ranking uses a separate scale that rewards energy density and ease of eating.',
+  },
+  science: [
+    {
+      text: { ja: '減量中のたんぱく質の役割をまとめた総説では、たんぱく質を多めに取る食事（体重1kgあたり1.2〜1.6g、1食25〜30g）が満腹感・体重管理・減量中の筋肉の維持に有利と整理されています。たんぱく質の「量」を確保しやすい食材を選ぶことが、その前提になります。',
+      en: 'A review of protein\'s role in weight loss concludes that higher-protein diets (1.2-1.6 g/kg/day, 25-30 g per meal) support satiety, weight management and preservation of lean mass. Choosing sources that make the quantity easy to reach is the precondition.' },
+      refs: [LEIDY_2015],
+    },
+    {
+      text: { ja: '減量後の体重維持を調べた無作為化比較試験では、たんぱく質を1日あたり約18%多く取ったグループのリバウンドが半分程度に抑えられていました。同じカロリーの中でたんぱく質の割合を上げるには、たんぱく質1gあたりのカロリーが低い食材が使いやすいということです。',
+      en: 'In a randomized trial of weight maintenance after loss, the group eating about 18% more protein regained roughly half as much weight. Raising protein within the same calories is easiest with foods that carry few calories per gram of protein.' },
+      refs: [WESTERTERP_2004],
+    },
+    {
+      text: { ja: '筋トレとたんぱく質の49試験のメタ分析では、総摂取量が体重1kgあたり約1.6g/日までは筋力・除脂肪量の増加が大きくなりました。増量の基準でカロリー密度を評価するのは、たんぱく質と同時にエネルギーも確保しやすい食材を上に置くためです。',
+      en: 'A meta-analysis of 49 trials found gains in strength and lean mass increasing up to about 1.6 g/kg/day of total protein. The bulking scale rewards energy density so that sources supplying both protein and energy rank higher.' },
+      refs: [MORTON_2018],
+    },
+    {
+      text: { ja: 'このアプリの食材の栄養値は、文部科学省「日本食品標準成分表（八訂）」の可食部100gあたりの値を目安として使っています。品種・部位・調理で20〜30%は動くので、格付けは「だいたいの並び」として読んでください。',
+      en: 'Nutrient values in this app are approximate figures from Japan\'s Standard Tables of Food Composition (8th revision), per 100 g edible portion. Variety, cut and cooking shift them by 20-30%, so read the tiers as a rough order.' },
+      refs: [MEXT_FOOD_TABLE_2020],
+    },
+  ],
+  actions: [
+    { ja: 'いちばんよく食べているCティア以下の食材を、週に1回だけSティアの食材に替えてみる。全部を替える必要はない。', en: 'Once a week, swap your most-eaten C-tier-or-lower source for an S-tier one. There is no need to replace everything.' },
+    { ja: '食事タブの「栄養ランキング › たんぱく源」で、いま食べているものがどのティアかを眺める。知っているだけで選び方が変わる。', en: 'Open Nutrient Ranking > Protein sources in the Meals tab and see which tier your usual foods sit in. Knowing is enough to shift your choices.' },
+    { ja: '外食・コンビニでは「主菜のたんぱく源を1つ決めてから」選ぶ。サラダチキン・焼き魚・ゆで卵はどこでも手に入る。', en: 'When eating out or at a convenience store, pick the protein source first. Salad chicken, grilled fish and boiled eggs are available almost anywhere.' },
+  ],
+  caution: {
+    ja: 'ティアは「同じたんぱく質量あたりのカロリー」を軸にした目安で、食材の善悪ではありません。脂質の多い食材にも脂溶性ビタミンや満足感といった役割があり、腎臓の病気などでたんぱく質の制限を受けている人は主治医の指示が優先です。',
+    en: 'Tiers are a guide based on calories per unit of protein, not a judgement of foods. Fattier sources also supply fat-soluble vitamins and satisfaction, and anyone under medical protein restriction (e.g. kidney disease) should follow their clinician\'s advice.',
+  },
+  sources: [LEIDY_2015, WESTERTERP_2004, MORTON_2018, MEXT_FOOD_TABLE_2020],
+};
+
 /** 未登録キーのフォールバック（準備中）。注意と一般的な行動だけを出す */
 export const FALLBACK_ARTICLE: LawArticle = {
   meaning: {
@@ -1039,6 +1092,8 @@ export const EVIDENCE: Record<string, LawArticle> = {
   lift_protein_pr: LIFT_PROTEIN_PR,
   lift_mood: LIFT_MOOD,
   multi_binge: MULTI_BINGE,
+  // 食材ナビ（2026-09-03）。variant 'swap' / 'default' は1記事で扱う
+  protein_tier: PROTEIN_TIER,
 };
 
 /** kind＋variant → 実際に使う evidenceKey（'kind:variant' が無ければ 'kind'。どちらも無ければ 'kind' を返す＝呼び出し側で準備中判定） */

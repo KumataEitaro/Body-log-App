@@ -26,6 +26,9 @@ import { weekdayRhythm } from '@/components/WeekdayHeatmapCard';
 import { buildDayFeatures, readCachedDayFeatures, summarizeRecent, type DayFeature } from './features';
 import { mineRules, riskRatio, conditionLabel, MIN_DAYS as ENGINE_MIN_DAYS } from './correlate';
 import { PROTEIN_PER_KG_DEFAULT } from './goal';
+import { getPurpose } from './purpose';
+import { getNutrientDb, foodName } from '@/content/nutrientDb';
+import { tierShareOf } from '@/content/proteinTiers';
 
 // ===== 型 =====
 
@@ -48,7 +51,9 @@ export type LawKind =
   | 'lift_sleep'          // 7h以上寝た日のトレはボリューム±◯%
   | 'lift_protein_pr'     // たんぱく質が目標に届いた週は自己ベスト更新が◯倍
   | 'lift_mood'           // トレした日の気分は平均±◯
-  | 'multi_binge';        // 多要素ルール（mineRules 上位3件を動的に法則化。id は因子の組で決定的）
+  | 'multi_binge'         // 多要素ルール（mineRules 上位3件を動的に法則化。id は因子の組で決定的）
+  // ---- 食材ナビ（content/proteinTiers.ts・直近30日の品目名 × たんぱく源ティア）----
+  | 'protein_tier';       // たんぱく源のAティア以上の割合＋Cティア以下→Sティアの置き換えで1食あたり−◯kcal
 
 // 文章生成に使う生値（数値・食材名など）。翻訳せずにこのまま保存する
 export type LawParams = Record<string, string | number>;
@@ -77,14 +82,19 @@ export type LawInput = {
   features?: DayFeature[];
   // たんぱく質目標（体重1kgあたりg。goals.protein_per_kg。未指定なら既定2.0）— lift_protein_pr の「目標」
   proteinPerKg?: number | null;
+  // ダイエット目的（lib/purpose のキー）。'bulk' なら protein_tier の格付けを増量基準に切り替える。未指定は減量基準
+  purposeKey?: string | null;
 };
 
 // 図鑑の「未発見枠」を出すための全種類リスト（表示順）
 export const LAW_KINDS: LawKind[] = [
   'food_up', 'food_safe', 'weekday', 'binge_trigger', 'timeslot', 'recover', 'comeback', 'sleep_factor',
   'sleep_debt_binge', 'mood_lag_binge', 'multi_binge', 'wheat_vs_rice_mood', 'lift_sleep', 'lift_protein_pr', 'lift_mood',
-  'salmon_master', 'chicken_heavy',
+  'salmon_master', 'chicken_heavy', 'protein_tier',
 ];
+
+const PROTEIN_TIER_MIN_N = 10;      // 直近30日でたんぱく源として数えられた品目が10未満なら protein_tier は出さない
+const PROTEIN_TIER_MIN_KCAL = 10;   // 置き換えの1食あたり差が10kcal未満なら「替えると−◯kcal」は言わない
 
 // ===== エンジン系の閾値（correlate.ts の安全弁に加えて、法則として口に出す最低ライン） =====
 const ENGINE_MIN_LIFT = 1.5;        // 「◯倍起きやすい」は1.5倍以上のときだけ（bingeAnalysis の1.4よりわずかに厳しく）
@@ -135,6 +145,8 @@ export function lawVariant(kind: LawKind, p: LawParams): string {
   // エンジン系で向きのある種類: wheat_vs_rice_mood → 'wheat_low' | 'rice_low'、lift_sleep / lift_mood → 'up' | 'down'
   if (kind === 'wheat_vs_rice_mood') return p.dir === 'rice_low' ? 'rice_low' : 'wheat_low';
   if (kind === 'lift_sleep' || kind === 'lift_mood') return p.dir === 'down' ? 'down' : 'up';
+  // protein_tier → 'swap'（Cティア以下→Sの置き換えが言える）| 'default'
+  if (kind === 'protein_tier') return Number(p.kcal) >= PROTEIN_TIER_MIN_KCAL && p.food ? 'swap' : 'default';
   return 'default';
 }
 
@@ -198,6 +210,7 @@ function lawKindHintBuiltin(kind: LawKind): string {
     case 'lift_protein_pr': return t('たんぱく質と自己ベストのこと');
     case 'lift_mood': return t('トレと気分のこと');
     case 'multi_binge': return t('いくつかの条件が重なる日のこと');
+    case 'protein_tier': return t('たんぱく源の選び方のこと');
   }
 }
 
@@ -315,7 +328,21 @@ function lawTextBuiltin(kind: LawKind, p: LawParams): { title: string; sub: stri
         title: t('あなたは{a}がそろった日、食べすぎが{x}倍起きやすい', { a: multiFactorText(String(p.f)), x: String(p.x) }),
         sub: t('該当{h}日を含む{n}日の記録から（相関であり、原因とは限りません）', { h: Number(p.h), n: Number(p.n) }),
       };
+    // ---- 食材ナビ（content/proteinTiers.ts）。食材名は辞書の日本語名を生値で保存し、表示時に現在の言語へ ----
+    case 'protein_tier':
+      return {
+        title: t('あなたのたんぱく源はAティア以上が{p}%', { p: Number(p.p) }),
+        sub: lawVariant('protein_tier', p) === 'swap'
+          ? t('{food}（{tier}ティア）を{best}（S）に替えると1食あたり約−{n}kcal', { food: tierFoodLabel(p.food), tier: String(p.tier), best: tierFoodLabel(p.best), n: Number(p.kcal).toLocaleString() })
+          : t('直近30日の{n}食のたんぱく源から（{mode}の基準）', { n: Number(p.n), mode: p.mode === 'bulk' ? t('増量') : t('減量') }),
+      };
   }
+}
+
+/** protein_tier の食材名: 生値は食材id。辞書にあれば現在の言語の名前、無ければ生値のまま */
+function tierFoodLabel(id: unknown): string {
+  const f = getNutrientDb().find((x) => x.id === String(id));
+  return f ? foodName(f) : String(id ?? '');
 }
 
 function makeLaw(id: string, kind: LawKind, p: LawParams, foundAt: string): Law {
@@ -434,7 +461,32 @@ export function detectLaws(input: LawInput): Law[] {
     }
   } catch { /* 同上 */ }
 
+  // --- 食材ナビ: たんぱく源ティア（直近30日の品目名 → content/proteinTiers.tierShareOf） ---
+  try {
+    const law = detectProteinTierLaw(input.itemDays, today, input.purposeKey);
+    if (law) out.push(law);
+  } catch { /* 同上 */ }
+
   return out;
+}
+
+/**
+ * protein_tier の検出（純関数・テスト対象）。直近30日の品目名をたんぱく源ティアに当て、
+ * たんぱく源として数えられた品目が10以上のときだけ法則にする。生値は食材id（翻訳非依存）で保存する。
+ * 目的が 'bulk' なら増量の基準、それ以外は減量の基準（content/proteinTiers.ts の基準表）
+ */
+export function detectProteinTierLaw(itemDays: ItemDay[], today: string, purposeKey?: string | null): Law | null {
+  const from = shiftDate(today, -30);
+  const names: string[] = [];
+  for (const d of itemDays) if (d.date > from && d.date <= today) names.push(...d.names);
+  const mode = purposeKey === 'bulk' ? 'bulk' : 'cut';
+  const share = tierShareOf(names, mode, PROTEIN_TIER_MIN_N);
+  if (!share) return null;
+  const p: LawParams = { p: share.pHigh, n: share.n, mode };
+  if (share.worst && share.best && share.kcalSaved >= PROTEIN_TIER_MIN_KCAL) {
+    p.food = share.worst.food.id; p.tier = share.worst.tier; p.best = share.best.id; p.kcal = share.kcalSaved;
+  }
+  return makeLaw('protein_tier', 'protein_tier', p, today);
 }
 
 // ===== インサイト・エンジン系の検出（純関数・テスト対象） =====
@@ -736,6 +788,7 @@ async function fetchLawInput(): Promise<LawInput | null> {
     recordedDates: [...recorded].sort(),
     sleepDays,
     features, proteinPerKg,
+    purposeKey: getPurpose(),   // protein_tier の格付け基準（bulk=増量）。端末に保存済みの目的をそのまま
   };
 }
 
