@@ -54,6 +54,8 @@ import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
+import { readCachedDayFeatures } from '@/lib/features';
+import { readWeekGoal, weekDaysOf, weekGoalProgress, weekGoalUnit } from '@/lib/weeklyReview';
 import { latestLawSummary } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
 import { logIcon, logTitle, moodLevelOf } from '@/lib/feed';
@@ -344,6 +346,23 @@ export default function ChangesScreen() {
   const [sleepStages, setSleepStages] = useState<SleepStages | null>(null);
   // 歩数の週目標（B-15・オフ=null）。health詳細にも「きょうの動き」と同じ週プログレスを出す
   const weekStepsGoal = useWeekStepsGoal();
+  // 週次レビュー（N4）で「この目標にする」を押した週の進捗。週のふりかえり行に小さく出す。
+  // 材料は日次特徴量のキャッシュだけ（readCachedDayFeatures＝通信もHealthKitも触らない）。
+  // 週次レビュー画面から戻ってきた瞬間に反映されるよう、フォーカスごとに読み直す
+  const [weekGoalRow, setWeekGoalRow] = useState<{ n: number; m: number; unit: string; over: boolean } | null>(null);
+  const refreshWeekGoal = useCallback(() => {
+    (async () => {
+      try {
+        const ws = weekStartOf2(todayJST());
+        const g = await readWeekGoal(ws);
+        if (!g) { setWeekGoalRow(null); return; }
+        const p = weekGoalProgress(g, weekDaysOf(await readCachedDayFeatures(), ws));
+        setWeekGoalRow({ n: p.n, m: p.m, unit: weekGoalUnit(g), over: p.over });
+      } catch { setWeekGoalRow(null); /* 進捗は飾り。読めなければ従来の要約に落ちる */ }
+    })();
+  }, []);
+  useEffect(() => { refreshWeekGoal(); }, [refreshWeekGoal]);
+  useFocusEffect(refreshWeekGoal);
 
   const load = useCallback(async () => {
     try {
@@ -984,6 +1003,11 @@ export default function ChangesScreen() {
         return t('{slot}が最多（{p}%）', { slot: names[top], p: Math.round((share[top] / total) * 100) });
       }
       case 'week': {
+        // 週次レビューで「この目標にする」を押した週は、進捗（n/5日）を優先して出す。
+        // 決めた目標が今どうなっているかは、先週比の数字より先に知りたい情報
+        if (weekGoalRow != null) {
+          return t('今週の目標 {n}/{m}{u}', { n: weekGoalRow.n, m: weekGoalRow.m, u: weekGoalRow.unit });
+        }
         // 旧digestの要約: 今週の記録日数＋先週比の体重変化（digestCardと同じ集計を1行に）
         const ws = weekStartOf2(today);
         const rec = rows.filter((r) => r.date >= ws && r.date <= today && r.intake != null).length;
@@ -1064,13 +1088,14 @@ export default function ChangesScreen() {
   }
   // 食事タブの＋シート「体の写真」から（/changes?open=photos&shoot=1&ts=…）:
   // 体写真の詳細ページを開き、BodyPhotosCard に「すぐ撮影」を伝える（既存のカメラ→体脂肪率→保存の流れに乗せる）
+  // 週次レビュー画面の「くわしく見る」から（/changes?open=week）: 週の数字の一覧を直接開く
   const { open: openParam, shoot: shootParam, ts: openTs } = useLocalSearchParams<{ open?: string; shoot?: string; ts?: string }>();
   const [photoShootTs, setPhotoShootTs] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (openParam !== 'photos') return;
+    if (openParam !== 'photos' && openParam !== 'week') return;
     detailTx.value = 0;
-    setDetailKey('photos');
-    if (shootParam === '1') setPhotoShootTs(openTs ?? String(Date.now()));
+    setDetailKey(openParam);
+    if (openParam === 'photos' && shootParam === '1') setPhotoShootTs(openTs ?? String(Date.now()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openParam, shootParam, openTs]);
 
@@ -1138,7 +1163,12 @@ export default function ChangesScreen() {
     // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり。
     // 旧digest行の王冠は統合先のweek行へ付け替え（ペイウォールsrcはdigestのまま）。
     // 新ティア: 食べ方の分析（eating詳細）もスタンダード以上の機能（src=eating）
+    //
+    // week行だけは王冠つきでも遷移を止めない（N4）: 行き先の週次レビュー画面が
+    // 「見出し＋体重変化までは無料・評価文と来週の目標はスタンダード」と自前でゲートするため、
+    // ここで蹴るとロック中の人が体重変化すら見られなくなる（law-detailと同じ流儀）
     const crowned = (key === 'week' && gate.gated('digest')) || (key === 'eating' && gate.gated('eating'));
+    const crownBlocks = crowned && key !== 'week';
     const secTitle = sectionHeadOf.get(key);
     const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
@@ -1147,10 +1177,17 @@ export default function ChangesScreen() {
                  // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
                  ref={key === 'body' ? chartTarget : undefined} collapsable={false}
                  onPress={() => {
-                   if (crowned) {
+                   if (crownBlocks) {
                      Haptics.selectionAsync().catch(() => {});
                      // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
                      router.push((key === 'eating' ? '/paywall?src=eating' : '/paywall?src=digest') as never);
+                     return;
+                   }
+                   // 週のふりかえり行の行き先は週次レビュー画面（N4）。数字の一覧（週間ダイジェスト＋
+                   // カレンダー）は、その画面の「くわしく見る」からこの詳細ページへ入る
+                   if (key === 'week') {
+                     Haptics.selectionAsync().catch(() => {});
+                     router.push('/weekly-review' as never);
                      return;
                    }
                    // lawsはカード詳細ではなく法則図鑑（スタック画面）への外部遷移
