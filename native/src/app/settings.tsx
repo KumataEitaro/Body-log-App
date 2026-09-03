@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
-  ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Switch,
+  ActivityIndicator, Alert, Modal, Platform, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
@@ -818,9 +818,9 @@ export default function SettingsScreen() {
 
     {/* ===== プロフィール編集モーダル ===== */}
     <Modal visible={sheet === 'profile'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+      <View style={s.sheetBody}>{/* KAVはpageSheet内で誤計算するためScrollView側のインセット自動調整に統一（2026-09-03） */}
         <SheetHeader icon={<UserRound size={ICON.lg} color={C.teal} />} title={t("プロフィール編集")} />
-        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets contentContainerStyle={{ paddingBottom: 24 }}>
           <Text style={s.label}>{t('表示名')}</Text>
           <TextInput style={s.input} value={name} onChangeText={setName} placeholder={t('表示名')} placeholderTextColor={C.faint} />
           <Text style={s.label}>{t('性別')}</Text>
@@ -860,7 +860,7 @@ export default function SettingsScreen() {
           <OptionButton style={{ marginTop: 16 }} label={t('保存する')} onPress={saveProfile} busy={busy} />
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
 
     {/* ===== 食事の制約モーダル（B-18・docs/DIET-MODES.md §3） =====
@@ -1213,14 +1213,14 @@ export default function SettingsScreen() {
 
     {/* ===== 統合目標モーダル（体重→赤字→運動→習慣→食べられる量→PFC） ===== */}
     <Modal visible={sheet === 'goal'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+      <View style={s.sheetBody}>{/* KAVはpageSheet内で誤計算するためScrollView側のインセット自動調整に統一（2026-09-03） */}
         <SheetHeader icon={<Target size={ICON.lg} color={C.teal} />} title={t("目標")} />
-        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets contentContainerStyle={{ paddingBottom: 24 }}>
           <GoalPanel mode="hub" weightSections="goal" />
           <Text style={s.note}>{t('チートデイの登録は「概要」タブのカードから行えます。')}</Text>
           <View style={{ height: 30 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
 
     {/* ===== アカウント削除モーダル ===== */}
