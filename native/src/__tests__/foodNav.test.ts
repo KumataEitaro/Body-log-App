@@ -70,6 +70,8 @@ describe('栄養DB（content/nutrientDb）', () => {
     expect(findFood('鶏むね肉のソテー 120g')?.id).toBe('chicken_breast');
     expect(findFood('サラダチキン（プレーン）')?.id).toBe('salad_chicken');
     expect(findFood('鶏もも肉（皮なし）の照り焼き')?.id).toBe('chicken_thigh_skinless');
+    expect(findFood('牛もも肉のステーキ')?.id).toBe('beef_round');      // 「もも肉」で鶏に誤爆しない
+    expect(findFood('豚もも肉の生姜焼き')?.id).toBe('pork_leg');
     expect(findFood('Greek yogurt')?.id).toBe('greek_yogurt');
     expect(findFood('プロテインバー')?.id).toBe('whey_protein');
     expect(findFood('カレーうどん')?.id).toBe('udon');
@@ -237,7 +239,7 @@ describe('たんぱく源ティア（content/proteinTiers）', () => {
     expect(mix.pHigh).toBeLessThan(100);
     expect(mix.worst?.food.id).toBe('pork_belly');
     expect(mix.worst?.tier).toBe('E');
-    expect(mix.best).not.toBeNull();
+    expect(mix.best?.id).toBe('chicken_breast');   // 同じカテゴリ（肉）の S 最上位に替える
     expect(mix.kcalSaved).toBeGreaterThan(10);
   });
 });

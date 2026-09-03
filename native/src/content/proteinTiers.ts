@@ -154,9 +154,10 @@ export function tierShareOf(names: string[], mode: SwapMode, minN = 10, db: Nutr
     if (tierRank(tier) >= tierRank('C') && (!worst || r.count > worst.count)) worst = { food: r.food, tier, count: r.count };
   }
   const pHigh = total > 0 ? Math.round((high / total) * 100) : 0;
-  // 置き換え先: Sティアのうち点数最高の食材（無ければ A）。worst と同じたんぱく質量で kcal を比べる
+  // 置き換え先: Sティアのうち worst と同じカテゴリ（肉→肉・魚→魚）で点数最高の食材。無ければ S の先頭（無ければ A）。
+  // 「豚バラ→卵白」より「豚バラ→鶏むね」のほうが同じ食卓で入れ替えられる
   const table = tierTable(mode, db);
-  const best = table.S[0] ?? table.A[0] ?? null;
+  const best = (worst ? table.S.find((f) => f.cat === worst.food.cat) : undefined) ?? table.S[0] ?? table.A[0] ?? null;
   let kcalSaved = 0;
   if (worst && best) {
     const pG = worst.food.per100.p * worst.food.serving / 100;

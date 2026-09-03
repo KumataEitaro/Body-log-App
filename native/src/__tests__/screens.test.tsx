@@ -9,6 +9,7 @@ import SettingsScreen from '../app/settings';
 import PaywallScreen from '../app/paywall';
 import AchievementsScreen from '../app/achievements';
 import LawsScreen from '../app/laws';
+import NutrientRankScreen from '../app/nutrient-rank';
 import LoginScreen from '../app/login';
 import InteractiveChart from '../components/InteractiveChart';
 import GoalPanel from '../components/GoalPanel';
@@ -33,6 +34,7 @@ describe('screens smoke（マウント時クラッシュ検出）', () => {
     ['プラン(ペイウォール)', <PaywallScreen key="paywall" />],
     ['実績', <AchievementsScreen key="ach" />],
     ['あなたの法則(図鑑)', <LawsScreen key="laws" />],
+    ['栄養ランキング(食材ナビ)', <NutrientRankScreen key="nutrient-rank" />],
     ['食事タブ', <LogScreen key="log" />],
     ['トレタブ', <TrainingScreen key="tr" />],
     ['概要タブ', <ChangesScreen key="ch" />],
