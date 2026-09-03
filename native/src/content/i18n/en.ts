@@ -2289,4 +2289,7 @@ export const EN: Record<string, string> = {
   "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "You've watched {n} ads this week. With Standard, that's 0.",
   "広告を消す →": "Remove ads →",
   "広告なしで使えます": "Ad-free access",
+  "食べるものを、食事タブでそのまま相談": "Ask what to eat right from the Meals tab",
+  "食べるものを相談する": "Ask what to eat",
+  "「食べるものを相談する」はスタンダードプランで使えます。": "\"Ask what to eat\" is available on the Standard Plan.",
 };

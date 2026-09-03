@@ -2211,4 +2211,7 @@ export const VI: Record<string, string> = {
   "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Bạn đã xem quảng cáo {n} lần trong tuần qua. Với gói Tiêu chuẩn, con số này là 0.",
   "広告を消す →": "Tắt quảng cáo →",
   "広告なしで使えます": "Dùng không có quảng cáo",
+  "食べるものを、食事タブでそのまま相談": "Tư vấn món ăn ngay tại tab Bữa ăn",
+  "食べるものを相談する": "Tư vấn món ăn",
+  "「食べるものを相談する」はスタンダードプランで使えます。": "Tính năng \"Tư vấn món ăn\" khả dụng trên gói Tiêu chuẩn.",
 };

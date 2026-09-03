@@ -2211,4 +2211,7 @@ export const ID: Record<string, string> = {
   "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Kamu sudah melihat iklan {n} kali minggu ini. Dengan Standard, jadinya 0 kali.",
   "広告を消す →": "Hilangkan iklan →",
   "広告なしで使えます": "Gunakan tanpa iklan",
+  "食べるものを、食事タブでそのまま相談": "Tanya saran makanan langsung di tab Makanan",
+  "食べるものを相談する": "Tanya saran makanan",
+  "「食べるものを相談する」はスタンダードプランで使えます。": "\"Tanya saran makanan\" tersedia di Paket Standar.",
 };

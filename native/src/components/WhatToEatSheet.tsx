@@ -213,7 +213,7 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
       <View style={s.wrap}>
         <View style={s.head}>
           <Sparkles size={ICON.lg} color={C.teal} strokeWidth={ICON.stroke} />
-          <Text style={s.title}>{t('何を食べる？')}</Text>
+          <Text style={s.title}>{t('食べるものを相談する')}</Text>
           <View style={{ flex: 1 }} />
           <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
             <X size={ICON.lg} color={C.sub} strokeWidth={ICON.stroke} />
@@ -233,7 +233,7 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
           {locked ? (
             // ===== 無料: 機能の存在は見せる（見本1件＋プランへの導線） =====
             <View style={s.lockBox}>
-              <Text style={s.lockT}>{t('「何を食べる？」はスタンダードプランで使えます。')}</Text>
+              <Text style={s.lockT}>{t('「食べるものを相談する」はスタンダードプランで使えます。')}</Text>
               <Text style={s.lockSub}>{t('残りカロリーと、あなたの記録（法則・定番・直近の食材）から、いまの一品を3つ提案します。AI相談と同じ枠を使います。')}</Text>
               <View style={[s.pickCard, s.pickCardBest, { marginTop: 12 }]}>
                 <Text style={s.bestBadge}>{t('見本')}</Text>

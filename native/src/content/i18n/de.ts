@@ -2211,4 +2211,7 @@ export const DE: Record<string, string> = {
   "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "In der letzten Woche hast du {n} Mal Werbung gesehen. Mit Standard wären es 0.",
   "広告を消す →": "Werbung entfernen →",
   "広告なしで使えます": "Ohne Werbung nutzen",
+  "食べるものを、食事タブでそのまま相談": "Lass dich direkt im Mahlzeiten-Tab beraten, was du essen kannst",
+  "食べるものを相談する": "Mahlzeiten-Tipps holen",
+  "「食べるものを相談する」はスタンダードプランで使えます。": "„Mahlzeiten-Tipps holen“ ist im Standard-Plan verfügbar.",
 };

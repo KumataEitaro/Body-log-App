@@ -174,7 +174,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                 {/* 区切り線: 上の4つ（記録する）と「何を食べる？」（AIに相談する）を性質で分ける。
                     ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
                 <View style={s.divider} />
-                <Row icon="whattoeat" label={t('何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
+                <Row icon="whattoeat" label={t('食べるものを相談する')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
               </View>
             )}
 
@@ -255,7 +255,7 @@ const s = themed(() => ({
 
   // 食事の大カード: 高さ84・アイコン48＋ラベル17/800を横並び（縦中央の計算が要らない）
   mealCard: {
-    height: 84, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18,
+    height: 76, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18,
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: 1.5, borderColor: C.hairline,
     shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
@@ -268,7 +268,7 @@ const s = themed(() => ({
   // リスト行: 高さ56（タップ領域44pt以上）・行間6
   rows: { marginTop: 10, gap: 6 },
   row: {
-    height: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12,
+    height: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12,
     backgroundColor: C.panel, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.hairline,
   },
   rowIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
@@ -276,7 +276,7 @@ const s = themed(() => ({
   // 押下は面をアクセントのごく薄い色に変えるだけ（縮小や縁の変化は行では過剰）
   pressedFace: { backgroundColor: C.accentSoft, borderColor: C.teal },
   // 記録（上）と相談（下）を分ける1pxライン。上下12ptの余白で「別のかたまり」に見せる
-  divider: { height: 1, backgroundColor: C.hairline, marginTop: 12, marginBottom: 12 },
+  divider: { height: 1, backgroundColor: C.hairline, marginTop: 10, marginBottom: 10 },
 
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
