@@ -1,14 +1,18 @@
 // JST（日本標準時）の日付・時刻フォーマッタ。Intlを一切使わない純関数。
 //
-// ■ なぜ自前で組むか（Androidの起動クラッシュ対策）
+// ■ なぜ自前で組むか（Androidの起動クラッシュ対策・2026-09-03）
 // これまで todayJST() などは `Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' })` を
-// 使っていた。iOSでは問題ないが、AndroidのHermesはIntlの有無・機能範囲がエンジンの
-// ビルドフラグ（hermesEnableIntl）とICUの載り方に左右され、環境によっては
-//   ・`Intl` 自体が undefined → `new Intl.DateTimeFormat(...)` が TypeError
-//   ・timeZone / hourCycle が未対応 → RangeError
-// になり得る。todayJST() は起動直後の通知再登録や記録画面の描画から呼ばれるため、
-// ここが throw すると「Androidだけ起動直後に落ちる」形になり、しかもスタックトレースが
-// 手に入らない状況では原因が極めて追いにくい（今回まさにそれを疑った）。
+// 使っていた。iOSはJavaScriptCore/Hermes＋AppleのICUで問題ない。
+// Androidは Hermes の Intl 実装で、事実として:
+//   ・RN 0.86 の hermes-android は `-DHERMES_ENABLE_INTL=True` でビルドされている
+//     （node_modules/react-native/ReactAndroid/hermes-engine/build.gradle.kts で確認）
+//     ＝`Intl` は存在する。だから「Intlが無い」は今回の起動クラッシュの真因ではない可能性が高い
+//   ・ただし実装は android.icu への薄いブリッジで、Appleの実装とは別物。
+//     オプションの組み合わせによって RangeError になる報告があり（hourCycle 等）、
+//     しかも「有効かどうか」がエンジンのビルドフラグ次第＝アプリ側から保証できない
+// todayJST() は起動直後の通知再登録や記録画面の描画から呼ばれるため、ここが throw すると
+// 「Androidだけ起動直後に落ちる」形になり、スタックトレースが取れない状況では追えない。
+// 保証できない依存を、保証できる純関数に置き換えられるなら置き換える方が安い。
 //
 // ■ 自前で厳密に一致させられる理由
 // 日本標準時は 1951年（最後の夏時刻）以降サマータイムが無く、常に UTC+9 固定。

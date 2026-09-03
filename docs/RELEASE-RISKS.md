@@ -76,8 +76,11 @@
 - 認証が読めないときも必ずログイン画面まで進む（無限スプラッシュを作らない）
 - モジュール評価時（ErrorBoundaryより手前）の副作用を全数 try/catch 化（4箇所）
 - `Intl.DateTimeFormat` 依存のJST整形を自前の純関数（lib/jst.ts）へ置換。
-  AndroidのHermesはIntlの有無・対応範囲がエンジンのビルドフラグ依存で、
-  `todayJST()` が throw すると起動直後に落ちる形になり得た（最有力候補だが未確定）
+  ただし **RN 0.86 の hermes-android は `-DHERMES_ENABLE_INTL=True` でビルドされている**
+  ことを確認したので（`ReactAndroid/hermes-engine/build.gradle.kts`）、
+  「Intlが無くて落ちた」は真因ではない可能性が高い。
+  それでも外したのは、Hermesの実装がAppleのICUとは別物でオプション次第でRangeErrorになり、
+  有効かどうかをアプリ側から保証できないため（保証できない依存を減らす）
 - `EXPO_PUBLIC_SUPABASE_*` がバンドルに埋め込まれていない場合、`createClient` が
   モジュール評価中に throw して JSバンドル読み込み中に死ぬ経路を塞いだ（記録して先へ進む）
 

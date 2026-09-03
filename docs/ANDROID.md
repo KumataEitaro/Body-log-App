@@ -204,10 +204,16 @@ JSの例外なら `ReactNativeJS`、Java/Kotlin側なら `AndroidRuntime: FATAL 
 - **iOS専用モジュールは動的 require ＋ `Platform.OS` の二重ガード。**
   現在このやり方で守っているのは `@kingstinct/react-native-healthkit`（lib/health.ts）と
   `react-native-google-mobile-ads`（components/AdBannerView.tsx）
-- **`Intl` に依存しない。** AndroidのHermesはIntlの有無・対応範囲がエンジンのビルドフラグ
-  依存で、`Intl` 自体が undefined／`timeZone`・`hourCycle` が RangeError になり得る。
-  JSTの日付・時刻は `lib/jst.ts`（UTC+9固定の純関数）を使う。
+- **`Intl` に依存しない。** JSTの日付・時刻は `lib/jst.ts`（UTC+9固定の純関数）を使う。
   ロケール依存の整形が本当に必要な箇所（paywall の通貨表示）だけ try/catch 付きで残してある
+  - 事実確認: RN 0.86 の hermes-android は `-DHERMES_ENABLE_INTL=True` でビルドされている
+    （`node_modules/react-native/ReactAndroid/hermes-engine/build.gradle.kts`）。
+    **つまり `Intl` は Android にも存在する**ので、「Intlが無くて落ちた」というのは
+    今回の真因ではない可能性が高い（正直に書いておく）
+  - それでも外した理由: Hermesの実装は android.icu への薄いブリッジで Apple の ICU とは別物、
+    オプションの組み合わせで RangeError になる報告があり（`hourCycle` 等）、
+    有効かどうかがエンジンのビルドフラグ次第＝アプリ側から保証できない。
+    保証できない依存を保証できる純関数に置き換えられるなら、そのほうが安い
 
 ### 5. 起動時にどれだけのモジュールが読まれるか（＝疑う範囲）
 
@@ -217,3 +223,56 @@ expo-router はリリースビルド（sync import mode）で **ルート直下�
 それらが import する lucide-react-native / react-native-svg / react-native-view-shot /
 expo-print / expo-camera / react-native-purchases / AdMob まで全部モジュール評価される。
 **「ログイン画面しか出ていないのだから関係ない」という切り分けは成立しない。**
+
+### 6. ネイティブモジュールのAndroid対応（2026-09-03 全数点検の結果）
+
+`native/package.json` の依存を1つずつ「Androidの実装があるか」「守れているか」で見た結果。
+判定方法は各パッケージの `expo-module.config.json` の `platforms` と `android/` ディレクトリの有無。
+
+**Androidにネイティブ実装が無いもの（3つ）**
+
+| モジュール | 状態 | 対処 |
+|---|---|---|
+| `@kingstinct/react-native-healthkit` | `android/` 無し（iOS専用） | ✅ `lib/health.ts` が動的 require ＋ `Platform.OS !== 'ios'` の二重ガード。JS側もパッケージが自前で「Androidならモックを返す」実装（`lib/commonjs/healthkit.js`）。config plugin は `withEntitlementsPlist` / `withInfoPlist` だけなので **androidのprebuildには一切影響しない**（app.json の plugins に置いたままで安全） |
+| `expo-glass-effect` | `platforms: ["apple"]` | ✅ `src/` のどこからも import していない（未使用の依存）。Androidでは autolink もされない |
+| `expo-symbols` | `platforms: ["apple"]` | ⚠️ `src/` から直接は使っていないが、**expo-router の Android版ネイティブタブが内部で import する**（`native-tabs/utils/materialIconConverter.android.js` → `unstable_getMaterialSymbolSourceAsync`）。Androidで評価されるのは `build/index.js` → `materialImageSource` / `SymbolView` の2つで、どちらもネイティブモジュール（`requireNativeModule('SymbolModule')`）を触らず **expo-font の `renderToImageAsync` でMaterial Symbolsフォントを画像化するだけ**。フォントは `@expo-google-fonts/material-symbols`（expo-symbolsの推移依存・インストール済み）。＝落ちない。ただし `md` アイコン名が辞書に無ければ**アイコンが出ないだけ**（例外にはならない） |
+
+**Androidに実装はあるが挙動が違う／確認したもの**
+
+- `expo-notifications`: チャンネル登録（`ensureAndroidChannel`）は `Platform.OS !== 'android'` で早期returnし、
+  全体が try/catch。**`setNotificationChannelAsync` は POST_NOTIFICATIONS 権限を要求しない**ので、
+  Android 13+ で未許可のまま起動しても throw しない。`reregisterAll` 全体も try/catch ＋ `safeBoot`
+- `react-native-google-mobile-ads`: 動的 require で守られ、`TestIds` は `ads` が非nullのときだけ参照
+  （`bannerUnitId(m, ...)` の引数経由）。`ensureAdsInit()` は無料プランの端末で1回だけ、try/catch＋`.catch()`。
+  **App IDは prebuild 後の AndroidManifest に
+  `com.google.android.gms.ads.APPLICATION_ID = ca-app-pub-3319916143033433~9006783518` として
+  正しく書き込まれることを実際に prebuild して確認済み**（未設定だと Google Mobile Ads SDK が
+  `Application.onCreate` で例外を投げてJSに到達する前に落ちるので、ここは実物で確認する価値がある）。
+  `DELAY_APP_MEASUREMENT_INIT = true` も入る
+- `expo-store-review`: 動的 import ＋ `isAvailableAsync()` で守っている（`lib/reviewPrompt.ts`）
+- `expo-print` / `expo-sharing` / `expo-media-library` / `expo-camera` / `expo-image-picker`:
+  すべてAndroid実装あり。起動時には呼ばれない（受診レポート・共有・バーコードのユーザー操作起点）
+- `react-native-svg` / `react-native-reanimated`(+`react-native-worklets`) / `react-native-screens` /
+  `react-native-safe-area-context` / `react-native-gesture-handler`: Android実装あり。
+  新アーキ（`newArchEnabled=true`）対応版が入っている
+- `@react-native-community/datetimepicker`: Android実装あり＋app.jsonのpluginsにも登録済み
+- `expo-router/unstable-native-tabs`: Androidは `NativeTabsView.android.js` があり、
+  `react-native-screens` の `TabsContainer.kt` が **自前で `ContextThemeWrapper(..., Theme_Material3_DayNight_NoActionBar)`**
+  を掛けている。つまり prebuild が生成する `AppTheme`（`Theme.AppCompat.DayNight.NoActionBar`）でも
+  BottomNavigationView のインフレートは落ちない（Materialテーマ必須の古典的クラッシュには当たらない）
+- `@expo/ui`: Android実装あり（Jetpack Compose）だが `src/` からは未使用。
+  未使用のまま autolink されるので、**将来ビルドサイズやCompose依存の衝突を疑うときは
+  最初に外す候補**（今回は起動クラッシュの原因になる経路が無い）
+
+**prebuild の生成物で確認したこと**（`npx expo prebuild --platform android --no-install`）
+
+- `gradle.properties`: `newArchEnabled=true` / `hermesEnabled=true` / `edgeToEdgeEnabled=true` /
+  `reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64`（ABIの取りこぼしなし）
+- **R8/minify は無効**（`android.enableMinifyInReleaseBuilds` 未設定＝false）。
+  ＝難読化でリフレクション参照が消えて落ちる、という定番の原因は今回は該当しない
+- `AndroidManifest.xml`: `enableOnBackInvokedCallback="false"`（predictiveBackGestureEnabled:false が効いている）、
+  ディープリンク `bodylog://` 登録済み、通知アイコン/色のmeta-data 登録済み
+- `MainApplication.kt` / `MainActivity.kt` はテンプレート素のまま（手が入っていない）
+- ⚠️ `expo-dev-client` が `dependencies` にあるため、リリース用のマニフェストにも
+  `SYSTEM_ALERT_WINDOW`（dev menuの浮遊ボタン用）が載る。Playの権限表示に出るので、
+  気になるなら `devDependencies` へ移す（起動クラッシュとは無関係）
