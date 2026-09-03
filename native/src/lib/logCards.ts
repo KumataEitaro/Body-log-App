@@ -20,6 +20,10 @@
 //     帯   … badge（獲得バッジ）> firstLaw（最初の法則）> brief（今日のひとこと）
 //  3. 「今日」にしか意味のないものは、過去日を表示中は出さない（TODAY_ONLY）。
 //     バッジ・最初の法則・チェックリストは日付に依存しないので過去日でも出る
+//  4. 「朝に出すもの」は**起床時刻より前には出さない**（MORNING_ONLY・2026-09-04 熊田さんの指摘）。
+//     0:30 に開くとJSTの日付はもう次の日なので、以前は「新しい日の朝のカード」が深夜に出ていた。
+//     本人の体感ではまだ「昨日の夜」なので、答える気になれないうえ1日1回のものを深夜に使い切る。
+//     窓の判定は lib/wakeTime.ts `beforeWake`（起床時刻はユーザー設定・夜勤も跨ぎで判定できる）
 //
 // ヒーロー・収支・今日の記録・前の食事・体重入力・広告枠は「構造カード」（ユーザーが⊖/⊕で自分で
 // 管理する、または位置が固定）なのでこの調停の対象外。スポットライト（マイ食品の案内・食事の制約の案内）は
@@ -38,9 +42,32 @@ export const BAND_PRIORITY: readonly AttentionBand[] = ['badge', 'firstLaw', 'br
 /** 今日を表示しているときだけ意味を持つもの（過去日では候補から外す） */
 export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'backfill', 'mood', 'positive', 'brief']);
 
+/**
+ * 「朝に出すもの」＝起床時刻より前（`beforeWake`）は候補から外すもの。
+ *
+ * 入っているもの:
+ *   caution / positive … 気づきアラート。「今日は食べすぎが起きやすい」は**今日の準備**の話なので、
+ *                        まだ寝る前の深夜に出しても行動に変えられない（しかも1日1回で消費される）
+ *   dayPlan            … 今日の予定ヒアリング。深夜に「今日は外食の予定ありますか？」は答えられない
+ *   mood               … 朝の気分。起きた直後の気分を聞きたいので、寝る前に聞いてしまうと意味がない
+ *
+ * **入っていないもの（＝深夜こそ出したい）**:
+ *   backfill（昨日の穴埋め）… 0:30 の本人の体感は「今日の続き」で、直前まで食べていた記憶が
+ *     いちばん鮮明。ここで「昨日ぶんが未記録です」と出せるのは、むしろ深夜だけの好機。
+ *     朝の窓で絞ると「寝る前に思い出して埋める」という一番自然な導線を殺すことになる
+ *   checklist / badge / firstLaw … 日付にも時刻にも依存しない（過去日でも出るのと同じ理由）
+ *   brief（今日のひとこと帯）… 帯1行で、答えを求めない読み物なので深夜に出ても消費されない
+ */
+export const MORNING_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'mood', 'positive']);
+
 export type AttentionInput = {
   /** 表示中の日付が今日か */
   isToday: boolean;
+  /**
+   * いまが「起床時刻より前」か（lib/wakeTime.ts `beforeWake`）。
+   * true の間は MORNING_ONLY のものを出さない。省略時は false（＝従来どおり出す）
+   */
+  beforeWake?: boolean;
   /** 出したい候補と枚数（positive だけ複数になりうる。無いものは 0 か省略） */
   candidates: Partial<Record<AttentionKey, number>>;
 };
@@ -56,6 +83,7 @@ function take(order: readonly AttentionKey[], input: AttentionInput, budget: num
     const want = Math.max(0, Math.floor(input.candidates[k] ?? 0));
     if (want === 0) continue;
     if (!input.isToday && TODAY_ONLY.has(k)) continue;   // 過去日に「今日は〜」を出さない
+    if (input.beforeWake && MORNING_ONLY.has(k)) continue;   // 深夜（起床前）に「朝のもの」を出さない
     const n = Math.min(want, left);
     out[k] = n;
     left -= n;

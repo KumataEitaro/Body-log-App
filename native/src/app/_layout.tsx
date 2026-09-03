@@ -19,6 +19,8 @@ import { C, themeGeneration } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
 import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
+// 起床時刻（「朝に出るもの」の窓の起点）。読めなくても既定7:00で判定されるだけなので起動は止めない
+import { loadWakeTime } from '@/lib/wakeTime';
 import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
 import { Linking } from 'react-native';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -59,6 +61,7 @@ export default function RootLayout() {
   useEffect(() => {
     safeBoot('loadFoodFreq', loadFoodFreq);
     safeBoot('loadPurpose', loadPurpose);
+    safeBoot('loadWakeTime', loadWakeTime);
   }, []);
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);

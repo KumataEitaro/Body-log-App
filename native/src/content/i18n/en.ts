@@ -2282,4 +2282,8 @@ export const EN: Record<string, string> = {
   "（{n}回）": "({n} times)",
   "内容をコピーする": "Copy content",
   "記録を消す": "Clear log",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Saved for {date}. You can view it in your feed by switching back to that day.",
+  "前日（{m}/{d}）として記録": "Log for yesterday ({m}/{d})",
+  "起床時刻": "Wake-up time",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Morning prompts (mood, plans, thoughts) won’t appear before this time. Adjust it to fit your daily routine.",
 };

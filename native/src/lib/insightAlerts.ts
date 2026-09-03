@@ -11,6 +11,7 @@ import { t } from './i18n';
 import { buildDayFeatures, shiftDate } from './features';
 import { evaluateAlerts, mineDefaultRules, suppressAlerts, type Alert, type AlertHistory, type Insight } from './correlate';
 import { getDailyReminderPrefs, getInsightNotifyEnabled, scheduleInsightNotification } from './notify';
+import { WAKE_DEFAULT_HM, beforeWake, minutesSinceWake, readWakeHm, type Hm } from './wakeTime';
 import type { LawKind, LawParams } from './laws';
 
 export const HISTORY_KEY = 'bl-insight-alert-history';   // AlertHistory[]（{id,date}）
@@ -18,10 +19,18 @@ export const CLOSED_KEY = 'bl-insight-alert-closed';     // AlertHistory[]（×�
 export const NOTIFIED_KEY = 'bl-insight-alert-notified'; // 'YYYY-MM-DD'（朝の通知を出した日）
 export const HISTORY_KEEP_DAYS = 30;
 export const MAX_CARDS = 2;
-/** 朝の通知を出す時間帯: この時刻より前の起動なら 8:00 に予約、これ以降の起動は「朝」ではないので出さない */
+/**
+ * 朝の通知の時刻。
+ * 【2026-09-04 変更】固定の 8:00 をやめ、**設定「起床時刻」**（lib/wakeTime.ts・既定7:00）に追従させた。
+ * 5時起きの人には遅すぎ、10時起きの人には寝ている間に鳴っていた（＝通知を開かない癖がつく）。
+ * @deprecated 旧固定値（既定値の説明用に残置）。判定は planMorningNotification が wake から組む
+ */
 export const MORNING_HOUR = 8;
+/** @deprecated 旧固定値。窓の長さは MORNING_WINDOW_MIN（起床から2時間）に置き換わった */
 export const MORNING_END_HOUR = 10;
-/** 8:00 を過ぎてからの起動は、いま開いているアプリ内のカードが役目を果たすので、少し置いてから鳴らす */
+/** 起床時刻から「朝」として通知してよい長さ（分）。旧実装の 8:00〜10:00 と同じ2時間幅を保つ */
+export const MORNING_WINDOW_MIN = 120;
+/** 起床時刻を過ぎてからの起動は、いま開いているアプリ内のカードが役目を果たすので、少し置いてから鳴らす */
 export const NOTIFY_DELAY_MIN = 3;
 
 // ===== 履歴（純関数） =====
@@ -71,6 +80,8 @@ export type NotifyPlanInput = {
   lastNotified: string | null;         // 最後に通知した日
   today: string;
   now: Date;
+  /** 設定「起床時刻」（省略時は既定 7:00）。通知の時刻はここに追従する */
+  wake?: Hm;
 };
 
 export type NotifyPlan = { alert: Alert; at: Date; title: string; body: string };
@@ -90,8 +101,11 @@ export function alertNotificationCopy(alert: Alert): { title: string; body: stri
  *  ・設定「気づきの通知」ON のときだけ
  *  ・1日1件（lastNotified === today なら出さない）
  *  ・caution だけ（positive は通知しない＝背中押しはアプリ内で十分）
- *  ・8:00 より前の起動 → 今日の 8:00 に予約。8:00〜10:00 の起動 → 3分後（開いている間は
- *    フォアグラウンドで表示されないので、カードで足りた人には届かない）。10:00 以降は「朝」ではないので出さない
+ *  ・**起床時刻より前の起動 → 今日の起床時刻に予約**（0:30 に開いた人にも、朝ちょうどに届く）。
+ *    起床〜＋2時間（MORNING_WINDOW_MIN）の起動 → 3分後（開いている間はフォアグラウンドで
+ *    表示されないので、カードで足りた人には届かない）。それ以降は「朝」ではないので出さない
+ *
+ * 時刻は端末ローカル時刻で組む（起床時刻の設定も端末の時計で選ぶので一致する）。
  */
 export function planMorningNotification(inp: NotifyPlanInput): NotifyPlan | null {
   if (!inp.enabled || inp.mode !== 'smart') return null;
@@ -99,11 +113,19 @@ export function planMorningNotification(inp: NotifyPlanInput): NotifyPlan | null
   const caution = inp.alerts.find((a) => a.tone === 'caution');
   if (!caution) return null;
   const now = inp.now;
-  const hour = now.getHours() + now.getMinutes() / 60;
-  if (hour >= MORNING_END_HOUR) return null;
+  const wake = inp.wake ?? WAKE_DEFAULT_HM;
+  const nowHm: Hm = { h: now.getHours(), m: now.getMinutes() };
+  const since = minutesSinceWake(nowHm, wake);
   const at = new Date(now.getTime());
-  if (hour < MORNING_HOUR) at.setHours(MORNING_HOUR, 0, 0, 0);
-  else at.setTime(now.getTime() + NOTIFY_DELAY_MIN * 60000);
+  if (since < MORNING_WINDOW_MIN) {
+    // 起きた直後にもう開いている人。カードが役目を果たすので、少し置いてから鳴らす
+    at.setTime(now.getTime() + NOTIFY_DELAY_MIN * 60000);
+  } else if (beforeWake(nowHm, wake)) {
+    // まだ起きる前（深夜に開いた人も含む）＝今日の起床時刻に予約する
+    at.setHours(wake.h, wake.m, 0, 0);
+  } else {
+    return null;   // 朝の窓を過ぎた起動。いま鳴らしても「朝の通知」ではない
+  }
   return { alert: caution, at, ...alertNotificationCopy(caution) };
 }
 
@@ -174,10 +196,10 @@ export async function loadInsightAlerts(today = todayJST()): Promise<InsightAler
  */
 export async function maybeScheduleMorningNotification(all: Alert[], today = todayJST(), now = new Date()): Promise<boolean> {
   try {
-    const [{ mode }, enabled, lastNotified] = await Promise.all([
-      getDailyReminderPrefs(), getInsightNotifyEnabled(), AsyncStorage.getItem(NOTIFIED_KEY),
+    const [{ mode }, enabled, lastNotified, wake] = await Promise.all([
+      getDailyReminderPrefs(), getInsightNotifyEnabled(), AsyncStorage.getItem(NOTIFIED_KEY), readWakeHm(),
     ]);
-    const plan = planMorningNotification({ alerts: all, mode, enabled, lastNotified, today, now });
+    const plan = planMorningNotification({ alerts: all, mode, enabled, lastNotified, today, now, wake });
     if (!plan) return false;
     return scheduleInsightNotification(plan, today, NOTIFIED_KEY);
   } catch { return false; }

@@ -2204,4 +2204,8 @@ export const ID: Record<string, string> = {
   "（{n}回）": "({n} kali)",
   "内容をコピーする": "Salin isi",
   "記録を消す": "Hapus log",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Disimpan sebagai catatan untuk {date}. Kamu bisa melihatnya di feed jika kembali ke tanggal tersebut.",
+  "前日（{m}/{d}）として記録": "Catat sebagai hari sebelumnya ({m}/{d})",
+  "起床時刻": "Waktu bangun tidur",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Item pagi (suasana hati, rencana hari ini, catatan) tidak akan muncul sebelum waktu ini. Silakan sesuaikan dengan ritme harianmu.",
 };

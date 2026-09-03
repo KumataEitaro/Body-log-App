@@ -2273,4 +2273,8 @@ export const ES: Record<string, string> = {
   "（{n}回）": "({n} veces)",
   "内容をコピーする": "Copiar contenido",
   "記録を消す": "Borrar registros",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Guardado para el {date}. Si cambias de fecha, podrás verlo en tu feed.",
+  "前日（{m}/{d}）として記録": "Registrar para ayer ({m}/{d})",
+  "起床時刻": "Hora de despertar",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Lo que sale por la mañana (ánimo, planes de hoy, notas) no aparecerá antes de esta hora. Cámbiala según tu ritmo diario.",
 };

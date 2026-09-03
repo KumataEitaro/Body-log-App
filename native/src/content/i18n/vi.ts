@@ -2204,4 +2204,8 @@ export const VI: Record<string, string> = {
   "（{n}回）": "({n} lần)",
   "内容をコピーする": "Sao chép nội dung",
   "記録を消す": "Xóa nhật ký",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Đã lưu nhật ký cho {date}. Bạn có thể xem lại trong bảng tin khi chuyển về ngày này.",
+  "前日（{m}/{d}）として記録": "Ghi nhật ký cho hôm trước ({m}/{d})",
+  "起床時刻": "Giờ thức dậy",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Các mục buổi sáng (tâm trạng, kế hoạch hôm nay, ghi chú) sẽ không xuất hiện trước giờ này. Hãy điều chỉnh theo nhịp sinh hoạt của bạn nhé.",
 };

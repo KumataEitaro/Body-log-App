@@ -84,12 +84,36 @@ describe('insightAlerts: 朝の通知', () => {
     expect(planMorningNotification({ ...base, mode: 'smart', now: at(6), alerts: [alert('p1', 'positive')] })).toBeNull();
   });
 
-  it('8:00前の起動は8:00に予約、8:00〜10:00は3分後、10:00以降は出さない', () => {
+  // 【2026-09-04】固定の 8:00 をやめ、設定「起床時刻」（既定7:00）に追従させた。
+  // 5時起きの人には遅すぎ、10時起きの人には寝ている間に鳴っていた（＝通知を開かない癖がつく）
+  it('起床前の起動は起床時刻に予約、起床〜+2時間は3分後、それ以降は出さない（既定7:00）', () => {
     const early = planMorningNotification({ ...base, mode: 'smart', now: at(6, 30) })!;
-    expect(early.at.getHours()).toBe(8); expect(early.at.getMinutes()).toBe(0);
+    expect(early.at.getHours()).toBe(7); expect(early.at.getMinutes()).toBe(0);
     const mid = planMorningNotification({ ...base, mode: 'smart', now: at(8, 30) })!;
     expect(mid.at.getTime()).toBe(at(8, 33).getTime());
-    expect(planMorningNotification({ ...base, mode: 'smart', now: at(10, 0) })).toBeNull();
+    expect(planMorningNotification({ ...base, mode: 'smart', now: at(9, 0) })).toBeNull();
+    expect(planMorningNotification({ ...base, mode: 'smart', now: at(21, 0) })).toBeNull();
+  });
+
+  it('**深夜（0:30）に開いた人にも、朝ちょうどに届く**（深夜に鳴らさない・黙って諦めない）', () => {
+    const night = planMorningNotification({ ...base, mode: 'smart', now: at(0, 30) })!;
+    expect(night.at.getHours()).toBe(7); expect(night.at.getMinutes()).toBe(0);
+  });
+
+  it('起床時刻の設定に追従する（5:00起床なら5:00・10:30起床なら10:30）', () => {
+    const early = planMorningNotification({ ...base, mode: 'smart', now: at(3, 0), wake: { h: 5, m: 0 } })!;
+    expect(early.at.getHours()).toBe(5); expect(early.at.getMinutes()).toBe(0);
+    const late = planMorningNotification({ ...base, mode: 'smart', now: at(8, 0), wake: { h: 10, m: 30 } })!;
+    expect(late.at.getHours()).toBe(10); expect(late.at.getMinutes()).toBe(30);
+    // 10:30起床の人にとって 8:00 はまだ寝ている時間なので、いま鳴らさず起床時刻に寄せる
+    expect(late.at.getTime()).toBeGreaterThan(at(8, 0).getTime());
+  });
+
+  it('夜勤（起床23:00）でも日付を跨いで判定できる（1:00は起床2時間後＝3分後に鳴らす）', () => {
+    const w = { h: 23, m: 0 };
+    const mid = planMorningNotification({ ...base, mode: 'smart', now: at(0, 30), wake: w })!;
+    expect(mid.at.getTime()).toBe(at(0, 33).getTime());
+    expect(planMorningNotification({ ...base, mode: 'smart', now: at(6, 0), wake: w })!.at.getHours()).toBe(23);
   });
 
   it('文言は非審判「今日は{factors先頭}の日」＋「無理せず、いつもどおりで」。caution を選ぶ', () => {

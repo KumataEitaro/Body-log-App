@@ -19,10 +19,37 @@ describe('shouldAskPlan（朝の1問の出し方＝質問攻めにしない）',
     expect(ask()).toBe(true);
   });
 
-  it('11時を過ぎたら出さない（今から今日の予定を聞く意味が薄い）', () => {
-    expect(ask({ hour: 10 })).toBe(true);
-    expect(ask({ hour: 11 })).toBe(false);
+  // 【2026-09-04】固定の「〜11時」から **起床時刻＋5時間の窓** に置き換えた（lib/wakeTime.ts）。
+  // 固定時刻だと5時起きの人には遅すぎ、10時起きの人は起きた時点で窓が閉じていた。
+  // さらに 0:30 に開くと「今日の予定は？」が深夜に出て、1日1回の質問を無駄に消費していた
+  it('既定（起床7:00）なら 7:00〜11:59 に聞き、12:00 で閉じる', () => {
+    expect(ask({ hour: 7, minute: 0 })).toBe(true);
+    expect(ask({ hour: 11, minute: 59 })).toBe(true);
+    expect(ask({ hour: 12 })).toBe(false);
     expect(ask({ hour: 19 })).toBe(false);
+  });
+
+  it('**深夜は出さない**（0:30 に「今日は外食の予定ありますか？」は答えられない）', () => {
+    expect(ask({ hour: 0, minute: 30 })).toBe(false);
+    expect(ask({ hour: 3 })).toBe(false);
+    expect(ask({ hour: 6, minute: 59 })).toBe(false);
+  });
+
+  it('起床時刻に追従する（早起きは早く閉じ、遅起きは遅くまで聞ける）', () => {
+    expect(ask({ hour: 6, wake: { h: 5, m: 0 } })).toBe(true);    // 5:00起床なら6時はまだ朝
+    expect(ask({ hour: 10, wake: { h: 5, m: 0 } })).toBe(false);  // 5:00+5h で閉じている
+    expect(ask({ hour: 9, wake: { h: 10, m: 30 } })).toBe(false); // まだ起きていない
+    expect(ask({ hour: 14, wake: { h: 10, m: 30 } })).toBe(true); // 10:30+5h=15:30 まで聞ける
+  });
+
+  it('夜勤（起床23:00）でも日付を跨いで聞ける（23:00〜翌4:00）', () => {
+    expect(ask({ hour: 23, wake: { h: 23, m: 0 } })).toBe(true);
+    expect(ask({ hour: 1, wake: { h: 23, m: 0 } })).toBe(true);
+    expect(ask({ hour: 5, wake: { h: 23, m: 0 } })).toBe(false);
+  });
+
+  it('時が壊れている（NaN）ときは出さない', () => {
+    expect(ask({ hour: Number.NaN })).toBe(false);
   });
 
   it('答えたら二度と出さない（1日1回）。「予定はない」と答えた場合も含む', () => {
