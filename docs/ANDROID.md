@@ -110,3 +110,20 @@ Supabase→Googleの認可ページを開き、`bodylog://auth-callback` に戻�
 4. **申請**: 製品版アクセス申請 → 通過後、事前登録 or 即公開
 5. **公開後**: id/th/vi/pt/koのストア文言を整備 → Store Listing Experimentsでアイコン/スクショ検証
 6. **その後**: RC Androidキー設定で課金解放、Health Connect対応をバックログへ
+
+## 署名の罠（2026-09-03に踏んだ）
+
+`expo prebuild --platform android` が生成する `android/app/build.gradle` は、**buildTypes.release でも
+`signingConfig signingConfigs.debug`** を指している。つまり何もしなければ**リリースビルドがデバッグ鍵で署名される**。
+この .aab を Play にあげると「アップロードされた Android App Bundle がデバッグモードで署名されています」で
+拒否され、続けて「App Bundle をアップロードしてください」「既存ユーザーへのアップグレードを許可していません」等の
+派生エラーが出る（原因は1つ）。
+
+`android/` はリポジトリに入れず毎回 prebuild するので、**ビルド時に注入**する方式にした:
+
+- `scripts/inject-android-signing.js` — signingConfigs に release を足し、buildTypes.release を向け直す（冪等）。
+  値は `System.getenv` で Gradle 実行時に読むので、**生成物やログにパスワードが残らない**
+- codemagic.yaml の rn-android に2ステップを追加: prebuild 直後の**注入**と、Build aab 直後の**署名の検証**
+  （署名者に `Android Debug` が含まれていたらビルドを落とす＝デバッグ署名の .aab を二度と外に出さない）
+- 鍵は Codemagic の `android_signing: [bodylog_keystore]` が渡す環境変数
+  `CM_KEYSTORE_PATH` / `CM_KEYSTORE_PASSWORD` / `CM_KEY_ALIAS` / `CM_KEY_PASSWORD`
