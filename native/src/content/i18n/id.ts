@@ -2204,4 +2204,5 @@ export const ID: Record<string, string> = {
   "（{n}回）": "({n} kali)",
   "内容をコピーする": "Salin isi",
   "記録を消す": "Hapus log",
+  "食事を記録": "Catat makanan",
 };
