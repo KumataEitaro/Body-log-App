@@ -21,7 +21,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  UtensilsCrossed, Activity, Camera, Weight, X, ChevronLeft, Salad, Pencil, Images, Sparkles,
+  UtensilsCrossed, Activity, Camera, Weight, X, ChevronLeft, Sparkles,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -99,8 +99,9 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
     });
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
 
-  const crumb = step === 'meal' ? t('食事') : step === 'weight' ? t('体重') : t('記録する');
-  const stepLabel = step === 'root' ? '1/2' : '2/2';
+  const crumb = step === 'weight' ? t('体重') : t('記録する');
+  // 「記録する」の下に段があるのは体重だけ（食事は直行になった）。1段のときは段表示を出さない
+  const stepLabel = step === 'root' ? null : '2/2';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={flush} statusBarTranslucent>
@@ -122,7 +123,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                 <Text style={s.crumb} numberOfLines={1}>
                   {step === 'root' ? crumb : <><Text style={s.crumbPrev}>{t('記録する')} › </Text>{crumb}</>}
                 </Text>
-                <Text style={s.step}>{stepLabel}</Text>
+                {stepLabel && <Text style={s.step}>{stepLabel}</Text>}
               </View>
               <Pressable onPress={onClose} hitSlop={10} style={s.headBtn} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
                 <X size={ICON.lg} color={C.sub} strokeWidth={ICON.stroke} />
@@ -131,7 +132,11 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
 
             {step === 'root' && (
               <View style={s.grid}>
-                <Tile Icon={UtensilsCrossed} label={t('食事')} onPress={() => go('meal')} testID="plus-meal" />
+                {/* 食事は2段目を挟まず**テキスト入力へ直行**（βフィードバック 2026-09-03:
+                    「食事と入力したら、食事入力をすぐやりたい」）。入力シートにはマイ食品チップ・
+                    写真/撮影アイコン・音声ヒントが既に載っており、入力方法の選択画面は二重の階層だった。
+                    写真だけシート内でもう1段（アイコン→カメラ/ライブラリ） */}
+                <Tile Icon={UtensilsCrossed} label={t('食事')} onPress={() => pick('meal:text')} testID="plus-meal" />
                 {/* 運動は「歩いた・泳いだ」も含む一般の運動（運動タブの「運動を記録する」へ）。ダンベルだと筋トレ限定に見えるので Activity */}
                 <Tile Icon={Activity} label={t('運動')} onPress={() => pick('exercise')} testID="plus-exercise" />
                 <Tile Icon={Camera} label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
@@ -139,15 +144,6 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                 {/* 5枚目「何を食べる？」（食事タブ内のAI相談）: ＋を押す習慣に乗せる第2の入口。
                     記録ではなく相談なので2×2の外に横長1枚で置き、記録4種と混ぜない */}
                 <Tile Icon={Sparkles} label={t('何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" wide />
-              </View>
-            )}
-
-            {step === 'meal' && (
-              <View style={s.grid}>
-                <Tile Icon={Salad} label={t('マイ食品')} onPress={() => pick('meal:myfood')} testID="plus-meal-myfood" />
-                <Tile Icon={Pencil} label={t('テキストで入力')} onPress={() => pick('meal:text')} testID="plus-meal-text" />
-                <Tile Icon={Images} label={t('写真を選ぶ')} onPress={() => pick('meal:library')} testID="plus-meal-library" />
-                <Tile Icon={Camera} label={t('撮影する')} onPress={() => pick('meal:camera')} testID="plus-meal-camera" />
               </View>
             )}
 
@@ -208,7 +204,7 @@ const s = themed(() => ({
   tile: {
     width: '47.5%', flexGrow: 1, aspectRatio: 1.35,
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: 1.5, borderColor: C.hairline,
-    alignItems: 'center', justifyContent: 'center', gap: 10,
+    alignItems: 'center', justifyContent: 'center', gap: 8,
     shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
   tilePressed: { borderColor: C.teal, backgroundColor: C.accentSoft, transform: [{ scale: 0.97 }] },
@@ -216,7 +212,9 @@ const s = themed(() => ({
   tileWide: { width: '100%', aspectRatio: undefined, flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 18, justifyContent: 'flex-start', gap: 12 },
   tileIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   tileIconWide: { width: 40, height: 40, borderRadius: 20 },
-  tileT: { fontSize: 15, fontWeight: '800', color: C.ink },
+  // lineHeightとincludeFontPaddingを固定しないと、フォントのディセンダぶんだけ
+  // アイコン＋ラベルの塊が下へ寄って見える（βフィードバック 2026-09-03「文字がボタンの下半分にある」）
+  tileT: { fontSize: 15, lineHeight: 18, fontWeight: '800', color: C.ink, textAlign: 'center', includeFontPadding: false },
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   wInput: {
