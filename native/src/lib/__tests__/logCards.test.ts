@@ -4,27 +4,43 @@
 import { arbitrateAttention, attentionCount, MAX_BANDS, MAX_CARDS, TODAY_ONLY, CARD_PRIORITY, BAND_PRIORITY } from '../logCards';
 
 const ALL_ON = {
-  caution: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
+  caution: 1, dayPlan: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
   badge: 1, firstLaw: 1, brief: 1,
 };
 
 describe('arbitrateAttention（ヒーロー直下の調停）', () => {
   it('全候補がそろっても カード最大2枚＋帯最大2本 を超えない', () => {
     const r = arbitrateAttention({ isToday: true, candidates: ALL_ON });
-    const cards = r.caution + r.backfill + r.checklist + r.mood + r.positive;
+    const cards = r.caution + r.dayPlan + r.backfill + r.checklist + r.mood + r.positive;
     const bands = r.badge + r.firstLaw + r.brief;
     expect(cards).toBe(MAX_CARDS);
     expect(bands).toBe(MAX_BANDS);
     expect(attentionCount(r)).toBe(MAX_CARDS + MAX_BANDS);
   });
 
-  it('カードは caution → backfill が先に枠を取り、checklist・mood・positive は譲る', () => {
+  it('カードは caution → dayPlan が先に枠を取り、backfill・checklist・mood・positive は譲る', () => {
     const r = arbitrateAttention({ isToday: true, candidates: ALL_ON });
     expect(r.caution).toBe(1);
-    expect(r.backfill).toBe(1);
+    expect(r.dayPlan).toBe(1);
+    expect(r.backfill).toBe(0);
     expect(r.checklist).toBe(0);
     expect(r.mood).toBe(0);
     expect(r.positive).toBe(0);
+  });
+
+  // N1（docs/STRATEGY.md §7）: 朝の1問は「答えると今日の配分そのものが変わる」＝この後に見る数字の前提。
+  // だから backfill（昨日の穴埋め）より上。ただし caution（今日は崩れやすい）には譲る
+  it('朝の1問は昨日の穴埋めより先に枠を取る', () => {
+    const r = arbitrateAttention({ isToday: true, candidates: { dayPlan: 1, backfill: 1 } });
+    expect(r.dayPlan).toBe(1);
+    expect(r.backfill).toBe(1);   // 枠は2枚あるので両方出る
+    const tight = arbitrateAttention({ isToday: true, candidates: { dayPlan: 1, backfill: 1 } }, 1);
+    expect(tight.dayPlan).toBe(1);
+    expect(tight.backfill).toBe(0);
+  });
+
+  it('朝の1問は「今日」を見ているときだけ（過去日の予定を聞かない）', () => {
+    expect(arbitrateAttention({ isToday: false, candidates: { dayPlan: 1 } }).dayPlan).toBe(0);
   });
 
   it('帯は badge → firstLaw が先で、brief は3本目なので出ない', () => {
