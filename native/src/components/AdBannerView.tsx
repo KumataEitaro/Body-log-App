@@ -75,12 +75,22 @@ export default function AdBannerView({ placement, loaded, onLoaded, onFailed }: 
   const { BannerAd, BannerAdSize } = ads;
   return (
     <View style={s.inner}>
+      {/* ===== 広告の「上」の行（＝広告ビューの外側）=====
+          ここは BannerAd の外なので、AdMobポリシー上の「広告に重ねる」には当たらない。
+          逆に **広告ビューの上に × や閉じるボタンを置くことは絶対にしない**:
+          - 広告の閉じるボタンを模倣するUIはポリシー違反（配信停止のリスク）
+          - 押しても消えない偽の×はユーザーへの裏切りでもある
+          消す手段は「課金する」だけで、その導線をこのリンク1本に集約する。
+          2026-09-04: 文言を「スタンダードプランで広告を消せます」→「広告を消す →」に短縮し、
+          色を C.faint → C.accentInk に変更（リンクだと分かる＝押せることが伝わる）。
+          「広告」ラベルは faint のまま＝広告であることの表示より導線を目立たせない */}
       {loaded && (
         <View style={s.head}>
           <Text style={s.label}>{t('広告')}</Text>
           {/* 「広告なし」の最安はスタンダード（ライト廃止・2026-09）。src=ads で文脈つきペイウォールへ */}
-          <Pressable onPress={() => router.push('/paywall?src=ads' as never)} hitSlop={8}>
-            <Text style={s.removeLink}>{t('スタンダードプランで広告を消せます')}</Text>
+          <Pressable onPress={() => router.push('/paywall?src=ads' as never)} hitSlop={8}
+                     accessibilityRole="button" accessibilityLabel={t('広告を消す →')}>
+            <Text style={s.removeLink}>{t('広告を消す →')}</Text>
           </Pressable>
         </View>
       )}
@@ -99,5 +109,7 @@ const s = themed(() => ({
   inner: { borderRadius: 12, overflow: 'hidden' },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, paddingHorizontal: 2 },
   label: { fontSize: 11, color: C.faint },
-  removeLink: { fontSize: 11, color: C.faint, textDecorationLine: 'underline' },
+  // 押せることが伝わる見た目（アクセント色＋下線）。ただし大きくはしない＝
+  // 記録の邪魔にならない範囲で「消す方法がある」ことだけを知らせる
+  removeLink: { fontSize: 11.5, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
 }));

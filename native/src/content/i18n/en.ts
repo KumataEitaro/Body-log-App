@@ -2283,4 +2283,10 @@ export const EN: Record<string, string> = {
   "内容をコピーする": "Copy content",
   "記録を消す": "Clear log",
   "食事を記録": "Log Meal",
+  "広告なしで、静かに記録する": "Log in peace, ad-free",
+  "スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。": "Go Standard or higher to remove ads and get significantly more AI analyses.",
+  "全画面の広告を、もう出さない": "No more full-screen ads",
+  "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "You've watched {n} ads this week. With Standard, that's 0.",
+  "広告を消す →": "Remove ads →",
+  "広告なしで使えます": "Ad-free access",
 };

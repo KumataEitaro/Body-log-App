@@ -2205,4 +2205,10 @@ export const VI: Record<string, string> = {
   "内容をコピーする": "Sao chép nội dung",
   "記録を消す": "Xóa nhật ký",
   "食事を記録": "Ghi lại bữa ăn",
+  "広告なしで、静かに記録する": "Ghi chép nhẹ nhàng, không có quảng cáo",
+  "スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。": "Từ gói Tiêu chuẩn trở lên, quảng cáo sẽ biến mất và số lượt phân tích bằng AI cũng tăng lên đáng kể.",
+  "全画面の広告を、もう出さない": "Không còn quảng cáo toàn màn hình",
+  "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Bạn đã xem quảng cáo {n} lần trong tuần qua. Với gói Tiêu chuẩn, con số này là 0.",
+  "広告を消す →": "Tắt quảng cáo →",
+  "広告なしで使えます": "Dùng không có quảng cáo",
 };

@@ -2274,4 +2274,10 @@ export const ES: Record<string, string> = {
   "内容をコピーする": "Copiar contenido",
   "記録を消す": "Borrar registros",
   "食事を記録": "Registrar comida",
+  "広告なしで、静かに記録する": "Registra sin anuncios, con total tranquilidad",
+  "スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。": "Con el plan Estándar o superior, elimina los anuncios y obtén muchos más análisis con IA.",
+  "全画面の広告を、もう出さない": "No volver a mostrar anuncios a pantalla completa",
+  "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Has visto anuncios {n} veces esta última semana. Con Estándar, serían 0.",
+  "広告を消す →": "Eliminar anuncios →",
+  "広告なしで使えます": "Disponible sin anuncios",
 };

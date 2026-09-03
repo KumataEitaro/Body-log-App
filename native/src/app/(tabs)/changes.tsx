@@ -31,6 +31,8 @@ import { Repeat } from 'lucide-react-native';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import AdSlot from '@/components/AdSlot';
+import { useInterstitial } from '@/lib/interstitialAd';
+import { useAdPitch } from '@/components/AdPitchSnackbar';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
@@ -1081,10 +1083,23 @@ export default function ChangesScreen() {
     Haptics.selectionAsync().catch(() => {});
     setSticker({ kind: 'weight', points: stickerPoints, days: stickerDays, bulk: purpose === 'bulk' });
   }
+  // 全画面広告（インタースティシャル）: 概要タブのメニュー行から詳細へドリルダウンする瞬間に
+  // 1枚はさむ。どの行き先で出すかは lib/interstitial.ts の INTERSTITIAL_TARGETS（1か所の表）で
+  // 決める（体の記録・運動の量・筋トレの成長・週のふりかえりだけ出す。バイタル/生理周期/
+  // 体の写真/栄養ランキング/法則は出さない）。頻度は同一セッション1回・10分間隔・1日3回まで。
+  // **遷移は必ず先に進める**（setDetailKey / router.push のあとに maybeShow を呼ぶ）＝
+  // 広告のロードを待たせない。詳細は docs/ADS.md
+  // 全画面広告が閉じ切ったあとだけ、控えめに「広告なしで使えます →」を1回。
+  // AdMobポリシー: 広告ビューに重ねない・閉じるボタンを模倣しない・表示を妨げない
+  // （閉じ切ってから別UIとして出すのは適合）。文言・頻度の規約は AdPitchSnackbar.tsx
+  const adPitch = useAdPitch(insets.bottom + 24);
+  const interstitial = useInterstitial({ onClosed: adPitch.pitch });
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
     detailTx.value = 0;   // 前回スワイプ途中の位置が残らないようにする
     setDetailKey(key);
+    // 遷移を確定させたあとに広告の判定（未ロード・条件未達なら何も起きない）
+    interstitial.maybeShow(key);
   }
   // 食事タブの＋シート「体の写真」から（/changes?open=photos&shoot=1&ts=…）:
   // 体写真の詳細ページを開き、BodyPhotosCard に「すぐ撮影」を伝える（既存のカメラ→体脂肪率→保存の流れに乗せる）
@@ -1188,6 +1203,9 @@ export default function ChangesScreen() {
                    if (key === 'week') {
                      Haptics.selectionAsync().catch(() => {});
                      router.push('/weekly-review' as never);
+                     // 遷移を出したあとに全画面広告の判定（週のふりかえりは対象・週1回程度の
+                     // 頻度なので体験を壊しにくい）。王冠つきでも遷移は止めない＝広告も同じ流儀
+                     interstitial.maybeShow('week');
                      return;
                    }
                    // lawsはカード詳細ではなく法則図鑑（スタック画面）への外部遷移
@@ -1335,6 +1353,9 @@ export default function ChangesScreen() {
         </GestureDetector>
       )}      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
       {undoBar.element}
+      {/* 「広告なしで使えます →」（全画面広告が閉じ切ったあとだけ・1回・約6秒）。
+          広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}
+      {adPitch.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={hidden.filter((k) => !unavailable.includes(k))} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}

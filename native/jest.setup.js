@@ -179,12 +179,29 @@ jest.mock('expo-linear-gradient', () => {
 });
 // --- AdMob（バナーは描画しない・importだけ解決させる。gate非activeのテスト環境では
 //     AdBanner自体がnullを返すため、実挙動には影響しない） ---
+// インタースティシャル（全画面）も生成・ロード・表示はすべてno-op。判定の式は
+// src/lib/__tests__/interstitial.test.ts（純関数）で固定しているので、ここは
+// 「importが解決し、画面がクラッシュしない」ことだけを担保する
 jest.mock('react-native-google-mobile-ads', () => ({
   __esModule: true,
   default: () => ({ initialize: jest.fn(async () => []) }),
   BannerAd: () => null,
   BannerAdSize: { ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER', ADAPTIVE_BANNER: 'ADAPTIVE_BANNER', BANNER: 'BANNER' },
-  TestIds: { ADAPTIVE_BANNER: 'ca-app-pub-3940256099942544/9214589741', BANNER: 'ca-app-pub-3940256099942544/2934735716' },
+  InterstitialAd: {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(async () => {}),
+      addAdEventListener: jest.fn(() => jest.fn()),
+      removeAllListeners: jest.fn(),
+      loaded: false,
+    })),
+  },
+  AdEventType: { LOADED: 'loaded', ERROR: 'error', OPENED: 'opened', CLOSED: 'closed', CLICKED: 'clicked', PAID: 'paid' },
+  TestIds: {
+    ADAPTIVE_BANNER: 'ca-app-pub-3940256099942544/9214589741',
+    BANNER: 'ca-app-pub-3940256099942544/2934735716',
+    INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
+  },
 }));
 
 jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn(async () => 'file:///tmp/sticker.png') }));
