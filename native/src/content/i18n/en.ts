@@ -2292,4 +2292,8 @@ export const EN: Record<string, string> = {
   "食べるものを、食事タブでそのまま相談": "Ask what to eat right from the Meals tab",
   "食べるものを相談する": "Ask what to eat",
   "「食べるものを相談する」はスタンダードプランで使えます。": "\"Ask what to eat\" is available on the Standard Plan.",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Saved for {date}. You can view it in your feed by switching back to that day.",
+  "前日（{m}/{d}）として記録": "Log for yesterday ({m}/{d})",
+  "起床時刻": "Wake-up time",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Morning prompts (mood, plans, thoughts) won’t appear before this time. Adjust it to fit your daily routine.",
 };

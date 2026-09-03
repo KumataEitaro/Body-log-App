@@ -10,7 +10,8 @@
 // 【設計方針】
 //  - **サーバー不要**: 予定は端末内の見込みであって記録ではない。AsyncStorage `bl-day-plan:<date>` に置き、
 //    7日より古いキーは掃除する。AIにも渡さない（端末内の算術で完結＝コスト0）。
-//  - **質問攻めにしない**: 1日1回・朝（〜11時）に1問だけ。外食/飲み会を選んだときだけ2問目（時刻）を許可。
+//  - **質問攻めにしない**: 1日1回・朝の窓（起床時刻〜＋5時間・設定で変えられる）に1問だけ。
+//    外食/飲み会を選んだときだけ2問目（時刻）を許可。
 //    答えたら即カードは畳む。「聞かないで」で以後この質問を出さない（`bl-day-plan-ask-off`）。
 //  - **嘘の緩和を作らない**: チートデイ（lib/goal.ts requiredDailyWithEvents で既に吸収済み）が
 //    登録されている日は再配分を出さない。二重に緩めた数字は「食べていい」の嘘になる。
@@ -20,6 +21,7 @@
 // 純関数（この下半分）と端末保存（上半分）を分け、判断のロジックは全部テストできる形にする。
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseHm } from './timeSlots';
+import { WAKE_DEFAULT_HM, isMorningWindow, type Hm } from './wakeTime';
 
 // ===== モデル =====
 
@@ -75,7 +77,18 @@ export function validateDayPlan(v: unknown): DayPlan | null {
 
 // ===== 聞き方（頻度・条件） =====
 
-/** 朝の1問を出す時限。11時を過ぎたら「今日の予定を今から聞く」意味が薄いので出さない */
+/**
+ * 朝の1問を出す時限。
+ *
+ * 【2026-09-04 変更】固定の 11 時をやめ、**起床時刻＋MORNING_SPAN_HOURS（5時間）**の窓に置き換えた。
+ * 固定時刻だと、5時起きの人は「もう昼前」でもまだ聞かれ、10時起きの人は起きた時点で窓が閉じている。
+ * さらに 0:30 に開くと（JSTの日付はもう次の日なので）「今日の予定は？」が深夜に出てしまい、
+ * 本人の体感ではまだ「昨日の夜」なので答えられない＝1日1回の質問を無駄に消費していた。
+ * 起床時刻に紐づけると、早起きの人は早く閉じ、遅起きの人は遅くまで聞ける（生活リズムの個人差に追従）。
+ *
+ * @deprecated 参照しないこと（旧実装の名残・既定値の説明用に残置）。判定は `shouldAskPlan` が
+ *             lib/wakeTime.ts `isMorningWindow` で行う
+ */
 export const ASK_UNTIL_HOUR = 11;
 /** 2問目（時刻）を聞く対象＝食べる側のイベントだけ。トレーニングに時刻は要らない（消費の見込みだけ足す） */
 export function needsTimeQuestion(kind: DayPlanKind): boolean {
@@ -87,6 +100,10 @@ export type AskInput = {
   isToday: boolean;
   /** 現在の時（0-23） */
   hour: number;
+  /** 現在の分（0-59・省略時0）。起床時刻が 7:30 のように15分刻みなので分まで見る */
+  minute?: number;
+  /** 起床時刻（省略時は既定 7:00）。ここから MORNING_SPAN_HOURS の間だけ聞く */
+  wake?: Hm;
   /** すでに今日の予定に答えているか */
   answered: boolean;
   /** 「聞かないで」を選んだか */
@@ -96,14 +113,19 @@ export type AskInput = {
 };
 
 /**
- * 朝の1問を出すか。**1日1回・朝（〜11時）・今日だけ**。
+ * 朝の1問を出すか。**1日1回・朝の窓（起床時刻〜＋5時間）・今日だけ**。
  * 答えた／「聞かないで」／チートデイ登録済み／過去日 のいずれでも出さない。
+ *
+ * 窓を起床時刻に紐づけている理由は ASK_UNTIL_HOUR のコメント参照。
+ * `isMorningWindow` は日付を跨ぐ形で判定するので、起床23:00 の夜勤の人でも 23:00〜翌4:00 に聞ける。
  */
 export function shouldAskPlan(i: AskInput): boolean {
   if (!i.isToday) return false;
   if (i.answered || i.askOff) return false;
   if (i.hasCheatDay) return false;
-  return Number.isFinite(i.hour) && i.hour < ASK_UNTIL_HOUR;
+  if (!Number.isFinite(i.hour)) return false;
+  const now: Hm = { h: i.hour, m: Number.isFinite(i.minute) ? Number(i.minute) : 0 };
+  return isMorningWindow(now, i.wake ?? WAKE_DEFAULT_HM);
 }
 
 // ===== 二重計上・衝突の判定（ここが嘘を作らない止め金） =====

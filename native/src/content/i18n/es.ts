@@ -2283,4 +2283,8 @@ export const ES: Record<string, string> = {
   "食べるものを、食事タブでそのまま相談": "Consulta qué comer directamente desde la pestaña de comidas",
   "食べるものを相談する": "Consultar qué comer",
   "「食べるものを相談する」はスタンダードプランで使えます。": "\"Consultar qué comer\" está disponible en el plan Estándar.",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Guardado para el {date}. Si cambias de fecha, podrás verlo en tu feed.",
+  "前日（{m}/{d}）として記録": "Registrar para ayer ({m}/{d})",
+  "起床時刻": "Hora de despertar",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Lo que sale por la mañana (ánimo, planes de hoy, notas) no aparecerá antes de esta hora. Cámbiala según tu ritmo diario.",
 };

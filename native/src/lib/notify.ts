@@ -17,6 +17,8 @@ import { supabase } from './supabase';
 // purpose→notifyの依存は一方向（purposeはnotifyをimportしない）なので循環しない。
 // sync.ts→notify.tsの既存依存もそのまま（notifyからsyncはimportしない）
 import { getPurpose } from './purpose';
+// 起床時刻は「未選択時の既定値の算出」にだけ使う（wakeTime は notify を import しないので循環しない）
+import { WAKE_DEFAULT_HM, WAKE_TIME_KEY, defaultReminderHour, wakeOrDefault } from './wakeTime';
 
 const IDS_KEY = 'bl-notif-ids';         // { daily?: string; weekly?: string }
 const SMART_KEY = 'bl-notif-smart-ids'; // { 'YYYY-MM-DD': notificationId }
@@ -68,18 +70,29 @@ const REMINDER_COPY = () => [
   { title: t('今日のごはん、なんでしたか？'), body: t('つぶやくだけで記録になります。写真1枚でもOK。') },
 ];
 
+/**
+ * 記録リマインダーの設定（モード・時刻）。
+ *
+ * 【2026-09-04】**未選択のときの既定値だけ**、設定「起床時刻」から算出する
+ * （`defaultReminderHour` = 起床＋14時間＝寝る少し前。既定7:00なら21:00で従来と完全に一致）。
+ * すでに本人が時刻を選んでいる場合は**絶対に上書きしない**。夜勤の人が「起床時刻より前の時刻」を
+ * 選んでいても、それは本人の生活では正しい時刻なので警告も出さない（勝手な最適化はしない）。
+ */
 export async function getDailyReminderPrefs(): Promise<{ mode: DailyReminderMode; hour: number }> {
   try {
-    const kv = await AsyncStorage.multiGet([MODE_KEY, TIME_KEY, 'bl-notif-daily']);
+    const kv = await AsyncStorage.multiGet([MODE_KEY, TIME_KEY, 'bl-notif-daily', WAKE_TIME_KEY]);
     let mode = kv[0]?.[1] as DailyReminderMode | null;
     if (mode !== 'off' && mode !== 'smart' && mode !== 'always') {
       // 旧トグル('1'/'0')からの移行。ONだった人は「記録がない日だけ」へ
       // （全部入力した日にも鳴るのが不満の起点だったため、賢い方を新既定にする）
       mode = kv[2]?.[1] === '1' ? 'smart' : 'off';
     }
-    const hour = Number(String(kv[1]?.[1] ?? '21').split(':')[0]);
-    return { mode, hour: hour >= 0 && hour <= 23 ? hour : 21 };
-  } catch { return { mode: 'off', hour: 21 }; }
+    const fallback = defaultReminderHour(wakeOrDefault(kv[3]?.[1]));
+    const stored = kv[1]?.[1];
+    if (stored == null) return { mode, hour: fallback };
+    const hour = Number(String(stored).split(':')[0]);
+    return { mode, hour: hour >= 0 && hour <= 23 ? hour : fallback };
+  } catch { return { mode: 'off', hour: defaultReminderHour(WAKE_DEFAULT_HM) }; }
 }
 
 async function getSmartIds(): Promise<Record<string, string>> {

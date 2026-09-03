@@ -2214,4 +2214,8 @@ export const VI: Record<string, string> = {
   "食べるものを、食事タブでそのまま相談": "Tư vấn món ăn ngay tại tab Bữa ăn",
   "食べるものを相談する": "Tư vấn món ăn",
   "「食べるものを相談する」はスタンダードプランで使えます。": "Tính năng \"Tư vấn món ăn\" khả dụng trên gói Tiêu chuẩn.",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Đã lưu nhật ký cho {date}. Bạn có thể xem lại trong bảng tin khi chuyển về ngày này.",
+  "前日（{m}/{d}）として記録": "Ghi nhật ký cho hôm trước ({m}/{d})",
+  "起床時刻": "Giờ thức dậy",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Các mục buổi sáng (tâm trạng, kế hoạch hôm nay, ghi chú) sẽ không xuất hiện trước giờ này. Hãy điều chỉnh theo nhịp sinh hoạt của bạn nhé.",
 };

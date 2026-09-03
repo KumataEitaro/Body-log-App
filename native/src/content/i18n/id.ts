@@ -2214,4 +2214,8 @@ export const ID: Record<string, string> = {
   "食べるものを、食事タブでそのまま相談": "Tanya saran makanan langsung di tab Makanan",
   "食べるものを相談する": "Tanya saran makanan",
   "「食べるものを相談する」はスタンダードプランで使えます。": "\"Tanya saran makanan\" tersedia di Paket Standar.",
+  "{date}の記録として保存しました。日付を戻すとフィードで確認できます。": "Disimpan sebagai catatan untuk {date}. Kamu bisa melihatnya di feed jika kembali ke tanggal tersebut.",
+  "前日（{m}/{d}）として記録": "Catat sebagai hari sebelumnya ({m}/{d})",
+  "起床時刻": "Waktu bangun tidur",
+  "朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。": "Item pagi (suasana hati, rencana hari ini, catatan) tidak akan muncul sebelum waktu ini. Silakan sesuaikan dengan ritme harianmu.",
 };

@@ -7,7 +7,10 @@ import {
   ActivityIndicator, Alert, Modal, Platform, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, cancelInsightNotification, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
+// 起床時刻（「朝に出るもの」の窓の起点・lib/wakeTime.ts）
+import { WAKE_STEP_MIN, setWakeTime, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
 import { usePurpose } from '@/lib/purpose';
 import { deleteConfirmMatches } from '@/lib/guard';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
@@ -25,7 +28,7 @@ import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { BellRing, FileText, Droplet, Bug } from 'lucide-react-native';
 import { shareMedicalReport } from '@/lib/medicalReport';
-import { t, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
+import { t, apiLang, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
 import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, PFC_PRESETS, BG_TINTS, paletteFor, darkPaletteFor, type PfcColors } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
@@ -331,6 +334,28 @@ export default function SettingsScreen() {
   function toggleInsight(on: boolean) {
     setNotifInsight(on);
     setInsightNotifyEnabled(on).catch(() => {});
+  }
+
+  // ===== 起床時刻（2026-09-04）=====
+  // 「朝に出るもの」の窓の起点。端末内だけに持つ（DBにもAIにも送らない＝本人の生活リズムの情報）。
+  // 記録の日付（1日の区切り）はこれでは動かない。動かすのは「出す/出さないの時間の窓」と、
+  // 気づきの朝の通知の時刻・記録リマインダーの**未選択時の既定値**だけ
+  const wake = useWakeTime();
+  const [wakePickerOpen, setWakePickerOpen] = useState(false);
+  const [wakeDraft, setWakeDraft] = useState<Date>(new Date());
+  function openWakePicker() {
+    const hm = wakeOrDefault(wake);
+    const d = new Date();
+    d.setHours(hm.h, hm.m, 0, 0);
+    setWakeDraft(d);
+    setWakePickerOpen(true);
+  }
+  function commitWake(d: Date) {
+    setWakeTime({ h: d.getHours(), m: d.getMinutes() });
+    // 予約済みの「気づきの朝の通知」は旧い起床時刻で組まれているので取り消す。
+    // 次に食事タブを開いたときに新しい時刻で組み直される（1日1件の枠も一緒に戻す）
+    cancelInsightNotification().catch(() => {});
+    AsyncStorage.removeItem('bl-insight-alert-notified').catch(() => {});
   }
   async function changeReminder(mode: DailyReminderMode, hour: number) {
     setRemMode(mode); setRemHour(hour);
@@ -669,6 +694,24 @@ export default function SettingsScreen() {
       {/* 通知 */}
       <Text style={s.groupLabel}>{t('通知')}</Text>
       <View style={s.group}>
+        {/* 起床時刻（2026-09-04・グループ先頭）: 「朝に出るもの」の時間の窓を本人に決めてもらう。
+            生活リズムは人によって違うので、固定時刻（旧: 朝の通知8:00・予定ヒアリング〜11時）では
+            早起きの人にも夜勤の人にも合わない。深夜に翌日ぶんの気分・過食アラートが出る問題の直し方でもある。
+            **記録の日付（1日の区切り）は動かさない**（docs/TODO.md B9） */}
+        <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.notifLabel}>{t('起床時刻')}</Text>
+            </View>
+            <Pressable style={s.wakeChip} onPress={openWakePicker} accessibilityRole="button">
+              <Text style={s.wakeChipT}>{wake}</Text>
+            </Pressable>
+          </View>
+          <Text style={[s.notifSub, { marginTop: 6 }]}>
+            {t('朝に出るもの（気分・今日の予定・気づき）は、この時刻より前には出しません。生活リズムに合わせて変えてください。')}
+          </Text>
+        </View>
+        <View style={s.sep} />
         <View style={{ paddingVertical: 12, paddingHorizontal: 14 }}>
           <Text style={s.notifLabel}>{t('記録リマインダー')}</Text>
           <Text style={[s.notifSub, { marginBottom: 10 }]}>
@@ -1329,6 +1372,39 @@ export default function SettingsScreen() {
 
     {/* ===== ご意見・不具合の報告（サポート節） ===== */}
     <FeedbackSheet visible={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
+    {/* 起床時刻のピッカー（15分刻み）。iOSはスピナー＋「決定」、Androidは端末のダイアログで即確定
+        （食事タブの「食べた時間」ピッカーと同じ作法） */}
+    <Modal visible={wakePickerOpen} transparent animationType="fade" onRequestClose={() => setWakePickerOpen(false)}>
+      <Pressable style={s.timeBack} onPress={() => setWakePickerOpen(false)}>
+        <Pressable style={s.timeCard} onPress={() => {}}>
+          <Text style={s.timeTitle}>{t('起床時刻')}</Text>
+          <DateTimePicker
+            locale={apiLang()}
+            value={wakeDraft} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minuteInterval={WAKE_STEP_MIN}
+            onChange={(ev, d) => {
+              if (Platform.OS !== 'ios') {
+                setWakePickerOpen(false);
+                if (ev.type === 'set' && d) commitWake(d);
+                return;
+              }
+              if (d) setWakeDraft(d);
+            }}
+          />
+          {Platform.OS === 'ios' && (
+            <View style={s.timeBtns}>
+              <Pressable style={s.timeBtnGhost} onPress={() => setWakePickerOpen(false)} hitSlop={6}>
+                <Text style={s.timeBtnGhostT}>{t('キャンセル')}</Text>
+              </Pressable>
+              <Pressable style={s.timeBtn} onPress={() => { commitWake(wakeDraft); setWakePickerOpen(false); }} hitSlop={6}>
+                <Text style={s.timeBtnT}>{t('決定')}</Text>
+              </Pressable>
+            </View>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
     <StatusBarMask />
     </View>
   );
@@ -1427,6 +1503,20 @@ const s = themed(() => ({
   rowLabel: { fontSize: 15, fontWeight: '600', color: C.ink },
   rowSub: { fontSize: 13, color: C.sub, marginTop: 1 },
   sep: { height: 0.5, backgroundColor: C.line, marginLeft: 56 },
+  // 起床時刻: 右端の時刻チップ＋15分刻みピッカー（食事タブの「食べた時間」と同じ見た目に揃える）
+  wakeChip: {
+    borderWidth: 1.5, borderColor: C.line, backgroundColor: C.chipBg,
+    borderRadius: RADIUS.chip, paddingHorizontal: 14, paddingVertical: 7,
+  },
+  wakeChipT: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  timeBack: { flex: 1, backgroundColor: rgba(C.ink, 0.35), justifyContent: 'center', padding: 24 },
+  timeCard: { backgroundColor: C.bg, borderRadius: 20, padding: 14 },
+  timeTitle: { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 4, marginLeft: 4 },
+  timeBtns: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  timeBtnGhost: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel },
+  timeBtnGhostT: { fontSize: 15, fontWeight: '800', color: C.sub },
+  timeBtn: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, backgroundColor: C.teal },
+  timeBtnT: { fontSize: 15, fontWeight: '800', color: C.accentInk },   // アクセント地の文字はCトークンで（生HEX禁止）
   // アクション
   logoutBtn: {
     flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center',

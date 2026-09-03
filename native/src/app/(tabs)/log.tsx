@@ -69,6 +69,8 @@ import {
   MEAL_TIME_PRESETS, MEAL_TIME_NOW, MEAL_TIME_STEP_MIN,
   resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm, slotOf,
 } from '@/lib/timeSlots';
+// 起床時刻（設定 > 通知）と「朝の窓」。深夜に朝のものを出さないための判定は全部この純関数群に閉じる
+import { beforeWake, previousDayTarget, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 // 気づきアラート（docs/INSIGHTS-ENGINE.md §8・E2）: 本人の法則で駆動する事前アラート。判定は lib/correlate、配線は lib/insightAlerts
 import { loadInsightAlerts, closeInsightAlert, maybeScheduleMorningNotification, lawLinkForAlert, type InsightAlertState } from '@/lib/insightAlerts';
@@ -414,6 +416,20 @@ export default function LogScreen() {
   // 「今日」のキー。日付跨ぎで変わると、その日1回系（気分の既読・穴埋め・過食リスク・ひとこと）を組み直す
   const todayKey = todayJST();
   const today = viewDate;
+  // ===== 起床時刻の窓（2026-09-04 熊田さんの指摘）=====
+  // 0:30 に開くとJSTの日付はもう次の日なので、以前は「新しい日の朝のカード」（気分・気づき・
+  // 今日の予定）が深夜に出ていた。本人の体感ではまだ「昨日の夜」で答えられないうえ、1日1回の
+  // ものを深夜に使い切ってしまう。そこで**朝に出すものだけ**を起床時刻の窓で絞る。
+  // 【線引き】記録の日付（todayJST）は動かさない。動かすと保存済みの date 列・ストリーク・
+  // 週集計の意味まで変わるため（docs/TODO.md B9 に別項目として起票）。
+  // 時刻は端末ローカル（起床時刻の設定も端末の時計で選ぶ）。フォーカス／前景復帰で再レンダーされ、
+  // そのときに窓の判定もやり直される（useTodayRollover と同じ経路）
+  const wakeStr = useWakeTime();
+  const wakeHm = useMemo(() => wakeOrDefault(wakeStr), [wakeStr]);
+  const nowClock = new Date();
+  const nowHm = { h: nowClock.getHours(), m: nowClock.getMinutes() };
+  /** いまは起床時刻より前（＝本人の体感では「まだ昨日の夜」）か */
+  const isBeforeWake = beforeWake(nowHm, wakeHm);
   // ヘルスケアのアクティブkcal（実測）と、それを目標へ反映する設定（既定OFF）。
   // 読み取りはlib/health.ts側でキャッシュ済み＝毎レンダーでHealthKitを叩かない
   const activeKcalToday = useActiveKcal(viewDate);
@@ -808,7 +824,7 @@ export default function LogScreen() {
     setFocusItem(null);   // 品目が変わったら注目を解除（消えた品を指し続けないため）
   }
   function clearTray() {
-    setParsed(null); setStagedNote(''); setFocusItem(null); setMealTime(null);
+    setParsed(null); setStagedNote(''); setFocusItem(null); setMealTime(null); setPrevDayOn(false);
     setAiNote(null); parseHistory.current = [];
     setAiDietFlags({});   // 制約の判定はこのトレイ限りのもの（次の解析に持ち越さない）
   }
@@ -966,9 +982,11 @@ export default function LogScreen() {
       if (parsed.weight != null && !(await confirmOutlierWeight(latestWeight, Number(parsed.weight)))) {
         return false;   // トレイは残る。体重チップの×で外すか、値を直して再保存できる
       }
-      // 食べた時間（トレイのチップ）。「いま」なら null → DBの now()。過去日は既定12:00か選んだ時刻が必ず入る
-      const res = await saveParsed(uid, parsed, stagedNote, viewDate, mealAt);
+      // 食べた時間（トレイのチップ）。「いま」なら null → DBの now()。過去日は既定12:00か選んだ時刻が必ず入る。
+      // 保存先の日付は saveDate（「前日として記録」を押しているときだけ前日・既定は表示中の日）
+      const res = await saveParsed(uid, parsed, stagedNote, saveDate, mealAt);
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return false; }
+      const savedToPrevDay = saveDate !== viewDate;
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
       let delFailed = false;
       if (editingId) {
@@ -976,20 +994,26 @@ export default function LogScreen() {
         if (error) delFailed = true;      // 新しい記録は入っているので、古い方が残ると二重になる
         else await syncEntriesForDate(uid, viewDate);
       }
+      // 表示中の日（今日）側は何も足していないので組み直す必要はない（saveParsed が saveDate 側を同期済み）。
+      // 編集で今日→前日へ移した場合だけ、上の editingId 分岐が viewDate を同期している
       const wasEdit = editingId != null;
       // G2: 1回の食事が2,500kcal超のとき、保存後の一言だけを非審判の文言に差し替える
       // （赤の超過表示や計算はいじらない。過食直後の罪悪感で記録をやめさせないための一点）
       const savedKcal = items.length > 0 ? Math.round(sumItems(items).kcal) : 0;
       setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null); setMealTime(null);
+      setPrevDayOn(false);   // 次の1食は既定（今日）に戻す＝押し続けたことを忘れて前日に入り続けない
       editingDateRef.current = null;
       // 保存できたら入力シートを閉じてフィードへ戻す（残量が数え下がる瞬間と新しい行が見える）
       closeInput();
       await load();
       setMsg(delFailed
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
-        : savedKcal > 2500
-          ? { ok: true, text: t('記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。') }
-          : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
+        // 前日へ寄せたときは、今日のフィードに出てこないので行き先を必ず言う（黙って消えたように見せない）
+        : savedToPrevDay
+          ? { ok: true, text: t('{date}の記録として保存しました。日付を戻すとフィードで確認できます。', { date: dateLabelOf(saveDate) }) }
+          : savedKcal > 2500
+            ? { ok: true, text: t('記録できたこと自体が、大きな一歩です。明日、極端に減らす必要はありません。いつも通りで大丈夫。') }
+            : { ok: true, text: wasEdit ? t('書き換えました。') : t('保存しました。') });
 
       invalidateStreak();   // 🔥チップを最新化
       refreshBadgeBand(true).catch(() => {});   // 保存で条件を満たしたバッジをその場で拾う
@@ -997,7 +1021,7 @@ export default function LogScreen() {
       // 案内（SpotlightTip＝透過Modal）は入力シート（pageSheet）が**閉じ切ってから**出す。
       // iOSは表示中/閉じかけのModalの兄弟に別のModalを出せないため、直後に出すと表示されないことがある
       try {
-        await recordItems(items, viewDate);
+        await recordItems(items, saveDate);   // 「よく食べる」の学習も実際に記録した日に付ける
         const s2 = await pickSuggestion(myFoods.map((f) => f.name), viewDate);
         if (s2) { queueTip(() => setSuggest(s2)); await markShown(viewDate); }
         else if (await shouldShowDietTip(dietProfile)) {
@@ -1285,14 +1309,15 @@ export default function LogScreen() {
     }
   }
 
-  // 朝の気分カード: その日まだ気分が無ければ1タップで聞く（スキップはその日限り）
+  // 朝の気分カード: その日まだ気分が無ければ1タップで聞く（スキップはその日限り）。
+  // 深夜（起床時刻より前）は出さない＝「起きた時の気分」を寝る前に聞かない（調停側でも MORNING_ONLY で止まる）
   const [moodSnoozed, setMoodSnoozed] = useState(true);
   useEffect(() => {
     AsyncStorage.getItem('bl-mood-snooze').then((v) => setMoodSnoozed(v === todayKey)).catch(() => {});
   }, [todayKey]);
   const [moodBusy, setMoodBusy] = useState(false);
   const hasMoodToday = dayLogs.some((l) => l.mood);
-  const showMood = viewDate === todayKey && profile != null && !hasMoodToday && !moodSnoozed;
+  const showMood = viewDate === todayKey && profile != null && !hasMoodToday && !moodSnoozed && !isBeforeWake;
   async function saveMood(n: number) {
     if (!uid || moodBusy) return;
     setMoodBusy(true);
@@ -1353,8 +1378,21 @@ export default function LogScreen() {
   const [timeDraft, setTimeDraft] = useState<Date>(new Date());   // ピッカー内の仮の値（iOSは「決定」で確定）
   const isViewToday = viewDate === todayKey;
   const mealTimeResolved = resolveMealTime(mealTime, isViewToday);
+  // ===== 深夜の食事を「前日として記録」（2026-09-04・②）=====
+  // 0:30 に食べたラーメンは本人の感覚では「昨日の夜食」。JSTの日付だけで決めると今日の1食目になり、
+  // 「昨日は目安どおりだったのに」という感覚と数字がズレる。
+  // 【勝手には寄せない】既定は今日のまま。押したときだけ `logs.date` を前日にする
+  //  （日付の意味をアプリが勝手に決めない＝1日の区切りを動かさないのと同じ理由）。
+  //  `at` は選んだ時刻のまま（「いま」ならDBの now()）＝実際に食べた瞬間は正直に残す。
+  //  date は「どの日の収支に入れるか」、at は「いつ食べたか」で役割が違う
+  const prevDayDate = previousDayTarget(viewDate, nowHm, wakeHm, todayKey);
+  const [prevDayOn, setPrevDayOn] = useState(false);
+  // 窓を抜けた（起床した／日付が変わった）ら選択は自動で解除する（前日への保存が居座らないように）
+  const prevDayActive = prevDayOn && prevDayDate != null;
+  /** 保存先の日付。「前日として記録」を押しているときだけ前日になる */
+  const saveDate = prevDayActive && prevDayDate ? prevDayDate : viewDate;
   // 保存に使う at。「いま」は送らずDBの now() に任せる（いちばん正確）
-  const mealAt = mealTimeResolved === MEAL_TIME_NOW ? null : buildAtJST(viewDate, mealTimeResolved);
+  const mealAt = mealTimeResolved === MEAL_TIME_NOW ? null : buildAtJST(saveDate, mealTimeResolved);
   // よく食べる食品の登録案内（保存後に1件だけ出す）
   const [suggest, setSuggest] = useState<Suggestion | null>(null);
   // 食事の制約（除外アラート）の存在を知らせる案内。
@@ -1370,6 +1408,7 @@ export default function LogScreen() {
   useEffect(() => {
     // 日付を動かしたら時刻の選択は既定に戻す（今日=「いま」・過去日=12:00 は日付ごとに解決し直す）
     setMealTime(null);
+    setPrevDayOn(false);   // 「前日として記録」も日付ごとの選択（別の日に持ち越さない）
     if (editingId && editingDateRef.current && editingDateRef.current !== viewDate) {
       setParsed(null); setStagedNote(''); setFocusItem(null); setEditingId(null);
       editingDateRef.current = null;
@@ -1474,14 +1513,18 @@ export default function LogScreen() {
   // ===== ヒーロー直下の調停（lib/logCards.ts）: 何を何枚出すかは1か所で決める =====
   // カード最大2枚（caution > backfill > checklist > mood > positive）・帯最大2本（badge > firstLaw > brief）。
   // 過去日を表示中は「今日は〜」のもの（caution/backfill/mood/positive/brief）を候補から外す
-  // N1 朝の1問を出すかは純関数 shouldAskPlan が決める（1日1回・〜11時・今日・未回答・「聞かないで」でない・
-  // チートデイ未登録）。枚数はここの調停に従う: caution > dayPlan > backfill
+  // N1 朝の1問を出すかは純関数 shouldAskPlan が決める（1日1回・朝の窓〔起床時刻〜＋5時間〕・今日・
+  // 未回答・「聞かないで」でない・チートデイ未登録）。枚数はここの調停に従う: caution > dayPlan > backfill
   const askDayPlan = shouldAskPlan({
-    isToday: isViewToday, hour: new Date().getHours(),
+    isToday: isViewToday, hour: nowHm.h, minute: nowHm.m, wake: wakeHm,
     answered: planAnswered, askOff: planAskOff, hasCheatDay,
   });
+  // beforeWake は「朝に出すもの」（caution/dayPlan/mood/positive）だけを止める。
+  // 昨日の穴埋め（backfill）は**深夜こそ出したい**ので対象外＝MORNING_ONLY に入れていない
+  // （0:30 の本人の体感は「今日の続き」で、直前まで食べていた記憶がいちばん鮮明）
   const attention = arbitrateAttention({
     isToday: isViewToday,
+    beforeWake: isBeforeWake,
     candidates: {
       caution: bingeRisk || cautionAlert ? 1 : 0,
       dayPlan: askDayPlan ? 1 : 0,
@@ -2056,9 +2099,11 @@ export default function LogScreen() {
                 <Text style={s.sheetCrumbPrev}>{t('食事')} › </Text>{INPUT_MODE_LABEL()[inputMode]}
               </Text>
               {/* いつの記録か（過去日はアンバー）。時刻は本人が「食べた時間」を選んだときだけ添える
-                  （「いま」はDB側のnow()で決まるので出さない＝嘘の時刻を見せない） */}
-              <Text style={[s.sheetDate, !isViewToday && s.sheetDatePast]}>
-                {t('{date} の記録', { date: dateLabelOf(viewDate) })}
+                  （「いま」はDB側のnow()で決まるので出さない＝嘘の時刻を見せない）。
+                  「前日として記録」を選んでいる間は**保存先の日付**を見せる（アンバーで気づかせる）＝
+                  どの日に入るかを保存前に必ず読めるようにする */}
+              <Text style={[s.sheetDate, (!isViewToday || prevDayActive) && s.sheetDatePast]}>
+                {t('{date} の記録', { date: dateLabelOf(saveDate) })}
                 {parsed != null && mealTimeResolved !== MEAL_TIME_NOW && (
                   <Text style={s.sheetTime}>{'  '}{mealTimeResolved}</Text>
                 )}
@@ -2151,7 +2196,10 @@ export default function LogScreen() {
                 <DietWarnRow alerts={dietAlerts} />
                 {/* 食べた時間（§4）: 「いま」（今日だけ）／候補5つ／⏱で15分刻みのピッカー。
                     選んだ時刻が logs.at に入る＝食べる時間帯の分析と特徴量が「保存した時刻」ではなく
-                    「食べた時刻」を見られるようになる。過去日は「いま」を出さず12:00を仮置き */}
+                    「食べた時刻」を見られるようになる。過去日は「いま」を出さず12:00を仮置き。
+                    末尾に「前日（m/d）として記録」（2026-09-04）: 起床時刻より前のあいだだけ出る逃げ道。
+                    深夜1時の夜食を「今日の1食目」にされると本人の感覚と収支がズレるため。
+                    **既定は今日のまま**で、押したときだけ logs.date が前日になる（at は選んだ時刻のまま） */}
                 {parsed != null && (() => {
                   const isPreset = mealTimeResolved === MEAL_TIME_NOW || MEAL_TIME_PRESETS.includes(mealTimeResolved);
                   const chip = (key: string, label: string, on: boolean, onPress: () => void) => (
@@ -2159,11 +2207,16 @@ export default function LogScreen() {
                       <Text style={[s.timeChipT, on && s.timeChipTOn]}>{label}</Text>
                     </Pressable>
                   );
+                  const pd = prevDayDate ? prevDayDate.split('-').map(Number) : null;
                   return (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.timeRow}>
                       {isViewToday && chip('now', t('いま'), mealTimeResolved === MEAL_TIME_NOW, () => setMealTime(MEAL_TIME_NOW))}
                       {MEAL_TIME_PRESETS.map((hm) => chip(hm, hm, mealTimeResolved === hm, () => setMealTime(hm)))}
                       {chip('pick', isPreset ? t('⏱ 時刻を選ぶ') : `⏱ ${mealTimeResolved}`, !isPreset, openTimePicker)}
+                      {pd && chip('prevday', t('前日（{m}/{d}）として記録', { m: pd[1], d: pd[2] }), prevDayActive, () => {
+                        setPrevDayOn((v) => !v);
+                        Haptics.selectionAsync().catch(() => {});
+                      })}
                     </ScrollView>
                   );
                 })()}
