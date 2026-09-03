@@ -28,7 +28,16 @@ import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import AddFoodSheet, { type MyFoodDraft } from '@/components/AddFoodSheet';
 import MenuAdvisor from '@/components/MenuAdvisor';
-import WhatToEatSheet from '@/components/WhatToEatSheet';
+import WhatToEatSheet, { type WhatIfSeedFromPick } from '@/components/WhatToEatSheet';
+// N1 今日の予定ヒアリング（朝の1問）＋N2 未来シミュレーション＋N3 司令塔（docs/STRATEGY.md §7）
+import TodayPlanCard from '@/components/TodayPlanCard';
+import WhatIfSheet, { type WhatIfSeed } from '@/components/WhatIfSheet';
+import {
+  planEffect, readAskOff, readDayPlan, shouldAskPlan, sweepDayPlans, writeAskOff, writeDayPlan,
+  type DayPlan,
+} from '@/lib/dayPlan';
+import { commandLine } from '@/lib/commandLine';
+import type { EatContext } from '@/lib/whatToEat';
 import { recordItems, pickSuggestion, markShown, markDeclined, type Suggestion } from '@/lib/foodSuggest';
 import { removeItemAt } from '@/lib/itemLog';
 import { previewFill } from '@/lib/preview';
@@ -57,7 +66,7 @@ import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal, useStepsOfDay 
 import { resolveBurnKcal } from '@/lib/stepsKcal';
 import {
   MEAL_TIME_PRESETS, MEAL_TIME_NOW, MEAL_TIME_STEP_MIN,
-  resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm,
+  resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm, slotOf,
 } from '@/lib/timeSlots';
 import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
 // 気づきアラート（docs/INSIGHTS-ENGINE.md §8・E2）: 本人の法則で駆動する事前アラート。判定は lib/correlate、配線は lib/insightAlerts
@@ -232,6 +241,15 @@ export default function LogScreen() {
   // ===== ＋ボタン → 2段シート → 入力シート =====
   const [plusOpen, setPlusOpen] = useState(false);
   const [eatOpen, setEatOpen] = useState(false);   // 「何を食べる？」シート（components/WhatToEatSheet.tsx）
+  // N3の司令塔CTAから開いたときの文脈（朝=献立／昼=コンビニ／夕=献立／夜=間食）。null=前回の選択のまま
+  const [eatContext, setEatContext] = useState<EatContext | undefined>(undefined);
+  // N2 未来シミュレーション（components/WhatIfSheet.tsx）。seedがnullでも品名の手入力から始められる
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  const [whatIfSeed, setWhatIfSeed] = useState<WhatIfSeed | null>(null);
+  // N1 今日の予定（端末内・lib/dayPlan.ts）。answered は「答えた or 予定なしと答えた」の両方を含む
+  const [dayPlan, setDayPlanState] = useState<DayPlan | null>(null);
+  const [planAnswered, setPlanAnswered] = useState(true);   // 読み込み前は「答え済み」＝1問を出さない（ちらつき防止）
+  const [planAskOff, setPlanAskOff] = useState(false);
   const [inputOpen, setInputOpen] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('text');
   // 「撮影する／写真を選ぶ」で開いたとき、入力シートが出きってからピッカーを起動するための予約
@@ -479,6 +497,29 @@ export default function LogScreen() {
   const eaten = Math.round(summary.intake ?? 0);
   const left = goalKcal - eaten;
   const heroLeft = useCountUp(left);   // 保存の瞬間、残量が数え下がって見える
+
+  // ===== N1 今日の予定（docs/STRATEGY.md §7 N1）=====
+  // 端末内だけで完結する見込み（サーバー・AIには渡さない）。表示日ごとに読み直し、古いキーは7日で掃除する
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [p, off] = await Promise.all([readDayPlan(viewDate), readAskOff()]);
+      if (!alive) return;
+      setDayPlanState(p);
+      setPlanAnswered(p != null);
+      setPlanAskOff(off);
+    })();
+    sweepDayPlans(todayKey);
+    return () => { alive = false; };
+  }, [viewDate, todayKey]);
+  // その日にチートデイ（PlanEvent）が登録済みか。登録済みなら requiredDailyWithEvents が既に緩めているので、
+  // 予定の再配分を重ねない（二重の緩和＝嘘になる）。朝の1問も出さない
+  const hasCheatDay = todayEvent != null;
+  // 予定を再配分に使ってよいか（純関数 planEffect が理由つきで返す）。
+  // 運動の実記録が入った日はトレーニング予定を無効化＝activeKcalGoalBonus / dayExerciseKcal と二重計上しない
+  const recordedExerciseKcal = Math.round(dayExerciseKcal(dayLogs)) + activeBonus;
+  const planFx = planEffect({ plan: dayPlan, hasCheatDay, recordedExerciseKcal });
+  const activePlan = planFx.active ? dayPlan : null;
   // 係数が未設定の間は、選んだ目的の既定値を使う（未選択なら従来の既定 P2.0/F0.9）
   const purposeKey = usePurpose();
   const purposePreset = purposeOf(purposeKey);
@@ -501,6 +542,15 @@ export default function LogScreen() {
   const eatenP = Math.round(summary.p ?? 0);
   const eatenF = Math.round(summary.f ?? 0);
   const eatenC = Math.round(summary.c ?? 0);
+  // ===== N3 司令塔（数字→解釈→行動を1画面で・docs/STRATEGY.md §7 N3）=====
+  // 解釈1行とCTAは純関数 commandLine が決める（画面側でif文を増やさない）。
+  // 時間帯は「いま」で判定するので、過去日を表示中は司令塔を出さない（「夕食を考える」を3日前の画面に出さない）
+  const pfcRemaining = {
+    p: macros ? Math.round(macros.p) - eatenP : null,
+    f: macros ? Math.round(macros.f) - eatenF : null,
+    c: macros ? Math.round(macros.c) - eatenC : null,
+  };
+  const command = commandLine(left, pfcRemaining, slotOf(new Date().getHours()), activePlan);
   // ホームウィジェット（lib/widget.ts）が同じ残量を見せるため、計算結果を共有ストアへ置く。
   // ウィジェットの見出しは「今日の残り」なので、**過去日を表示中の数字は流さない**（別日を見ている間に
   // 3日前の残量が「今日」として書かれていた・2026-09-02 自己監査）。依存配列なしで毎レンダー走っていたのも直す
@@ -1421,10 +1471,17 @@ export default function LogScreen() {
   // ===== ヒーロー直下の調停（lib/logCards.ts）: 何を何枚出すかは1か所で決める =====
   // カード最大2枚（caution > backfill > checklist > mood > positive）・帯最大2本（badge > firstLaw > brief）。
   // 過去日を表示中は「今日は〜」のもの（caution/backfill/mood/positive/brief）を候補から外す
+  // N1 朝の1問を出すかは純関数 shouldAskPlan が決める（1日1回・〜11時・今日・未回答・「聞かないで」でない・
+  // チートデイ未登録）。枚数はここの調停に従う: caution > dayPlan > backfill
+  const askDayPlan = shouldAskPlan({
+    isToday: isViewToday, hour: new Date().getHours(),
+    answered: planAnswered, askOff: planAskOff, hasCheatDay,
+  });
   const attention = arbitrateAttention({
     isToday: isViewToday,
     candidates: {
       caution: bingeRisk || cautionAlert ? 1 : 0,
+      dayPlan: askDayPlan ? 1 : 0,
       backfill: backfill ? 1 : 0,
       checklist: vis('checklist') && checklistLive ? 1 : 0,
       mood: vis('mood') && showMood ? 1 : 0,
@@ -1601,13 +1658,29 @@ export default function LogScreen() {
                 </View>
               </View>
             )}
-            {/* 「何を食べる？」の主導線: 残量が出ている＝いちばん悩む瞬間に1行で相談へ（components/WhatToEatSheet.tsx） */}
-            <Pressable style={({ pressed }) => [s.eatBtn, pressed && { opacity: 0.8 }]} onPress={() => setEatOpen(true)}
-                       accessibilityRole="button" accessibilityLabel={t('この残りで、何を食べる？')}>
-              <Sparkles size={ICON.sm} color={C.accentInk} strokeWidth={ICON.stroke} />
-              <Text style={s.eatBtnT}>{t('この残りで、何を食べる？')}</Text>
-              <Text style={s.eatBtnArrow}>›</Text>
-            </Pressable>
+            {/* ===== N3 今日の司令塔（docs/STRATEGY.md §7 N3）=====
+                数字→解釈→行動を1画面で閉じる。**カードを足さない**（2026-09-02 自己監査の「ヒーロー直下11ブロック」
+                を作り直さない）ため、旧「この残りで、何を食べる？」ボタンをこのブロックに統合した。
+                中身は 解釈1行（lib/commandLine.ts・残量の内訳＋時間帯＋N1の予定で言い分け）＋
+                時間帯で出し分けたCTA（朝=今日のプラン／昼=昼／夕=夕食）＋N2への小さな1行。
+                過去日を表示中は「いま」の時間帯で言う意味がないので出さない */}
+            {isViewToday && (
+              <View style={s.cmdBlock}>
+                <Text style={s.cmdLine}>{command.text}</Text>
+                <Pressable style={({ pressed }) => [s.eatBtn, pressed && { opacity: 0.8 }]}
+                           onPress={() => { setEatContext(command.cta.eatContext); setEatOpen(true); }}
+                           accessibilityRole="button" accessibilityLabel={command.cta.label}>
+                  <Sparkles size={ICON.sm} color={C.accentInk} strokeWidth={ICON.stroke} />
+                  <Text style={s.eatBtnT}>{command.cta.label}</Text>
+                  <Text style={s.eatBtnArrow}>›</Text>
+                </Pressable>
+                {/* N2 未来シミュレーションの入口③: 品名を自分で書いて「今日／今週／体重のペース」を見る */}
+                <Pressable onPress={() => { setWhatIfSeed(null); setWhatIfOpen(true); }} hitSlop={8}
+                           style={{ alignSelf: 'center', marginTop: 8 }} accessibilityRole="button">
+                  <Text style={s.cmdWhatIf}>{t('食べたらどうなる？')}</Text>
+                </Pressable>
+              </View>
+            )}
           </Animated.View>
         )}
 
@@ -1741,6 +1814,21 @@ export default function LogScreen() {
               </Pressable>
             )}
           </View>
+        )}
+
+        {/* N1 朝の1問（docs/STRATEGY.md §6朝・§7 N1）: 「今日は外食の予定ありますか？」に1タップ答えると、
+            ヒーロー下の司令塔行が今日の配分を組み替える。1日1回・朝だけ・答えたら即畳む（判定は lib/dayPlan.ts）。
+            caution が出ている日は調停でこちらが譲る（今日の準備の話が先） */}
+        {attention.dayPlan > 0 && (
+          <TodayPlanCard
+            onAnswer={(p) => {
+              setDayPlanState(p);
+              setPlanAnswered(true);
+              writeDayPlan(viewDate, p);
+              Haptics.selectionAsync().catch(() => {});
+            }}
+            onAskOff={() => { setPlanAskOff(true); writeAskOff(true); }}
+          />
         )}
 
         {/* §8 ポジティブ側の気づき: 良い条件がそろった日は背中を押す（控えめなアクセント面・ボタン無し・×で今日は閉じる） */}
@@ -1919,14 +2007,25 @@ export default function LogScreen() {
           「これにする」はシートが閉じ切ってから届く → 入力欄に品名を充填してテキスト入力シートを開く（自動確定しない） */}
       <WhatToEatSheet
         visible={eatOpen} onClose={() => setEatOpen(false)}
-        remaining={{
-          kcal: left,
-          p: macros ? Math.round(macros.p) - eatenP : null,
-          f: macros ? Math.round(macros.f) - eatenF : null,
-          c: macros ? Math.round(macros.c) - eatenC : null,
-        }}
+        initialContext={eatContext}
+        remaining={{ kcal: left, ...pfcRemaining }}
         myFoods={myFoods}
         onPick={(name) => { setChat(name); openInput('text'); }}
+        // N2 入口①: 案の数字（AI由来）をそのまま未来シミュレーションへ渡す
+        onWhatIf={(seed: WhatIfSeedFromPick) => { setWhatIfSeed(seed); setWhatIfOpen(true); }}
+      />
+
+      {/* N2 未来シミュレーション（docs/STRATEGY.md §7 N2）: 禁止せず、選択の結果（今日／今週／体重のペース）を見せる。
+          入口は①「何を食べる？」の各案 ②入力シートの「これを食べたら？」 ③ヒーローの司令塔行。
+          「これを記録する」は入力欄への充填まで（自動確定しない＝既存のステージング哲学） */}
+      <WhatIfSheet
+        visible={whatIfOpen} onClose={() => setWhatIfOpen(false)}
+        seed={whatIfSeed}
+        remainingKcal={left}
+        pfc={pfcRemaining}
+        days={balanceDays}
+        perDayDeficit={plan ? plan.requiredDaily : 0}
+        onLog={(name) => { setChat(name); openInput('text'); }}
       />
 
       {/* ===== 入力シート（pageSheet）: 旧ドックの機能はすべてここに集約 =====
@@ -2226,6 +2325,19 @@ export default function LogScreen() {
                   onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
                 />
               )}
+              {/* N2 入口②: テキストに食べ物を書いた状態で「これを食べたら？」（docs/STRATEGY.md §7 N2）。
+                  入力シート（pageSheet）の中から別のModalは開けないので、閉じ切ってから開く（queueTip と同じ流儀） */}
+              {chat.trim().length > 0 && parsed == null && (
+                <Pressable hitSlop={8} style={({ pressed }) => [s.dockWhatIf, pressed && { opacity: 0.7 }]}
+                           accessibilityRole="button" accessibilityLabel={t('これを食べたら？')}
+                           onPress={() => {
+                             const name = chat.trim();
+                             closeInput();
+                             queueTip(() => { setWhatIfSeed({ name }); setWhatIfOpen(true); });
+                           }}>
+                  <Text style={s.dockWhatIfT}>{t('これを食べたら？')}</Text>
+                </Pressable>
+              )}
               <View style={{ flex: 1 }} />
               <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}
                          accessibilityRole="button" accessibilityLabel={t('送信')}>
@@ -2366,6 +2478,10 @@ const s = themed(() => ({
   },
   eatBtnT: { flex: 1, fontSize: 14, fontWeight: '800', color: C.accentInk },
   eatBtnArrow: { fontSize: 17, fontWeight: '700', color: C.accentInk },
+  // N3 司令塔ブロック（解釈1行＋CTA＋N2への1行）。上に細い区切りを置いて「数字」と「意味」を分ける
+  cmdBlock: { marginTop: 12, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 12 },
+  cmdLine: { fontSize: 14.5, fontWeight: '700', color: C.ink, lineHeight: 22 },
+  cmdWhatIf: { fontSize: 12.5, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
   hline: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 8 },
   hfill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
   heroMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, flexWrap: 'wrap' },
@@ -2502,6 +2618,12 @@ const s = themed(() => ({
   timeBtn: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: RADIUS.chip, backgroundColor: C.teal },
   timeBtnT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   dockSend: { backgroundColor: C.teal, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  // N2「これを食べたら？」（コンポーザーの補助・送信より控えめ）
+  dockWhatIf: {
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.chip,
+    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+  },
+  dockWhatIfT: { fontSize: 12, fontWeight: '800', color: C.accentInk },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
   // 残量ストリップ（シート上部・常設）

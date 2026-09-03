@@ -10,6 +10,9 @@
 //  1. 同時に出す上限: カードは最大 MAX_CARDS 枚、帯（1行の細い帯）は最大 MAX_BANDS 本
 //  2. 優先順位（上ほど先に枠を取る）:
 //     カード … caution（過食リスク／気づきの注意。今日の準備に直結）
+//            > dayPlan（N1 朝の1問「今日は外食の予定ありますか？」。答えると今日の配分そのものが変わる
+//                      ＝この後に見る全部の数字の前提。だから backfill より上。ただし caution は
+//                      「今日が崩れやすい」という今日の準備の話で、予定の再配分より先に読まれるべきなので下に置く）
 //            > backfill（昨日の未記録。放置すると収支の数字がズレる）
 //            > checklist（新規ユーザー14日間の道しるべ。日々の入力より先に「次に何をするか」）
 //            > mood（1タップの気分入力）
@@ -21,7 +24,7 @@
 // ヒーロー・収支・今日の記録・前の食事・体重入力・広告枠は「構造カード」（ユーザーが⊖/⊕で自分で
 // 管理する、または位置が固定）なのでこの調停の対象外。スポットライト（マイ食品の案内・食事の制約の案内）は
 // Modal であり、保存直後に1枚だけ・互いに排他で出るのでここには載せない。
-export type AttentionCard = 'caution' | 'backfill' | 'checklist' | 'mood' | 'positive';
+export type AttentionCard = 'caution' | 'dayPlan' | 'backfill' | 'checklist' | 'mood' | 'positive';
 export type AttentionBand = 'badge' | 'firstLaw' | 'brief';
 export type AttentionKey = AttentionCard | AttentionBand;
 
@@ -29,11 +32,11 @@ export const MAX_CARDS = 2;
 export const MAX_BANDS = 2;
 
 /** 枠を取る順（先頭ほど優先） */
-export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'backfill', 'checklist', 'mood', 'positive'];
+export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'dayPlan', 'backfill', 'checklist', 'mood', 'positive'];
 export const BAND_PRIORITY: readonly AttentionBand[] = ['badge', 'firstLaw', 'brief'];
 
 /** 今日を表示しているときだけ意味を持つもの（過去日では候補から外す） */
-export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'backfill', 'mood', 'positive', 'brief']);
+export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'backfill', 'mood', 'positive', 'brief']);
 
 export type AttentionInput = {
   /** 表示中の日付が今日か */

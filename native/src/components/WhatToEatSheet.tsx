@@ -64,7 +64,10 @@ async function fetchRecentTags(): Promise<string> {
   } catch { return ''; }
 }
 
-export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, onPick }: {
+/** 「食べたらどうなる？」（N2）へ渡す種。案のkcal・PFCはAIの値なので概算せずそのまま使える */
+export type WhatIfSeedFromPick = { name: string; kcal: number; p: number; f: number; c: number };
+
+export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, onPick, onWhatIf, initialContext }: {
   visible: boolean;
   onClose: () => void;
   /** 今日の残り（食事タブのヒーローと同じ計算値） */
@@ -73,6 +76,17 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
   myFoods: { id: string; name: string }[];
   /** 「これにする」で品名を受け取る。シートが閉じ切ってから呼ばれる（入力欄への充填は呼び出し側の責務） */
   onPick: (name: string) => void;
+  /**
+   * N2「食べたらどうなる？」（docs/STRATEGY.md §7 N2）。各案から未来シミュレーションへ。
+   * onPick と同じく**このシートが閉じ切ってから**呼ばれる（iOSは表示中のModalの兄弟に別のModalを出せない）
+   */
+  onWhatIf?: (seed: WhatIfSeedFromPick) => void;
+  /**
+   * N3の司令塔CTA（朝=今日のプラン／昼=昼／夕=夕食）から開くときの文脈。
+   * 「夕食を考える」で開いて『コンビニ』が選ばれているのは会話として噛み合わないので、
+   * 開くたびにこの文脈へ合わせる（未指定なら前回の選択を引き継ぐ従来どおり）
+   */
+  initialContext?: EatContext;
 }) {
   const router = useRouter();
   const [ctx, setCtx] = useState<EatContext>('convenience');
@@ -82,18 +96,25 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
   const [error, setError] = useState<string | null>(null);
   // 429 plan_limit のときだけ導線を出す。上限0（無料）は機能紹介のペイウォール、日次上限は limit_coach
   const [upgradeSrc, setUpgradeSrc] = useState<'eat' | 'limit_coach' | null>(null);
-  const pending = useRef<string | null>(null);
+  // 閉じ切ってから実行する持ち越し。'pick'=入力欄へ品名を充填 / 'whatif'=未来シミュレーションを開く
+  const pending = useRef<{ kind: 'pick'; name: string } | { kind: 'whatif'; seed: WhatIfSeedFromPick } | null>(null);
 
   // 開くたびに結果を捨てる（残量が変わっているかもしれない）。文脈チップは前回の選択を引き継ぐ
   useEffect(() => {
-    if (visible) { setResult(null); setError(null); setUpgradeSrc(null); setLoading(false); }
-  }, [visible]);
+    if (visible) {
+      setResult(null); setError(null); setUpgradeSrc(null); setLoading(false);
+      if (initialContext) setCtx(initialContext);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, initialContext]);
 
   // 閉じ切ってから品名を渡す（iOS: onDismiss／Android: 閉じアニメ後）
   function flush() {
-    const name = pending.current;
+    const p = pending.current;
     pending.current = null;
-    if (name) onPick(name);
+    if (!p) return;
+    if (p.kind === 'pick') onPick(p.name);
+    else onWhatIf?.(p.seed);
   }
   useEffect(() => {
     if (visible || !pending.current) return;
@@ -167,7 +188,12 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
   }
 
   function choose(name: string) {
-    pending.current = name;
+    pending.current = { kind: 'pick', name };
+    onClose();
+  }
+  /** N2への持ち越し。案の数字（AI由来）をそのまま渡すので概算に落とさない */
+  function askWhatIf(p: EatPick) {
+    pending.current = { kind: 'whatif', seed: { name: p.name, kcal: Math.round(p.estKcal), p: Math.round(p.p), f: Math.round(p.f), c: Math.round(p.c) } };
     onClose();
   }
   function openPaywall(src: 'eat' | 'limit_coach') {
@@ -268,6 +294,14 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
                         <SwapHint name={p.name} />
                         <OptionButton style={{ marginTop: 10 }} variant={best ? 'teal' : 'tonal'}
                                       label={t('これにする → 記録')} onPress={() => choose(p.name)} />
+                        {/* N2 未来シミュレーション（docs/STRATEGY.md §7 N2）: 決める前に「今日／今週／体重のペース」を見る。
+                            禁止のためではなく、選択の結果を先に見せるための1行 */}
+                        {onWhatIf && (
+                          <Pressable onPress={() => askWhatIf(p)} hitSlop={8} style={{ alignSelf: 'center', marginTop: 8 }}
+                                     accessibilityRole="button">
+                            <Text style={s.whatIfLink}>{t('食べたらどうなる？')}</Text>
+                          </Pressable>
+                        )}
                       </View>
                     );
                   })}
@@ -340,6 +374,8 @@ const s = themed(() => ({
   loadingT: { fontSize: 15, fontWeight: '700', color: C.sub },
   errT: { fontSize: 15, color: C.sub, lineHeight: 22, textAlign: 'center', paddingHorizontal: 8 },
   link: { color: C.accentInk, fontWeight: '700', fontSize: 14 },
+  // N2への導線（案カードの下・控えめ）。主導線は「これにする → 記録」のまま
+  whatIfLink: { color: C.accentInk, fontWeight: '700', fontSize: 13, textDecorationLine: 'underline' },
   lockBox: { marginTop: 4, gap: 8 },
   lockT: { fontSize: 15, fontWeight: '800', color: C.ink, lineHeight: 21 },
   lockSub: { fontSize: 13, color: C.sub, lineHeight: 19 },
