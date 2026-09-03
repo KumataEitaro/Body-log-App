@@ -2204,4 +2204,10 @@ export const FR: Record<string, string> = {
   "（{n}回）": "({n} fois)",
   "内容をコピーする": "Copier le contenu",
   "記録を消す": "Effacer le journal",
+  "広告なしで、静かに記録する": "Enregistrez en toute tranquillité, sans pub",
+  "スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。": "Avec Standard ou supérieur, plus de pubs et beaucoup plus d'analyses IA.",
+  "全画面の広告を、もう出さない": "Plus aucune pub plein écran",
+  "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Vous avez vu {n} pubs cette semaine. Avec Standard, c'est 0.",
+  "広告を消す →": "Supprimer les pubs →",
+  "広告なしで使えます": "Profitez-en sans pub",
 };

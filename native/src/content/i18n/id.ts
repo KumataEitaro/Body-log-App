@@ -2204,4 +2204,10 @@ export const ID: Record<string, string> = {
   "（{n}回）": "({n} kali)",
   "内容をコピーする": "Salin isi",
   "記録を消す": "Hapus log",
+  "広告なしで、静かに記録する": "Catat dengan tenang tanpa iklan",
+  "スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。": "Dengan Standard ke atas, bebas iklan dan analisis AI meningkat drastis.",
+  "全画面の広告を、もう出さない": "Tidak ada lagi iklan layar penuh",
+  "この1週間で広告を{n}回見ています。スタンダードなら0回です。": "Kamu sudah melihat iklan {n} kali minggu ini. Dengan Standard, jadinya 0 kali.",
+  "広告を消す →": "Hilangkan iklan →",
+  "広告なしで使えます": "Gunakan tanpa iklan",
 };

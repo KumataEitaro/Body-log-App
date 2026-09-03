@@ -19,6 +19,7 @@ import { themed } from '@/lib/ui';
 import { useGate } from '@/lib/gate';
 import { useReduceMotion } from '@/lib/motion';
 import { AD_COLLAPSE_MS, bannerMounted, nextAdSlotState, shouldShowAd, type AdPlacement, type AdSlotEvent, type AdSlotState } from '@/lib/ads';
+import { recordAdImpression } from '@/lib/adImpressions';
 import AdBannerView, { adsAvailable, ensureAdsInit } from '@/components/AdBannerView';
 
 type Props = {
@@ -79,7 +80,12 @@ export default function AdSlot({ placement, compact }: Props) {
         <AdBannerView
           placement={placement}
           loaded={loaded}
-          onLoaded={() => dispatch('loaded')}
+          onLoaded={() => {
+            dispatch('loaded');
+            // 「この1週間で広告を{n}回見ています」の n を数える（端末内のみ・lib/adImpressions.ts）。
+            // 同じ枠の短時間の重複（タブ往復・再レイアウト）は数えない＝数字を水増ししない
+            recordAdImpression(placement).catch(() => {});
+          }}
           onFailed={() => dispatch('failed')}
         />
       </View>

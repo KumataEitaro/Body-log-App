@@ -20,6 +20,8 @@ import { useReduceMotion } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import CouponSheet from '@/components/CouponSheet';
 import { applyEntitlement } from '@/lib/gate';
+import { shouldShowImpressionCount } from '@/lib/ads';
+import { readWeeklyImpressions } from '@/lib/adImpressions';
 import {
   purchasesAvailable, fetchOffers, purchase, restore, currentPlan,
   PAYWALL_PLANS, defaultSelection, preferredPeriod,
@@ -75,9 +77,18 @@ const SRC_COPY = (): Record<string, { h: string; lead: string }> => ({
     h: t('食べないものを、AIが見張る'),
     lead: t('かんたん判定（辞書のみ）は無料で動きます。スタンダード以上でAIが写真と原材料まで読み、メニューの候補にも印をつけます。これは推定で、安全確認には使えません。'),
   },
+  // ===== 広告からの遷移（2026-09-04）=====
+  // 広告除去だけを売らない: 「広告が消える」単体は訴求として弱く、単価も上がらない。
+  // 必ず「＋AIの回数が増える」と束ねて並べる（プラン表の1行目も「広告なし」）
   ads: {
-    h: t('広告のない、静かな画面に'),
-    lead: t('スタンダード以上で広告が消えて、記録に集中できます。'),
+    h: t('広告なしで、静かに記録する'),
+    lead: t('スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。'),
+  },
+  // 全画面広告を閉じた直後（AdPitchSnackbar から）。「もう出さない」と言い切れるのは
+  // 課金が広告を本当に消すからで、これは仕組みで保証している（lib/ads.ts shouldShowAd）
+  ads_after: {
+    h: t('全画面の広告を、もう出さない'),
+    lead: t('スタンダード以上で広告が消えて、AIの解析回数もぐっと増えます。'),
   },
   // ===== 上限到達（429 plan_limit）からの遷移。kind別に「何を使い切ったか」を言う =====
   limit_text: {
@@ -138,6 +149,11 @@ export default function PaywallScreen() {
   const [busy, setBusy] = useState(false);
   const [goalLine, setGoalLine] = useState('');
   const [couponOpen, setCouponOpen] = useState(false);
+  // 広告からの遷移（src=ads / ads_after）で見せる「直近1週間に広告を見た回数」。
+  // 事実だけを1行。3回未満は出さない（小さい数字で大げさに言わない）。
+  // 広告が実際に出ない状態（RCキー未設定・課金者）では常に出ない＝嘘をつかない
+  const [adViews, setAdViews] = useState(0);
+  const fromAds = src === 'ads' || src === 'ads_after';
 
   // プレミアムカードの縁を「1本だけ」ゆっくり明滅させる（主役への視線誘導）。
   // 相談タブの入力ドックと同じ流儀＝全開の縁を重ねてopacityだけネイティブ側で往復。
@@ -162,6 +178,12 @@ export default function PaywallScreen() {
       setSel(defaultSelection(o));
     })();
   }, []);
+
+  // 広告由来のときだけ、端末に残した「見た回数」を読む（サーバーへは送っていない）
+  useEffect(() => {
+    if (!fromAds) return;
+    readWeeklyImpressions().then(setAdViews).catch(() => {});
+  }, [fromAds]);
 
   // オンボーディング直後だけ、決めたばかりの目標を見出しに差し込む（パーソナライズ）
   useEffect(() => {
@@ -340,8 +362,18 @@ export default function PaywallScreen() {
             h: t('プラン'),
             lead: t('記録・グラフはずっと無料。AIをもっと使いたくなったら。'),
           };
+          // 回数行（広告由来・3回以上・広告が実際に出る状態のときだけ）。
+          // **先頭の訴求**として見出しの上に置く＝自分の数字を先に見せ、そのあとで
+          // 「広告なし＋AIの回数」の価値を読ませる。煽り・エスカレーション・
+          // 罪悪感の表現は使わない（回数が増えても文言は変わらない）
+          const showCount = fromAds && shouldShowImpressionCount({ active: purchasesAvailable(), plan, impressions7d: adViews });
           return (
             <>
+              {showCount && (
+                <Text style={s.adCount}>
+                  {t('この1週間で広告を{n}回見ています。スタンダードなら0回です。', { n: adViews })}
+                </Text>
+              )}
               <Text style={s.h}>{copy.h}</Text>
               <Text style={s.lead}>
                 {goalLine}
@@ -403,6 +435,9 @@ const s = themed(() => ({
   scroll: { padding: SPACE.screen, paddingTop: 8, paddingBottom: 48 },
   h: { ...HEAD.page, color: C.ink },
   lead: { fontSize: 14, color: C.sub, marginTop: 4, marginBottom: 14 },
+  // 広告を見た回数の1行（見出しの上）。事実の提示なので警告色（coral等）は使わず、
+  // アクセント色で静かに置く＝責める見た目にしない
+  adCount: { fontSize: 13, fontWeight: '700', color: C.accentInk, marginBottom: 6 },
   pending: { backgroundColor: C.panel, borderRadius: RADIUS.tile, padding: 24, alignItems: 'center', marginTop: 12 },
   pendingT: { color: C.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 },
   // 控えめなカード（スタンダード）: 面は素・枠線のみ

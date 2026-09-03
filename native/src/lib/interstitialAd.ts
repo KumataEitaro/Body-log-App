@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useGate } from './gate';
 import { shouldShowAd } from './ads';
+import { recordAdImpression } from './adImpressions';
 import { todayJST } from './calc';
 import {
   INTERSTITIAL_STORE_KEY,
@@ -92,13 +93,29 @@ export type Interstitial = {
   maybeShow: (detailKey: string) => void;
 };
 
+export type InterstitialOptions = {
+  /**
+   * 全画面広告が**閉じ切ったあと**に呼ばれる（AdEventType.CLOSED）。
+   * ここで「広告なしで使えます」の誘導を出す（components/AdPitchSnackbar.tsx）。
+   * AdMobポリシー: 広告ビューに重ねない・閉じるボタンを模倣しない・表示を妨げない。
+   * 閉じ切ってから別UIとして出すのは適合する。**ここで記録や課金の処理は進めない**
+   * （閉じた瞬間に何かが完了していると、広告に操作させられたように感じる）
+   */
+  onClosed?: () => void;
+};
+
 /**
  * 概要タブ用のインタースティシャル。マウント時に事前ロードし、
  * ドリルダウンの瞬間に条件がそろっていれば全画面を出す。
  */
-export function useInterstitial(): Interstitial {
+export function useInterstitial(opts?: InterstitialOptions): Interstitial {
   const { active, plan } = useGate();
   const eligible = !!ads && shouldShowAd(active, plan);
+  // onClosed は毎レンダー作り直されるので ref 経由で呼ぶ（リスナーを張り直さない）
+  const onClosedRef = useRef(opts?.onClosed);
+  onClosedRef.current = opts?.onClosed;
+  // 自分が show() した広告の閉じるイベントだけを拾う（未表示のまま来た CLOSED は無視）
+  const showedRef = useRef(false);
 
   const adRef = useRef<InterstitialInstance | null>(null);
   const loadedRef = useRef(false);
@@ -134,9 +151,15 @@ export function useInterstitial(): Interstitial {
     // ロード失敗（在庫なし・通信断）は「出さない」だけ。リトライしない＝遷移のたびに
     // 失敗リクエストを積まない（次のセッションで自然に再挑戦される）
     offs.push(ad.addAdEventListener(AdEventType.ERROR, () => { loadedRef.current = false; }));
-    // 閉じられたら二度と出さない（セッション1回）。ここで裏で何かを進めることはしない＝
-    // 「閉じたら元の画面がそこにある」だけ（遷移は広告より先に完了している）
-    offs.push(ad.addAdEventListener(AdEventType.CLOSED, () => { loadedRef.current = false; }));
+    // 閉じられたら二度と出さない（セッション1回）。裏で処理を進めることはしない＝
+    // 「閉じたら元の画面がそこにある」だけ（遷移は広告より先に完了している）。
+    // 閉じ切ったこの瞬間だけ、別UIとして「広告なしで使えます」を出す（onClosed）
+    offs.push(ad.addAdEventListener(AdEventType.CLOSED, () => {
+      loadedRef.current = false;
+      if (!showedRef.current) return;
+      showedRef.current = false;
+      try { onClosedRef.current?.(); } catch { /* 誘導が出ないだけ */ }
+    }));
     try { ad.load(); } catch { /* 失敗しても no-op */ }
     return () => {
       offs.forEach((off) => { try { off(); } catch { /* noop */ } });
@@ -167,9 +190,12 @@ export function useInterstitial(): Interstitial {
     // ここから先は「出す」。show() は Promise だが await しない＝遷移も描画も待たせない
     sessionShown = true;
     loadedRef.current = false;
+    showedRef.current = true;
     const next = recordInterstitialShown(h, nowMs, todayJST());
     historyRef.current = next;
     saveInterstitialHistory(next).catch(() => {});
+    // 「見た回数」に1回ぶん足す（ペイウォールで事実として見せる数字・lib/adImpressions.ts）
+    recordAdImpression('interstitial').catch(() => {});
     try {
       const p = ad.show() as unknown;
       if (p && typeof (p as Promise<void>).catch === 'function') (p as Promise<void>).catch(() => {});

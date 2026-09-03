@@ -32,6 +32,7 @@ import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import AdSlot from '@/components/AdSlot';
 import { useInterstitial } from '@/lib/interstitialAd';
+import { useAdPitch } from '@/components/AdPitchSnackbar';
 import HeaderGear from '@/components/HeaderGear';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
@@ -1088,7 +1089,11 @@ export default function ChangesScreen() {
   // 体の写真/栄養ランキング/法則は出さない）。頻度は同一セッション1回・10分間隔・1日3回まで。
   // **遷移は必ず先に進める**（setDetailKey / router.push のあとに maybeShow を呼ぶ）＝
   // 広告のロードを待たせない。詳細は docs/ADS.md
-  const interstitial = useInterstitial();
+  // 全画面広告が閉じ切ったあとだけ、控えめに「広告なしで使えます →」を1回。
+  // AdMobポリシー: 広告ビューに重ねない・閉じるボタンを模倣しない・表示を妨げない
+  // （閉じ切ってから別UIとして出すのは適合）。文言・頻度の規約は AdPitchSnackbar.tsx
+  const adPitch = useAdPitch(insets.bottom + 24);
+  const interstitial = useInterstitial({ onClosed: adPitch.pitch });
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
     detailTx.value = 0;   // 前回スワイプ途中の位置が残らないようにする
@@ -1348,6 +1353,9 @@ export default function ChangesScreen() {
         </GestureDetector>
       )}      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
       {undoBar.element}
+      {/* 「広告なしで使えます →」（全画面広告が閉じ切ったあとだけ・1回・約6秒）。
+          広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}
+      {adPitch.element}
       <AddCardSheet
         visible={addOpen} onClose={() => setAddOpen(false)}
         hidden={hidden.filter((k) => !unavailable.includes(k))} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
