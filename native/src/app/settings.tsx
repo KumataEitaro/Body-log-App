@@ -191,6 +191,7 @@ export default function SettingsScreen() {
   const [renameEdit, setRenameEdit] = useState<{ kind: 'food' | 'set'; id: string; name: string } | null>(null);
   // テーマ変更でツリーが作り直されたときだけ、直前まで開いていたシートを引き継ぐ（reopenSheet 参照）
   const [sheet, setSheet] = useState<Sheet>(() => { const v = reopenSheet; reopenSheet = null; return v; });
+  const dietScrollRef = useRef<ScrollView>(null); // 食事の制約シート: 自由記述欄へフォーカス時に末尾へスクロール
   const reopened = useRef(sheet !== null);
   // ヘルスケア連携の状態表示（連携中・最終同期）と「体重は手入力を優先」トグル
   const healthLink = useHealthLinkState();
@@ -866,9 +867,12 @@ export default function SettingsScreen() {
         構成の順番そのものが防御になっている: ①免責 → ②同意 → ③トグル。
         免責より先にトグルを置く並べ替えをしないこと */}
     <Modal visible={sheet === 'diet'} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.sheetBody}>
+      {/* KeyboardAvoidingView(padding)はpageSheet内でシートのオフセットぶん高さを誤計算し、長いフォーム末尾の
+          自由記述欄がキーボードに隠れて「打っている文字が見えない」不具合になっていた（βフィードバック 2026-09-03）。
+          ログイン画面と同じく ScrollView のキーボードインセット自動調整＋フォーカス時に末尾へスクロールで対処 */}
+      <View style={s.sheetBody}>
         <SheetHeader icon={<Ban size={ICON.lg} color={C.teal} />} title={t('食事の制約')} />
-        <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        <ScrollView ref={dietScrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets contentContainerStyle={{ paddingBottom: 24 }}>
           {/* §6-2: 免責は最上部。同意済みでも消さない（同意は薄れるので設定を触るたび読める場所に残す） */}
           <DietDisclaimerPanel />
           {diet.consentAt == null ? (
@@ -927,6 +931,7 @@ export default function SettingsScreen() {
               onChangeText={(v) => { setDiet((p) => ({ ...p, custom: v })); setDietMsg(null); }}
               placeholder={t('例: えび・かにを避けています。パクチーも無理です。')}
               placeholderTextColor={C.faint}
+              onFocus={() => { setTimeout(() => dietScrollRef.current?.scrollToEnd({ animated: true }), 250); }}
             />
           )}
 
@@ -941,7 +946,7 @@ export default function SettingsScreen() {
           </Text>
           <View style={{ height: 32 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
 
     {/* ===== テーマ選択モーダル =====
