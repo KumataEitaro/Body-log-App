@@ -2204,4 +2204,5 @@ export const FR: Record<string, string> = {
   "（{n}回）": "({n} fois)",
   "内容をコピーする": "Copier le contenu",
   "記録を消す": "Effacer le journal",
+  "食事を記録": "Enregistrer le repas",
 };

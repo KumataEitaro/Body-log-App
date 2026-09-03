@@ -2204,4 +2204,5 @@ export const VI: Record<string, string> = {
   "（{n}回）": "({n} lần)",
   "内容をコピーする": "Sao chép nội dung",
   "記録を消す": "Xóa nhật ký",
+  "食事を記録": "Ghi lại bữa ăn",
 };

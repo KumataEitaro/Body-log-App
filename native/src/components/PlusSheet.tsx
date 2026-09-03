@@ -1,33 +1,54 @@
-// ＋ボタンのボトムシート（2026-09-02・Appleヘルスケア式「何を記録するか → どう入力するか」）
+// ＋ボタンのボトムシート（2026-09-04・「食事だけ大きいカード＋残りはリスト行」へ再設計）
 //
-// 1段目: 「食事」「運動」「体の写真」「体重」の4タイル（2×2）
-// 2段目: 食事 → 入力方法「マイ食品」「テキストで入力」「写真を選ぶ」「撮影する」の4タイル
-//         体重 → シート内で数値を入れて保存（画面を移らずに済ませる）
-//         運動・体の写真 → シートを閉じて既存の画面へ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
+// 構成: 食事＝高さ84の大カード（使用頻度が圧倒的に高い主導線）／運動・体の写真・体重＝高さ56のリスト行／
+//       区切り線を挟んで「何を食べる？」（記録ではなく相談なので性質で分ける）
+// 体重だけシート内でもう1段（数値を入れて保存。画面を移らずに済ませる）。
+// 運動・体の写真はシートを閉じて既存の画面へ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
 //
-// 【設計判断】
+// 【なぜ2×2グリッドをやめたか（熊田さん判断 2026-09-04）】
+// 大きなカードを2×2に並べる形は「アプリランチャー風グリッド」で、2つの構造的な弱点がある。
+//   ① アイコンとラベルを**縦に積む**ため縦中央の計算が要る。新アーキ(Fabric)×iOS の lineHeight 問題や
+//      adjustsFontSizeToFit と併せると文字が下に寄る事故が起きた（react-native#53092 / #52642 / #42044）
+//   ② 枡を正方形に近づけるため**余白を作る宿命**があり、情報量に対して背が高くなる
+// リスト行は**アイコンとラベルが横並び**なので縦ずれが構造的に起きず、行の高さ＝内容の高さで余白が生まれない。
+// iOS 2026 の「何かを追加する」場面の主流でもある（Appleヘルスケアの「データを追加」等）。
+// そのため以下は禁止: lineHeight の指定・adjustsFontSizeToFit の使用・アイコンとラベルの縦積み
+//
+// 【設計判断（継続）】
 // - バーコード読み取りは**置かない**。食品データベースを持っておらず（Open Food Facts に日本の
 //   商品はほぼ無い）、選ばせても失敗体験にしかならないため（熊田さん指示 2026-09-02）
-// - 段の移動はシートの中で行い、Modalは1枚のまま。上部に「1/2」「2/2」のステップ表示と
-//   前の選択（「食事 ›」）を出し、‹ で戻れる。閉じるは × とスワイプダウン
-// - 「テキスト／写真／マイ食品」を選んだあとは pageSheet の入力シート（食事タブ側）が開く。
+// - 「食事を記録」を選んだあとは pageSheet の入力シート（食事タブ側）が開く。
 //   iOSは表示中のModalの兄弟に別のModalを出せないため、**このシートが閉じ切ってから**
 //   onAction を呼ぶ（onDismiss＝iOS／閉じアニメ後のタイマー＝Android。二重発火はrefで防ぐ）
-// - タイルは C.panel の面・RADIUS.card の角丸・押下でアクセント縁＋わずかに縮む。
-//   アイコンはアクセント色の薄い円の上に載せ、ラベルは 15px/800
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  UtensilsCrossed, Activity, Camera, Weight, X, ChevronLeft, Sparkles,
+  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, RADIUS, SPACE, ICON, themed } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
+
+/** 段ごとのアイコンを**1箇所**に集約する（差し替えが1行で済むように）。
+ *  タブバーは SF Symbols（食事 fork.knife／運動 figure.strengthtraining.traditional）だが、
+ *  シートは Lucide で Android と同一の絵にしつつ**概念をタブに合わせる**:
+ *    食事         Utensils       交差(UtensilsCrossed)ではなく平行＝タブの fork.knife に近い
+ *    運動         Dumbbell       タブは「筋トレする人」。旧 Activity（心拍の波線）は運動に見えなかった
+ *    体の写真     PersonStanding カメラは食事撮影で既に使っており、同じ絵に別の意味を持たせない
+ *    体重         Scale          体重計として読みやすい（旧 Weight は分銅で伝わらない）
+ *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持） */
+const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat', LucideIcon> = {
+  meal: Utensils,
+  exercise: Dumbbell,
+  bodyphoto: PersonStanding,
+  weight: Scale,
+  whattoeat: Sparkles,
+};
 
 /** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート） */
 export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto';
@@ -36,7 +57,7 @@ export type PlusStep = 'root' | 'meal' | 'weight';
 export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
   visible: boolean;
   onClose: () => void;
-  /** タイルを選んだとき。シートが閉じ切ってから呼ばれる */
+  /** 行を選んだとき。シートが閉じ切ってから呼ばれる */
   onAction: (a: PlusAction) => void;
   /** 体重（表示単位の文字列）を保存する。null=成功（シートを閉じる）／''=本人が取り消した（何も出さない）／文字列=エラー文 */
   onSaveWeight: (text: string) => Promise<string | null>;
@@ -135,19 +156,25 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
             </View>
 
             {step === 'root' && (
-              <View style={s.grid}>
-                {/* 食事は2段目を挟まず**テキスト入力へ直行**（βフィードバック 2026-09-03:
+              <View>
+                {/* 食事だけ大きなカード（高さ84）。＋を押す理由の大半が食事の記録なので、
+                    他の4つと同格に並べず主導線として一段大きく見せる。
+                    食事は2段目を挟まず**テキスト入力へ直行**（βフィードバック 2026-09-03:
                     「食事と入力したら、食事入力をすぐやりたい」）。入力シートにはマイ食品チップ・
-                    写真/撮影アイコン・音声ヒントが既に載っており、入力方法の選択画面は二重の階層だった。
-                    写真だけシート内でもう1段（アイコン→カメラ/ライブラリ） */}
-                <Tile Icon={UtensilsCrossed} label={t('食事')} onPress={() => pick('meal:text')} testID="plus-meal" />
-                {/* 運動は「歩いた・泳いだ」も含む一般の運動（運動タブの「運動を記録する」へ）。ダンベルだと筋トレ限定に見えるので Activity */}
-                <Tile Icon={Activity} label={t('運動')} onPress={() => pick('exercise')} testID="plus-exercise" />
-                <Tile Icon={Camera} label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
-                <Tile Icon={Weight} label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
-                {/* 5枚目「何を食べる？」（食事タブ内のAI相談）: ＋を押す習慣に乗せる第2の入口。
-                    記録ではなく相談なので2×2の外に横長1枚で置き、記録4種と混ぜない */}
-                <Tile Icon={Sparkles} label={t('何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" wide />
+                    写真/撮影アイコン・音声ヒントが既に載っており、入力方法の選択画面は二重の階層だった */}
+                <MealCard onPress={() => pick('meal:text')} />
+
+                {/* 残りの記録はリスト行（高さ56・行間6）。運動は「歩いた・泳いだ」も含む一般の運動 */}
+                <View style={s.rows}>
+                  <Row icon="exercise" label={t('運動')} onPress={() => pick('exercise')} testID="plus-exercise" />
+                  <Row icon="bodyphoto" label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
+                  <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
+                </View>
+
+                {/* 区切り線: 上の4つ（記録する）と「何を食べる？」（AIに相談する）を性質で分ける。
+                    ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
+                <View style={s.divider} />
+                <Row icon="whattoeat" label={t('何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
               </View>
             )}
 
@@ -175,18 +202,39 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
   );
 }
 
-/** 大きな選択タイル（2×2グリッドの1枡）。wide=横長1枚（アイコンとラベルを横並び） */
-function Tile({ Icon, label, onPress, testID, wide }: { Icon: LucideIcon; label: string; onPress: () => void; testID?: string; wide?: boolean }) {
+/** 食事の大カード（高さ84）。アイコン48ptの角丸＋ラベル17/800を**横並び**で置く */
+function MealCard({ onPress }: { onPress: () => void }) {
+  const Icon = ROW_ICON.meal;
+  const label = t('食事を記録');
+  return (
+    <Pressable
+      testID="plus-meal" accessibilityRole="button" accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [s.mealCard, pressed && s.pressedFace]}
+    >
+      <View style={s.mealIcon}>
+        <Icon size={ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} />
+      </View>
+      <Text style={s.mealT} numberOfLines={1} maxFontSizeMultiplier={1.3}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** リスト行（高さ56＝タップ領域44pt以上）。アイコン40ptの角丸・ラベル16/700・右端にシェブロン。
+ *  アイコンとラベルは必ず**横並び**（縦積みをやめた理由はファイル冒頭のコメント） */
+function Row({ icon, label, onPress, testID }: { icon: keyof typeof ROW_ICON; label: string; onPress: () => void; testID?: string }) {
+  const Icon = ROW_ICON[icon];
   return (
     <Pressable
       testID={testID} accessibilityRole="button" accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [s.tile, wide && s.tileWide, pressed && s.tilePressed]}
+      style={({ pressed }) => [s.row, pressed && s.pressedFace]}
     >
-      <View style={[s.tileIcon, wide && s.tileIconWide]}>
-        <Icon size={wide ? ICON.lg : ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} />
+      <View style={s.rowIcon}>
+        <Icon size={ICON.md} color={C.accentInk} strokeWidth={ICON.stroke} />
       </View>
-      <Text style={s.tileT} numberOfLines={2} maxFontSizeMultiplier={1.2}>{label}</Text>
+      <Text style={s.rowT} numberOfLines={1} maxFontSizeMultiplier={1.3}>{label}</Text>
+      <ChevronRight size={ICON.md} color={C.faint} strokeWidth={ICON.stroke} />
     </Pressable>
   );
 }
@@ -204,25 +252,32 @@ const s = themed(() => ({
   crumb: { fontSize: 17, fontWeight: '800', color: C.ink },
   crumbPrev: { color: C.sub, fontWeight: '700' },
   step: { fontSize: 11, fontWeight: '700', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: {
-    // aspectRatio をやめて固定高に: 幅に比例して背が高くなるのを止める。
-    // 92pt = アイコン44 + 間隔6 + ラベル18 + 上下余白 → タップ領域は十分（44pt以上）
-    width: '47.5%', flexGrow: 1, height: 92, paddingHorizontal: 8,
+
+  // 食事の大カード: 高さ84・アイコン48＋ラベル17/800を横並び（縦中央の計算が要らない）
+  mealCard: {
+    height: 84, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18,
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: 1.5, borderColor: C.hairline,
-    alignItems: 'center', justifyContent: 'center', gap: 6,
     shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
-  tilePressed: { borderColor: C.teal, backgroundColor: C.accentSoft, transform: [{ scale: 0.97 }] },
-  // 横長1枚（「何を食べる？」）: 2×2の正方形タイルより低く、アイコンとラベルを横並びに
-  tileWide: { width: '100%', height: 60, flexDirection: 'row', paddingVertical: 0, paddingHorizontal: 18, justifyContent: 'flex-start', gap: 12 },
-  tileIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
-  tileIconWide: { width: 40, height: 40, borderRadius: 20 },
+  mealIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   // lineHeight は指定しない: 新アーキ(Fabric)×iOS では lineHeight があるとベースラインが
-  // 尊重されず、アイコン＋ラベルの塊が中央より下へずれる（react-native#53092。
-  // adjustsFontSizeToFit との併用でも位置ずれの報告あり #52642 / #42044）。
-  // 折り返しは numberOfLines={2} 側で受ける（英語ラベルが切れないように）
-  tileT: { fontSize: 15, fontWeight: '800', color: C.ink, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false },
+  // 尊重されず、文字が中央より下へずれる（react-native#53092。adjustsFontSizeToFit との
+  // 併用でも位置ずれの報告あり #52642 / #42044）。横並びなので折り返しも不要＝1行で足りる
+  mealT: { flex: 1, fontSize: 17, fontWeight: '800', color: C.ink, includeFontPadding: false },
+
+  // リスト行: 高さ56（タップ領域44pt以上）・行間6
+  rows: { marginTop: 10, gap: 6 },
+  row: {
+    height: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12,
+    backgroundColor: C.panel, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.hairline,
+  },
+  rowIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
+  rowT: { flex: 1, fontSize: 16, fontWeight: '700', color: C.ink, includeFontPadding: false },
+  // 押下は面をアクセントのごく薄い色に変えるだけ（縮小や縁の変化は行では過剰）
+  pressedFace: { backgroundColor: C.accentSoft, borderColor: C.teal },
+  // 記録（上）と相談（下）を分ける1pxライン。上下12ptの余白で「別のかたまり」に見せる
+  divider: { height: 1, backgroundColor: C.hairline, marginTop: 12, marginBottom: 12 },
+
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   wInput: {

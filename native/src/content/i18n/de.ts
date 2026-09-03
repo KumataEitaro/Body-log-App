@@ -2204,4 +2204,5 @@ export const DE: Record<string, string> = {
   "（{n}回）": "({n}-mal)",
   "内容をコピーする": "Inhalt kopieren",
   "記録を消す": "Protokoll löschen",
+  "食事を記録": "Mahlzeit eintragen",
 };
