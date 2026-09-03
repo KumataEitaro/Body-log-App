@@ -283,8 +283,9 @@ workflows:
           node scripts/inject-android-signing.js native/android/app/build.gradle
       - name: Build aab
         script: |
-          # Codemagicのandroid_signing（上のbodylog_keystore）が有効なら、署名設定は
-          # gradleに自動注入される（リポジトリにキーストアを置かない）
+          # 注意: android_signing はキーストアを**用意するだけ**で、gradle には自動注入されない。
+          # 実際の署名設定は直前の「リリース署名を注入」ステップが build.gradle へ書き込む
+          # （2026-09-03: この誤解でデバッグ署名の .aab を作り Play に拒否された）。
           cd native/android
           chmod +x gradlew
           ./gradlew bundleRelease
