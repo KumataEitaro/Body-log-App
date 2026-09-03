@@ -139,8 +139,10 @@ workflows:
             # Associated Domains（ログインのパスワード自動入力をWebと共有）は、App ID側でcapabilityを有効化し
             # Team IDをAASAに埋めた後に ENABLE_ASSOCIATED_DOMAINS=true で点灯する（docs/LOGIN-AUTOFILL.md）。
             # 未設定のまま宣言だけ残すと自動署名が古いプロファイルを再利用して必ず失敗する（2026-09-02のビルド失敗）。
+          # 注意: plutil はキー内のドット（com.apple.…）を階層区切りと誤解釈して静かに失敗する（build_ipa(6)で判明）。
+          # ドット入りキーの操作は必ず PlistBuddy（区切りは「:」）を使うこと。
             if [ "$ENABLE_ASSOCIATED_DOMAINS" != "true" ]; then
-              plutil -remove com.apple.developer.associated-domains "$ENT" 2>/dev/null && echo "associated-domains removed (ENABLE_ASSOCIATED_DOMAINS != true)" || echo "associated-domains not present (ok)"
+              /usr/libexec/PlistBuddy -c "Delete :com.apple.developer.associated-domains" "$ENT" 2>/dev/null && echo "associated-domains removed (ENABLE_ASSOCIATED_DOMAINS != true)" || echo "associated-domains not present (ok)"
             fi
             plutil -p "$ENT"
           fi
@@ -168,17 +170,17 @@ workflows:
           # ここで「ビルドに必要なentitlement」と「取得済みプロファイルのentitlement」を比較し、
           # 足りなければ該当プロファイルをポータルから削除→作り直し→再適用する。手作業の削除を不要にする。
           ENT="native/ios/BodyLog/BodyLog.entitlements"
-          NEED_AD=0; plutil -extract com.apple.developer.associated-domains xml1 -o /dev/null "$ENT" 2>/dev/null && NEED_AD=1
+          NEED_AD=0; /usr/libexec/PlistBuddy -c "Print :com.apple.developer.associated-domains" "$ENT" >/dev/null 2>&1 && NEED_AD=1
           echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
           if [ "$NEED_AD" = "1" ]; then
             STALE=0
             for f in ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision; do
               [ -f "$f" ] || continue
               security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
-              BID=$(plutil -extract Entitlements.application-identifier raw -o - /tmp/prof.plist 2>/dev/null)
+              BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
               case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
-              if ! plutil -extract Entitlements.com.apple.developer.associated-domains xml1 -o /dev/null /tmp/prof.plist 2>/dev/null; then
-                NAME=$(plutil -extract Name raw -o - /tmp/prof.plist); echo "古いプロファイルを検出: $NAME（associated-domains無し）"; STALE=1
+              if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /tmp/prof.plist >/dev/null 2>&1; then
+                NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null); echo "古いプロファイルを検出: $NAME（associated-domains無し）"; STALE=1
               fi
             done
             if [ "$STALE" = "1" ]; then
