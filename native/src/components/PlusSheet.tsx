@@ -105,13 +105,17 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={flush} statusBarTranslucent>
-      {/* 体重の段でキーボードが出ると、画面下端に置いたシートごと隠れる（入力欄も「体重を記録」も見えない）。
-          KAV でシートをキーボードの上へ持ち上げる（2026-09-02 自己監査） */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      {/* KAV は**体重の段だけ**に効かせる（数値入力でキーボードが出るのはここだけ）。
+          根の段まで包むと、キーボードが無いのにシート下へ見えない余白が残り、
+          「記録方法を選ぶだけ」のシートが不必要に背高くなる（βフィードバック 2026-09-03） */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' && step === 'weight' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel={t('閉じる')} />
         <GestureDetector gesture={pan}>
-          <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + 16 }, slide]}>
+          <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + 10 }, slide]}>
             <View style={s.grip} />
             <View style={s.head}>
               {step !== 'root' ? (
@@ -182,7 +186,7 @@ function Tile({ Icon, label, onPress, testID, wide }: { Icon: LucideIcon; label:
       <View style={[s.tileIcon, wide && s.tileIconWide]}>
         <Icon size={wide ? ICON.lg : ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} />
       </View>
-      <Text style={s.tileT} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
+      <Text style={s.tileT} numberOfLines={2} maxFontSizeMultiplier={1.2}>{label}</Text>
     </Pressable>
   );
 }
@@ -191,30 +195,34 @@ const s = themed(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(11,18,32,0.38)' },   // Navy由来の暗幕（生HEXは面/地以外に書かない規約の例外: 透過幕）
   sheet: {
     backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: SPACE.screen, paddingTop: 8,
+    paddingHorizontal: SPACE.screen, paddingTop: 6,
     shadowColor: C.shadow, shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: -4 }, elevation: 12,
   },
-  grip: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: C.line, marginBottom: 8 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  grip: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: C.line, marginBottom: 6 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   headBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   crumb: { fontSize: 17, fontWeight: '800', color: C.ink },
   crumbPrev: { color: C.sub, fontWeight: '700' },
   step: { fontSize: 11, fontWeight: '700', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: {
-    width: '47.5%', flexGrow: 1, aspectRatio: 1.35,
+    // aspectRatio をやめて固定高に: 幅に比例して背が高くなるのを止める。
+    // 92pt = アイコン44 + 間隔6 + ラベル18 + 上下余白 → タップ領域は十分（44pt以上）
+    width: '47.5%', flexGrow: 1, height: 92, paddingHorizontal: 8,
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: 1.5, borderColor: C.hairline,
-    alignItems: 'center', justifyContent: 'center', gap: 8,
+    alignItems: 'center', justifyContent: 'center', gap: 6,
     shadowColor: C.shadow, shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1,
   },
   tilePressed: { borderColor: C.teal, backgroundColor: C.accentSoft, transform: [{ scale: 0.97 }] },
   // 横長1枚（「何を食べる？」）: 2×2の正方形タイルより低く、アイコンとラベルを横並びに
-  tileWide: { width: '100%', aspectRatio: undefined, flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 18, justifyContent: 'flex-start', gap: 12 },
-  tileIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
+  tileWide: { width: '100%', height: 60, flexDirection: 'row', paddingVertical: 0, paddingHorizontal: 18, justifyContent: 'flex-start', gap: 12 },
+  tileIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   tileIconWide: { width: 40, height: 40, borderRadius: 20 },
-  // lineHeightとincludeFontPaddingを固定しないと、フォントのディセンダぶんだけ
-  // アイコン＋ラベルの塊が下へ寄って見える（βフィードバック 2026-09-03「文字がボタンの下半分にある」）
-  tileT: { fontSize: 15, lineHeight: 18, fontWeight: '800', color: C.ink, textAlign: 'center', includeFontPadding: false },
+  // lineHeight は指定しない: 新アーキ(Fabric)×iOS では lineHeight があるとベースラインが
+  // 尊重されず、アイコン＋ラベルの塊が中央より下へずれる（react-native#53092。
+  // adjustsFontSizeToFit との併用でも位置ずれの報告あり #52642 / #42044）。
+  // 折り返しは numberOfLines={2} 側で受ける（英語ラベルが切れないように）
+  tileT: { fontSize: 15, fontWeight: '800', color: C.ink, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false },
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   wInput: {
