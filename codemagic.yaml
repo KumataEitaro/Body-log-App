@@ -40,38 +40,6 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.gotcha.bodylog" ios/App/App/App.entitlements || true
           gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
           ruby scripts/add-widget-target.rb
-      - name: 署名プロファイルの整合（entitlementに合わないプロファイルを捨てて作り直す）
-        script: |
-          # Codemagicの自動署名は既存プロファイルを再利用するため、App IDにcapabilityを足しても
-          # 古いプロファイル（Associated Domains無し）で署名が失敗し続ける（2026-09-03 build_ipa(5)）。
-          # ここで「ビルドに必要なentitlement」と「取得済みプロファイルのentitlement」を比較し、
-          # 足りなければ該当プロファイルをポータルから削除→作り直し→再適用する。手作業の削除を不要にする。
-          ENT="native/ios/BodyLog/BodyLog.entitlements"
-          NEED_AD=0; plutil -extract com.apple.developer.associated-domains xml1 -o /dev/null "$ENT" 2>/dev/null && NEED_AD=1
-          echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
-          if [ "$NEED_AD" = "1" ]; then
-            STALE=0
-            for f in ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision; do
-              [ -f "$f" ] || continue
-              security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
-              BID=$(plutil -extract Entitlements.application-identifier raw -o - /tmp/prof.plist 2>/dev/null)
-              case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
-              if ! plutil -extract Entitlements.com.apple.developer.associated-domains xml1 -o /dev/null /tmp/prof.plist 2>/dev/null; then
-                NAME=$(plutil -extract Name raw -o - /tmp/prof.plist); echo "古いプロファイルを検出: $NAME（associated-domains無し）"; STALE=1
-              fi
-            done
-            if [ "$STALE" = "1" ]; then
-              # このバンドルIDの App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し
-              for id in $(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id"); do
-                echo "delete profile $id"; app-store-connect profiles delete "$id" || true
-              done
-              rm -f ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision
-              app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create
-              echo "プロファイルを作り直しました（Associated Domains込み）"
-            else
-              echo "取得済みプロファイルは要件を満たしています"
-            fi
-          fi
       - name: Set build number
         script: |
           cd ios/App
@@ -193,6 +161,38 @@ workflows:
           # 拡張ターゲットをpbxprojへ注入（この後のagvtoolがウィジェットのビルド番号も揃える）
           gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
           ruby scripts/add-widget-target-rn.rb
+      - name: 署名プロファイルの整合（entitlementに合わないプロファイルを捨てて作り直す）
+        script: |
+          # Codemagicの自動署名は既存プロファイルを再利用するため、App IDにcapabilityを足しても
+          # 古いプロファイル（Associated Domains無し）で署名が失敗し続ける（2026-09-03 build_ipa(5)）。
+          # ここで「ビルドに必要なentitlement」と「取得済みプロファイルのentitlement」を比較し、
+          # 足りなければ該当プロファイルをポータルから削除→作り直し→再適用する。手作業の削除を不要にする。
+          ENT="native/ios/BodyLog/BodyLog.entitlements"
+          NEED_AD=0; plutil -extract com.apple.developer.associated-domains xml1 -o /dev/null "$ENT" 2>/dev/null && NEED_AD=1
+          echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
+          if [ "$NEED_AD" = "1" ]; then
+            STALE=0
+            for f in ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision; do
+              [ -f "$f" ] || continue
+              security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
+              BID=$(plutil -extract Entitlements.application-identifier raw -o - /tmp/prof.plist 2>/dev/null)
+              case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
+              if ! plutil -extract Entitlements.com.apple.developer.associated-domains xml1 -o /dev/null /tmp/prof.plist 2>/dev/null; then
+                NAME=$(plutil -extract Name raw -o - /tmp/prof.plist); echo "古いプロファイルを検出: $NAME（associated-domains無し）"; STALE=1
+              fi
+            done
+            if [ "$STALE" = "1" ]; then
+              # このバンドルIDの App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し
+              for id in $(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id"); do
+                echo "delete profile $id"; app-store-connect profiles delete "$id" || true
+              done
+              rm -f ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision
+              app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create
+              echo "プロファイルを作り直しました（Associated Domains込み）"
+            else
+              echo "取得済みプロファイルは要件を満たしています"
+            fi
+          fi
       - name: Set build number
         script: |
           cd native/ios
