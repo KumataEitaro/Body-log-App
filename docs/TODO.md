@@ -7,14 +7,6 @@
 
 ## A. 熊田さんの作業（順番どおりが最短）
 
-### A1. 🔴 最優先: Supabase の SQL 10本を実行
-行き先 → https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
-`supabase/migration-23.sql` 〜 `migration-32.sql`（**23も未実行**。一度は数え漏らしていた）
-- 全て再実行安全（`if not exists` / `drop policy if exists`）
-- **26 が未実行だと「食事の制約」を同意してもONにできない**（実際に詰まった箇所）
-- ⚠️ **27 を実行すると次回起動で全員に再同意画面が出る**（規約を全面改訂したので正しい挙動）
-- 確認SQL（`8 / 5 / 1` が出れば完了）はチャット履歴に貼ったものを再利用
-
 ### A2. 🔴 iOS: TestFlight のクラッシュを見る
 https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィードバック → クラッシュ**
 - **KishimotoYumi さんの端末で 1.1.0 (81) がクラッシュ2件**・フィードバック3件が届いている
@@ -157,6 +149,8 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 
 ## C. 完了（1行記録・2026-09-04）
 
+- **Supabase migration 23〜32 を実行完了**（`migration-23-32-all.sql` で一括。27を含むので
+  次回起動で全ユーザーに再同意画面が出る＝規約全面改訂に伴う正しい挙動）
 - 1.1.0 を iOS（build 81/84）と Android（versionCode 119）で両方ビルド成功
 - N1〜N4（今日の予定ヒアリング＋再配分・未来シミュレーション・司令塔・Weekly Review）
 - 食材ナビ（栄養DB86品・スマート置き換え・栄養ランキング・たんぱく源ティア）
