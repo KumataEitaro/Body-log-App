@@ -62,7 +62,10 @@ https://play.google.com/console → BodyLoger → ダッシュボードの「詳
 | クローズドテストの国 | **日本** |
 | ストアの掲載情報 | 簡単な説明・詳しい説明はチャット履歴の草案を貼る |
 
-### A6. 🟡 iOS: ログイン自動入力の仕上げ（Associated Domains）
+### A6. 🟡 iOS: ログイン自動入力の確認（設定は完了・再ビルド待ち）
+**Apple Developer の設定と Codemagic の `ENABLE_ASSOCIATED_DOMAINS=true` は 2026-09-04 に完了。**
+残っているのは `rn-testflight` を1回回して、実機でいつものアカウントが
+パスワード候補に出ることを確認するだけ。
 1. Apple Developer → App ID `com.gotcha.bodylog.rn` で **Associated Domains を ON**（**済み**）
 2. **Profiles で「bodylog rn appstore 2」を削除** ← CI が自動で作り直すので実は不要になった
    （`codemagic.yaml` の「署名プロファイルの整合」ステップが古いプロファイルを捨てて作り直す）
@@ -74,19 +77,6 @@ https://play.google.com/console → BodyLoger → ダッシュボードの「詳
 - **彩羽根田さん が App Store Connect の招待を未承諾**（3日で期限切れ・切れていたら「招待を再送信」）
 - 承諾後、TestFlight → 内部テスト「初期招待」グループへ追加
 - 小澤祥太さんは追加済み（「招待済み」＝TestFlight アプリからインストール待ち）
-
-### A8. 🟢 AdMob: インタースティシャルID を Codemagic に登録（ユニットは作成済み）
-AdMob 側のユニット作成は **2026-09-04 に完了**。残るのは環境変数の登録だけ。
-https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables → グループ `rc`
-| 変数名 | 値 |
-|---|---|
-| `EXPO_PUBLIC_ADMOB_INTERSTITIAL_IOS` | `ca-app-pub-3319916143033433/9926213590` |
-| `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID` | `ca-app-pub-3319916143033433/5986968582` |
-- Secure（暗号化）は不要。登録後に再ビルドすると焼き込まれる（署名の変更なし）
-- **未設定のあいだは全画面広告は出ない**（安全側の既定）。詳細 docs/ADS.md
-- 実際に広告が出るのは **A9（課金点火）以降**。それまでは表示条件を満たさない
-- あわせて https://apps.admob.com → **お支払い** で支払い情報・税務情報を登録
-  （未登録だと収益が発生しても振り込まれない。広告表示自体は可能）
 
 ### A9. 🟢 課金を点火するとき（3点セットは必ず同時）
 1. `EXPO_PUBLIC_RC_IOS_KEY` / `_ANDROID_KEY` を設定
@@ -102,9 +92,15 @@ https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables 
 - `05_業務メモ_社内限` は BodyLog 無関係なので除く
 - 詳細 docs/HANDOVER.md（コード・設計・SQL は GitHub にあるので失われない）
 
-### A11. 🟠 Play への自動アップロード用サービスアカウント（検証サイクルが1周短くなる）
-コード側（`codemagic.yaml` の `publishing > google_play`）は **2026-09-04 に投入済み**。
-下の3つを登録すると、`rn-android` のビルド成功で**内部テストへ自動アップロード**される。
+### A11. 🟠 Play への自動アップロード: 初回ビルドで疎通確認（設定は完了）
+**サービスアカウント作成・Play での権限付与・Codemagic への登録はすべて 2026-09-04 に完了。**
+残っているのは `rn-android` を1回回して、実際に内部テストへ入るかを見るだけ（A3 と同じ1回で兼ねられる）。
+
+- ❌ `403` / `The caller does not have permission` が出たら**権限の反映待ち**（数分〜最大24時間）。
+  設定ミスではないので時間を置いて再実行。その間は Artifacts から手動アップロードもできる
+
+<details><summary>実施済みの手順（記録）</summary>
+
 
 1. **サービスアカウント作成** https://console.cloud.google.com/iam-admin/serviceaccounts
    → 「サービス アカウントを作成」→ 名前 `codemagic-play-publisher` → 作成
@@ -117,8 +113,10 @@ https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables 
    - name `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` / value **JSONの中身を全部** / group `google_play`
    - **Secret にチェック**（Play への書き込み権限そのもの。JSONの中身はチャットに貼らない）
 
-- 権限の反映に**数分〜最大24時間**かかることがある。`403` や
-  `The caller does not have permission` で落ちたら時間を置いて再実行
+</details>
+
+- サービスアカウント: `codemagic-play-publisher@bodyloger.iam.gserviceaccount.com`
+  （Play の権限は「テスト版リリースを管理」＋「アプリ情報の閲覧」に限定・製品版の権限は無し）
 - 製品版への昇格は自動化していない（審査に出る経路は必ず人間が踏む）
 - 詳細と設計判断は docs/ANDROID.md「Playへの自動アップロード」
 
@@ -186,6 +184,10 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 ---
 
 ## C. 完了（1行記録・2026-09-04）
+
+- **Play への自動アップロード**（サービスアカウント＋`publishing > google_play`・track=internal）
+- **AdMob インタースティシャルIDを Codemagic に登録**（iOS/Android 各1・実際の表示は A9 以降）
+- **`ENABLE_ASSOCIATED_DOMAINS=true` を登録**（ログイン自動入力・iOS再ビルドで有効化）
 
 - **Supabase migration 23〜32 を実行完了**（`migration-23-32-all.sql` で一括。27を含むので
   次回起動で全ユーザーに再同意画面が出る＝規約全面改訂に伴う正しい挙動）
