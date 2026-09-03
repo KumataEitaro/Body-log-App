@@ -233,8 +233,10 @@ workflows:
   #     キーストアが無ければ手元で生成する（docs/ANDROID.md にkeytoolコマンド例あり）。
   #  2. キーストア未アップロードの間は下の android_signing の2行をコメントアウトすれば
   #     無署名でもビルド自体は通る（Playへは提出できないが動作確認用にはなる）。
-  # 公開: 今はGoogle Play Consoleへ .aab を手動アップロードする運用
-  # （サービスアカウント未作成のため）。作成後に publishing > google_play を足して自動化する。
+  # 公開: ビルド成功で **内部テストトラックに自動アップロード**される（下の publishing）。
+  #  3. Codemagic UI の環境変数グループ「google_play」に、Google Cloud で作った
+  #     サービスアカウントJSONの**中身をそのまま** GCLOUD_SERVICE_ACCOUNT_CREDENTIALS として
+  #     登録し、Secure（暗号化）にする。手順は docs/ANDROID.md「Playへの自動アップロード」。
   rn-android:
     name: BodyLog RN (native/) → Google Play (aab)
     # linux_x2は無料の個人プランでは使えない（"instance type is not available with the
@@ -251,6 +253,9 @@ workflows:
       # 追加する。未設定の間はアプリ側が安全に「未課金」扱いになる（課金UIが出ないだけ）
       groups:
         - rc
+        # サービスアカウントJSON（GCLOUD_SERVICE_ACCOUNT_CREDENTIALS）。
+        # 下の publishing > google_play が参照する。Secure で登録すること
+        - google_play
       android_signing:
         - bodylog_keystore
     scripts:
@@ -305,3 +310,14 @@ workflows:
           echo "✅ リリース鍵で署名されています"
     artifacts:
       - native/android/app/build/outputs/**/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # 内部テストにだけ入れる。製品版への昇格は必ず人間が Play Console で行う
+        # （審査に出る経路を自動化しない）
+        track: internal
+        # まだ製品版を公開したことがないアプリでは、Googleのバリデーションが
+        # 「変更を自動でレビューに送れない」と拒否することがある
+        # （"Your edit cannot be sent for review automatically"）。
+        # 内部テストはそもそも審査不要なので、レビューには送らない
+        changes_not_sent_for_review: true

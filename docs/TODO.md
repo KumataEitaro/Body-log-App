@@ -15,16 +15,19 @@ https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィ
 
 ### A3. 🟠 Android: 起動クラッシュの検証
 
-> ⚠️ **`rn-android` はビルドするだけ。Play への公開は手動**（yaml に publishing が無い）。
-> **.aab は端末に直接インストールできない**（Play が端末ごとの apk に分割配信する形式）ので、
-> 下の 2〜4 を飛ばすと**古いビルドで起動テストしてしまう**。2026-09-04 に実際に1周無駄にした。
+> ⚠️ **.aab は端末に直接インストールできない**（Play が端末ごとの apk に分割配信する形式）。
+> ビルドしただけでは端末は古いままなので、**必ず 4〜5 で入れ替わりを確認してから**起動テストする。
+> 2026-09-04 にこれを飛ばして1周無駄にした。
+>
+> **A11 のサービスアカウントを登録すると 2〜3 は自動になる**（ビルド成功で内部テストに入る）。
+> 登録前は 2〜3 も手で行う。
 
 1. Codemagic で **rn-android** を実行（https://codemagic.io/apps・main の最新）
    - 起動を止めない構造（safeBoot）と Intl 依存の排除が入っている
-2. 成功したビルドを開き、ページ下部の **Artifacts → `app-release.aab`** をダウンロード
-3. https://play.google.com/console → BodyLoger → **テストとリリース → テスト → 内部テスト**
+2. （A11未登録のあいだだけ）成功したビルドを開き **Artifacts → `app-release.aab`** をダウンロード
+3. （同）https://play.google.com/console → BodyLoger → **テストとリリース → テスト → 内部テスト**
    → 「新しいリリースを作成」→ .aab をドラッグ → 保存 → リリースのレビュー → 公開を開始
-   （処理に5〜15分）
+   （処理に5〜15分。A11登録後はここまで自動）
 4. 端末を更新する（**自動では降ってこない**）:
    Playストア → 右上のアイコン → **アプリとデバイスの管理 → 利用可能なアップデート** → 更新
 5. **入れ替わったことを確認する**: 端末の 設定 → アプリ → BodyLog → アプリの詳細情報 で
@@ -98,6 +101,26 @@ https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables 
 - `02_ローカルのみ設定`（.env.local）／`03_素材`（アイコン元画像）／`04_Claudeの記憶`
 - `05_業務メモ_社内限` は BodyLog 無関係なので除く
 - 詳細 docs/HANDOVER.md（コード・設計・SQL は GitHub にあるので失われない）
+
+### A11. 🟠 Play への自動アップロード用サービスアカウント（検証サイクルが1周短くなる）
+コード側（`codemagic.yaml` の `publishing > google_play`）は **2026-09-04 に投入済み**。
+下の3つを登録すると、`rn-android` のビルド成功で**内部テストへ自動アップロード**される。
+
+1. **サービスアカウント作成** https://console.cloud.google.com/iam-admin/serviceaccounts
+   → 「サービス アカウントを作成」→ 名前 `codemagic-play-publisher` → 作成
+   → **ロールは付けない** → 完了 → キー → 鍵を追加 → 新しい鍵を作成 → **JSON** をダウンロード
+   → API を有効化 https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com
+2. **Play で権限付与** https://play.google.com/console → 左下 **ユーザーと権限** → 新しいユーザーを招待
+   → サービスアカウントのメールアドレス → アプリの権限で BodyLoger を選び
+   **「テスト版リリースを管理」＋「アプリ情報の閲覧」**だけ付ける（製品版の権限は与えない）
+3. **Codemagic に登録** https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables
+   - name `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` / value **JSONの中身を全部** / group `google_play`
+   - **Secret にチェック**（Play への書き込み権限そのもの。JSONの中身はチャットに貼らない）
+
+- 権限の反映に**数分〜最大24時間**かかることがある。`403` や
+  `The caller does not have permission` で落ちたら時間を置いて再実行
+- 製品版への昇格は自動化していない（審査に出る経路は必ず人間が踏む）
+- 詳細と設計判断は docs/ANDROID.md「Playへの自動アップロード」
 
 ---
 

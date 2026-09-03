@@ -38,6 +38,64 @@ keytool -genkeypair -v \
 
 サービスアカウントを作成したら、codemagic.yaml に `publishing > google_play` を足してアップロードまで自動化できる（それまでは手動アップロード運用）。
 
+## Playへの自動アップロード（2026-09-04 導入）
+
+`rn-android` のビルドが成功すると、.aab が **内部テストトラックへ自動アップロード**される
+（`codemagic.yaml` の `publishing > google_play`）。ダウンロードも手動アップロードも不要。
+
+**製品版への昇格は自動化していない。** 審査に出る経路は必ず人間が Play Console で踏む。
+
+### なぜ入れたか
+
+手動運用のあいだ、「再ビルドしたのに端末が古いまま」で検証サイクルを丸ごと1周
+無駄にした（2026-09-04・起動クラッシュの調査）。ビルドと配布のあいだに人手が挟まる限り
+この取り違えは必ず再発するので、経路自体を消した。iOS は `submit_to_testflight` で
+既に自動だったので、非対称も解消している。
+
+### 初回だけ必要な準備
+
+**1. サービスアカウントを作る**（Google Cloud）
+
+https://console.cloud.google.com/iam-admin/serviceaccounts
+
+- プロジェクトは何でもよい（無ければ「新しいプロジェクト」で作る）
+- 「サービス アカウントを作成」→ 名前 `codemagic-play-publisher` → 作成
+- **ロールは付けない**（Play 側で権限を与えるので Google Cloud の IAM ロールは不要）
+- 作成後、そのアカウントの **キー → 鍵を追加 → 新しい鍵を作成 → JSON** → ダウンロード
+- あわせて **Google Play Android Developer API** を有効化する
+  https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com
+
+**2. Play Console でそのアカウントに権限を与える**
+
+https://play.google.com/console → 左下 **ユーザーと権限** → **新しいユーザーを招待**
+
+- メールアドレスに、作ったサービスアカウントのアドレス
+  （`codemagic-play-publisher@<プロジェクト>.iam.gserviceaccount.com`）
+- **アプリの権限** で BodyLoger を選び、以下を付ける:
+  - リリース: **テスト版リリースを管理**（Release to testing tracks）
+  - **アプリ情報の閲覧（read-only）**
+- 製品版へのリリース権限は**与えない**（自動で世に出る経路を作らない）
+
+**3. Codemagic に JSON を登録**
+
+https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables
+
+- Variable name: `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`
+- Variable value: **ダウンロードしたJSONファイルの中身をそのまま全部**貼る
+- Variable group: `google_play`（新規作成される）
+- **Secret にチェックを入れる**（このJSONは秘密鍵を含む。Play への書き込み権限そのもの）
+
+### 注意
+
+- **最初の1本は手動アップロードが必要**という Google の制約がある。BodyLoger は
+  versionCode 119 を手で上げているので、この条件は既に満たしている
+- サービスアカウントの権限が Play に反映されるまで**数分〜最大24時間**かかることがある。
+  直後のビルドが `403` や `The caller does not have permission` で落ちたら、時間を置いて再実行
+- `changes_not_sent_for_review: true` にしている。製品版を一度も公開していないアプリでは
+  Google が「変更を自動でレビューに送れない」と拒否するため
+  （`Your edit cannot be sent for review automatically`）。内部テストは審査不要なので送らない
+- **JSONの中身をチャットに貼らないこと**。Play への書き込み権限そのものなので、
+  漏れたら鍵を無効化して作り直す（Google Cloud の該当サービスアカウント → キー → 削除）
 ## RevenueCat（課金）— 後回しでOK
 - 未設定の間は **課金UIが一切出ないだけ**で、アプリは全機能「未課金プラン」として正常動作する
 - 対応する場合:
@@ -153,6 +211,10 @@ Android vitals も反映待ちで、スタックトレースが一切手に入�
 「まだ落ちる」と結論した）。`rn-android` に `publishing` は無く、.aab は artifacts に
 置かれるだけ＝**Playへのアップロードは手動**。さらに **.aab は端末に直接インストールできない**
 （Play が端末ごとの apk に分割して配信する形式）ので、Play を経由する以外の道が無い。
+
+> **2026-09-04 以降は 1〜2 が自動**（`publishing > google_play`）。ビルド成功で内部テストに
+> 入るので、確認するのは 3〜4 だけ。下の「Playへの自動アップロード」節を参照。
+> サービスアカウントを登録する前のビルドについては 1〜2 も手で行う。
 
 1. Codemagic の成功したビルド → **Artifacts → `app-release.aab`** をダウンロード
 2. Play Console → **テスト → 内部テスト → 新しいリリースを作成** → .aab をアップロード → 公開
