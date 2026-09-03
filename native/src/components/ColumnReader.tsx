@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Modal, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BookOpen, X, ChevronRight } from 'lucide-react-native';
+import { BookOpen, X, ChevronRight, Trophy } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { getColumns, type Column } from '@/content/columns';
 import { C, RADIUS, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
@@ -50,6 +51,7 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
   const [open, setOpen] = useState<Column | null>(null);
   const [read, setRead] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   // リモート配信の記事が届いたら（起動後に取得が終わったら）一覧を組み直す
   useRemoteContent();
   const todayStr = todayJST();
@@ -164,6 +166,19 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
         </Pressable>
       ))}
 
+      {/* 食材ナビ（2026-09-03）: 読み物と同じ「数字の意味が分かる場所」に、栄養ランキング図鑑への入口を1節置く。
+          記事ではなくスタック画面（/nutrient-rank）なので、一覧の末尾に区切って出す */}
+      <Text style={s.navHead}>{t('栄養ランキング')}</Text>
+      <Pressable style={({ pressed }) => [s.navRow, pressed && { opacity: 0.75 }]} onPress={() => router.push('/nutrient-rank' as never)}
+                 accessibilityRole="button" accessibilityLabel={t('栄養ランキング')}>
+        <View style={s.navIcon}><Trophy size={18} color={C.teal} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>{t('◯◯が多いのは？食材ランキング')}</Text>
+          <Text style={s.lead} numberOfLines={2}>{t('鉄・ビタミン・亜鉛…が多い食材と、同じ栄養をより少ないカロリーで取る「かしこい置き換え」。たんぱく源のティア表も')}</Text>
+        </View>
+        <ChevronRight size={16} color={C.faint} />
+      </Pressable>
+
       {reader}
     </View>
   );
@@ -194,6 +209,10 @@ const s = themed(() => ({
   newPill: { backgroundColor: C.accentBadge, borderRadius: RADIUS.chip, paddingHorizontal: 6, paddingVertical: 1 },
   newPillT: { fontSize: 11, fontWeight: '900', color: C.accentInk, letterSpacing: 0.4 },
   lead: { fontSize: 13, color: C.sub, marginTop: 2 },
+  // 食材ナビの入口（読み物一覧の末尾の1節）
+  navHead: { fontSize: 13, fontWeight: '800', color: C.sub, marginTop: 16, marginBottom: 4 },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, backgroundColor: C.accentSoft, borderRadius: RADIUS.panel, paddingHorizontal: 10 },
+  navIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   readerWrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20 },
   readerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   readerEmoji: { fontSize: 30 },

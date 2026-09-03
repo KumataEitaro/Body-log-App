@@ -91,6 +91,15 @@ function summarize(kind: LawKind, p: LawParams): DataSummary | null {
       const factors = String(p.f ?? '').split('+').filter(Boolean).map((k) => conditionLabel(k));
       return { value: String(p.x), unit: t('倍'), label: t('次の条件がそろった日の食べすぎの起きやすさ'), note: t('該当{h}日を含む{n}日の記録から（相関であり、原因とは限りません）', { h: Number(p.h), n: Number(p.n) }), factors };
     }
+    // ---- 食材ナビ（content/proteinTiers.ts）。Aティア以上の割合を帯で見せる ----
+    case 'protein_tier': {
+      const pct = Number(p.p) || 0;
+      return {
+        value: String(pct), unit: '%', label: t('たんぱく源のうちAティア以上の割合（たんぱく質g加重）'),
+        note: t('直近30日の{n}食のたんぱく源から（{mode}の基準）', { n: Number(p.n), mode: p.mode === 'bulk' ? t('増量') : t('減量') }),
+        bar: { pct: Math.min(1, Math.max(0, pct / 100)), left: t('Aティア以上'), right: t('Bティア以下') },
+      };
+    }
     default:
       return null;
   }

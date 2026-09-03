@@ -95,7 +95,8 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // 詳細ページで統合元カードを縦に積む（各カード自体は無改造）
 // cycle（生理周期モード）は設定「生理周期を記録する」をONにした人にだけ現れる（既定OFF）。
 // 既存のcycles（増量/減量サイクル比較）とは別物なので、キー名を混同しないこと
-const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'volume', 'strength', 'health'];
+// nutrients は食材ナビの栄養ランキング図鑑（/nutrient-rank）への外部遷移行（laws と同じ扱い・2026-09-03）
+const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'nutrients', 'volume', 'strength', 'health'];
 // 統合行→詳細で縦に積む旧カードの並び
 const DETAIL_STACKS: Record<string, string[]> = {
   body: ['goal', 'kpi', 'chart', 'table'],
@@ -110,7 +111,7 @@ const DETAIL_STACKS: Record<string, string[]> = {
 // ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
   { title: () => t('からだ'), keys: ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles'] },
-  { title: () => t('食事'), keys: ['eating', 'week'] },
+  { title: () => t('食事'), keys: ['eating', 'week', 'nutrients'] },
   { title: () => t('運動'), keys: ['volume', 'strength', 'health'] },
 ];
 // セクション順→セクション内は引数の相対順。未知キーは末尾へ（防御・落とさない）
@@ -124,7 +125,7 @@ const CARD_LABELS = (): Record<string, string> => ({
   // 統合行（メニュー・詳細タイトル・⊕シートで使う）
   body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
   laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), photos: t('体の写真'), health: t('歩数・睡眠'),
-  vitals: t('バイタル'), cycle: t('生理周期'),
+  vitals: t('バイタル'), cycle: t('生理周期'), nutrients: t('栄養ランキング'),
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
@@ -999,6 +1000,7 @@ export default function ChangesScreen() {
           : t('今週{n}日記録', { n: rec });
       }
       case 'laws': return lawLine ?? t('記録が貯まると、あなたの法則が見つかります');
+      case 'nutrients': return t('◯◯が多い食材・かしこい置き換え・たんぱく源ティア');
       case 'bulkguard': return t('週あたりの増量ペースを見張る');
       case 'cycles': {
         // 現在のサイクル「増量 5週目・+1.2kg」（進行中の期間＋期間内の体重変化）
@@ -1034,6 +1036,7 @@ export default function ChangesScreen() {
       case 'volume': return <Dumbbell {...p} />;
       case 'strength': return <Trophy {...p} />;
       case 'laws': return <BookOpen {...p} />;
+      case 'nutrients': return <Trophy {...p} />;
       case 'bulkguard': return <Gauge {...p} />;
       case 'cycles': return <Repeat {...p} />;
       case 'photos': return <Camera {...p} />;
@@ -1155,6 +1158,12 @@ export default function ChangesScreen() {
                    if (key === 'laws') {
                      Haptics.selectionAsync().catch(() => {});
                      router.push('/laws' as never);
+                     return;
+                   }
+                   // nutrients も同じく別ページに住む機能（食材ナビの栄養ランキング図鑑）
+                   if (key === 'nutrients') {
+                     Haptics.selectionAsync().catch(() => {});
+                     router.push('/nutrient-rank' as never);
                      return;
                    }
                    openDetail(key);

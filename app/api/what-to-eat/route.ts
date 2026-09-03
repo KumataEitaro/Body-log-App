@@ -22,6 +22,7 @@ export const preferredRegion = 'hnd1';
 const NOTE_MAX = 80;
 const INSIGHTS_MAX = 600;
 const TAGS_MAX = 200;
+const TIERS_MAX = 400;   // たんぱく源ティアの要約（食材ナビ・端末側 tierPromptSummary の上限と同値）
 
 /** 制御文字を落として長さで切る（プロンプト肥大・改行によるルール破壊の防止） */
 function cleanText(v: unknown, max: number): string {
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
   const note = cleanText(body.note, NOTE_MAX);
   const insights = cleanText(body.insights, INSIGHTS_MAX);
   const recentTags = cleanText(body.recentTags, TAGS_MAX).replace(/\n+/g, ' ');
+  const proteinTiers = cleanText(body.proteinTiers, TIERS_MAX).replace(/\n+/g, ' ');
   const myFoods = Array.isArray(body.myFoods)
     ? body.myFoods.filter((s): s is string => typeof s === 'string').map((s) => cleanText(s, 40)).filter(Boolean).slice(0, 10)
     : [];
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
     context, remainingKcal, pRemain, fRemain, cRemain, slot,
     // 目的はクライアント（端末の選択）を優先し、無ければプロフィールの値
     purposeKey: purposeFromClient ?? (prof?.purpose ? String(prof.purpose) : null),
-    note, outLang, dietBlock, insights, recentTags, myFoods,
+    note, outLang, dietBlock, insights, recentTags, proteinTiers, myFoods,
     constraintsNote: prof?.constraints_note ?? null,
     maternity: prof?.maternity === true,
   };

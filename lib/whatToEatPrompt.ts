@@ -135,6 +135,8 @@ export function buildWhatToEatPrompt(input: {
   insights?: string;
   /** 直近3日の食材タグ要約（「米: 約540g・鶏肉: 約300g」）。空なら省く */
   recentTags?: string;
+  /** たんぱく源ティアの要約（食材ナビ・native content/proteinTiers.tierPromptSummary。減量/増量で基準が変わる）。空なら省く */
+  proteinTiers?: string;
   /** マイ食品の名前上位（最大10） */
   myFoods?: string[];
   /** 恒常的な制約（profiles.constraints_note） */
@@ -145,6 +147,7 @@ export function buildWhatToEatPrompt(input: {
   retry?: boolean;
 }): string {
   const { context, remainingKcal, pRemain, fRemain, cRemain, slot, purposeKey, outLang, dietBlock, insights, recentTags, retry } = input;
+  const proteinTiers = String(input.proteinTiers ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim().slice(0, 400);
   const rk = Math.round(remainingKcal);
   const note = String(input.note ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
   const constraints = String(input.constraintsNote ?? '').replace(/\s*[\r\n]+\s*/g, ' / ').trim().slice(0, 500);
@@ -162,6 +165,7 @@ export function buildWhatToEatPrompt(input: {
     (note ? `- 本人の一言（最優先で尊重する）: 「${note}」\n` : '') +
     (recentTags ? `- 直近3日でよく食べた食材: ${recentTags}\n` : '') +
     (myFoods.length ? `- 本人のマイ食品（いつもの定番）: ${myFoods.join(' / ')}\n` : '') +
+    (proteinTiers ? `- ${proteinTiers}\n` : '') +
     (insights ? `\n${insights}\n` : '') +
     '\n【選び方のルール】\n' +
     purposeRules(purposeKey) +
@@ -170,6 +174,7 @@ export function buildWhatToEatPrompt(input: {
     `- 時間帯を考慮する: 朝なら1日の残りの配分、${kind === 'snack' ? '間食なら次の食事を邪魔しない量' : '夜・深夜なら最後の1食として軽め・消化に優しいもの'}を意識する\n` +
     (recentTags ? '- 直近3日で偏っている食材は3案すべての主役にしない。少なくとも1案は別の食材群に振る（偏りを指摘・批判はしない）\n' : '') +
     (myFoods.length ? '- マイ食品に合うものがあれば、3案のうち1案までは本人の定番を主役にしてよい（再現しやすい）。無理に使わない\n' : '') +
+    (proteinTiers ? '- たんぱく源ティアを参考に、3案のうち少なくとも1案はSティアのたんぱく源を主役にする。ティアという言葉や格付けはreasonに書かない（「たんぱく質が効率よく取れる」程度に言う）。C以下の食材を批判しない\n' : '') +
     '- 3案は互いに違う方向性にする（同じ主菜の言い換えを並べない）\n' +
     '- estKcal・p・f・cは一般的な1人前から推定した整数（kcal・g）\n' +
     '- reasonは1文だけ。責めない・審判しないトーンで、「なぜこの残量・時間帯・目的に合うか」を肯定形で書く（「〜はダメ」「〜は避けて」の否定形は使わない）\n' +

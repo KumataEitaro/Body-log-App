@@ -32,6 +32,8 @@ import { readFoodFreq, foodScores } from '@/lib/foods';
 import { useDiet, isDietOff } from '@/lib/diet';
 import { mergeAlerts, rulesFor, type DietLevel } from '@/lib/dietCheck';
 import { useGate } from '@/lib/gate';
+import { swapsFor, swapLine, emojiText, type SwapMode } from '@/lib/smartSwap';
+import { tierPromptSummary } from '@/content/proteinTiers';
 import { C, ICON, RADIUS, rgba, sheetTopPad, themed } from '@/lib/ui';
 import {
   EAT_CONTEXTS, EAT_NOTE_MAX, contextLabel, contextHint, promptKindOf, remainingLine,
@@ -128,11 +130,13 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
     if (loading) return;
     setLoading(true); setError(null); setUpgradeSrc(null);
     try {
-      // 端末内で組める文脈: 本人の法則（上位3件＋直近7日）・直近3日の食材タグ・マイ食品の上位名
+      // 端末内で組める文脈: 本人の法則（上位3件＋直近7日）・直近3日の食材タグ・マイ食品の上位名・
+      // たんぱく源ティアの要約（食材ナビ。目的が増量なら増量の基準）
       const [insights, recentTags] = await Promise.all([
         coachInsightsBlock().catch(() => ''),
         fetchRecentTags(),
       ]);
+      const swapMode: SwapMode = getPurpose() === 'bulk' ? 'bulk' : 'cut';
       const { ok, json } = await apiPost<ApiRes>('/api/what-to-eat', {
         context: ctx,
         remainingKcal: Math.round(remaining.kcal),
@@ -144,6 +148,7 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
         note: note.trim().slice(0, EAT_NOTE_MAX),
         insights,
         recentTags,
+        proteinTiers: tierPromptSummary(swapMode),
         myFoods: topMyFoodNames(myFoods, foodScores(readFoodFreq())),
         lang: apiLang(),
       });
@@ -258,6 +263,9 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
                           <Text style={[s.dietBadge, p.dietFlag === 'high' ? s.dietBadgeHigh : s.dietBadgeMaybe]}>{t('⚠️ 対象の可能性')}</Text>
                         )}
                         <PickBody p={p} />
+                        {/* 食材ナビ「置き換えるなら」: 提案の主役食材に、同じ栄養素をより少ない（増量なら多い）kcalで
+                            取れる候補があるときだけ1行。栄養素を限定した効率だけを言う（lib/smartSwap の規約） */}
+                        <SwapHint name={p.name} />
                         <OptionButton style={{ marginTop: 10 }} variant={best ? 'teal' : 'tonal'}
                                       label={t('これにする → 記録')} onPress={() => choose(p.name)} />
                       </View>
@@ -298,8 +306,27 @@ function PickBody({ p }: { p: EatPick }) {
   );
 }
 
+/** 「置き換えるなら」1行（該当があるときだけ）。「🍊×4 ≒ 🫑×1」の対比＋文 */
+function SwapHint({ name }: { name: string }) {
+  const sw = useMemo(() => swapsFor(name, { mode: getPurpose() === 'bulk' ? 'bulk' : 'cut' })[0], [name]);
+  if (!sw) return null;
+  return (
+    <View style={s.swapRow}>
+      <Text style={s.swapLabel}>{t('置き換えるなら')}</Text>
+      <Text style={s.swapT} numberOfLines={2}>
+        <Text style={s.swapEmoji}>{emojiText(sw.from)} ≒ {emojiText(sw.to)}</Text>{'  '}{swapLine(sw)}
+      </Text>
+    </View>
+  );
+}
+
 const s = themed(() => ({
   wrap: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18, paddingTop: sheetTopPad(18) },
+  // 食材ナビ「置き換えるなら」（カード内の1行・薄い面）
+  swapRow: { marginTop: 8, backgroundColor: C.chipBg, borderRadius: RADIUS.input, paddingHorizontal: 10, paddingVertical: 7 },
+  swapLabel: { fontSize: 11, fontWeight: '800', color: C.accentInk, letterSpacing: 0.4 },
+  swapT: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginTop: 2 },
+  swapEmoji: { fontSize: 13, fontWeight: '800', color: C.ink },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   remain: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 6, marginBottom: 12, fontVariant: ['tabular-nums'] },

@@ -31,6 +31,8 @@ const VARIANTS: [string, string][] = [
   // エンジン系の向きのある variant（1記事で両方向）
   ['wheat_vs_rice_mood', 'wheat_low'], ['wheat_vs_rice_mood', 'rice_low'],
   ['lift_sleep', 'up'], ['lift_sleep', 'down'], ['lift_mood', 'up'], ['lift_mood', 'down'],
+  // 食材ナビ（protein_tier）。variant 'swap'（置き換えが言える）/ 'default' は1記事
+  ['protein_tier', 'default'], ['protein_tier', 'swap'],
 ];
 
 const ja = (v: unknown): string => (typeof v === 'string' ? v : (v as Record<string, string>)?.ja ?? '');
@@ -107,7 +109,7 @@ describe('各記事の7節の整合', () => {
     const urls = new Set<string>();
     for (const src of a.sources) {
       expect(src.url).toMatch(/^https:\/\//);
-      expect(src.url).toMatch(/pubmed\.ncbi\.nlm\.nih\.gov|doi\.org|mhlw\.go\.jp/);   // 査読誌（PubMed/DOI）か公的機関（e-ヘルスネット kennet.mhlw.go.jp を含む）
+      expect(src.url).toMatch(/pubmed\.ncbi\.nlm\.nih\.gov|doi\.org|mhlw\.go\.jp|mext\.go\.jp/);   // 査読誌（PubMed/DOI）か公的機関（e-ヘルスネット kennet.mhlw.go.jp・文部科学省の食品成分表を含む）
       expect(src.authors.length).toBeGreaterThan(2);
       expect(src.title.length).toBeGreaterThan(5);
       expect(src.journal.length).toBeGreaterThan(2);
