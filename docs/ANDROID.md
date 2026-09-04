@@ -96,6 +96,89 @@ https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables
   （`Your edit cannot be sent for review automatically`）。内部テストは審査不要なので送らない
 - **JSONの中身をチャットに貼らないこと**。Play への書き込み権限そのものなので、
   漏れたら鍵を無効化して作り直す（Google Cloud の該当サービスアカウント → キー → 削除）
+## iOS 専用ライブラリの扱い（プラットフォーム安全性・2026-09-04）
+
+### 何が起きたか
+
+iOS は正常・Android は「一瞬で落ちる」。safeBoot（`_layout` の effect を1つずつ受け止める）を
+入れても変わらなかった。safeBoot が守れるのは **JS が動き始めた後** だけで、
+**ネイティブ初期化（Application.onCreate → ReactHost → TurboModule/JSI の登録）** と
+**JS バンドルの評価（モジュールのトップレベル）** は守備範囲外だった。
+
+Android の autolink 一覧を実際に出して分かったこと:
+
+| 部品 | iOS | Android | 問題 |
+|---|---|---|---|
+| `@kingstinct/react-native-healthkit` | 使う | 実装なし（autolink されない） | JS は Android でもバンドルされ、`health.ts` が**モジュールスコープで require** していた |
+| `react-native-nitro-modules`（↑の依存・C++/JSI） | 使う | **autolink される** | **使い手ゼロのまま起動時に JSI へ差し込まれる** |
+| `@expo/ui`（expo-router の依存・ネイティブタブが使う） | 使う | **autolink される** | 直接依存として **57.0.11** が残り、expo-router が要求する **57.0.15** と不整合。`npx expo install --fix` で整列した。外してはいけない |
+| `expo-glass-effect` / `expo-symbols` | 未使用 | apple 専用（されない） | 無害だが不要 |
+
+HealthKit の JS は import した瞬間に `NitroModules.createHybridObject(...)` を **8回即時実行**する
+（`lib/module/modules.js`）。Android には HybridObject が無いので毎起動で必ず失敗する経路を踏んでいた。
+try/catch で JS 例外は拾えるが、その手前のネイティブ側で落ちる経路は塞げない。
+
+### 構造的な原因
+
+**「iOS のために入れた部品が、Android のネイティブと JS 評価に漏れる」**。
+npm の依存はプラットフォーム別に持てないので、何もしなければ全部が両 OS に入る。
+iOS で動作確認して満足すると、Android には**使わない C++ ライブラリだけが残る**。
+
+### 対策（3層）
+
+1. **ネイティブ**: `native/react-native.config.js` で iOS 専用ライブラリを Android の autolink から外す
+   ```js
+   dependencies: {
+     'react-native-nitro-modules': { platforms: { android: null } },
+     '@kingstinct/react-native-healthkit': { platforms: { android: null } },
+   }
+   ```
+2. **JS**: `Platform.OS !== 'ios'` で **require の前に** 切る（`lib/health.ts`）。try/catch では足りない
+3. **見張り**: `src/__tests__/platformSafety.test.ts` が
+   - react-native.config.js の除外が消えていないこと
+   - iOS 専用ライブラリの静的 import が無いこと
+   - 未使用の iOS 専用パッケージ（`expo-glass-effect` / `expo-symbols`）や、expo-router が管理すべき
+     `@expo/ui` を **直接依存として**持たないこと（バージョンが SDK とずれる原因になる）
+   - app.json に旧 top-level `splash` が無いこと（expo-doctor のスキーマ違反）
+   を落とす。**新しく iOS 専用ライブラリを入れたら、このテストの `IOS_ONLY_NATIVE` に登録する。**
+
+### 新しいライブラリを入れるときの手順
+
+1. `npx expo install <pkg>`（SDK と整合するバージョンが入る。`npm install` は使わない）
+2. そのライブラリが **iOS 専用か**を確認: `node_modules/<pkg>/expo-module.config.json` の `platforms`、
+   または `react-native.config.js` / `android/` の有無。**依存（`npm ls <pkg>`）も見る**
+3. iOS 専用なら: react-native.config.js に `android: null` を足し、JS は Platform で先に切り、
+   `platformSafety.test.ts` の `IOS_ONLY_NATIVE` に登録
+4. `npx expo-doctor` が全部 ✔ であること
+5. main に入れたら **GitHub Actions「Android smoke」が起動確認**する（下記）
+
+### ブランチやリポジトリを OS 別に分けるべきか → 分けない
+
+分けても解決しない。問題は「コードが共有されていること」ではなく「Android で検証されていないこと」。
+リポジトリやブランチを分けると:
+- 同じバグ修正を2回入れる（片方だけ直って片方が古いまま、が常態化する）
+- 辞書・法則・栄養DBなど OS に関係ないものまで二重管理になる
+- 「iOS で入れた機能を Android にも移す」作業が毎回発生し、結局は忘れる
+
+代わりに **1本のコードに対して Android の検証を自動で挟む**（次節）。
+OS 別に分けるのは **ビルド設定と CI のワークフロー**（Codemagic の rn-testflight / rn-android）だけで足りる。
+
+## GitHub Actions「Android smoke」（起動スモークテスト・2026-09-04）
+
+`.github/workflows/android-smoke.yml`。**リリース構成の APK をエミュレータで起動し、
+12秒後にプロセスが生きているかを見て、logcat をアーティファクトに残す。**
+
+- 走るタイミング: 手動（Actions → Android smoke → Run workflow）と、`main` への push で
+  `native/**` が変わったとき
+- 落ちたら: Actions のそのランの **Artifacts → android-smoke-logs** → `logcat-crash.txt`（ネイティブ）／
+  `logcat-app.txt`（JS 例外・safeBoot の記録）を読む。**トレースが無い状態でコードを当てにいかない**
+- 通ったら: 「Android の release ビルドが起動する」ことの機械的な保証
+- autolink の一覧（`autolink-rn.json` / `autolink-expo.json`）も残るので、
+  「Android に何がリンクされているか」を後から確認できる。iOS 専用ネイティブが混ざっていたら CI 自体が落ちる
+- 費用: 私有リポジトリの無料枠 2,000分/月、1回 ≒ 20〜25分。main への push が1日5回を超えるなら
+  `paths` を絞るか手動のみに落とす
+- Codemagic との役割分担: Codemagic は「Play に上げる .aab を作って配る」、こちらは「起動するか」だけ。
+  署名鍵は渡さない（GitHub にシークレットを置かない）
 ## RevenueCat（課金）— 後回しでOK
 - 未設定の間は **課金UIが一切出ないだけ**で、アプリは全機能「未課金プラン」として正常動作する
 - 対応する場合:

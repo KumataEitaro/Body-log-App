@@ -5,11 +5,6 @@
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#C8FAFB"
-    },
     "scheme": "bodylog",
     "userInterfaceStyle": "automatic",
     "ios": {

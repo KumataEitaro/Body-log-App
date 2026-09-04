@@ -1,0 +1,141 @@
+# Android 起動スモークテスト（2026-09-04）
+#
+# 【なぜあるか】
+# iOS は正常なのに Android は「一瞬で落ちる」が、内部テストではリリース前レポートが出ず、
+# 手元に adb も無く、スタックトレースが一切取れなかった。
+# このワークフローは **リリース構成（Hermes・release variant）の APK をエミュレータで起動し、
+# 10秒後にプロセスが生きているかを見て、logcat をアーティファクトとして残す**。
+# 落ちればトレースがここで読める。落ちなければ「Android で起動する」ことの機械的な保証になる。
+#
+# 【いつ走るか】
+# ・手動（Actions → Android smoke → Run workflow）
+# ・main への push で native/ か codemagic 関連が変わったとき
+# GitHub Actions の私有リポジトリ無料枠は 2,000分/月。1回 ≒ 20〜25分なので、
+# main への push が1日5回を超えるようなら paths を絞るか手動のみに落とす。
+#
+# 【Codemagic と何が違うか】
+# Codemagic の rn-android は「Play に上げる .aab を作る」ためのもの（署名・アップロード）。
+# こちらは「起動するか」だけを見る。署名はデバッグ鍵で構わないので鍵を渡さない＝
+# シークレットを GitHub に置かない。
+name: Android smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'native/**'
+      - '.github/workflows/android-smoke.yml'
+
+concurrency:
+  group: android-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM（エミュレータを高速に回す）
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        working-directory: native
+        run: npm ci
+
+      - name: Prebuild（android/ を生成）
+        working-directory: native
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Autolink 一覧を残す（iOS 専用ネイティブが混ざっていないかを後から読める）
+        working-directory: native
+        run: |
+          npx expo-modules-autolinking react-native-config --platform android --json > autolink-rn.json
+          npx expo-modules-autolinking resolve --platform android --json > autolink-expo.json
+          echo "== RN CLI 系 =="; node -e "const c=require('./autolink-rn.json');console.log(Object.keys(c.dependencies).filter(n=>c.dependencies[n].platforms&&c.dependencies[n].platforms.android).join('\n'))"
+          echo "== Expo 系 =="; node -e "const c=require('./autolink-expo.json');console.log((c.modules||[]).map(m=>m.packageName).join('\n'))"
+          # iOS 専用ネイティブが Android に漏れていたらここで落とす（テストと二重で見張る）
+          if node -e "const c=require('./autolink-rn.json');const d=c.dependencies;process.exit((d['react-native-nitro-modules']&&d['react-native-nitro-modules'].platforms.android)||(d['@kingstinct/react-native-healthkit']&&d['@kingstinct/react-native-healthkit'].platforms.android)?1:0)"; then
+            echo "✅ nitro / healthkit は Android に含まれていない"
+          else
+            echo "❌ iOS 専用ネイティブが Android の autolink に含まれている" >&2; exit 1
+          fi
+
+      - name: Build release APK（x86_64 のみ・エミュレータ用）
+        working-directory: native/android
+        # 本番と同じ release variant（Hermes バイトコード・minify 設定も同じ）。ABI はエミュレータぶんだけに絞って時間を削る
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+
+      - name: Run on emulator and capture logcat
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            set -x
+            PKG=com.gotcha.bodylog.rn
+            APK=$(ls native/android/app/build/outputs/apk/release/*.apk | head -1)
+            adb logcat -c
+            adb install -r "$APK"
+            adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1
+            sleep 12
+            # プロセスが生きているか
+            if adb shell pidof "$PKG" >/dev/null; then ALIVE=1; else ALIVE=0; fi
+            adb logcat -d > logcat-full.txt
+            # 読みやすい抜粋: JS 例外・Java/Kotlin の致命例外・ネイティブクラッシュ・safeBoot の記録
+            adb logcat -d "*:S" ReactNative:V ReactNativeJS:V AndroidRuntime:E DEBUG:F libc:F > logcat-app.txt || true
+            adb logcat -d --buffer=crash > logcat-crash.txt || true
+            echo "== 致命例外 =="; grep -n "FATAL EXCEPTION\|Fatal signal\|SIGSEGV\|SIGABRT\|UnsatisfiedLinkError\|NoClassDefFoundError\|NoSuchMethodError" logcat-full.txt | head -40 || true
+            echo "== JS 例外 =="; grep -n "ReactNativeJS" logcat-app.txt | grep -i "error\|exception\|invariant" | head -20 || true
+            echo "ALIVE=$ALIVE"
+            echo "ALIVE=$ALIVE" >> "$GITHUB_ENV"
+
+      - name: Upload logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-smoke-logs
+          path: |
+            logcat-full.txt
+            logcat-app.txt
+            logcat-crash.txt
+            native/autolink-rn.json
+            native/autolink-expo.json
+          retention-days: 14
+
+      - name: Verdict
+        run: |
+          if [ "${ALIVE}" != "1" ]; then
+            echo "❌ アプリが起動12秒後に生きていません。Artifacts の logcat-crash.txt / logcat-full.txt を読む" >&2
+            exit 1
+          fi
+          # 生きていても致命例外が出ていたら落とす（ErrorBoundary が拾って画面だけ出ている可能性）
+          if grep -q "FATAL EXCEPTION\|Fatal signal" logcat-full.txt; then
+            echo "❌ プロセスは生きているが致命例外のログがある" >&2
+            exit 1
+          fi
+          echo "✅ Android release ビルドが起動し、12秒後も生きている"

@@ -17,7 +17,14 @@ import { jstYmd, jstHour } from './jst';
 
 type HK = typeof import('@kingstinct/react-native-healthkit');
 
+// HealthKit の JS は **iOS のときだけ** 評価する。
+// このライブラリは Nitro Modules 製で、import した瞬間に NitroModules.createHybridObject(...) を
+// 8回即時実行する（lib/module/modules.js）。Android には実装が無いので必ず失敗し、
+// try/catch で JS 例外は拾えても、その手前のネイティブ（JSI）側で落ちる経路は塞げない。
+// 「Android では評価すらしない」が唯一確実な防ぎ方（2026-09-04・起動クラッシュ対策）。
+// あわせて native/react-native.config.js で nitro-modules 自体を Android の autolink から外している。
 const hk: HK | null = (() => {
+  if (Platform.OS !== 'ios') return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('@kingstinct/react-native-healthkit') as HK;

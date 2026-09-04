@@ -174,7 +174,10 @@ workflows:
           echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
           if [ "$NEED_AD" = "1" ]; then
             STALE=0
-            for f in ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision; do
+            # パスに空白（"Provisioning Profiles"）があるため必ずクォートする。
+            # 2026-09-04: 未クォートで glob が2語に割れて1件もマッチせず、「要件を満たしている」と
+            # 誤判定して古いプロファイルのまま Build ipa に進み、Associated Domains で失敗した
+            for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
               [ -f "$f" ] || continue
               security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
               BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
@@ -188,7 +191,7 @@ workflows:
               for id in $(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id"); do
                 echo "delete profile $id"; app-store-connect profiles delete "$id" || true
               done
-              rm -f ~/Library/MobileDevice/Provisioning Profiles/*.mobileprovision
+              rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision
               app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create
               echo "プロファイルを作り直しました（Associated Domains込み）"
             else
