@@ -26,7 +26,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight,
+  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,16 +42,17 @@ import { t } from '@/lib/i18n';
  *    体の写真     PersonStanding カメラは食事撮影で既に使っており、同じ絵に別の意味を持たせない
  *    体重         Scale          体重計として読みやすい（旧 Weight は分銅で伝わらない）
  *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持） */
-const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat', LucideIcon> = {
+const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan', LucideIcon> = {
   meal: Utensils,
   exercise: Dumbbell,
   bodyphoto: PersonStanding,
   weight: Scale,
   whattoeat: Sparkles,
+  plan: CalendarPlus,
 };
 
 /** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート） */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto';
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto' | 'plan';
 export type PlusStep = 'root' | 'meal' | 'weight';
 
 export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
@@ -171,10 +172,16 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                   <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
                 </View>
 
-                {/* 区切り線: 上の4つ（記録する）と「何を食べる？」（AIに相談する）を性質で分ける。
+                {/* 区切り線: 上（起きたことを記録する）と下（これからのことを決める）を性質で分ける。
                     ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
                 <View style={s.divider} />
-                <Row icon="whattoeat" label={t('食べるものを相談する')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
+                <View style={s.rows}>
+                  <Row icon="whattoeat" label={t('食べるものを相談する')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
+                  {/* 先の予定（飲み会・チートデイ）。「明日 飲み会がある」と気づくのは記録中か
+                      予定を思い出したときで、設定画面を開いている時ではない。従来は設定の奥（4タップ以上）
+                      にしか入口が無く、当日には間に合わなかった */}
+                  <Row icon="plan" label={t('先の予定を入れる')} onPress={() => pick('plan')} testID="plus-plan" />
+                </View>
               </View>
             )}
 

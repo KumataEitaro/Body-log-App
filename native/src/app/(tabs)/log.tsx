@@ -15,7 +15,7 @@ import {
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, UtensilsCrossed, X } from 'lucide-react-native';
+import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, UtensilsCrossed, X , CalendarClock } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
@@ -23,6 +23,9 @@ import DateStrip from '@/components/DateStrip';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
 import PlusFab from '@/components/PlusFab';
 import PlusSheet, { type PlusAction } from '@/components/PlusSheet';
+import EventPlanSheet, { type EventDraft } from '@/components/EventPlanSheet';
+import { nextEvent, eventBandText } from '@/lib/eventPlan';
+import { scheduleCheatDayEve } from '@/lib/notify';
 import { FoodName, ItemsTitle, PfcInline, KcalCell } from '@/components/FoodRowText';
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
@@ -244,6 +247,9 @@ export default function LogScreen() {
   const [recentOpen, setRecentOpen] = useState(false);
   // ===== ＋ボタン → 2段シート → 入力シート =====
   const [plusOpen, setPlusOpen] = useState(false);
+  // 先の予定（飲み会・外食・チートデイ）のシート。＋シートの「先の予定を入れる」から開く
+  const [eventPlanOpen, setEventPlanOpen] = useState(false);
+  const [eventPlanBusy, setEventPlanBusy] = useState(false);
   const [eatOpen, setEatOpen] = useState(false);   // 「何を食べる？」シート（components/WhatToEatSheet.tsx）
   // N3の司令塔CTAから開いたときの文脈（朝=献立／昼=コンビニ／夕=献立／夜=間食）。null=前回の選択のまま
   const [eatContext, setEatContext] = useState<EatContext | undefined>(undefined);
@@ -359,6 +365,8 @@ export default function LogScreen() {
       case 'bodyphoto':
         router.navigate({ pathname: '/changes', params: { open: 'photos', shoot: '1', ts: String(Date.now()) } } as never);
         break;
+      // 先の予定（飲み会・外食・チートデイ）。＋シートが閉じ切ってから届くので pageSheet を直接開ける
+      case 'plan': setEventPlanOpen(true); break;
     }
   }
 
@@ -502,6 +510,8 @@ export default function LogScreen() {
   const [kcalAdjust] = useKcalAdjust();
   const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
+  // 7日以内のいちばん近い予定（帯に1件だけ出す）。常設にすると読まれなくなるので窓で絞る
+  const upcomingEvent = nextEvent(events, today);
   const todayEvent = events.find((e) => e.date === today) ?? null;
   // 1日に食べられる量 = max(維持 − 必要赤字/日 + 手動調整, BMR)。目標画面の「結論」と同じ関数（lib/deficit.ts）。
   // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する。
@@ -1239,6 +1249,34 @@ export default function LogScreen() {
     setMsg({ ok: true, text: t('🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。') });
   }
 
+  // 先の予定を登録する。保存するのは events の1行だけで、計画への織り込みは
+  // computePlan（lib/goal.ts）が既に持っている＝ここでは計算しない。
+  // 同じ日に既に予定があれば置き換える（1日に2件あっても、超過の見込みは1つで足りる。
+  // 二重登録すると吸収額が倍になり、身に覚えのない厳しい目標が出てしまう）
+  async function saveEventPlan(d: EventDraft) {
+    if (!uid) return;
+    setEventPlanBusy(true);
+    try {
+      const dup = events.filter((e) => e.date === d.date);
+      if (dup.length > 0) {
+        await supabase.from('events').delete().in('id', dup.map((e) => e.id));
+      }
+      const { data: ev, error } = await supabase.from('events')
+        .insert({ user_id: uid, date: d.date, title: d.title, extra_kcal: d.extra_kcal })
+        .select('id,date,title,extra_kcal').single();
+      if (error) {
+        setMsg({ ok: false, text: t('予定の登録に失敗しました。もう一度お試しください。') });
+        return;
+      }
+      setEvents((prev) => [...prev.filter((e) => e.date !== d.date), ev as PlanEvent & { id: string }]
+        .sort((a, b) => (a.date < b.date ? -1 : 1)));
+      // 前日20時のリマインド（通知許可がなければ静かにスキップ）
+      scheduleCheatDayEve(d.date);
+      setEventPlanOpen(false);
+      setMsg({ ok: true, text: t('予定を入れました。その日のぶんは、今日から少しずつ空けておきます。') });
+    } finally { setEventPlanBusy(false); }
+  }
+
   // ===== 昨日の穴埋め（未記録の爆食日を翌日に低摩擦で回収する・Web版と同一） =====
   // 文言は「昨日」ではなく実日付で言う。過去日を表示中のユーザーには
   // 「昨日」がどの日を指すのか分からなくなるため（βフィードバック 2026-08-30）
@@ -1889,6 +1927,18 @@ export default function LogScreen() {
           />
         )}
 
+        {/* 先の予定が近いことを知らせる帯（7日以内の直近1件だけ）。
+            登録した瞬間から目標が静かに締まるので、「なぜ今日はいつもより少ないのか」を
+            必ず読めるようにする。理由の見えない我慢は続かない。
+            過去日を見ているときは出さない（その日の話ではないため） */}
+        {upcomingEvent && viewDate === today && (
+          <Pressable style={s.eventBand} onPress={() => setEventPlanOpen(true)}
+                     accessibilityRole="button" accessibilityLabel={eventBandText(upcomingEvent, today)}>
+            <CalendarClock size={16} color={C.teal} />
+            <Text style={s.eventBandT} numberOfLines={2}>{eventBandText(upcomingEvent, today)}</Text>
+          </Pressable>
+        )}
+
         {/* §8 ポジティブ側の気づき: 良い条件がそろった日は背中を押す（控えめなアクセント面・ボタン無し・×で今日は閉じる） */}
         {shownPositive.map((a) => (
           <View key={a.id} style={s.positiveCard}>
@@ -2056,6 +2106,15 @@ export default function LogScreen() {
         onSaveWeight={saveWeightValue}
         weightUnit={units.weight}
         weightPlaceholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
+      />
+
+      {/* 先の予定（飲み会・外食・チートデイ）。登録すると computePlan が自動で吸収する。
+          目標日と吸収方式を渡すのは「登録前に何が起きるか」をシート内で見せるため */}
+      <EventPlanSheet
+        visible={eventPlanOpen} onClose={() => setEventPlanOpen(false)}
+        onSave={saveEventPlan} busy={eventPlanBusy}
+        targetDate={goal?.target_date ?? null}
+        absorbDays={goal?.absorb_days ?? null}
       />
 
       {/* 「何を食べる？」（食事タブ内のAI相談・pageSheet）。ヒーローの1行ボタンと＋シート1段目のタイルから開く。
@@ -2561,6 +2620,14 @@ const s = themed(() => ({
   alertNote: { fontSize: 11, color: C.faint, lineHeight: 16, marginTop: 4 },
   alertLink: { fontSize: 13, fontWeight: '700', color: C.accentInk, textDecorationLine: 'underline' },
   positiveCard: { backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder, borderRadius: RADIUS.card, padding: SPACE.card, marginBottom: 12 },
+  // 先の予定が近いことを知らせる帯。カードではなく1行の帯にしているのは、
+  // 行動を求める通知ではなく「なぜ今日はいつもより少ないのか」の説明だから（読めれば足りる）
+  eventBand: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+    borderRadius: RADIUS.card, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12,
+  },
+  eventBandT: { flex: 1, fontSize: 13, color: C.accentInk, fontWeight: '700' },
   positiveTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
   positiveFactor: { fontSize: 13, color: C.sub, lineHeight: 19 },
   h2sub: { fontWeight: '400', color: C.sub },
