@@ -144,3 +144,24 @@
 6. [ ] TestFlight/内部テストでE欄を一巡
 7. [ ] globalCapの値を確認（F1）
 8. [ ] 提出バージョンは1.1.0へ切り上げ（RELEASE.md）
+
+## 追記 2026-09-04: TestFlight のペイウォールが $ 表示だった件
+
+実機（TestFlight・iOS）でペイウォールの価格が `$4.99 / $29.99 / $9.99 / $69.99` と USD で表示された。
+
+**アプリ側の問題ではない。** `app/paywall.tsx` は価格文字列も通貨コードも StoreKit（RevenueCat の
+`pkg.product.priceString` / `currencyCode`）から受け取ってそのまま出しており、`$` を固定で書いていない。
+月あたり換算も `currencyCode` を使って `Intl.NumberFormat` で整形している。
+
+通貨は **端末の App Store アカウント（TestFlight では Sandbox アカウント）の国**で決まる。
+USD で出た＝その端末で使っていたアカウントのストアフロントが US だった、ということ。
+日本のアカウントで見れば ¥ になる。
+
+### 確認手順（A3/A4 の実施そのもの）
+1. https://appstoreconnect.apple.com → **ユーザーとアクセス → Sandbox → テスター** で
+   **国/地域＝日本** の Sandbox テスターを作る（既存のものがあれば国を確認）
+2. 端末の **設定 → App Store → サンドボックス アカウント** にそのテスターでサインイン
+3. アプリのペイウォールを開き、**¥ 表示**と、App Store Connect で設定した日本の価格と一致することを確認
+4. App Store Connect → アプリ → **サブスクリプション → 各商品 → 価格** で、日本（JPY）の価格が
+   意図した値になっているか（USD 基準の自動換算のままになっていないか）も確認する
+
