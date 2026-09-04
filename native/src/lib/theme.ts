@@ -9,7 +9,7 @@
 //   - 白地の文字用アクセント accentInk は WCAG AA(4.5:1) を満たすまで自動で濃くする（lib/contrast.ts）
 //   - ダークは Navy(#0B1220) の地 ＋ Card Gray(#111827) の面の2階調に固定。アクセントで地を染めない
 import { useSyncExternalStore } from 'react';
-import { Appearance as RNAppearance } from 'react-native';
+import { Appearance as RNAppearance, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { applyPalette, rgba, type Palette } from './ui';
 import { ensureContrast, mixHex, AA_TEXT, AA_LARGE } from './contrast';
@@ -301,13 +301,49 @@ const emit = () => { snapshot = { ...prefs, scheme: currentScheme() }; listeners
 
 export function pfcColors(): PfcColors { return prefs.pfc; }
 
+// いま画面に効いている明暗（applyCurrent が最後に適用したもの）。
+// AppState 復帰時に OS の明暗と比べて「ずれていれば再同期」するための基準
+let appliedScheme: 'light' | 'dark' | null = null;
+// 最後に RNAppearance.setColorScheme へ渡した値。同じ値を毎回渡すと iOS が外観変更イベントを
+// 再発火させ、リスナー → applyCurrent → setColorScheme → リスナー… の連鎖になりうる
+let lastOverride: 'light' | 'dark' | null | undefined = undefined;
+// 再入防止（setColorScheme が同期的にリスナーを呼ぶ環境でも一度しか適用しない）
+let applying = false;
+
 function applyCurrent(): void {
-  const scheme = currentScheme();
-  applyPalette(scheme === 'dark' ? darkPaletteFor(prefs.accent) : paletteFor(prefs.accent, prefs.bg));
-  // ネイティブUI（タブバー・ヘッダー・シート）も同じ明暗に固定する。
-  // mode=systemのときはOS追従（null）。これを怠るとLiquid Glassのバーだけ暗い事故が再発する
-  // 型定義がnull（=OS追従に戻す）を受け付けない版があるためキャストする（ランタイムは対応済み）
-  try { RNAppearance.setColorScheme((prefs.mode === 'system' ? null : prefs.mode) as unknown as 'light' | 'dark'); } catch { /* 旧RNでは無視 */ }
+  if (applying) return;
+  applying = true;
+  try {
+    const scheme = currentScheme();
+    appliedScheme = scheme;
+    applyPalette(scheme === 'dark' ? darkPaletteFor(prefs.accent) : paletteFor(prefs.accent, prefs.bg));
+    // ネイティブUI（タブバー・ヘッダー・シート）も同じ明暗に固定する。
+    // mode=systemのときはOS追従（null）。これを怠るとLiquid Glassのバーだけ暗い事故が再発する。
+    // 値が変わるときだけ呼ぶ（上の lastOverride の理由）。
+    // 型定義がnull（=OS追従に戻す）を受け付けない版があるためキャストする（ランタイムは対応済み）
+    const override = prefs.mode === 'system' ? null : prefs.mode;
+    if (override !== lastOverride) {
+      lastOverride = override;
+      try { RNAppearance.setColorScheme(override as unknown as 'light' | 'dark'); } catch { /* 旧RNでは無視 */ }
+    }
+  } finally {
+    applying = false;
+  }
+}
+
+/**
+ * OS の明暗と「いま効いている明暗」がずれていれば適用し直す（mode=system のときだけ）。
+ * 背景にいる間に OS が自動ダークへ切り替わると、Appearance のイベントが JS に届かない／
+ * 順序が崩れることがある（2026-09-04 19:12 の「上の帯だけ白い」スクリーンショット）。
+ * AppState が active に戻った瞬間に呼び、ずれていたら applyCurrent()+emit() する。
+ * 戻り値: 適用したか（テストと診断用）
+ */
+export function resyncSchemeFromOS(): boolean {
+  if (prefs.mode !== 'system') return false;
+  if (currentScheme() === appliedScheme) return false;
+  applyCurrent();
+  emit();
+  return true;
 }
 
 export async function loadTheme(): Promise<void> {
@@ -336,6 +372,14 @@ try {
     if (prefs.mode !== 'system') return;
     applyCurrent();
     emit();
+  });
+} catch { /* テスト環境等では無視 */ }
+
+// 背景から戻った瞬間に OS の明暗と再同期する（上の resyncSchemeFromOS のコメント参照）。
+// Appearance のイベントが取りこぼされても、ここで必ず追いつく
+try {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') resyncSchemeFromOS();
   });
 } catch { /* テスト環境等では無視 */ }
 

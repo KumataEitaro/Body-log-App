@@ -1761,11 +1761,9 @@ export default function LogScreen() {
                   <Text style={s.eatBtnT}>{command.cta.label}</Text>
                   <Text style={s.eatBtnArrow}>›</Text>
                 </Pressable>
-                {/* N2 未来シミュレーションの入口③: 品名を自分で書いて「今日／今週／体重のペース」を見る */}
-                <Pressable onPress={() => { setWhatIfSeed(null); setWhatIfOpen(true); }} hitSlop={8}
-                           style={{ alignSelf: 'center', marginTop: 8 }} accessibilityRole="button">
-                  <Text style={s.cmdWhatIf}>{t('食べたらどうなる？')}</Text>
-                </Pressable>
+                {/* N2 未来シミュレーションの入口③（品名を自分で書く）は 2026-09-04 に撤去。
+                    何も入れていない段階で「食べたらどうなる？」と聞かれても答える材料が無く、
+                    入口①（あとのカロリーで何を食べる？の案から）と入口②（トレイの解析結果から）で足りる */}
               </View>
             )}
           </Animated.View>

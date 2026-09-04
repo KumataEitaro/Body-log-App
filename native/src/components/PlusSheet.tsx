@@ -177,7 +177,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                     ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
                 <View style={s.divider} />
                 <View style={s.rows}>
-                  <Row icon="whattoeat" label={t('食べるものを相談する')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
+                  <Row icon="whattoeat" label={t('あとのカロリーで何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
                   {/* 先の予定（飲み会・チートデイ）。「明日 飲み会がある」と気づくのは記録中か
                       予定を思い出したときで、設定画面を開いている時ではない。従来は設定の奥（4タップ以上）
                       にしか入口が無く、当日には間に合わなかった */}

@@ -85,9 +85,11 @@ export function Chip({ label, selected, onPress, onLongPress, tone = 'teal', lea
 }
 
 // ===== OptionButton =====
-export function OptionButton({ label, onPress, variant = 'filled', busy, disabled, style, leading }: {
+export function OptionButton({ label, onPress, onLongPress, variant = 'filled', busy, disabled, style, leading }: {
   label: string;
   onPress: () => void;
+  /** 長押しの別動作（例: ＋セットは タップ=同じセットを即追加 / 長押し=ダイアルで直して追加） */
+  onLongPress?: () => void;
   variant?: 'filled' | 'tonal' | 'teal';
   busy?: boolean;
   disabled?: boolean;
@@ -102,6 +104,7 @@ export function OptionButton({ label, onPress, variant = 'filled', busy, disable
   return (
     <Pressable onPressIn={() => press(0.95)} onPressOut={() => press(1)}
                onPress={() => { hapt(); onPress(); }} disabled={disabled || busy}
+               onLongPress={onLongPress ? () => { hapt(); onLongPress(); } : undefined} delayLongPress={350}
                style={[{ borderRadius: 999 }, style]} android_ripple={ripple()}>
       <Animated.View style={[s.opt, box, (disabled && !busy) && { opacity: 0.4 }, { transform: [{ scale: sc }] }]}>
         {busy ? <ActivityIndicator color={variant === 'tonal' ? C.ink : variant === 'filled' ? C.panel : '#fff'} /> : (

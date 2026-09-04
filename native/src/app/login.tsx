@@ -1,4 +1,5 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
+import { useThemeRefresh } from '@/lib/theme';
 import { useState, useEffect, useRef, memo } from 'react';
 import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -52,6 +53,7 @@ type AuthFieldProps = {
 const AuthField = memo(function AuthField({
   inputRef, placeholder, value, onChangeText, textContentType, autoComplete, secure, email,
 }: AuthFieldProps) {
+  useThemeRefresh(); // memo は props が同じなら描き直さない＝テーマ変更が届かないので自分で購読する
   return (
     <TextInput
       ref={inputRef}
