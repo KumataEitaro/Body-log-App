@@ -10,6 +10,7 @@
 //  ・各カードの中に「月額」と「年額（月あたり換算・N%お得）」を両方見せる方式は維持
 //    （期間を切り替えないと年額の存在に気づけない＝価格比較の分断を避ける）。
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, Linking, Platform, Animated } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -143,6 +144,7 @@ const CARDS = PLAN_INFO.filter((i) => PAYWALL_PLANS.includes(i.plan));
 const HERO: Plan = 'premium';
 
 export default function PaywallScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const { src } = useLocalSearchParams<{ src?: string }>();
   const fromOnboarding = src === 'onboarding';

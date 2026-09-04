@@ -65,61 +65,71 @@ type FoodEntry = { kind: 'food' | 'set'; id: string; name: string; kcal: number;
 type Sheet = null | 'lang' | 'theme' | 'profile' | 'foods' | 'health' | 'delete' | 'goal' | 'columns' | 'diet' | 'boot';
 
 // テーマ変更でルートのツリーが作り直されるとき、次のマウントで開き直すシート。
-// モジュール変数なので再マウントをまたいで残り、読んだ直後に消す（通常の初回マウントでは null）
-let reopenSheet: Sheet = null;
 
-// テーマ設定のプレビュー。いま効いているパレット（C）だけで描くので、選択→再マウントのたびに新しい配色になる。
-// ヒーロー（アクセントの塗り面＋白文字）・P/F/Cバー・意味色（達成/注意/超過）・リンク文字（accentInk）を
-// 1枚に収め、「塗り面のアクセント」と「文字のアクセント（濃い側）」の差もここで見える
+// テーマ設定のプレビュー。**食事タブのヒーロー（あと食べられる）と同じ構成**で描く。
+// 以前はアクセント塗りのヒーロー（旧デザイン）のモックで、実際のUIと別物だった（熊田さん 2026-09-04）。
+// ここで見せたいのは「この配色で実際の画面がどう見えるか」なので、白カード・墨文字・アクセントは
+// リンク文字と助言ボックスの面、P/F/Cはバーの色、という実物どおりの使い方で見せる。数字はダミー。
 function ThemePreview({ pfc }: { pfc: PfcColors }) {
   return (
     <View style={pv.card}>
-      <View style={pv.hero}>
-        {/* グラデーションの明端（accentHi）を右上に重ね、#4D7CFF→#6AA3FF の流れを擬似的に出す */}
-        <View style={pv.heroHi} />
-        <Text style={pv.heroLabel}>{t('あと食べられる')}</Text>
-        <Text style={pv.heroN} maxFontSizeMultiplier={1.3}>1,240<Text style={pv.heroU}> kcal</Text></Text>
+      <View style={pv.labelRow}>
+        <Text style={pv.label}>{t('あと食べられる')}{t('（計画）')}</Text>
+        <View style={pv.streak}><Text style={pv.streakT}>🔥 {t('記録')} 12{t('日連続')}</Text></View>
       </View>
-      <View style={pv.bars}>
-        {([[t('たんぱく質'), pfc.p, '72%'], [t('脂質'), pfc.f, '48%'], [t('炭水化物'), pfc.c, '88%']] as const).map(([label, col, w]) => (
-          <View key={label} style={pv.barRow}>
-            <Text style={pv.barL} numberOfLines={1}>{label}</Text>
-            <View style={pv.track}><View style={[pv.fill, { width: w, backgroundColor: col }]} /></View>
+      <Text style={pv.n} maxFontSizeMultiplier={1.3}>692<Text style={pv.u}> kcal</Text></Text>
+      <View style={pv.track}><View style={[pv.fill, { width: '62%' }]} /></View>
+      <View style={pv.meta}>
+        <Text style={pv.metaT}>{t('摂取')} 1,130</Text>
+        <Text style={pv.metaT}>{t('目標')} <Text style={pv.metaGoal}>1,822</Text>  <Text style={pv.metaAdjust}>{t('目標を調整')} ›</Text></Text>
+      </View>
+      <View style={pv.pfc}>
+        {([[t('たんぱく質'), 'P', pfc.p, '62%', t('あと{n}g', { n: 41 })],
+           [t('脂質'), 'F', pfc.f, '84%', t('あと{n}g', { n: 7 })],
+           [t('炭水化物'), 'C', pfc.c, '48%', t('あと{n}g', { n: 98 })]] as const).map(([ja, ab, col, w, rest]) => (
+          <View key={ab} style={pv.pfcRow}>
+            <Text style={pv.pfcL} numberOfLines={1}>{ja}<Text style={pv.pfcAb}> {ab}</Text></Text>
+            <View style={pv.pfcBar}><View style={[pv.pfcFill, { width: w, backgroundColor: col }]} /></View>
+            <Text style={pv.pfcT}>{rest}</Text>
           </View>
         ))}
       </View>
-      <View style={pv.foot}>
-        <View style={pv.pill}><Text style={pv.pillT}>{t('達成')}</Text></View>
-        <Text style={pv.warn}>{t('注意')}</Text>
-        <Text style={pv.over}>{t('超過')}</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={pv.link}>{t('くわしく見る')} →</Text>
-      </View>
+      <View style={pv.advice}><Text style={pv.adviceT} numberOfLines={2}>{t('たんぱく質があと41g残っています。主菜をもう一品入れると届きます。')}</Text></View>
     </View>
   );
 }
+// log.tsx のヒーロー系スタイル（hero / heroL / heroN / hline / heroMeta / pfc* / adviceBox）と同じトークンを使う。
+// 寸法だけプレビュー用に少し詰める
 const pv = themed(() => ({
   card: {
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
     shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2,
-    padding: 12, marginTop: 4, gap: 12,
+    padding: 14, marginTop: 4,
   },
-  hero: { backgroundColor: C.teal, borderRadius: RADIUS.panel, padding: 14, overflow: 'hidden' },
-  heroHi: { position: 'absolute', right: -30, top: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: C.accentHi, opacity: 0.55 },
-  heroLabel: { fontSize: 12, fontWeight: '800', color: '#fff', opacity: 0.9 },   // アクセント地の上の白文字（固定色。テーマに追従させない）
-  heroN: { fontSize: 28, fontWeight: '800', color: '#fff', marginTop: 2, fontVariant: ['tabular-nums'] },  // 同上
-  heroU: { fontSize: 14, fontWeight: '700' },
-  bars: { gap: 8 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  barL: { width: 64, fontSize: 12, fontWeight: '700', color: C.sub },
-  track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.track, overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 4 },
-  foot: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  pill: { backgroundColor: C.successWeak, borderRadius: RADIUS.chip, paddingHorizontal: 9, paddingVertical: 3 },
-  pillT: { fontSize: 11.5, fontWeight: '800', color: C.successInk },
-  warn: { fontSize: 12, fontWeight: '800', color: C.amber },
-  over: { fontSize: 12, fontWeight: '800', color: C.coral },
-  link: { fontSize: 12.5, fontWeight: '800', color: C.accentInk },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  label: { fontSize: 12, fontWeight: '700', color: C.sub, letterSpacing: 0.5, flexShrink: 1 },
+  streak: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  streakT: { fontSize: 11, fontWeight: '700', color: C.ink, fontVariant: ['tabular-nums'] },
+  n: { fontSize: 34, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
+  u: { fontSize: 14, color: C.sub, fontWeight: '600' },
+  track: { height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden', marginVertical: 6 },
+  fill: { height: 7, backgroundColor: C.calorieBar, borderRadius: 4 },
+  meta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
+  metaT: { fontSize: 12, color: C.sub, fontVariant: ['tabular-nums'] },
+  metaGoal: { fontWeight: '800', color: C.ink, textDecorationLine: 'underline' },
+  metaAdjust: { fontSize: 11, fontWeight: '800', color: C.accentInk },
+  pfc: { marginTop: 8, gap: 5 },
+  pfcRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pfcL: { width: 72, fontSize: 12, fontWeight: '800', color: C.ink },
+  pfcAb: { fontSize: 11, fontWeight: '700', color: C.faint },
+  pfcBar: { flex: 1, height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden' },
+  pfcFill: { height: '100%', borderRadius: 4 },
+  pfcT: { width: 64, fontSize: 12, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  advice: {
+    marginTop: 8, backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+    borderRadius: RADIUS.tile, paddingHorizontal: 10, paddingVertical: 7,
+  },
+  adviceT: { fontSize: 12, color: C.ink, lineHeight: 17, fontWeight: '500' },
 }));
 
 // 記録のCSVエクスポート（データは本人のもの、を形にする）
@@ -194,8 +204,7 @@ export default function SettingsScreen() {
   const [meals, setMeals] = useState<MyMeal[]>([]);
   // 名前変更中の行（行がその場でTextInputに変わる。単品・セットのどちらも同じUI）
   const [renameEdit, setRenameEdit] = useState<{ kind: 'food' | 'set'; id: string; name: string } | null>(null);
-  // テーマ変更でツリーが作り直されたときだけ、直前まで開いていたシートを引き継ぐ（reopenSheet 参照）
-  const [sheet, setSheet] = useState<Sheet>(() => { const v = reopenSheet; reopenSheet = null; return v; });
+  const [sheet, setSheet] = useState<Sheet>(null);
   const dietScrollRef = useRef<ScrollView>(null); // 食事の制約シート: 自由記述欄へフォーカス時に末尾へスクロール
   const reopened = useRef(sheet !== null);
   // ヘルスケア連携の状態表示（連携中・最終同期）と「体重は手入力を優先」トグル
@@ -289,9 +298,9 @@ export default function SettingsScreen() {
   const [avatarOpen, setAvatarOpen] = useState(false);
 
   function openSheet(v: Sheet) { setMsg(null); setDelConfirm(''); setSheet(v); }
-  // テーマの変更は applyPalette → 世代更新 → ルートの Stack 再マウントを伴う。
-  // この画面も作り直されるので、開いているテーマシートを次のマウントへ引き継いでから適用する
-  function changeTheme(patch: Parameters<typeof setTheme>[0]) { reopenSheet = 'theme'; void setTheme(patch); }
+  // テーマの変更は applyPalette → 世代更新 → useTheme() の購読でこの画面が再描画される。
+  // 画面は再マウントされないので、開いているテーマシートはそのまま残り、プレビューも同じフレームで新色になる
+  function changeTheme(patch: Parameters<typeof setTheme>[0]) { void setTheme(patch); }
 
   // 記録の週目標・歩数の週目標は統合目標画面（GoalPanel hub → HabitGoals）へ移設した
 
@@ -1018,11 +1027,8 @@ export default function SettingsScreen() {
       </View>
     </Modal>
 
-    {/* ===== テーマ選択モーダル =====
-        構成（2026-09-02 刷新）: プレビュー → 明暗 → アクセント → 背景トーン → P/F/C（プリセット＋個別）。
-        選択のたびにパレット世代が進みルートの Stack がツリーごと作り直されるため、この画面も再マウントされる。
-        reopenSheet（モジュール変数）で「テーマシートを開いたまま」を引き継ぎ、再表示のときはスライドの
-        アニメを省く（毎タップで下からせり上がるのを防ぐ） */}
+    {/* 選ぶと即時に反映される。この画面は useTheme() を購読していて再マウントされないので、
+            シートは開いたまま・プレビューも同じフレームで新しい配色になる（2026-09-04 に再マウント方式から変更） */}
     <Modal visible={sheet === 'theme'} animationType={reopened.current ? 'none' : 'slide'} presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
       <View style={s.sheetBody}>
         <SheetHeader icon={<Palette size={ICON.lg} color={C.teal} />} title={t('テーマカラー')} />

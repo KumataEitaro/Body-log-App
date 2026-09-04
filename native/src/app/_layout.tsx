@@ -15,7 +15,7 @@ import { loadLocale, useLocale, t } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
-import { C, themeGeneration } from '@/lib/ui';
+import { C } from '@/lib/ui';
 import { loadAvatar } from '@/lib/avatar';
 import { loadFoodFreq } from '@/lib/foods';
 import { loadPurpose } from '@/lib/purpose';
@@ -128,10 +128,12 @@ export default function RootLayout() {
         <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
         {/* GuideProviderはルートに置く（設定画面がタブ外に出たため、タブ内限定だとuseGuideが届かない） */}
         <GuideProvider>
-          {/* テーマ世代（themeGeneration）をキーに含める。アクセント・背景トーン・明暗の
-              どれが変わってもパレット差し替え＝世代更新なので、条件を数え上げる必要がない。
-              P/F/Cの配色はパレットとは独立した設定なので別途キーに含める */}
-          <Stack key={`${locale}-g${themeGeneration()}-${theme.pfc.p}${theme.pfc.f}${theme.pfc.c}`} screenOptions={{
+          {/* key は言語だけ。テーマは **再マウントではなく購読**で追従する（各ルートの useThemeRefresh・
+              lib/theme.ts）。以前はテーマ世代も key に含めて Stack を丸ごと作り直していたが、
+              開いている Modal（設定のテーマシート）まで破棄→即再表示になり、iOS で古いモーダルが
+              残って「プレビューだけ色が古い」事故を起こした（2026-09-04）。
+              screenOptions の色はこの _layout 自身が useTheme() で再描画されるので追従する */}
+          <Stack key={locale} screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: C.bg },
             // ヘッダー（設定などタブ外のスタック画面）もテーマに追従させる。

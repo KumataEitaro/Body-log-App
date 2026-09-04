@@ -1,6 +1,7 @@
 // AIコーチ相談タブ: 本人データを根拠に回答
 // 初期状態は中央寄せのウェルカムUI（アイコン+2x2クイック質問）。会話開始後は通常のタイムライン
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Modal, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -80,6 +81,7 @@ function RichText({ text, style }: { text: string; style: object }) {
 }
 
 export default function CoachScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
   // 王冠ゲーティング: AI相談はスタンダード以上（新ティア）。バナー表示中も入力欄は

@@ -1,6 +1,7 @@
 // 身体の変化タブ（Phase 2）: KPIサマリー＋推移グラフ（系列・期間切替）。
 // Web版ダッシュボードの中核の移植（カレンダー・傾向カード等はPhase 3）
 import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl, useWindowDimensions, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
@@ -212,6 +213,7 @@ function addDays(d: string, n: number): string {
 }
 
 export default function ChangesScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<Row[]>([]);
   // 食べる時間帯カード用（id/at/items付きの生ログ）

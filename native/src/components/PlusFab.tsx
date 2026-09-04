@@ -31,7 +31,8 @@ export default function PlusFab({ onPress, badge = 0 }: { onPress: () => void; b
       <Pressable
         accessibilityRole="button" accessibilityLabel={t('記録を追加')}
         onPressIn={() => press(0.92)} onPressOut={() => press(1)}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
+        // ＋は入力の入口なので、シート内の行（Light）より一段はっきりした Medium で「押せた」を返す
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onPress(); }}
         hitSlop={8}
       >
         <Animated.View style={[s.fab, { transform: [{ scale: sc }] }]}>

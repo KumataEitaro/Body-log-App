@@ -12,7 +12,9 @@ import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { quickStreak, maybeEvaluateBadges, unseenBadgeCount } from '@/lib/achievements';
 
-export default function StreakChip() {
+/** inline=true: ヒーローの見出し行の右端に置く用（外側の余白なし・少し小さく）。
+ *  2026-09-04: 単独で浮いていた「12日連続」を、意味が読める「記録 12日連続」にしてヒーローへ埋め込んだ */
+export default function StreakChip({ inline = false }: { inline?: boolean } = {}) {
   const router = useRouter();
   const [days, setDays] = useState<number | null>(null);
   const [unseen, setUnseen] = useState(0);
@@ -29,13 +31,14 @@ export default function StreakChip() {
 
   if (days == null) return null;
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
-      <Pressable style={({ pressed }) => [s.chip, unseen > 0 && s.chipNew, pressed && { opacity: 0.7 }]}
+    <View style={inline ? undefined : { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
+      <Pressable style={({ pressed }) => [s.chip, inline && s.chipInline, unseen > 0 && s.chipNew, pressed && { opacity: 0.7 }]}
                  onPress={() => router.push('/achievements' as never)} hitSlop={6}>
         {days > 0 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Flame size={13} color={C.teal} fill={C.teal} />
-            <Text style={s.t}><Text style={s.n}>{days}</Text>{t('日連続')}</Text>
+            {/* 「12日連続」だけでは何が連続なのか読めない。主語（記録）を付ける */}
+            <Text style={s.t}>{t('記録')} <Text style={s.n}>{days}</Text>{t('日連続')}</Text>
           </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -58,6 +61,7 @@ const s = themed(() => ({
   },
   // 未読があるときだけアクセント寄りの枠にして、見に行く価値があると分かるようにする
   chipNew: { borderColor: C.accentBorder, backgroundColor: C.accentSoft },
+  chipInline: { paddingHorizontal: 9, paddingVertical: 3 },
   t: { fontSize: 12, fontWeight: '700', color: C.ink },
   n: { fontSize: 13, fontWeight: '900', color: C.ink, fontVariant: ['tabular-nums'] },
 }));

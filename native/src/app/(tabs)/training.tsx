@@ -8,6 +8,7 @@
 //     手で足すときは「運動を記録する」→ 種目を毎回選ぶ → 時間ダイアル（components/ActivityLogSheet.tsx）
 //   ・「きょうの動き」は1段小さく（順番は不変）。日付ストリップの行はスクロールしても上端に固定
 import { useCallback, useEffect, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Modal, Vibration, AppState, Linking } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import TabHeader from '@/components/TabHeader';
@@ -57,6 +58,7 @@ const EX_LABELS = (): Record<string, string> => ({
 });
 
 export default function TrainingScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const insets = useSafeAreaInsets();
   const [history, setHistory] = useState<HistRow[]>([]);
   const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒

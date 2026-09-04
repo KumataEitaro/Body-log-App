@@ -2,6 +2,7 @@
 // バッジはメダル（BadgeIcon）で見せる。獲得済み=カテゴリ色の金属円盤＋獲得日、
 // 未獲得=無彩色のシルエット＋条件文（次に何をすればいいかと「集める余地」が常に見える）。
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { Share2, Flame, PartyPopper, UserPlus } from 'lucide-react-native';
@@ -122,6 +123,7 @@ function BadgeSheet({ badge, onShare, onClose }: { badge: BadgeState; onShare: (
 }
 
 export default function AchievementsScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const [report, setReport] = useState<AchievementReport | null>(null);
   const [sticker, setSticker] = useState<StickerData | null>(null);
   const [celebrate, setCelebrate] = useState<BadgeState[]>([]);

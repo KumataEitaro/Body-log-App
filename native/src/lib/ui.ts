@@ -228,8 +228,9 @@ export function themed<T extends NamedStyles<T> | NamedStyles<Record<string, unk
 /**
  * パレットを丸ごと差し替える。
  * C を書き換えてから世代を進めるだけ。既存スタイルは次に読まれた時点で作り直される。
- * （画面へ届けるにはコンポーネントの再描画が要る。ルートの Stack key と
- *   useTheme() の購読でツリーが作り直されるため、切替直後の1フレームで揃う）
+ * （画面へ届けるにはコンポーネントの再描画が要る。各ルートが useThemeRefresh()（lib/theme.ts）で
+ *   世代を購読して再描画するので、切替直後の1フレームで揃う。以前の「Stack を key で再マウント」は
+ *   開いている Modal まで作り直して iOS で古いモーダルが残ったため 2026-09-04 に廃止）
  */
 export function applyPalette(next: Palette): void {
   // 実際に変化があるときだけ世代を進める（無駄な再生成を避ける）

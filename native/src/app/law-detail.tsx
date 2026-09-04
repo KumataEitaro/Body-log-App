@@ -9,6 +9,7 @@
 // ・遷移パラメータ: kind（LawKind）・p（生値のJSON）・at（発見日）・locked（'1'=ロック中）。
 //   生値を持ち回るのは、laws.ts の図鑑ストアを再読込せずに表示できるようにするため（lawTextで文章を再構成）
 import { useMemo, type ReactNode } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -135,6 +136,7 @@ function SourceRow({ n, src }: { n: number; src: EvidenceSource }) {
 }
 
 export default function LawDetailScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
   useRemoteContent();   // リモートの記事差し替えが届いたら再描画
