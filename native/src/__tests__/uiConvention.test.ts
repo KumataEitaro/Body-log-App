@@ -99,3 +99,45 @@ describe('翻訳の取りこぼし', () => {
     expect(raw.map((m) => m[0].trim())).toEqual([]);
   });
 });
+
+describe('設定への導線（2026-09-04・右上の⚙を廃止）', () => {
+  // 入口が概要タブの「設定」ブロック1つだけになったので、ここが壊れると
+  // アプリを消して入れ直す以外に設定へ戻る手段が無くなる。
+  const changes = read('app/(tabs)/changes.tsx');
+
+  it('概要タブに設定ブロックの4行が存在する', () => {
+    // 目標設定・実績・通知センター・設定。どれか1つでも消えたら気づけるようにする
+    for (const label of ['目標設定', '実績', '通知センター', '設定']) {
+      expect(changes).toContain(`label: t('${label}')`);
+    }
+    expect(changes).toContain("const settingsBlock = (");
+  });
+
+  it('設定ブロックは並べ替え・非表示の対象に入っていない', () => {
+    // SECTION_DEFS / ALL_ORDER_DEFAULT に設定系のキーが混ざると、ユーザーが自分で
+    // 入口を非表示にできてしまう（＝設定に二度と辿り着けない）。
+    // 設定ブロックは headerJSX に固定で描くこと
+    const orderLine = changes.match(/const ALL_ORDER_DEFAULT = \[[^\]]*\]/)?.[0] ?? '';
+    const sectionDefs = changes.match(/const SECTION_DEFS[\s\S]*?\n\];/)?.[0] ?? '';
+    expect(orderLine).not.toBe('');
+    expect(sectionDefs).not.toBe('');
+    for (const key of ['settings', 'goal', 'notice', 'achievements']) {
+      expect(orderLine).not.toContain(`'${key}'`);
+      expect(sectionDefs).not.toContain(`'${key}'`);
+    }
+  });
+
+  it('HeaderGear はどこからも使われていない（復活したら落とす）', () => {
+    // 復活させると「⚙とブロックの2つの入口」になり、どちらが正かが曖昧になる。
+    // 戻すなら意図的に戻す（このテストごと直す）
+    const users = FILES.filter((f) => /HeaderGear/.test(readFileSync(f, 'utf8')))
+      .map(rel);
+    expect(users).toEqual([]);
+  });
+
+  it('概要タブのセクション名が現行の呼称になっている', () => {
+    for (const title of ['からだの変化', '食事の傾向', '運動の傾向']) {
+      expect(changes).toContain(`t('${title}')`);
+    }
+  });
+});

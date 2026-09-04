@@ -227,6 +227,8 @@ export default function SettingsScreen() {
     // 'goalW' / 'goalT' は統合前の旧リンク。どちらも統合目標画面へ向ける（古い通知・相談履歴から来ても迷子にしない）
     if (open === 'goal' || open === 'goalW' || open === 'goalT') openSheet('goal');
     else if (open === 'profile' || open === 'theme' || open === 'diet') openSheet(open);
+    // 概要タブの設定ブロック「通知センター」行から（旧・右上⚙のバッジの行き先）
+    else if (open === 'notice') { todo.refresh(); setNoticeOpen(true); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ts]);
 
