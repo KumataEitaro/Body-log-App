@@ -13,7 +13,14 @@ https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィ
 - スタックトレースを Claude に貼る。**Android の起動クラッシュと同根の可能性**があるので優先度が高い
 - 同じ画面の **フィードバック → スクリーンショット** も3件確認
 
-### A3. 🟠 Android: 起動クラッシュの検証
+### A3. 🔴 Android: 起動クラッシュの検証（対策ビルドで再検証）
+
+> **2026-09-04 対策投入済み（fix/android-native-hygiene）**: iOS 専用ネイティブ（HealthKit の依存
+> `react-native-nitro-modules`＝C++/JSI）が Android に漏れていた経路を塞ぎ、依存を SDK57 に整列した。
+> 詳細 docs/ANDROID.md「iOS 専用ライブラリの扱い」。**次の rn-android ビルドで再検証する。**
+> あわせて GitHub Actions「Android smoke」が main への push で release APK をエミュレータ起動し
+> logcat を残すので、**落ちる場合はそこでトレースが読める**（A4 のクローズドテストを待たなくてよい）。
+> https://github.com/KumataEitaro/Body-log-App/actions
 
 > ⚠️ **.aab は端末に直接インストールできない**（Play が端末ごとの apk に分割配信する形式）。
 > ビルドしただけでは端末は古いままなので、**必ず 4〜5 で入れ替わりを確認してから**起動テストする。
@@ -227,6 +234,9 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 ---
 
 ## C. 完了（1行記録・2026-09-04）
+
+- **Android: iOS専用ネイティブの漏れを塞ぐ**（nitro/healthkit を autolink から除外・health.ts を Platform で切る・依存を SDK57 に整列・expo-doctor 21/21）＋ **GitHub Actions「Android smoke」**（エミュレータ起動＋logcat）
+- **iOS: 署名整合ステップの空白パス未クォートを修正**（Associated Domains のプロファイル作り直しが素通りしていた）
 
 - **Play への自動アップロードが初回ビルドで疎通**（内部テストトラックにリリースが自動作成された。
   途中の失敗2回は changes_not_sent_for_review の誤設定と Play 権限の反映待ち）
