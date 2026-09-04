@@ -20,10 +20,10 @@ import { C, rgba, sheetTopPad, themed } from '@/lib/ui';
 // 消すと「安全な物だけ出た」と誤解させるため、印をつけて順位を下げるだけにする
 import { useDiet, isDietOff } from '@/lib/diet';
 import { mergeAlerts, rulesFor, type DietLevel } from '@/lib/dietCheck';
-import { DietEstimateNote, DietSilenceNote } from '@/components/DietNotes';
+import { DietEstimateNote, DietSilenceNote, dietBadgeLabel } from '@/components/DietNotes';
 import { useGate } from '@/lib/gate';
 
-type Pick = { name: string; estKcal: number; reason: string; dietFlag?: DietLevel };
+type Pick = { name: string; estKcal: number; reason: string; dietFlag?: DietLevel; dietModes?: string[] };
 type AdviceResult = { picks: Pick[]; note: string };
 
 export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
@@ -58,14 +58,19 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
       items: list.map((p) => ({ name: p.name })), rules, aiFlags, premium: dietPremium,
     });
     const level = new Map<string, DietLevel>();
-    for (const a of alerts) if (level.get(a.name) !== 'high') level.set(a.name, a.level);
+    // どのプリセットで当たったか（バッジで名指しする）。AI判定だけの場合は空＝本人の設定全体を出す
+    const modesBy = new Map<string, Set<string>>();
+    for (const a of alerts) {
+      if (level.get(a.name) !== 'high') level.set(a.name, a.level);
+      if (a.mode) { if (!modesBy.has(a.name)) modesBy.set(a.name, new Set()); modesBy.get(a.name)!.add(a.mode); }
+    }
     const rank = (p: Pick) => {
       const lv = level.get(p.name);
       return lv === 'high' ? 2 : lv === 'maybe' ? 1 : 0;
     };
     // 元の並び（AIの自信順）を保ったまま、該当の可能性があるものだけ後ろへ（安定ソート）
     return list
-      .map((p, i) => ({ p: { ...p, dietFlag: level.get(p.name) }, i }))
+      .map((p, i) => ({ p: { ...p, dietFlag: level.get(p.name), dietModes: [...(modesBy.get(p.name) ?? [])] }, i }))
       .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i)
       .map((x) => x.p);
   }, [result, diet, dietOn, dietPremium]);
@@ -182,7 +187,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
                   {best && <Text style={s.bestBadge}>{t('いちばんのおすすめ')}</Text>}
                   {flagged && (
                     <Text style={[s.dietBadge, p.dietFlag === 'high' ? s.dietBadgeHigh : s.dietBadgeMaybe]}>
-                      {t('⚠️ 対象の可能性')}
+                      {dietBadgeLabel(p.dietFlag!, p.dietModes ?? [], diet.modes)}
                     </Text>
                   )}
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
@@ -201,7 +206,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
               {dietOn && picks.length > 0 && (
                 <View style={{ marginBottom: 4 }}>
                   <DietEstimateNote onDetail={() => { setVisible(false); router.push('/settings?open=diet' as never); }} />
-                  <DietSilenceNote />
+                  <DietSilenceNote modes={diet.modes} />
                 </View>
               )}
               {picks.length > 0 && !!result.note && <Text style={s.footNote}>{result.note}</Text>}

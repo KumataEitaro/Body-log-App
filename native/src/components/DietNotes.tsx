@@ -34,6 +34,22 @@ export function dietModeLabel(key: DietModeKey): string {
   }
 }
 
+/**
+ * 候補カードのバッジ文言（MenuAdvisor / WhatToEatSheet）。
+ * 以前は「⚠️ 対象の可能性」の一言で、**何の対象か**が読めなかった（2026-09-04 熊田さん指摘）。
+ * 辞書で当たったプリセット（hitModes）があればそれを、AI判定だけで当たった場合は本人が設定している
+ * プリセット（activeModes）を名指しする。複数は「・」でつなぐ。
+ * 断定はしない（「含む可能性」で止める・§6）。絵文字は使わない。
+ */
+export function dietBadgeLabel(level: DietLevel, hitModes: readonly string[], activeModes: readonly string[]): string {
+  const keys = (hitModes.length > 0 ? hitModes : activeModes) as readonly DietModeKey[];
+  const names = [...new Set(keys.map(dietModeLabel).filter(Boolean))].join('・');
+  if (!names) return level === 'high' ? t('対象を含む可能性が高い') : t('対象を含む可能性');
+  return level === 'high'
+    ? t('{modes}の対象を含む可能性が高い', { modes: names })
+    : t('{modes}の対象を含む可能性', { modes: names });
+}
+
 /** プリセットの補足（設定行のsub。翻訳される） */
 export function dietModeSub(key: DietModeKey): string {
   switch (key) {
@@ -113,8 +129,16 @@ export function DietEstimateNote({ onDetail }: { onDetail?: () => void }) {
  * 無警告時の常設表記（§6-4）。解析結果の下に薄く**常時**出す。
  * 「警告が無い＝安全」と誤読させないための最後の砦なので、条件付きで隠さない。
  */
-export function DietSilenceNote() {
-  return <Text style={s.silenceT}>{t('表示のない品目も、対象を含む可能性があります。')}</Text>;
+export function DietSilenceNote({ modes }: { modes?: readonly string[] } = {}) {
+  // 本人が設定しているプリセットを名指しする（「対象」だけでは何の対象か分からない）
+  const names = [...new Set(((modes ?? []) as readonly DietModeKey[]).map(dietModeLabel).filter(Boolean))].join('・');
+  return (
+    <Text style={s.silenceT}>
+      {names
+        ? t('表示のない品目も、{modes}の対象を含む可能性があります。', { modes: names })
+        : t('表示のない品目も、対象を含む可能性があります。')}
+    </Text>
+  );
 }
 
 /** 品目チップに添える小さな印。high=⚠️ / maybe=アンバーの点（§5） */

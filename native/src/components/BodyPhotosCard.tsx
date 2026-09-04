@@ -108,15 +108,21 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
       const { error: upErr } = await supabase.storage.from('body-photos')
         .upload(path, b64ToBytes(pendingImg.base64), { contentType: 'image/jpeg' });
       if (upErr) {
-        setMsg(/bucket|not found/i.test(upErr.message)
-          ? t('ストレージ未セットアップです（apply-pending.sqlのv16を実行してください）。')
-          : t('写真の保存に失敗しました。'));
+        // 原因が読めないと直せない（2026-09-05「保存できない」報告）。DB/Storage の本文を短く添える
+        setMsg((/bucket|not found/i.test(upErr.message)
+          ? t('ストレージ未セットアップです（supabase/fix-body-photos.sql を実行してください）。')
+          : t('写真の保存に失敗しました。')) + ` [${String(upErr.message).slice(0, 120)}]`);
         return;
       }
       const bf = bfInput.trim() === '' ? null : Number(bfInput);
       const { error: insErr } = await supabase.from('body_photos')
         .insert({ user_id: uid, date, path, bodyfat: bf });
-      if (insErr) { setMsg(t('記録の保存に失敗しました（v16 SQL未適用の可能性）。')); return; }
+      if (insErr) {
+        // 「v16 未適用」は当て推量。テーブル無し(42P01)・RLS拒否(42501)・列無し(42703)を本文で区別できるようにする
+        const detail = [insErr.code, insErr.message].filter(Boolean).join(' ').slice(0, 140);
+        setMsg(t('記録の保存に失敗しました（supabase/fix-body-photos.sql を実行してください）。') + (detail ? ` [${detail}]` : ''));
+        return;
+      }
       // 体脂肪率はグラフ用に日次サマリーへも反映
       if (bf != null && bf > 0) {
         await supabase.from('entries').upsert({ user_id: uid, date, bodyfat: bf }, { onConflict: 'user_id,date' });

@@ -2337,4 +2337,11 @@ export const EN: Record<string, string> = {
   "調整は必要ありません": "No adjustment needed",
   "予定の翌日から{n}日かけて、1日あたり約{k}kcalずつ取り返します": "We'll make up for it over {n} days starting the day after the event, by about {k}kcal per day.",
   "今日から目標日まで、1日あたり約{k}kcalずつ先に空けておきます": "From today until your target date, we will set aside about {k}kcal per day in advance",
+  "ストレージ未セットアップです（supabase/fix-body-photos.sql を実行してください）。": "Storage is not set up yet (please run supabase/fix-body-photos.sql).",
+  "記録の保存に失敗しました（supabase/fix-body-photos.sql を実行してください）。": "Failed to save record (please run supabase/fix-body-photos.sql).",
+  "対象を含む可能性が高い": "Likely to contain target items",
+  "対象を含む可能性": "May contain target items",
+  "{modes}の対象を含む可能性が高い": "Likely to contain {modes}",
+  "{modes}の対象を含む可能性": "May contain {modes}",
+  "表示のない品目も、{modes}の対象を含む可能性があります。": "Items without labels may still contain {modes}.",
 };

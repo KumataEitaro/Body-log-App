@@ -2259,4 +2259,11 @@ export const ID: Record<string, string> = {
   "調整は必要ありません": "Tidak perlu penyesuaian",
   "予定の翌日から{n}日かけて、1日あたり約{k}kcalずつ取り返します": "Mulai hari berikutnya setelah acara, kalori akan ditebus sekitar {k}kcal per hari selama {n} hari",
   "今日から目標日まで、1日あたり約{k}kcalずつ先に空けておきます": "Mulai hari ini hingga tanggal target, kami akan menyisihkan sekitar {k}kcal per hari terlebih dahulu",
+  "ストレージ未セットアップです（supabase/fix-body-photos.sql を実行してください）。": "Penyimpanan belum disiapkan (silakan jalankan supabase/fix-body-photos.sql).",
+  "記録の保存に失敗しました（supabase/fix-body-photos.sql を実行してください）。": "Gagal menyimpan catatan (silakan jalankan supabase/fix-body-photos.sql).",
+  "対象を含む可能性が高い": "Sangat mungkin mengandung target",
+  "対象を含む可能性": "Kemungkinan mengandung target",
+  "{modes}の対象を含む可能性が高い": "Sangat mungkin mengandung target untuk {modes}",
+  "{modes}の対象を含む可能性": "Kemungkinan mengandung target untuk {modes}",
+  "表示のない品目も、{modes}の対象を含む可能性があります。": "Item yang tidak tercantum mungkin juga mengandung target untuk {modes}.",
 };

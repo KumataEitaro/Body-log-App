@@ -101,6 +101,8 @@ export type EatPick = {
   c: number;
   /** 選ぶ理由（1文・非審判） */
   reason: string;
+  /** 辞書で当たったプリセットのキー（バッジで名指しするため。AI判定のみなら空） */
+  dietModes?: string[];
   /** 食事の制約（B-18）に該当する可能性。該当なしはキーごと無し */
   dietFlag?: 'high' | 'maybe';
 };

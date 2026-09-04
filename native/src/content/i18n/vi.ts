@@ -2259,4 +2259,11 @@ export const VI: Record<string, string> = {
   "調整は必要ありません": "Không cần điều chỉnh",
   "予定の翌日から{n}日かけて、1日あたり約{k}kcalずつ取り返します": "Bắt đầu từ ngày sau ngày lên lịch, sẽ bù lại khoảng {k}kcal mỗi ngày trong vòng {n} ngày",
   "今日から目標日まで、1日あたり約{k}kcalずつ先に空けておきます": "Từ hôm nay cho đến ngày mục tiêu, mỗi ngày sẽ chừa sẵn khoảng {k}kcal",
+  "ストレージ未セットアップです（supabase/fix-body-photos.sql を実行してください）。": "Chưa thiết lập bộ nhớ (vui lòng chạy supabase/fix-body-photos.sql).",
+  "記録の保存に失敗しました（supabase/fix-body-photos.sql を実行してください）。": "Không thể lưu bản ghi (vui lòng chạy supabase/fix-body-photos.sql).",
+  "対象を含む可能性が高い": "Rất có thể chứa thành phần cần lưu ý",
+  "対象を含む可能性": "Có thể chứa thành phần cần lưu ý",
+  "{modes}の対象を含む可能性が高い": "Rất có thể chứa thành phần thuộc {modes}",
+  "{modes}の対象を含む可能性": "Có thể chứa thành phần thuộc {modes}",
+  "表示のない品目も、{modes}の対象を含む可能性があります。": "Các mục không hiển thị cũng có thể chứa thành phần thuộc {modes}.",
 };

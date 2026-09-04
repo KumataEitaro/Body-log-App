@@ -2259,4 +2259,11 @@ export const FR: Record<string, string> = {
   "調整は必要ありません": "Aucun ajustement nécessaire",
   "予定の翌日から{n}日かけて、1日あたり約{k}kcalずつ取り返します": "Nous compenserons sur {n} jours après l'événement, à hauteur d'environ {k}kcal par jour.",
   "今日から目標日まで、1日あたり約{k}kcalずつ先に空けておきます": "D'ici la date cible, nous réserverons environ {k} kcal par jour à l'avance",
+  "ストレージ未セットアップです（supabase/fix-body-photos.sql を実行してください）。": "Stockage non configuré (veuillez exécuter supabase/fix-body-photos.sql).",
+  "記録の保存に失敗しました（supabase/fix-body-photos.sql を実行してください）。": "Échec de l'enregistrement (veuillez exécuter supabase/fix-body-photos.sql).",
+  "対象を含む可能性が高い": "Forte probabilité de présence",
+  "対象を含む可能性": "Présence potentielle",
+  "{modes}の対象を含む可能性が高い": "Forte probabilité de correspondre à : {modes}",
+  "{modes}の対象を含む可能性": "Correspondance potentielle à : {modes}",
+  "表示のない品目も、{modes}の対象を含む可能性があります。": "Les éléments non listés peuvent également correspondre à : {modes}.",
 };
