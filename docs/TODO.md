@@ -96,34 +96,6 @@ https://play.google.com/console → BodyLoger → ダッシュボードの「詳
 - `05_業務メモ_社内限` は BodyLog 無関係なので除く
 - 詳細 docs/HANDOVER.md（コード・設計・SQL は GitHub にあるので失われない）
 
-### A11. 🟠 Play への自動アップロード: 初回ビルドで疎通確認（設定は完了）
-**サービスアカウント作成・Play での権限付与・Codemagic への登録はすべて 2026-09-04 に完了。**
-残っているのは `rn-android` を1回回して、実際に内部テストへ入るかを見るだけ（A3 と同じ1回で兼ねられる）。
-
-- ❌ `403` / `The caller does not have permission` が出たら**権限の反映待ち**（数分〜最大24時間）。
-  設定ミスではないので時間を置いて再実行。その間は Artifacts から手動アップロードもできる
-
-<details><summary>実施済みの手順（記録）</summary>
-
-
-1. **サービスアカウント作成** https://console.cloud.google.com/iam-admin/serviceaccounts
-   → 「サービス アカウントを作成」→ 名前 `codemagic-play-publisher` → 作成
-   → **ロールは付けない** → 完了 → キー → 鍵を追加 → 新しい鍵を作成 → **JSON** をダウンロード
-   → API を有効化 https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com
-2. **Play で権限付与** https://play.google.com/console → 左下 **ユーザーと権限** → 新しいユーザーを招待
-   → サービスアカウントのメールアドレス → アプリの権限で BodyLoger を選び
-   **「テスト版リリースを管理」＋「アプリ情報の閲覧」**だけ付ける（製品版の権限は与えない）
-3. **Codemagic に登録** https://codemagic.io/apps → Body-log-App → ⚙️ → Environment variables
-   - name `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` / value **JSONの中身を全部** / group `google_play`
-   - **Secret にチェック**（Play への書き込み権限そのもの。JSONの中身はチャットに貼らない）
-
-</details>
-
-- サービスアカウント: `codemagic-play-publisher@bodyloger.iam.gserviceaccount.com`
-  （Play の権限は「テスト版リリースを管理」＋「アプリ情報の閲覧」に限定・製品版の権限は無し）
-- 製品版への昇格は自動化していない（審査に出る経路は必ず人間が踏む）
-- 詳細と設計判断は docs/ANDROID.md「Playへの自動アップロード」
-
 ### A12. 🔴 Play: クローズドテスト（個人用アカウントは製品版の前に必須）
 
 2026-09-04 に Play Console のダッシュボードで判明:
@@ -255,6 +227,9 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 ---
 
 ## C. 完了（1行記録・2026-09-04）
+
+- **Play への自動アップロードが初回ビルドで疎通**（内部テストトラックにリリースが自動作成された。
+  途中の失敗2回は changes_not_sent_for_review の誤設定と Play 権限の反映待ち）
 
 - **Play への自動アップロード**（サービスアカウント＋`publishing > google_play`・track=internal）
 - **AdMob インタースティシャルIDを Codemagic に登録**（iOS/Android 各1・実際の表示は A9 以降）
