@@ -27,6 +27,13 @@ on:
       - 'native/**'
       - '.github/workflows/android-smoke.yml'
 
+# 同じブランチで新しい push があったら、走っている古い実行は打ち切る。
+# main の最新が起動するかだけが知りたいので、追い越された実行に無料枠を使わない。
+#
+# ⚠️ そのとき古い実行は「失敗」として赤く出て、注釈は
+#    "Canceling since a higher priority waiting request ... exists" になる。
+#    **これはアプリのクラッシュではない**（2026-09-04 に実際に紛らわしかった）。
+#    赤い実行を見たら、まず注釈がキャンセルかどうかを確認すること。
 concurrency:
   group: android-smoke-${{ github.ref }}
   cancel-in-progress: true
