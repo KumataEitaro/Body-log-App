@@ -169,6 +169,7 @@ workflows:
           # 古いプロファイル（Associated Domains無し）で署名が失敗し続ける（2026-09-03 build_ipa(5)）。
           # ここで「ビルドに必要なentitlement」と「取得済みプロファイルのentitlement」を比較し、
           # 足りなければ該当プロファイルをポータルから削除→作り直し→再適用する。手作業の削除を不要にする。
+          set -e   # 途中の失敗を握りつぶさない（2026-09-04 に握りつぶしで Build ipa が空振りした）
           ENT="native/ios/BodyLog/BodyLog.entitlements"
           NEED_AD=0; /usr/libexec/PlistBuddy -c "Print :com.apple.developer.associated-domains" "$ENT" >/dev/null 2>&1 && NEED_AD=1
           echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
@@ -192,8 +193,29 @@ workflows:
                 echo "delete profile $id"; app-store-connect profiles delete "$id" || true
               done
               rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision
-              app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create
-              echo "プロファイルを作り直しました（Associated Domains込み）"
+              # 作り直しを試す。ユーザースクリプトの文脈では証明書の秘密鍵が渡らず失敗することがある
+              # （2026-09-04 build_ipa(7): 失敗が echo で握りつぶされ Build ipa が空のプロファイルで落ちた）。
+              # 失敗しても止めず、下の「実際に出来たか」の検証で判定する
+              app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create || echo "fetch-signing-files --create は失敗（下で判定）"
+              OK=0
+              for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+                [ -f "$f" ] || continue
+                security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
+                BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
+                case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
+                /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /tmp/prof.plist >/dev/null 2>&1 && OK=1
+              done
+              if [ "$OK" = "1" ]; then
+                # 新しいプロファイルを Xcode プロジェクトに掛け直す（Build ipa 側の use-profiles だけに任せない）
+                xcode-project use-profiles --project "native/ios/BodyLog.xcodeproj" --warn-only
+                echo "✅ プロファイルを作り直しました（Associated Domains込み）"
+              else
+                echo "❌ 要件を満たすプロファイルを手元に作れませんでした。" >&2
+                echo "   ポータルの古いプロファイルは削除済みなので、**このワークフローをもう一度実行**すると" >&2
+                echo "   Codemagic の自動署名（ビルド前）が現在の capability で新しいプロファイルを作ります。" >&2
+                echo "   それでも同じなら Apple Developer → Identifiers → $BUNDLE_ID で Associated Domains が ON か確認。" >&2
+                exit 1
+              fi
             else
               echo "取得済みプロファイルは要件を満たしています"
             fi
