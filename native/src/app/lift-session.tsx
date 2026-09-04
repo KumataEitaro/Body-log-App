@@ -10,6 +10,7 @@
 // 集計・e1RM・PR判定・オフラインキュー・履歴カードは従来のまま動く。
 // セッション中の状態は AsyncStorage（bl-lift-session）に持ち、アプリを切り替えても消えない。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, Alert, Vibration } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,6 +44,7 @@ type HistRow = { id: string; date: string; text: string };
 const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
 
 export default function LiftSessionScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ date?: string }>();

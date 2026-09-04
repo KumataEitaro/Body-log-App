@@ -14,6 +14,7 @@
 // 【王冠ゲート】既存の digest と同じ（src=digest）。無料プランでは見出しと体重変化までを見せ、
 // 評価文と来週の目標を「スタンダードで開きます」の1枚に置き換える（ぼかさない＝law-detailと同じ流儀）。
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -62,6 +63,7 @@ type Loaded = {
 };
 
 export default function WeeklyReviewScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
   const locked = gate.gated('digest');

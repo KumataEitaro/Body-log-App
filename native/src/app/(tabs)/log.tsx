@@ -49,7 +49,7 @@ import { MinusBadge, AddCardSheet, useCardLayout } from '@/components/CardLayout
 import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL } from '@/lib/pfcAdvice';
-import { pfcColors } from '@/lib/theme';
+import { pfcColors, useThemeRefresh } from '@/lib/theme';
 import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -221,6 +221,7 @@ const bs = themed(() => ({
 }));
 
 export default function LogScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const insets = useSafeAreaInsets();
   const router = useRouter();
   // 削除のUndoスナックバー。右下の＋ボタン（56px）と重ならない高さに出す
@@ -1637,8 +1638,6 @@ export default function LogScreen() {
         />
 
         {/* 🔥ストリーク常設チップ（タップで実績ページへ） */}
-        <StreakChip />
-
         {/* 今日のひとこと帯（ヘッダーとヒーローの間・タップで展開・×でその日は閉じる）。帯の3本目なら出ない（調停） */}
         {brief && attention.brief > 0 && (
           <DailyBrief brief={brief} onClose={() => {
@@ -1651,6 +1650,9 @@ export default function LogScreen() {
         {vis('hero') && profile && (
           <Animated.View style={[s.hero, enter[1]]} ref={heroTarget} collapsable={false}>
             <MinusBadge editing={editing} onPress={() => cards.hide('hero')} />
+            {/* 見出し行の右端に記録ストリーク（旧・単独チップ）。ヒーローは毎日見る場所なので
+                「続いている」がここで読める。タップで実績へ */}
+            <View style={s.heroLRow}>
             <Text style={s.heroL}>
               {isBulk
                 // 増量: 残量はタスク（あと食べる）、使い切りは達成。減量の「オーバー赤」を出さない
@@ -1661,6 +1663,8 @@ export default function LogScreen() {
                 : t('かなり多め')}
               {plan ? t('（計画）') : t('（維持）')}
             </Text>
+            <StreakChip inline />
+            </View>
             {/* ヒーローの大数字は文字サイズ拡大で崩れやすいため上限1.3（本文系は制限しない） */}
             <Text style={[s.heroN, isBulk ? { color: left > 0 ? C.amber : C.teal } : overColor != null && { color: overColor }]}
                   maxFontSizeMultiplier={1.3}>
@@ -2588,7 +2592,8 @@ const s = themed(() => ({
     backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 18,
     marginBottom: 20,   // 記録リストとの間だけ広くする（カード同士は12）
   },
-  heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5 },
+  heroLRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  heroL: { fontSize: 13, fontWeight: '700', color: C.sub, letterSpacing: 0.5, flexShrink: 1 },
   heroN: { fontSize: 44, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginVertical: 2 },
   heroU: { fontSize: 17, color: C.sub, fontWeight: '600' },
   // アクティブぶんの上乗せ内訳（目標が増えた理由の1行）。増加は良い知らせなのでアクセント色

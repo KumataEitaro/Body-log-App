@@ -91,13 +91,14 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // selection は iOS でほとんど感じない。行を押した手応えは impact Light で返す（熊田さん 2026-09-04）
   function pick(a: PlusAction) {
-    Haptics.selectionAsync().catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     pending.current = a;
     onClose();
   }
   function go(next: PlusStep) {
-    Haptics.selectionAsync().catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setStep(next);
   }
   async function saveWeight() {

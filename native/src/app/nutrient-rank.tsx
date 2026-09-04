@@ -10,6 +10,7 @@
 // 入口: 読み物一覧の「栄養ランキング」節（ColumnReader）・概要タブ「食事」セクションの行（changes.tsx）
 // 値は日本食品標準成分表（八訂）ベースの **目安**。画面の下に必ず注記を出す。食材の善悪は言わない（smartSwap の規約）
 import { useEffect, useMemo, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, StyleSheet, Platform } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -87,6 +88,7 @@ function SwapList({ swaps }: { swaps: Swap[] }) {
 }
 
 export default function NutrientRankScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const params = useLocalSearchParams<{ tab?: string; nutrient?: string; food?: string }>();
   useRemoteContent();   // リモートの栄養データが届いたら組み直す
   const purpose = usePurpose();

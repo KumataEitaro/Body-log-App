@@ -7,6 +7,7 @@
 //  ・共有アイコンはカードから外した（熊田さん: 「法則をストーリーに乗せる意味はない」。共有は実績ページのバッジ・PRだけ）
 //  ・分析は全て端末内ローカル（lib/laws.ts）。サーバへは何も送らない
 import { useEffect, useRef, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -68,6 +69,7 @@ function CelebrateOverlay({ laws, onClose }: { laws: Law[]; onClose: () => void 
 }
 
 export default function LawsScreen() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
   const [laws, setLaws] = useState<Law[] | null>(null);   // null=読み込み中

@@ -5,6 +5,7 @@
 // ③ 目標（体重・期日・体脂肪率は任意。減らす人も増やす人も同じ逆算）
 // ④ 筋トレ目標（任意・スキップ可）
 import { useEffect, useState } from 'react';
+import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, {
   FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
@@ -27,6 +28,7 @@ import OnboardingIntro from '@/components/OnboardingIntro';
 const DONE_KEY = 'bl-onboard-done';
 
 export default function Onboarding() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [stage, setStage] = useState<'intro' | 'wizard'>('intro');

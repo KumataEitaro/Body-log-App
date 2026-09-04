@@ -5,10 +5,12 @@
 //  ・タブバーの高さは取得できない → 下端の余白は insets.bottom で取る
 //  ・FlatListはscroll-to-top等が効かないことがある（このアプリはScrollView構成）
 import { NativeTabs, NativeTabTrigger } from 'expo-router/unstable-native-tabs';
+import { useThemeRefresh } from '@/lib/theme';
 import { C } from '@/lib/ui';
 import { t, useLocale } from '@/lib/i18n';
 
 export default function TabsLayout() {
+  useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   useLocale(); // 言語を切り替えたらタブ名も即座に追従
   return (
     <>

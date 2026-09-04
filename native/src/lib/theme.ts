@@ -348,6 +348,15 @@ export async function setTheme(patch: Partial<ThemePrefs>): Promise<void> {
 
 export function getTheme(): ThemeSnapshot { return snapshot; }
 
+/**
+ * 「テーマが変わったらこの画面を再描画する」だけの購読。値は要らない。
+ * 各ルート（画面）の先頭で呼ぶ。themed で作ったスタイルは世代が変わると新しいオブジェクトを返すので、
+ * 再描画さえ起きれば全ての色が揃う。以前は _layout の Stack を key で丸ごと再マウントしていたが、
+ * 開いている Modal（テーマシート）も破棄→即再表示になり iOS で古いモーダルが残る事故があった（2026-09-04）。
+ * __tests__/themeSubscription.test.ts が「全ルートが購読している」ことを見張る。
+ */
+export function useThemeRefresh(): void { useTheme(); }
+
 export function useTheme(): ThemeSnapshot {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
