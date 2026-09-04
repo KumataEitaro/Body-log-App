@@ -20,7 +20,7 @@ import { View, Text, Modal, ScrollView, Pressable, TextInput, ActivityIndicator,
 import { Sparkles, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
-import { DietEstimateNote, DietSilenceNote } from '@/components/DietNotes';
+import { DietEstimateNote, DietSilenceNote, dietBadgeLabel } from '@/components/DietNotes';
 import { apiPost } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { t, apiLang } from '@/lib/i18n';
@@ -139,10 +139,15 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
     for (const p of list) if (p.dietFlag) aiFlags[p.name] = p.dietFlag;
     const alerts = mergeAlerts({ items: list.map((p) => ({ name: p.name })), rules, aiFlags, premium: dietPremium });
     const level = new Map<string, DietLevel>();
-    for (const a of alerts) if (level.get(a.name) !== 'high') level.set(a.name, a.level);
+    // どのプリセットで当たったか（バッジで名指しする）。AI判定だけの場合は空＝本人の設定全体を出す
+    const modesBy = new Map<string, Set<string>>();
+    for (const a of alerts) {
+      if (level.get(a.name) !== 'high') level.set(a.name, a.level);
+      if (a.mode) { if (!modesBy.has(a.name)) modesBy.set(a.name, new Set()); modesBy.get(a.name)!.add(a.mode); }
+    }
     const rank = (p: EatPick) => { const lv = level.get(p.name); return lv === 'high' ? 2 : lv === 'maybe' ? 1 : 0; };
     return list
-      .map((p, i) => ({ p: { ...p, dietFlag: level.get(p.name) }, i }))
+      .map((p, i) => ({ p: { ...p, dietFlag: level.get(p.name), dietModes: [...(modesBy.get(p.name) ?? [])] }, i }))
       .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i)
       .map((x) => x.p);
   }, [result, diet, dietOn, dietPremium]);
@@ -286,7 +291,9 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
                                                            p.dietFlag === 'maybe' && s.pickCardMaybe]}>
                         {best && <Text style={s.bestBadge}>{t('いちばんのおすすめ')}</Text>}
                         {flagged && (
-                          <Text style={[s.dietBadge, p.dietFlag === 'high' ? s.dietBadgeHigh : s.dietBadgeMaybe]}>{t('⚠️ 対象の可能性')}</Text>
+                          <Text style={[s.dietBadge, p.dietFlag === 'high' ? s.dietBadgeHigh : s.dietBadgeMaybe]}>
+                            {dietBadgeLabel(p.dietFlag!, p.dietModes ?? [], diet.modes)}
+                          </Text>
                         )}
                         <PickBody p={p} />
                         {/* 食材ナビ「置き換えるなら」: 提案の主役食材に、同じ栄養素をより少ない（増量なら多い）kcalで
@@ -310,7 +317,7 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
                   {dietOn && (
                     <View style={{ marginTop: 8 }}>
                       <DietEstimateNote onDetail={() => { onClose(); router.push('/settings?open=diet' as never); }} />
-                      <DietSilenceNote />
+                      <DietSilenceNote modes={diet.modes} />
                     </View>
                   )}
                   {!!result.note && <Text style={s.footNote}>{result.note}</Text>}
