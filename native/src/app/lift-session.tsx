@@ -338,7 +338,7 @@ export default function LiftSessionScreen() {
           </Pressable>
         </View>
         {/* MM:SSは1行固定のため文字サイズ拡大は上限1.3 */}
-        <Text style={[s.restN, left === 0 && { color: C.successInk }]} maxFontSizeMultiplier={1.3}>
+        <Text style={[s.restN, left === 0 && { color: C.successInk }]} maxFontSizeMultiplier={1.15}>
           {left == null ? mmss(restSec) : mmss(left)}
         </Text>
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
@@ -496,7 +496,9 @@ const s = themed(() => ({
   restL: { fontSize: 13, fontWeight: '800', color: C.ink },
   restLenBtn: { borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 4 },
   restLenT: { fontSize: 12, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
-  restN: { fontSize: 40, fontWeight: '900', color: C.accentInk, fontVariant: ['tabular-nums'], textAlign: 'center', marginTop: 2, lineHeight: 46 },
+  // 残り時間は画面の主役。64pt の等幅数字を太さ 700・字間を詰めて、時計アプリのように読ませる。
+  // lineHeight は付けない（Fabric×iOS で縦位置がずれる既知の事故・PlusSheet で踏んだ）
+  restN: { fontSize: 64, fontWeight: '700', color: C.accentInk, fontVariant: ['tabular-nums'], textAlign: 'center', marginTop: 4, letterSpacing: -2, includeFontPadding: false },
   restBtn: { flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 9, alignItems: 'center' },
   restBtnT: { fontSize: 14, fontWeight: '800', color: '#fff' },   // アクセント塗り面の上の白文字は固定色
   restBtnGhost: { flex: 1, borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: RADIUS.chip, paddingVertical: 9, alignItems: 'center' },
