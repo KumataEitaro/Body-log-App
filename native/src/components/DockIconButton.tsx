@@ -14,7 +14,7 @@ export default function DockIconButton({ Icon, onPress, onLongPress, disabled, t
   size?: number;
   guideKey?: string;          // ガイドツアーの照射対象キー（食事ドックのカメラ・成分表示が渡す）
 }) {
-  // ガイドの照射対象になれる（HeaderGearと同じ流儀: 未指定はダミーキーで登録）
+  // ガイドの照射対象になれる（未指定はダミーキーで登録して、フックの数を毎回同じにする）
   const target = useGuideTarget(guideKey ?? '__dock_unused__');
   return (
     <Pressable

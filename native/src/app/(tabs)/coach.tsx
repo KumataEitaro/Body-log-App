@@ -19,7 +19,6 @@ import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import StatusBarMask from '@/components/StatusBarMask';
 import { useGuideTarget } from '@/components/GuideTour';
 import VoiceHintButton from '@/components/VoiceHintButton';
-import HeaderGear from '@/components/HeaderGear';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
@@ -444,7 +443,6 @@ export default function CoachScreen() {
         </View>
       </View>
       <StatusBarMask />
-      <HeaderGear />
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
         <History size={16} color={C.sub} />

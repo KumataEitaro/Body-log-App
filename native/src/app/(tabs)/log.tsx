@@ -94,7 +94,6 @@ import { BookOpen } from 'lucide-react-native';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
 import ReorderableChips from '@/components/ReorderableChips';
-import HeaderGear from '@/components/HeaderGear';
 import StreakChip from '@/components/StreakChip';
 import BadgeIcon from '@/components/BadgeIcon';
 // 食事の制約（B-18・docs/DIET-MODES.md）。警告は情報提供だけで、保存は絶対にブロックしない
@@ -2508,7 +2507,6 @@ export default function LogScreen() {
       {/* おかえりフロー: 発火判定はコンポーネント内で完結（マウント直後のみ→既存Modalと競合しない） */}
       <ComebackSheet onSaved={load} />
       {/* ステータスバー領域はスティッキーヘッダー（TabHeader）が覆うので StatusBarMask は置かない */}
-      <HeaderGear />
     </View>
   );
 }

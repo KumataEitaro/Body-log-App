@@ -11,7 +11,9 @@
 //   StatusBarMask（透過96%の帯）は、貼り付いたヘッダーの上に重なって二重の面になるので
 //   この3タブでは使わない（ヘッダーが不透明 C.bg なので下を通るカードは見えない）
 // - スクロール余白（SPACE.screen）の内側に置かれるため、負のマージンで左右いっぱいに広げ、
-//   下の C.hairline を画面幅ぶん引く。右端の 38px は固定配置の HeaderGear（⚙）の席
+//   下の C.hairline を画面幅ぶん引く。
+// - 以前は右端 38px を固定配置の⚙ボタンの席として空けていたが、2026-09-04 に⚙を廃止
+//   （設定は概要タブの「設定」ブロックへ移動）したので、その予約席も返した
 import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +48,6 @@ const s = themed(() => ({
     paddingBottom: 10, marginBottom: 12,
     borderBottomWidth: 1, borderBottomColor: C.hairline,
   },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginRight: 38, minHeight: 34 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 34 },
   title: { ...HEAD.page, color: C.ink },
 }));

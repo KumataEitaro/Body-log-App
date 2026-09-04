@@ -33,7 +33,9 @@ import CrownBadge from '@/components/CrownBadge';
 import AdSlot from '@/components/AdSlot';
 import { useInterstitial } from '@/lib/interstitialAd';
 import { useAdPitch } from '@/components/AdPitchSnackbar';
-import HeaderGear from '@/components/HeaderGear';
+import { Settings as SettingsIcon, Target, Award, BellRing } from 'lucide-react-native';
+import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
+import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
@@ -113,10 +115,13 @@ const DETAIL_STACKS: Record<string, string[]> = {
 // メニューのセクション小見出し（Appleヘルスケアの「トレンド」「ハイライト」式）。
 // キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
 // ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
+// 「設定」ブロックはここに入れない: 並べ替え・非表示の対象になってしまい、
+// 非表示にされると（右上の⚙を廃止したので）設定へ二度と辿り着けなくなる。
+// 設定ブロックは headerJSX に固定で描く（見た目は同じ sectionH ＋ menuRow）
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
-  { title: () => t('からだ'), keys: ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles'] },
-  { title: () => t('食事'), keys: ['eating', 'week', 'nutrients'] },
-  { title: () => t('運動'), keys: ['volume', 'strength', 'health'] },
+  { title: () => t('からだの変化'), keys: ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles'] },
+  { title: () => t('食事の傾向'), keys: ['eating', 'week', 'nutrients'] },
+  { title: () => t('運動の傾向'), keys: ['volume', 'strength', 'health'] },
 ];
 // セクション順→セクション内は引数の相対順。未知キーは末尾へ（防御・落とさない）
 function normalizeOrder(order: string[]): string[] {
@@ -238,6 +243,19 @@ export default function ChangesScreen() {
   // リーンバルク・ガードは増量目的のときだけ意味を持つ（減量中は判定が全部ノイズになる）
   const purpose = usePurpose();
   const chartTarget = useGuideTarget('chart');
+  // 設定ブロック（旧・右上の⚙）。ガイドツアーの 'gear' はこの行を指す
+  const gearTarget = useGuideTarget('gear');
+  const todo = useTodoBadge();
+  // 未読バッジ数（実績行の赤ドット）。実績ページを開くと消えるので戻るたびに読み直す
+  const [unseenBadges, setUnseenBadges] = useState(0);
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    unseenBadgeCount().then((n) => { if (alive) setUnseenBadges(n); }).catch(() => {});
+    todo.refresh();
+    return () => { alive = false; };
+    // todo は毎レンダーで作り直されるので依存に入れない（入れると毎フレーム再取得になる）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
   // 開いている詳細ページ（nullならマスタメニュー）。ヘルスケア式のメニュー→詳細
   const [detailKey, setDetailKey] = useState<string | null>(null);
   // 初回ロードが終わったか（スケルトン解除の判定。ロード自体は既存のload()）
@@ -1246,7 +1264,8 @@ export default function ChangesScreen() {
     );
   }
 
-  // タイトル行は上端に貼り付く（食事・運動タブと共通の TabHeader。⚙は固定配置のHeaderGear＝右余白38で衝突回避）
+  // タイトル行は上端に貼り付く（食事・運動タブと共通の TabHeader）。
+  // 2026-09-04 に右上の⚙を廃止したので、右余白38の予約席は無くなっている
   const stickyHeaderJSX = (
     <TabHeader
       title={t('概要')}
@@ -1267,9 +1286,66 @@ export default function ChangesScreen() {
       )}
     />
   );
+  // 設定ブロックの1行（menuRow と同じ見た目。並べ替え・非表示の対象ではないので
+  // ドラッグ用のハンドラは持たない＝設定へ辿り着けなくなる事故が構造的に起きない）
+  function settingsRow(o: {
+    key: string; icon: ReactNode; label: string; sub: string; badge?: number;
+    onPress: () => void; guideRef?: React.Ref<View>;
+  }) {
+    return (
+      <Pressable key={o.key}
+                 style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+                 android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
+                 ref={o.guideRef} collapsable={false}
+                 onPress={() => { Haptics.selectionAsync().catch(() => {}); o.onPress(); }}>
+        <View style={s.menuIcon}>{o.icon}</View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.menuT}>{o.label}</Text>
+          <Text style={s.menuSub} numberOfLines={1}>{o.sub}</Text>
+        </View>
+        {o.badge != null && o.badge > 0 && <TodoBadge count={o.badge} style={{ marginRight: 6 }} />}
+        <Text style={s.menuGo}>›</Text>
+      </Pressable>
+    );
+  }
+  // 同じ画面へ2回続けて飛ぶとき expo-router は同一パスを無視するので、ts で毎回別URLにする
+  const openSettings = (open?: string) => router.push(
+    (open ? `/settings?open=${open}&ts=${Date.now()}` : '/settings') as never,
+  );
+  const settingsBlock = (
+    <View>
+      <Text style={s.sectionH}>{t('設定')}</Text>
+      {settingsRow({
+        key: 'goal', icon: <Target size={17} color={C.teal} />, label: t('目標設定'),
+        sub: t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC'),
+        onPress: () => openSettings('goal'),
+      })}
+      {settingsRow({
+        key: 'achievements', icon: <Award size={17} color={C.teal} />, label: t('実績'),
+        sub: t('ストリーク・バッジ・ストーリー共有'), badge: unseenBadges,
+        onPress: () => router.push('/achievements' as never),
+      })}
+      {settingsRow({
+        key: 'notice', icon: <BellRing size={17} color={C.teal} />, label: t('通知センター'),
+        sub: todo.count > 0
+          ? t('入力すべき項目が{n}件あります', { n: todo.count })
+          : t('いま対応が必要な項目はありません'),
+        badge: todo.count,
+        onPress: () => openSettings('notice'),
+      })}
+      {settingsRow({
+        key: 'settings', icon: <SettingsIcon size={17} color={C.teal} />, label: t('設定'),
+        sub: t('プロフィール・マイ食品・食べないもの・テーマ・言語・通知・ヘルスケア連携'),
+        onPress: () => openSettings(), guideRef: gearTarget,
+      })}
+    </View>
+  );
   const headerJSX = (
     <>
       {editing && <Text style={s.editHint}>{t('行を長押し→そのままドラッグで並び替え。「完了」で保存します')}</Text>}
+      {/* 設定ブロック（2026-09-04・右上の⚙を廃止して概要の最上部へ）。
+          並び替え中は隠す（ドラッグの視界を邪魔しない・他のブロックと同じ流儀） */}
+      {!editing && settingsBlock}
       {/* きょうのハイライト（B-16）: セクション見出しより上の最上部に1枚だけ。
           並び替え中は非表示（ドラッグの視界を邪魔しない）。lawsは図鑑へ、他は詳細ページへ */}
       {!editing && (
@@ -1365,7 +1441,6 @@ export default function ChangesScreen() {
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
       {/* 一覧はスティッキーヘッダーがステータスバー領域を覆う。詳細ページ（戻る行の構成）だけ従来の下敷きを使う */}
       {detailKey != null && <StatusBarMask />}
-      <HeaderGear guideKey="gear" />
     </View>
   );
 }

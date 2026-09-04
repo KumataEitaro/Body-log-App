@@ -28,7 +28,6 @@ import GoalPanel from '@/components/GoalPanel';
 import { bumpRestCount } from '@/lib/achievements';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import ReorderableCards from '@/components/ReorderableCards';
-import HeaderGear from '@/components/HeaderGear';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateStrip from '@/components/DateStrip';
 import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
@@ -743,7 +742,6 @@ export default function TrainingScreen() {
                   onShow={cards.show} shownKeys={visibleOrder} />
 
     {/* ステータスバー領域はスティッキーヘッダー（TabHeader）が覆うので StatusBarMask は置かない */}
-    <HeaderGear />
     </View>
   );
 }
