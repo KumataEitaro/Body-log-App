@@ -2266,4 +2266,6 @@ export const PT: Record<string, string> = {
   "{modes}の対象を含む可能性が高い": "Alta probabilidade de conter itens de {modes}",
   "{modes}の対象を含む可能性": "Pode conter itens de {modes}",
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Itens não listados também podem conter itens de {modes}.",
+  "体の写真を追加": "Adicionar foto corporal",
+  "写真から選ぶ": "Escolher da galeria",
 };

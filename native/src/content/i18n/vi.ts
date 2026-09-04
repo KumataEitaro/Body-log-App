@@ -2266,4 +2266,6 @@ export const VI: Record<string, string> = {
   "{modes}の対象を含む可能性が高い": "Rất có thể chứa thành phần thuộc {modes}",
   "{modes}の対象を含む可能性": "Có thể chứa thành phần thuộc {modes}",
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Các mục không hiển thị cũng có thể chứa thành phần thuộc {modes}.",
+  "体の写真を追加": "Thêm ảnh vóc dáng",
+  "写真から選ぶ": "Chọn từ thư viện ảnh",
 };
