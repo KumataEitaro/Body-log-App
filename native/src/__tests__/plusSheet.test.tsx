@@ -4,7 +4,7 @@
 // （2×2の大きなカードを並べる形は、アイコンとラベルを縦積みするため縦中央の計算が要り、
 //   新アーキ×iOS の lineHeight 問題で文字が下に寄る事故を招いた。詳細は PlusSheet.tsx 冒頭）
 // ここが壊れると記録が一切できなくなるので、①食事カードが1枚 ②運動・体の写真・体重・
-// 「食べるものを相談する」がリスト行として在る ③食事は1タップで meal:text が閉じ切ってから届く
+// 「あとのカロリーで何を食べる？」がリスト行として在る ③食事は1タップで meal:text が閉じ切ってから届く
 // ④2×2グリッドが無い ⑤体重は従来どおりシート内2段目、を検証する。
 // 食事タブ本体（LogScreen）が＋ボタンと入力シートを持ってマウントできることも見る。
 import renderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -40,7 +40,7 @@ function hasText(tree: ReactTestRenderer, text: string): boolean {
 }
 
 describe('＋シート（食事は大カード・他はリスト行）', () => {
-  it('食事の大カードが1枚だけ・運動/体の写真/体重/食べるものを相談するはリスト行（段表示は出さない）', async () => {
+  it('食事の大カードが1枚だけ・運動/体の写真/体重/あとのカロリーで何を食べる？はリスト行（段表示は出さない）', async () => {
     const tree = await mount(
       <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />,
     );
@@ -55,7 +55,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     expect(styleOf(meal).flexDirection).toBe('row');
 
     // ② 残りはすべて高さ52のリスト行で、右端にシェブロンが付く
-    for (const l of ['運動', '体の写真', '体重', '食べるものを相談する']) {
+    for (const l of ['運動', '体の写真', '体重', 'あとのカロリーで何を食べる？']) {
       const row = item(tree, l);
       expect(row).toBeTruthy();
       expect(styleOf(row).height).toBe(52);
@@ -65,7 +65,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     // ③ 2×2グリッド（flexWrap で折り返す枡・幅%指定・正方形に近い高さ）はもう無い
     const wrapped = tree.root.findAll((n) => n.type === View && (styleOf(n) as { flexWrap?: string }).flexWrap === 'wrap');
     expect(wrapped).toHaveLength(0);
-    for (const l of ['食事を記録', '運動', '体の写真', '体重', '食べるものを相談する']) {
+    for (const l of ['食事を記録', '運動', '体の写真', '体重', 'あとのカロリーで何を食べる？']) {
       expect(styleOf(item(tree, l)).width).toBeUndefined();   // 旧タイルは width:'47.5%'
     }
 
@@ -107,8 +107,8 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     await act(async () => { tree.unmount(); });
   });
 
-  it('リスト行の行動もそのまま外へ出る（運動・体の写真・食べるものを相談する）', async () => {
-    for (const [label, action] of [['運動', 'exercise'], ['体の写真', 'bodyphoto'], ['食べるものを相談する', 'meal:whattoeat']] as const) {
+  it('リスト行の行動もそのまま外へ出る（運動・体の写真・あとのカロリーで何を食べる？）', async () => {
+    for (const [label, action] of [['運動', 'exercise'], ['体の写真', 'bodyphoto'], ['あとのカロリーで何を食べる？', 'meal:whattoeat']] as const) {
       const onAction = jest.fn();
       let visible = true;
       const el = () => (

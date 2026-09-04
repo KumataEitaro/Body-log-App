@@ -14,10 +14,23 @@
 //   下の C.hairline を画面幅ぶん引く。
 // - 以前は右端 38px を固定配置の⚙ボタンの席として空けていたが、2026-09-04 に⚙を廃止
 //   （設定は概要タブの「設定」ブロックへ移動）したので、その予約席も返した
+//
+// 【ダークモードで上部だけ白く残る事故の再発防止（2026-09-04）】
+// この帯だけが古いテーマのまま残る報告が3回続いた（設定での切替・OSの自動ダーク）。
+// RN の sticky header は子を Animated.View（ネイティブ駆動の translateY）で包み、子の style を
+// `styles.fill` に差し替える。この経路は「親が再描画したから子も新しい色で描き直される」という
+// 前提が最も崩れやすい場所（Fabric＋Animated の props 更新の取りこぼし・親のメモ化・
+// テーマ変更時にこの画面がアクティブでない等）。そこで**親に頼らず自衛**する:
+//   1) 自分で useTheme() を購読し、テーマが変われば必ず自分が再描画される
+//   2) 内側の View に世代（themeGeneration）を key で付け、テーマが変わったら
+//      **ネイティブビューごと作り直す**（色の差分送信に頼らない）
+// これで「どの経路でテーマが変わっても、この帯は必ず新しい色で描かれる」が構造的に成立する。
+// __tests__/tabHeader.test.tsx が「親を再描画しなくても背景色が切り替わる」ことを見張る。
 import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, HEAD, SPACE, themed } from '@/lib/ui';
+import { C, HEAD, SPACE, themed, themeGeneration } from '@/lib/ui';
+import { useTheme } from '@/lib/theme';
 
 export default function TabHeader({ title, right, children }: {
   title: string;
@@ -27,8 +40,12 @@ export default function TabHeader({ title, right, children }: {
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  // 親の再描画に依存せず、テーマの変更で自分が必ず再描画される（上のコメント参照）
+  useTheme();
+  const gen = themeGeneration();
   return (
-    <View style={[s.wrap, { paddingTop: insets.top + 8 }]}>
+    // key に世代を含める＝テーマが変わるとネイティブビューを作り直す（色の差分送信に頼らない）
+    <View key={`theme-${gen}`} style={[s.wrap, { paddingTop: insets.top + 8 }]} testID="tab-header">
       <View style={s.row}>
         <Text style={s.title}>{title}</Text>
         {right}

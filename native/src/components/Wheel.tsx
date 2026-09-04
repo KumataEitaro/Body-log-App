@@ -3,6 +3,7 @@
 // もとは WeightDial.tsx の中にあった。筋トレ記録画面（セットの重量/回数・レストの長さ）と
 // 運動記録シート（時間）でも同じ「回して選ぶ」操作にそろえるため、ここへ切り出した。
 // 見た目・行高・触覚は WeightDial のときから変えていない（重量ダイアルの印象は不変）。
+import { useThemeRefresh } from '@/lib/theme';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,8 @@ export const WHEEL_H = ITEM_H * VISIBLE;
 
 /** ホイールの1行。選択中だけ濃く大きく（数百行あるためmemoで再描画を2行に抑える） */
 const Row = memo(function Row({ label, selected }: { label: string; selected: boolean }) {
+  // memo は props が同じなら描き直さない＝テーマ変更が届かない。自分で購読して追従する
+  useThemeRefresh();
   return (
     <View style={{ height: ITEM_H, alignItems: 'center', justifyContent: 'center' }}>
       {/* ホイールは行高ITEM_H固定のため文字サイズ拡大は上限1.3 */}

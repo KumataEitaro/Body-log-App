@@ -2,21 +2,24 @@
 //
 // ジムで「レストを見ながら」使う画面なので、上部にレストタイマーを常時出し、
 // その下にセット行（1行=1セット: 種目・重量・回数）を積んでいく。
-//   ・＋セット …… 前セットの種目・重量・回数を引き継いだ行を足し、ダイアルを開く（9→7→5 は回数だけ回す）
+//   ・セットを追加 …… タップ=前セットと同じ行を**即追加**してレスト開始（同じ重量×回数を重ねるのが大半。
+//                     毎回ダイアルを開かせない）／長押し=複製した行をダイアルで直してから追加（9→7→5）
 //   ・行タップ …… そのセットの重量と回数を同じダイアルで直す
 //   ・自重種目 …… 加重/補助を1本のダイアル（−60〜+60kg・0=自重）で選ぶ（lib/liftSession.ts）
 //   ・セットを決めるとレストが自動で始まる（終了で触覚＋バイブ）。長さはダイアルで選び 'bl-rest-sec' に記憶
+//   ・レスト中にアプリを離れたら、終了時刻に1回だけローカル通知（画面に戻ったら取り消す＝二重に鳴らさない）
 // 保存は既存の記録（logs.text `🏋️ …`・adj=0）にそのまま落とす（lib/liftSession.ts sessionText）。
 // 集計・e1RM・PR判定・オフラインキュー・履歴カードは従来のまま動く。
 // セッション中の状態は AsyncStorage（bl-lift-session）に持ち、アプリを切り替えても消えない。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThemeRefresh } from '@/lib/theme';
-import { View, Text, Pressable, ScrollView, Alert, Vibration } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert, Vibration, AppState } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Timer, Plus, Dumbbell, X } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+import { Timer, Plus, Dumbbell, X, Play, RotateCcw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { enqueue, flush, pendingCount, isNetworkError } from '@/lib/offlineQueue';
@@ -130,6 +133,36 @@ export default function LiftSessionScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }
   function stopRest() { update({ restEndsAt: null }); }
+
+  // ===== レスト終了の通知（画面を離れているときだけ） =====
+  // 画面を見ている間は触覚＋バイブで足りる。背景に回ったときだけ、終了時刻に1回のローカル通知を予約し、
+  // 戻ってきたら取り消す（二重に鳴らさない）。通知の許可が無ければ黙って何もしない
+  // （ロック画面／Dynamic Island に常時カウントダウンを出す Live Activity は別件 docs/TODO.md B10）
+  const restNotifId = useRef<string | null>(null);
+  const cancelRestNotif = useCallback(async () => {
+    const id = restNotifId.current;
+    restNotifId.current = null;
+    if (id) { try { await Notifications.cancelScheduledNotificationAsync(id); } catch { /* 無視 */ } }
+  }, []);
+  const scheduleRestNotif = useCallback(async (endsAt: number) => {
+    await cancelRestNotif();
+    if (endsAt - Date.now() < 1500) return;
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      if (!perm.granted) return;
+      restNotifId.current = await Notifications.scheduleNotificationAsync({
+        content: { title: t('レスト終了'), body: t('次のセットへ。'), sound: true, data: { url: 'bodylog://lift-session' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(endsAt) },
+      });
+    } catch { /* Expo Go 等では黙って諦める */ }
+  }, [cancelRestNotif]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') { void cancelRestNotif(); return; }
+      if (restEndsAt != null && restEndsAt > Date.now()) void scheduleRestNotif(restEndsAt);
+    });
+    return () => { sub.remove(); void cancelRestNotif(); };
+  }, [restEndsAt, cancelRestNotif, scheduleRestNotif]);
   const [restDial, setRestDial] = useState(false);
   function pickRest(sec: number) {
     AsyncStorage.setItem('bl-rest-sec', String(sec)).catch(() => {});
@@ -154,8 +187,18 @@ export default function LiftSessionScreen() {
     }
     setDial({ set, isNew: true });
   }
-  /** ＋セット: 直前の行を引き継ぐ（種目が無ければピッカーへ） */
+  /** セットを追加（タップ）: 直前の行と同じ重量・回数を**そのまま即追加**してレストを始める。
+   *  同じセットを何本も重ねるのが筋トレの大半なので、毎回ダイアルを開かせない（2026-09-04）。
+   *  回数や重量を変えるときは長押し（addSetEdit）か、行をタップして直す */
   function addSet() {
+    const last = sets[sets.length - 1];
+    if (!last) { setPickerOpen(true); return; }
+    update({ sets: [...sets, nextSet(last)] });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    startRest();
+  }
+  /** セットを追加（長押し）: 複製した行をダイアルで直してから確定する（9→7→5 と落ちるとき） */
+  function addSetEdit() {
     const last = sets[sets.length - 1];
     if (!last) { setPickerOpen(true); return; }
     setDial({ set: nextSet(last), isNew: true });
@@ -211,7 +254,7 @@ export default function LiftSessionScreen() {
   }
   /** RMフィードバック: そのセッションの最高e1RMを目標・自己ベストと照合して一言返す */
   async function feedbackFor(name: string | undefined): Promise<string> {
-    let fb = t('保存しました。継続が最強の種目です💪');
+    let fb = t('保存しました。続けることが、いちばん効く種目です。');
     if (!name) return fb;
     try {
       let est = 0; let bestKg = 0; let bestReps = 0;
@@ -234,7 +277,7 @@ export default function LiftSessionScreen() {
         fb = t('おしい！RM換算だとMAX {est}kg。目標{goal}kgまであと{left}kg', { est, goal: goalKg, left: goalKg - est })
           + (need && need > bestReps ? t('（{kg}kgなら{need}回で到達）', { kg: bestKg, need }) : '');
       } else if (bestPast > 0 && est > bestPast) {
-        fb = t('自己ベスト更新💪 {name} 推定MAX {est}kg（前回比 +{d}kg）', { name, est, d: est - bestPast });
+        fb = t('自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）', { name, est, d: est - bestPast });
       } else {
         fb = t('保存しました。{name} 推定MAX {est}kg（RM換算）', { name, est });
       }
@@ -284,8 +327,10 @@ export default function LiftSessionScreen() {
         <View style={s.restBarTrack}><View style={[s.restBarFill, { width: `${restPct}%` }]} /></View>
         <View style={s.restHead}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Timer size={ICON.sm} color={C.teal} />
-            <Text style={s.restL}>{t('レスト')}</Text>
+            <Timer size={ICON.sm} color={left === 0 ? C.successInk : C.teal} />
+            {/* 終了時は見出しで言う（数字は 00:00 のまま）。以前の「終了💪 次のセットへ」は
+                40pt の数字欄で折り返して見た目が崩れていた（2026-09-04） */}
+            <Text style={[s.restL, left === 0 && { color: C.successInk }]}>{left === 0 ? t('レスト終了') : t('レスト')}</Text>
           </View>
           {/* 長さはダイアルで選ぶ（ボタン列は廃止） */}
           <Pressable style={s.restLenBtn} onPress={() => setRestDial(true)} hitSlop={8}>
@@ -294,11 +339,15 @@ export default function LiftSessionScreen() {
         </View>
         {/* MM:SSは1行固定のため文字サイズ拡大は上限1.3 */}
         <Text style={[s.restN, left === 0 && { color: C.successInk }]} maxFontSizeMultiplier={1.3}>
-          {left == null ? mmss(restSec) : left > 0 ? mmss(left) : t('終了💪 次のセットへ')}
+          {left == null ? mmss(restSec) : mmss(left)}
         </Text>
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-          <Pressable style={s.restBtn} onPress={startRest} hitSlop={6}>
-            <Text style={s.restBtnT}>{left == null || left === 0 ? t('▶ 開始') : t('↻ やり直す')}</Text>
+          <Pressable style={s.restBtn} onPress={startRest} hitSlop={6} accessibilityRole="button">
+            {/* 記号文字（▶ ↻）ではなくアイコン。フォント依存の見え方のばらつきを無くす */}
+            {left == null || left === 0
+              ? <Play size={ICON.sm} color="#fff" strokeWidth={ICON.strokeBold} />
+              : <RotateCcw size={ICON.sm} color="#fff" strokeWidth={ICON.strokeBold} />}
+            <Text style={s.restBtnT}>{left == null || left === 0 ? t('開始') : t('やり直す')}</Text>
           </Pressable>
           {left != null && (
             <Pressable style={s.restBtnGhost} onPress={stopRest} hitSlop={6}>
@@ -364,10 +413,14 @@ export default function LiftSessionScreen() {
             )}
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              <OptionButton style={{ flex: 1.2 }} variant="teal" label={t('＋ セット')} onPress={addSet}
+              {/* ラベルに「＋」を書かない（leading のアイコンと二重になる） */}
+              <OptionButton style={{ flex: 1.2 }} variant="teal" label={t('セットを追加')} onPress={addSet} onLongPress={addSetEdit}
                             leading={<Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />} />
               <OptionButton style={{ flex: 1 }} variant="tonal" label={sets.length === 0 ? t('種目を選ぶ') : t('別の種目')} onPress={() => setPickerOpen(true)} />
             </View>
+            {sets.length > 0 && (
+              <Text style={s.addHint}>{t('タップで同じセットを追加。回数や重量を変えるなら長押し、または行をタップ。')}</Text>
+            )}
             {/* よく使う種目は1タップで足せる */}
             {favLifts.length > 0 && (
               <View style={s.favRow}>
@@ -444,10 +497,11 @@ const s = themed(() => ({
   restLenBtn: { borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, borderRadius: RADIUS.chip, paddingHorizontal: 10, paddingVertical: 4 },
   restLenT: { fontSize: 12, fontWeight: '800', color: C.accentInk, fontVariant: ['tabular-nums'] },
   restN: { fontSize: 40, fontWeight: '900', color: C.accentInk, fontVariant: ['tabular-nums'], textAlign: 'center', marginTop: 2, lineHeight: 46 },
-  restBtn: { flex: 1, backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 9, alignItems: 'center' },
+  restBtn: { flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', backgroundColor: C.teal, borderRadius: RADIUS.chip, paddingVertical: 9, alignItems: 'center' },
   restBtnT: { fontSize: 14, fontWeight: '800', color: '#fff' },   // アクセント塗り面の上の白文字は固定色
   restBtnGhost: { flex: 1, borderWidth: 1.5, borderColor: C.line, backgroundColor: C.panel, borderRadius: RADIUS.chip, paddingVertical: 9, alignItems: 'center' },
   restBtnGhostT: { fontSize: 14, fontWeight: '800', color: C.sub },
+  addHint: { fontSize: 11.5, color: C.sub, marginTop: 8, lineHeight: 16 },
   dateNote: { fontSize: 12, fontWeight: '700', color: C.amber, marginBottom: 8, textAlign: 'center' },
   // 空状態
   emptyBox: { alignItems: 'center', gap: 6, paddingVertical: 26, paddingHorizontal: 16 },
