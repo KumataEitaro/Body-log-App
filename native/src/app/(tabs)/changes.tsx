@@ -911,7 +911,7 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
-      // 食事タブの＋シート「体の写真」から来たときは、開いた瞬間にカメラを立ち上げる（autoCaptureKey=ノンス）
+      // 食事タブの＋シート「体の写真」から来たときは、開いた瞬間に「撮影する／写真から選ぶ」を出す（autoCaptureKey=ノンス）
       case 'photos': return <BodyPhotosCard autoCaptureKey={photoShootTs} />;
       // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
       case 'vitals': return <VitalsCard width={winW - 60} />;

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Image, ScrollView,
-  TextInput, ActivityIndicator, Alert, Modal,
+  TextInput, ActivityIndicator, Alert, Modal, ActionSheetIOS, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -27,7 +27,8 @@ function b64ToBytes(b64: string): Uint8Array {
 }
 
 export default function BodyPhotosCard({ autoCaptureKey }: {
-  /** 値が入って（変わって）いたら、その回だけカメラを即起動する（食事タブの＋シート「体の写真」からの着地用ノンス） */
+  /** 値が入って（変わって）いたら、その回だけ「撮影する／写真から選ぶ」の選択を出す（食事タブの＋シート「体の写真」からの着地用ノンス）。
+   *  以前は即カメラだったが、撮り直しや過去の写真を選ぶ場面で行き止まりになるため選択式に（2026-09-05） */
   autoCaptureKey?: string;
 } = {}) {
   const [photos, setPhotos] = useState<PhotoView[]>([]);
@@ -53,10 +54,26 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
     setPhotos(withUrls);
   }, []);
   useEffect(() => { load(); }, [load]);
-  // ＋シートからの「すぐ撮影」。ページ遷移のアニメーションが落ち着いてからカメラを出す
+  /** 追加の入口: 撮影するか写真から選ぶかを本人が選ぶ（iOS はアクションシート・Android はダイアログ） */
+  function chooseSource() {
+    const go = (i: number) => { if (i === 0) pick(true).catch(() => {}); else if (i === 1) pick(false).catch(() => {}); };
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: t('体の写真を追加'), options: [t('撮影する'), t('写真から選ぶ'), t('キャンセル')], cancelButtonIndex: 2 },
+        go,
+      );
+    } else {
+      Alert.alert(t('体の写真を追加'), undefined, [
+        { text: t('撮影する'), onPress: () => go(0) },
+        { text: t('写真から選ぶ'), onPress: () => go(1) },
+        { text: t('キャンセル'), style: 'cancel' },
+      ]);
+    }
+  }
+  // ＋シートからの着地。ページ遷移のアニメーションが落ち着いてから選択を出す（即カメラはやめた）
   useEffect(() => {
     if (!autoCaptureKey) return;
-    const h = setTimeout(() => { pick(true).catch(() => {}); }, 350);
+    const h = setTimeout(() => { chooseSource(); }, 350);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCaptureKey]);

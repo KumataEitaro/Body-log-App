@@ -2266,4 +2266,6 @@ export const ID: Record<string, string> = {
   "{modes}の対象を含む可能性が高い": "Sangat mungkin mengandung target untuk {modes}",
   "{modes}の対象を含む可能性": "Kemungkinan mengandung target untuk {modes}",
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Item yang tidak tercantum mungkin juga mengandung target untuk {modes}.",
+  "体の写真を追加": "Tambah foto tubuh",
+  "写真から選ぶ": "Pilih dari foto",
 };
