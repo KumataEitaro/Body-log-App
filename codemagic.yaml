@@ -316,8 +316,9 @@ workflows:
         # 内部テストにだけ入れる。製品版への昇格は必ず人間が Play Console で行う
         # （審査に出る経路を自動化しない）
         track: internal
-        # まだ製品版を公開したことがないアプリでは、Googleのバリデーションが
-        # 「変更を自動でレビューに送れない」と拒否することがある
-        # （"Your edit cannot be sent for review automatically"）。
-        # 内部テストはそもそも審査不要なので、レビューには送らない
-        changes_not_sent_for_review: true
+        # changes_not_sent_for_review は**付けない**（既定のまま）。
+        # 2026-09-04 に true を入れたら、bundle のアップロードは通ったのに
+        # トラック割り当てで Google に拒否された:
+        #   "Changes are sent for review automatically.
+        #    The query parameter changesNotSentForReview must not be set."
+        # このアプリは変更が自動でレビューに送られる状態なので、渡すこと自体が誤り。
