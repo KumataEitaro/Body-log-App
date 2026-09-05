@@ -184,13 +184,17 @@ workflows:
               BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
               case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
               if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /tmp/prof.plist >/dev/null 2>&1; then
-                NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null); echo "古いプロファイルを検出: $NAME（associated-domains無し）"; STALE=1
+                NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null); UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/prof.plist 2>/dev/null)
+                echo "古いプロファイルを検出: ${NAME} (${UUID}) — associated-domains 無し"; STALE=1
               fi
             done
             if [ "$STALE" = "1" ]; then
               DELETE_FAILED=0
-              # このバンドルIDの App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し
-              for id in $(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id"); do
+              # このバンドルIDの App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し。
+              # 一覧が空（APIキーの権限で読めない・build(9)で実際にそうだった）なら削除もできないので、手動削除の案内へ
+              IDS=$(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id" 2>/dev/null)
+              if [ -z "$IDS" ]; then echo "⚠️ API からプロファイルの一覧が取れません（権限不足の可能性）。ポータルで手動削除が必要です"; DELETE_FAILED=1; fi
+              for id in $IDS; do
                 # 削除の失敗を握りつぶさない: APIキーの権限（Developer 役割）では削除できないことがあり、
                 # 2026-09-04 (7)(8) はこれが毎回失敗→手元だけ消える→ゼロで Build ipa が落ちるループだった
                 if app-store-connect profiles delete "$id"; then echo "deleted profile $id"; else echo "⚠️ profile $id の削除に失敗（APIキーの権限不足の可能性）"; DELETE_FAILED=1; fi
