@@ -7,6 +7,10 @@
 
 ## A. 熊田さんの作業（順番どおりが最短）
 
+> ⚠️ **SQL を実行したら必ず最後に `notify pgrst, 'reload schema';`**（supabase/reload-schema.sql）。
+> 2026-09-06: これを忘れて「規約画面が毎回出る／プロフィールが消える／体の写真が保存できない」が同時発生した。
+> まとめ SQL（migration-23-32-all.sql / fix-body-photos.sql）の末尾には組み込み済み。
+
 ### A2. 🔴 iOS: TestFlight のクラッシュを見る
 https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィードバック → クラッシュ**
 - **KishimotoYumi さんの端末で 1.1.0 (81) がクラッシュ2件**・フィードバック3件が届いている

@@ -43,3 +43,6 @@ select
   (select count(*) from storage.buckets where id = 'body-photos') as "bucket",
   (select count(*) from information_schema.columns
      where table_schema = 'public' and table_name = 'entries' and column_name = 'bodyfat') as "entries_bodyfat";
+
+-- API のスキーマキャッシュを更新（これが無いと新しい列・テーブルを API が知らず、保存が失敗する）
+notify pgrst, 'reload schema';

@@ -345,3 +345,5 @@ select
   (select count(*) from public.plan_limits
      where plan = 'free' and text_day = 3 and photo_day = 1 and coach_day = 0) as free_limits_ok;
 -- 正しく通っていれば: new_tables=8 / profile_cols=5 / my_foods_items=1 / nutrients_ok=1 / free_limits_ok=1
+-- API のスキーマキャッシュを更新（これが無いと新しい列・テーブルを API が知らず、保存が失敗する）
+notify pgrst, 'reload schema';
