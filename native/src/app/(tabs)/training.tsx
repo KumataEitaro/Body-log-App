@@ -1,4 +1,6 @@
-// 運動タブ: きょうの動き（ヘルスケア実測が主）＋ 運動を記録する（種目を毎回選ぶシート）＋ レストタイマー ＋ 筋トレを記録する（全画面）
+// 運動タブ: 記録の入口2枚（筋トレ／運動）を最上部に固定 ＋ きょうの動き（ヘルスケア実測が主・畳める）＋ レストタイマー
+//   2026-09-06: 「運動を記録する」「筋トレを記録する」はカードではなく**左右2枚のタイル**として
+//   ヘッダー（並び替え対象の外）に固定。以前は「きょうの動き」が長く、記録の入口までスクロールが要った
 // 筋トレ勢だけでなくライトユーザーも「今日も動けた」を記録できるようにする。
 //
 // 2026-09-02 再設計（熊田さんβFB）:
@@ -20,7 +22,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, SPACE, ICON, HEAD, themed, rgba } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
 import { useTodayRollover } from '@/lib/rollover';
@@ -42,19 +44,19 @@ import { AddCardSheet, useCardLayout, useCardOrder } from '@/components/CardLayo
 import { OptionButton } from '@/components/ui/Selectable';
 import AdSlot from '@/components/AdSlot';
 import { t } from '@/lib/i18n';
+import * as Haptics from 'expo-haptics';
 
 type HistRow = { id: string; date: string; text: string };
 
 // 並び替え・表示/非表示できるカード（既定の並び: きょうの動き→運動を記録→レストタイマー→筋トレを記録）。
 // 概要タブと同じ操作（日付ストリップ or カードの長押し→編集モード／ドラッグで並び替え／⊖で非表示／⊕で戻す）。
 // 非表示は 'bl-cards-exercise'（useCardLayout）・並び順は 'bl-order-exercise'（useCardOrder）に別キーで保存。
-// キー名（quick / liftInput）は保存済みの並び・非表示設定を壊さないため従来のまま
-const EX_CARDS = ['move', 'quick', 'rest', 'liftInput'];
+// 2026-09-06: quick（運動を記録）と liftInput（筋トレを記録）はカードから**タイル（ヘッダー固定）**へ移した。
+// 保存済みの並び・非表示にこの2キーが残っていても、useCardLayout/useCardOrder が既知キーだけに揃える
+const EX_CARDS = ['move', 'rest'];
 const EX_LABELS = (): Record<string, string> => ({
   move: t('きょうの動き'),
-  quick: t('運動を記録する'),
   rest: t('レストタイマー'),
-  liftInput: t('筋トレを記録する'),
 });
 
 export default function TrainingScreen() {
@@ -64,6 +66,8 @@ export default function TrainingScreen() {
   const [restLeft, setRestLeft] = useState<number | null>(null); // レストタイマー残秒
   // レストの長さは人と種目で違う（高重量なら3分、追い込みなら45秒）。ダイアルで選んで記憶する（筋トレ記録画面と共有）
   const [restSec, setRestSec] = useState(REST_DEFAULT_SEC);
+  // きょうの動きの「週の歩数・時間帯別」は畳んでおく（開いてすぐ記録の入口に届くよう、カードを低く保つ）
+  const [moveMore, setMoveMore] = useState(false);
   const [restDial, setRestDial] = useState(false);
   const trainInputTarget = useGuideTarget('trainInput');
   const moveTarget = useGuideTarget('moveCard');   // ガイド章「食べる前に分かる」: きょうの動き（逆算の1行）
@@ -394,8 +398,53 @@ export default function TrainingScreen() {
   );
 
   // ===== ヘッダー（固定部の下・スクロールする部分: 編集ヒント・未同期チップ・メッセージ） =====
+  // ===== 記録の入口: 左右2枚のタイル（並び替え・非表示の対象にしない＝いつでも最上部にある） =====
+  // 左=筋トレ（主・アクセント塗り）／右=運動（副・面）。ジムでも歩いた日でも、開いてすぐ1タップで入れる
+  const tilesJSX = (
+    <View style={s.tiles}>
+      <Pressable
+        ref={liftTarget} collapsable={false} testID="tile-lift"
+        style={({ pressed }) => [s.tile, s.tilePrimary, pressed && s.tilePressed]}
+        android_ripple={{ color: rgba('#FFFFFF', 0.18), borderless: false }}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); openLiftSession(); }}
+        accessibilityRole="button" accessibilityLabel={pendingSession ? t('セッションを再開する') : t('筋トレを記録する')}
+      >
+        <View style={[s.tileIcon, s.tileIconPrimary]}><Dumbbell size={22} color="#fff" strokeWidth={ICON.strokeBold} /></View>
+        <View>
+          <Text style={[s.tileT, s.tileTPrimary]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+            {pendingSession ? t('セッションを再開する') : t('筋トレを記録する')}
+          </Text>
+          <Text style={[s.tileSub, s.tileSubPrimary]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+            {pendingSession
+              ? t('{n}セット・{d}', { n: pendingSession.sets, d: pendingSession.date.slice(5).replace('-', '/') })
+              : t('レストを見ながらセットを積む')}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        ref={trainInputTarget} collapsable={false} testID="tile-activity"
+        style={({ pressed }) => [s.tile, s.tileTonal, pressed && s.tilePressed]}
+        android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setActSheet(true); }}
+        accessibilityRole="button" accessibilityLabel={t('運動を記録する')}
+      >
+        <View style={[s.tileIcon, s.tileIconTonal]}><Footprints size={22} color={C.accentInk} strokeWidth={ICON.strokeBold} /></View>
+        <View>
+          <Text style={s.tileT} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('運動を記録する')}</Text>
+          <Text style={s.tileSub} numberOfLines={1} maxFontSizeMultiplier={1.2}>{t('種目を選んで時間を回す')}</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
   const headerJSX = (
     <>
+      {!editing && tilesJSX}
+      {/* ヘルスケアからの取り込みは副導線（Apple Watch 等の実測は自動同期が基本） */}
+      {!editing && (
+        <Pressable style={s.tilesFoot} onPress={openHk} hitSlop={8} accessibilityRole="button">
+          <Text style={s.tilesFootT}>{t('ヘルスケアから取り込む（Apple Watch等）')} ›</Text>
+        </Pressable>
+      )}
       {editing && <Text style={s.editHint}>{t('カードを長押し→そのままドラッグで並び替え。⊖で隠す。「完了」で保存します')}</Text>}
       {pendingN > 0 && (
         <Pressable style={s.syncChip} onPress={manualFlush} hitSlop={6}>
@@ -506,10 +555,16 @@ export default function TrainingScreen() {
               </Text>
             )}
             </View>
-            {weekStepsGoal != null && (healthDays?.length ?? 0) > 0 && (
+            {(weekStepsGoal != null || last7.length > 1 || (hourlySteps != null && hourlySteps.some((v) => v > 0))) && (
+              <Pressable onPress={() => setMoveMore((v) => !v)} hitSlop={8} style={s.mvMoreRow} accessibilityRole="button">
+                <Text style={s.mvMore}>{moveMore ? t('たたむ') : t('週の歩数・時間帯別をみる')}</Text>
+                <ChevronRight size={ICON.sm} color={C.accentInk} style={{ transform: [{ rotate: moveMore ? '-90deg' : '90deg' }] }} />
+              </Pressable>
+            )}
+            {moveMore && weekStepsGoal != null && (healthDays?.length ?? 0) > 0 && (
               <WeekStepsBar days={healthDays!} today={todayJST()} goal={weekStepsGoal} />
             )}
-            {last7.length > 1 && (
+            {moveMore && last7.length > 1 && (
               <View style={s.mvBars}>
                 {last7.map((d) => {
                   const [y, m, dd] = d.date.split('-').map(Number);
@@ -525,7 +580,7 @@ export default function TrainingScreen() {
               </View>
             )}
             {/* 時間帯別の歩数（0-23時・ヘルスケア式）。高さは 44→32 に縮小 */}
-            {hourlySteps != null && hourlySteps.some((v) => v > 0) && (() => {
+            {moveMore && hourlySteps != null && hourlySteps.some((v) => v > 0) && (() => {
               const nowH = jstHourNow();
               const isToday = viewDate === todayJST();
               const maxHr = Math.max(1, ...hourlySteps);
@@ -563,17 +618,7 @@ export default function TrainingScreen() {
         );
     }
 
-    if (key === 'quick') {
-      // ===== 運動を記録する: 基本はヘルスケア取り込み。手で足すときは種目を毎回選ぶシート =====
-      return (
-        <View style={s.card} ref={trainInputTarget} collapsable={false}>
-          <View style={s.h2Row}><Footprints size={ICON.md} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('運動を記録する')}</Text></View>
-          <Text style={s.muted}>{t('消費カロリーはヘルスケアから自動で取り込みます。散歩やランニングを手で足すときは、種目を選んで時間を回すだけ。')}</Text>
-          <OptionButton style={{ marginTop: 12 }} label={t('運動を記録する')} onPress={() => setActSheet(true)} busy={actSaving} />
-          <OptionButton style={{ marginTop: 8 }} variant="tonal" label={t('ヘルスケアから取り込む（Apple Watch等）')} onPress={openHk} />
-        </View>
-      );
-    }
+    // quick（運動を記録する）は 2026-09-06 にヘッダーのタイルへ移した（tilesJSX）
 
     if (key === 'rest') {
       // レストタイマー（いつでも手動で起動できる独立タイマー。長さはダイアルで選ぶ）
@@ -620,27 +665,7 @@ export default function TrainingScreen() {
       );
     }
 
-    if (key === 'liftInput') {
-      // ===== 筋トレを記録する: 入力は全画面の記録画面へ（レストを見ながらセットを積む） =====
-      return (
-      <View style={s.card} ref={liftTarget} collapsable={false}>
-        <View style={s.h2Row}>
-          <ClipboardList size={ICON.md} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('筋トレを記録する')}</Text>
-        </View>
-        <Text style={s.liftIntro}>{t('本気で挙げる人向け。ボリューム・目標進捗・インターバルまで全部無料で管理できます。')}</Text>
-        <Text style={s.muted}>{t('記録画面ではレストタイマーを見ながら、セットごとに重量と回数をダイアルで積んでいけます。懸垂の補助・加重も同じダイアルで。')}</Text>
-        {pendingSession && (
-          <Pressable style={s.resumeRow} onPress={openLiftSession}>
-            <Dumbbell size={ICON.md} color={C.accentInk} />
-            <Text style={s.resumeT}>{t('記録中のセッションがあります（{n}セット・{d}）', { n: pendingSession.sets, d: pendingSession.date.slice(5).replace('-', '/') })}</Text>
-            <ChevronRight size={ICON.md} color={C.accentInk} />
-          </Pressable>
-        )}
-        <OptionButton style={{ marginTop: 12 }} variant="teal" label={pendingSession ? t('セッションを再開する') : t('筋トレを記録する')} onPress={openLiftSession}
-                      leading={<Dumbbell size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />} />
-      </View>
-      );
-    }
+    // liftInput（筋トレを記録する）は 2026-09-06 にヘッダーのタイルへ移した（tilesJSX・再開導線もタイルのサブ行）
     return null;
   }
 
@@ -760,6 +785,29 @@ const s = themed(() => ({
   mvAuthHint: { fontSize: 11.5, color: C.amber, fontWeight: '600', lineHeight: 16, marginTop: 8 },
   // きょうの動きカード（2026-09-02 1段小さく: 大数字 25→20・カード余白 16→12・チャート高 44→32）
   cardCompact: { padding: 12 },
+  // 記録の入口タイル（ヘッダー固定・2枚）。角丸20・アイコンは角丸14の面に乗せる。
+  // 左（筋トレ）はアクセント塗り＝主、右（運動）は面＝副。押下で 0.985 に沈む
+  tiles: { flexDirection: 'row', gap: 10, marginBottom: 6 },
+  tile: {
+    flex: 1, minHeight: 108, borderRadius: 20, padding: 14, justifyContent: 'space-between',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline,
+    shadowColor: C.shadow, shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+    overflow: 'hidden',
+  },
+  tilePrimary: { backgroundColor: C.teal, borderColor: C.teal },
+  tileTonal: { backgroundColor: C.panel },
+  tilePressed: { transform: [{ scale: 0.985 }], opacity: 0.92 },
+  tileIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  tileIconPrimary: { backgroundColor: rgba('#FFFFFF', 0.22) },
+  tileIconTonal: { backgroundColor: C.accentSoft },
+  tileT: { fontSize: 15, fontWeight: '800', color: C.ink, marginTop: 12 },
+  tileTPrimary: { color: '#fff' },   // アクセント塗り面の上の白文字は固定色
+  tileSub: { fontSize: 11.5, color: C.sub, marginTop: 2 },
+  tileSubPrimary: { color: rgba('#FFFFFF', 0.85) },
+  tilesFoot: { alignSelf: 'flex-end', paddingVertical: 6, paddingHorizontal: 4, marginBottom: 6 },
+  tilesFootT: { fontSize: 12, fontWeight: '700', color: C.accentInk },
+  mvMoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, marginTop: 10, paddingVertical: 4 },
+  mvMore: { fontSize: 12.5, fontWeight: '800', color: C.accentInk },
   mvRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   mvStat: { flex: 1, backgroundColor: C.bg, borderRadius: RADIUS.tile, paddingVertical: 10, paddingHorizontal: 12 },
   mvLblRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },

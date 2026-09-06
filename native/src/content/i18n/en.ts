@@ -2346,4 +2346,9 @@ export const EN: Record<string, string> = {
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Items without labels may still contain {modes}.",
   "体の写真を追加": "Add body photo",
   "写真から選ぶ": "Choose from photos",
+  "{n}セット・{d}": "{n} sets · {d}",
+  "レストを見ながらセットを積む": "Track rest while logging sets",
+  "種目を選んで時間を回す": "Pick an exercise & start the timer",
+  "たたむ": "Collapse",
+  "週の歩数・時間帯別をみる": "View weekly steps by time of day",
 };
