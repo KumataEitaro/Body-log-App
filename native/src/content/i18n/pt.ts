@@ -2268,4 +2268,9 @@ export const PT: Record<string, string> = {
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Itens não listados também podem conter itens de {modes}.",
   "体の写真を追加": "Adicionar foto corporal",
   "写真から選ぶ": "Escolher da galeria",
+  "{n}セット・{d}": "{n} séries · {d}",
+  "レストを見ながらセットを積む": "Faça as séries acompanhando o descanso",
+  "種目を選んで時間を回す": "Escolha o exercício e solte o cronômetro",
+  "たたむ": "Recolher",
+  "週の歩数・時間帯別をみる": "Ver passos da semana e por horário",
 };

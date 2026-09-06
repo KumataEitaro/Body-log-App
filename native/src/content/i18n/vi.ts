@@ -2268,4 +2268,9 @@ export const VI: Record<string, string> = {
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Các mục không hiển thị cũng có thể chứa thành phần thuộc {modes}.",
   "体の写真を追加": "Thêm ảnh vóc dáng",
   "写真から選ぶ": "Chọn từ thư viện ảnh",
+  "{n}セット・{d}": "{n} hiệp · {d}",
+  "レストを見ながらセットを積む": "Theo dõi thời gian nghỉ và hoàn thành các hiệp",
+  "種目を選んで時間を回す": "Chọn bài tập và bấm giờ",
+  "たたむ": "Thu gọn",
+  "週の歩数・時間帯別をみる": "Xem số bước và khung giờ trong tuần",
 };

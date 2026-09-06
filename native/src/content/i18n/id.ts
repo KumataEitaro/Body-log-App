@@ -2268,4 +2268,9 @@ export const ID: Record<string, string> = {
   "表示のない品目も、{modes}の対象を含む可能性があります。": "Item yang tidak tercantum mungkin juga mengandung target untuk {modes}.",
   "体の写真を追加": "Tambah foto tubuh",
   "写真から選ぶ": "Pilih dari foto",
+  "{n}セット・{d}": "{n} set · {d}",
+  "レストを見ながらセットを積む": "Tambah set sambil pantau istirahat",
+  "種目を選んで時間を回す": "Pilih latihan dan jalankan timer",
+  "たたむ": "Tutup",
+  "週の歩数・時間帯別をみる": "Lihat langkah mingguan & per jam",
 };
