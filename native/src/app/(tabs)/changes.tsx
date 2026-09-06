@@ -8,14 +8,12 @@ import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ReorderableCards from '@/components/ReorderableCards';
 import Animated, {
   FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
-import { AddCardSheet } from '@/components/CardLayout';
 import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft, Flame } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line, Rect } from 'react-native-svg';
@@ -46,6 +44,7 @@ import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2, Share2 } from 'lucide-react-native';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 
+// （2026-09-06 廃止: 長押しで揺れる編集モード・並び替え・非表示は撤去し、行はセクション順で固定。以下は経緯の記録）
 // 並び替えはReorderableCards（gesture-handler+reanimated 4の自前実装・インプレイスの
 // 長押しドラッグ。外部D&Dライブラリは白画面事故があったため使わない）
 import MonthCalendar, { type DayMark } from '@/components/MonthCalendar';
@@ -247,6 +246,14 @@ export default function ChangesScreen() {
   const chartTarget = useGuideTarget('chart');
   // 設定ブロック（旧・右上の⚙）。ガイドツアーの 'gear' はこの行を指す
   const gearTarget = useGuideTarget('gear');
+  // ガイドツアーの自動スクロール受け口（以前は ReorderableCards の onScroller が提供していた）
+  const listRef = useRef<ScrollView>(null);
+  const listY = useRef(0);
+  useEffect(() => {
+    guide.registerScroller('/changes', (delta: number) => {
+      listRef.current?.scrollTo({ y: Math.max(0, listY.current + delta), animated: true });
+    });
+  }, [guide]);
   const todo = useTodoBadge();
   // 未読バッジ数（実績行の赤ドット）。実績ページを開くと消えるので戻るたびに読み直す
   const [unseenBadges, setUnseenBadges] = useState(0);
@@ -308,10 +315,8 @@ export default function ChangesScreen() {
     const h = BackHandler.addEventListener('hardwareBackPress', () => { setDetailKey(null); return true; });
     return () => h.remove();
   }, [detailKey]);
-  const [editing, setEditing] = useState(false);
-  const [orderAll, setOrderAll] = useState<string[]>(ALL_ORDER_DEFAULT);
-  const [hiddenAll, setHiddenAll] = useState<string[]>([]);
-  const [addOpen, setAddOpen] = useState(false);
+  // 並び替え・非表示・編集モードは 2026-09-06 に廃止（行の長押しで揺れる挙動が不評で、機能自体も使われなかった）。
+  // 保存済みの bl-order-all2 / bl-hidden-all2 は読まない＝全員がセクション順の固定表示
   const [bodyTableOpen, setBodyTableOpen] = useState(false);
   const [liftTableOpen, setLiftTableOpen] = useState(false);
   const [tableMetric, setTableMetric] = useState<'weight' | 'waist' | 'bodyfat'>('weight');
@@ -324,43 +329,6 @@ export default function ChangesScreen() {
     setBodyTableOpen(true);
   }
 
-  // 並び順の復元。カード統合でキー体系が変わったため保存キーをv2に更新。
-  // 旧キー（bl-order-all等）は読まない＝全員新既定から再スタート
-  // （旧構成のキーが混ざる事故を避ける最も安全な方法。フィルタで消えるだけだが読む意味もない）
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = JSON.parse((await AsyncStorage.getItem('bl-order-all2')) || 'null');
-        if (Array.isArray(all)) setOrderAll(mergeOrder(all, ALL_ORDER_DEFAULT));
-        const hAll = JSON.parse((await AsyncStorage.getItem('bl-hidden-all2')) || 'null');
-        if (Array.isArray(hAll)) setHiddenAll(hAll.filter((k: string) => ALL_ORDER_DEFAULT.includes(k)));
-      } catch { /* 初回など */ }
-    })();
-  }, []);
-
-  // 離脱時確定用に最新値をrefへ同期（AppState/blurリスナーの古いクロージャ対策）
-  const editStateRef = useRef({ editing: false, all: ALL_ORDER_DEFAULT });
-  editStateRef.current = { editing, all: orderAll };
-
-  const finishEditing = useCallback(async () => {
-    setEditing(false);
-    try {
-      await AsyncStorage.setItem('bl-order-all2', JSON.stringify(editStateRef.current.all));
-    } catch { /* 保存失敗はレイアウトが戻るだけ */ }
-  }, []);
-
-  // 編集中にホーム画面へ戻った（バックグラウンド化）ら、その時点の並びで確定する
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (st) => {
-      if ((st === 'background' || st === 'inactive') && editStateRef.current.editing) finishEditing();
-    });
-    return () => sub.remove();
-  }, [finishEditing]);
-
-  // 編集中に他タブへ移動した場合も確定する
-  useFocusEffect(
-    useCallback(() => () => { if (editStateRef.current.editing) finishEditing(); }, [finishEditing])
-  );
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthMsg, setHealthMsg] = useState<string | null>(null);
@@ -947,45 +915,8 @@ export default function ChangesScreen() {
     ...(cycleOn ? [] : ['cycle']),
     ...(Platform.OS === 'ios' ? [] : ['health']),
   ];
-  const hidden = hiddenAll;
-  // 描画は常にセクション正規化した並びを使う（保存値がセクションを跨いでいても壊れない）
-  const orderNorm = normalizeOrder(orderAll);
-  const visibleOrder = orderNorm.filter((k) => !hidden.includes(k) && !unavailable.includes(k));
-
-  // 表示中カードの並べ替え結果を、非表示・非対象カードの位置を保ったまま全体の順序へ戻す。
-  // ドラッグ確定はそのまま保存してよい（描画側で毎回正規化するので、セクションを跨いだ
-  // 落下も自セクション内の相対位置だけが反映される＝跨ぎは実質無効）
-  const setOrder = (nextVisible: string[]) => {
-    let i = 0;
-    setOrderAll(orderNorm.map((k) => (hidden.includes(k) || unavailable.includes(k) ? k : nextVisible[i++])));
-  };
-
-  function hideCard(key: string) {
-    const next = [...hidden, key];
-    setHiddenAll(next);
-    AsyncStorage.setItem('bl-hidden-all2', JSON.stringify(next)).catch(() => {});
-  }
-  function showCard(key: string) {
-    const next = hidden.filter((k) => k !== key);
-    setHiddenAll(next);
-    AsyncStorage.setItem('bl-hidden-all2', JSON.stringify(next)).catch(() => {});
-  }
-
-  // 最初の並びに戻す（旧世代の保存キーもここで掃除する）
-  async function resetOrder() {
-    setOrderAll(ALL_ORDER_DEFAULT);
-    setHiddenAll([]);
-    try {
-      await AsyncStorage.removeItem('bl-order-all2');
-      await AsyncStorage.removeItem('bl-hidden-all2');
-      await AsyncStorage.removeItem('bl-order-all');
-      await AsyncStorage.removeItem('bl-hidden-all');
-      await AsyncStorage.removeItem('bl-order-body');
-      await AsyncStorage.removeItem('bl-order-train');
-      await AsyncStorage.removeItem('bl-hidden-body');
-      await AsyncStorage.removeItem('bl-hidden-train');
-    } catch { /* 無視 */ }
-  }
+  // 並びはセクション順で固定（並び替え・非表示は廃止）。unavailable だけを除く
+  const visibleOrder = normalizeOrder(ALL_ORDER_DEFAULT).filter((k) => !unavailable.includes(k));
 
   // ===== マスタメニューの要約行（ヘルスケア式: 名前＋変化の言語化＋ミニチャート） =====
   function weekDeltaOf(sel: (r: Row) => number | null): number | null {
@@ -1190,8 +1121,7 @@ export default function ChangesScreen() {
   // 広告枠（概要タブ・1枠）: 「からだ」セクションと「食事」セクションの間＝食事セクションの
   // 見出しの直上。詳細ページ（detailKey!=null）には置かない。並び替え中も非表示。
   // 食事セクションの行が全部隠されているときは枠を出さない（無理に別の場所へ置かない）
-  const adBeforeKey = editing ? null
-    : (visibleOrder.find((k) => SECTION_DEFS[1].keys.includes(k)) ?? null);
+  const adBeforeKey = visibleOrder.find((k) => SECTION_DEFS[1].keys.includes(k)) ?? null;
   function menuRow(key: string) {
     const withSpark = key === 'body' && sparkVals.length >= 2;
     // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
@@ -1242,8 +1172,7 @@ export default function ChangesScreen() {
                      return;
                    }
                    openDetail(key);
-                 }}
-                 onLongPress={() => setEditing(true)} delayLongPress={400}>
+                 }}>
         <View style={s.menuIcon}>{menuIconOf(key)}</View>
         <View style={{ flex: 1 }}>
           <Text style={s.menuT}>{CARD_LABELS()[key] ?? key}</Text>
@@ -1268,26 +1197,7 @@ export default function ChangesScreen() {
 
   // タイトル行は上端に貼り付く（食事・運動タブと共通の TabHeader）。
   // 2026-09-04 に右上の⚙を廃止したので、右余白38の予約席は無くなっている
-  const stickyHeaderJSX = (
-    <TabHeader
-      title={t('概要')}
-      right={(
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          {editing ? (
-            <>
-              <Pressable onPress={() => setAddOpen(true)} style={s.addBtn} hitSlop={8}>
-                <Plus size={ICON.md} color="#fff" strokeWidth={ICON.strokeBold} />
-              </Pressable>
-              <Pressable onPress={resetOrder} style={s.editBtn} hitSlop={8}><Text style={s.editBtnT}>{t('元に戻す')}</Text></Pressable>
-              <Pressable onPress={finishEditing} style={s.doneBtn} hitSlop={8}><Text style={s.doneBtnT}>{t('完了')}</Text></Pressable>
-            </>
-          ) : (
-            <Pressable onPress={() => setEditing(true)} hitSlop={8} style={s.editBtn}><Text style={s.editBtnT}>{t('≡ 並べ替え')}</Text></Pressable>
-          )}
-        </View>
-      )}
-    />
-  );
+  const stickyHeaderJSX = <TabHeader title={t('概要')} />;
   // 設定ブロックの1行（menuRow と同じ見た目。並べ替え・非表示の対象ではないので
   // ドラッグ用のハンドラは持たない＝設定へ辿り着けなくなる事故が構造的に起きない）
   function settingsRow(o: {
@@ -1344,21 +1254,16 @@ export default function ChangesScreen() {
   );
   const headerJSX = (
     <>
-      {editing && <Text style={s.editHint}>{t('行を長押し→そのままドラッグで並び替え。「完了」で保存します')}</Text>}
-      {/* 設定ブロック（2026-09-04・右上の⚙を廃止して概要の最上部へ）。
-          並び替え中は隠す（ドラッグの視界を邪魔しない・他のブロックと同じ流儀） */}
-      {!editing && settingsBlock}
-      {/* きょうのハイライト（B-16）: セクション見出しより上の最上部に1枚だけ。
-          並び替え中は非表示（ドラッグの視界を邪魔しない）。lawsは図鑑へ、他は詳細ページへ */}
-      {!editing && (
-        <HighlightCard
-          rows={rows} today={today} ready={menuLoaded}
-          onOpen={(target: HighlightTarget) => {
-            if (target === 'laws') { router.push('/laws' as never); return; }
-            openDetail(target);
-          }}
-        />
-      )}
+      {/* 設定ブロック（2026-09-04・右上の⚙を廃止して概要の最上部へ） */}
+      {settingsBlock}
+      {/* きょうのハイライト（B-16）: セクション見出しより上の最上部に1枚だけ。lawsは図鑑へ、他は詳細ページへ */}
+      <HighlightCard
+        rows={rows} today={today} ready={menuLoaded}
+        onOpen={(target: HighlightTarget) => {
+          if (target === 'laws') { router.push('/laws' as never); return; }
+          openDetail(target);
+        }}
+      />
     </>
   );
 
@@ -1382,22 +1287,21 @@ export default function ChangesScreen() {
           ))}
         </ScrollView>
       ) : detailKey == null ? (
-        // ===== マスタメニュー（ヘルスケア式: 要約行のリスト。行の長押しで並び替え） =====
-        <ReorderableCards
-          editing={editing}
-          order={visibleOrder}
-          onOrderChange={setOrder}
-          renderCard={menuRow}
-          onHide={hideCard}
-          ghostLabel={(k) => CARD_LABELS()[k] ?? k}
-          header={headerJSX}
-          stickyHeader={stickyHeaderJSX}
-          onEnterEdit={() => setEditing(true)}
+        // ===== マスタメニュー（ヘルスケア式: 要約行のリスト。並びはセクション順で固定） =====
+        <ScrollView
+          ref={listRef}
+          style={{ flex: 1 }}
+          stickyHeaderIndices={STICKY_FIRST}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
           // 上端の余白はスティッキーヘッダー自身が持つ（insets.top）ので、ここは 0
           contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 24 }]}
-          onScroller={(fn) => guide.registerScroller('/changes', fn)}
-        />
+          onScroll={(e) => { listY.current = e.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={32}
+        >
+          {stickyHeaderJSX}
+          {headerJSX}
+          {visibleOrder.map((k) => <View key={k}>{menuRow(k)}</View>)}
+        </ScrollView>
       ) : (
         // ===== 詳細ページ（メニュー行タップで展開。既存カードをそのまま全画面で見せる） =====
         // エッジスワイプ（左端開始のPan）で指に追従してスライドし、1/3超か勢いがあれば閉じる
@@ -1434,10 +1338,6 @@ export default function ChangesScreen() {
       {/* 「広告なしで使えます →」（全画面広告が閉じ切ったあとだけ・1回・約6秒）。
           広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}
       {adPitch.element}
-      <AddCardSheet
-        visible={addOpen} onClose={() => setAddOpen(false)}
-        hidden={hidden.filter((k) => !unavailable.includes(k))} shownKeys={visibleOrder} labels={CARD_LABELS()} onShow={showCard}
-      />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
