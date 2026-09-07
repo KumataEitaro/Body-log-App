@@ -125,24 +125,37 @@ jobs:
 
       - name: クラッシュ抜粋を ci-logs ブランチへ公開（ログイン無しで読めるように）
         if: always()
+        # 公開に失敗しても Verdict（本来の判定）は走らせる
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           [ -f smoke-summary.md ] || { echo "抜粋が無い（エミュレータ前で失敗）"; exit 0; }
-          mkdir -p /tmp/cilogs && cp smoke-summary.md /tmp/cilogs/summary.md
-          cp logcat-crash.txt /tmp/cilogs/ 2>/dev/null || true
-          cp logcat-app.txt /tmp/cilogs/ 2>/dev/null || true
+          # #12 の失敗: 作業ツリー内で --orphan → git rm → add -A としたら node_modules/ や android/build まで
+          # 追加されて 2 分後に落ちた。**別ディレクトリの空リポジトリ**で ci-logs だけを扱う。
+          PUB=/tmp/cilogs-repo
+          rm -rf "$PUB" && mkdir -p "$PUB" && cd "$PUB"
+          git init -q
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin ci-logs:ci-logs 2>/dev/null || git checkout --orphan ci-logs
-          git checkout ci-logs 2>/dev/null || true
-          git rm -rfq . 2>/dev/null || true
-          mkdir -p android-smoke/${GITHUB_RUN_NUMBER}
-          cp /tmp/cilogs/* android-smoke/${GITHUB_RUN_NUMBER}/
-          rm -rf android-smoke/latest && cp -r android-smoke/${GITHUB_RUN_NUMBER} android-smoke/latest
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth=1 origin ci-logs 2>/dev/null; then
+            git checkout -q -b ci-logs FETCH_HEAD
+          else
+            git checkout -q --orphan ci-logs
+          fi
+          DEST="android-smoke/${GITHUB_RUN_NUMBER}"
+          mkdir -p "$DEST"
+          cp "${GITHUB_WORKSPACE}/smoke-summary.md" "$DEST/summary.md"
+          cp "${GITHUB_WORKSPACE}/logcat-crash.txt" "$DEST/" 2>/dev/null || true
+          cp "${GITHUB_WORKSPACE}/logcat-app.txt" "$DEST/" 2>/dev/null || true
+          rm -rf android-smoke/latest && cp -r "$DEST" android-smoke/latest
           printf '# Android smoke logs\n\n最新: android-smoke/latest/summary.md（run #%s・%s）\n' "${GITHUB_RUN_NUMBER}" "${GITHUB_SHA}" > README.md
           git add -A
-          git commit -qm "android-smoke #${GITHUB_RUN_NUMBER} (${GITHUB_SHA:0:7})" || echo "変更なし"
+          git commit -qm "android-smoke #${GITHUB_RUN_NUMBER} (${GITHUB_SHA:0:7})"
           git push -q origin ci-logs
+          echo "公開: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/ci-logs/android-smoke/latest/summary.md"
 
       - name: Verdict
         run: |
