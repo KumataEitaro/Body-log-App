@@ -19,6 +19,16 @@ https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィ
 
 ### A3. 🔴 Android: 起動クラッシュの検証（対策ビルドで再検証）
 
+> **2026-09-07 真因確定・修正投入（fix/android-appearance-null）**: android-smoke #13 の logcat で
+> `AppearanceModule.setColorScheme` の NullPointerException を確認。`lib/theme.ts` が OS 追従のときに
+> `Appearance.setColorScheme(null)` を呼んでいた（ダークモード導入以来）。Android は非 null 引数なので
+> 別スレッドで即死、JS の try/catch では捕まらない。`'unspecified'` に修正＋再発防止テスト。
+> 詳細 docs/ANDROID.md「2026-09-07 に確定した真因」。**次の rn-android ビルド（1.1.1）で端末確認 → A3 完了**。
+> android-smoke #14 が緑なら機械的にも確認できる。ログは
+> https://raw.githubusercontent.com/KumataEitaro/Body-log-App/ci-logs/android-smoke/latest/summary.md
+>
+> （2026-09-04 の対策は下記。これは iOS 専用ネイティブの漏れで、別の問題を先に塞いだことになる）
+
 > **2026-09-04 対策投入済み（fix/android-native-hygiene）**: iOS 専用ネイティブ（HealthKit の依存
 > `react-native-nitro-modules`＝C++/JSI）が Android に漏れていた経路を塞ぎ、依存を SDK57 に整列した。
 > 詳細 docs/ANDROID.md「iOS 専用ライブラリの扱い」。**次の rn-android ビルドで再検証する。**
