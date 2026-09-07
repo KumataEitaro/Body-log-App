@@ -27,6 +27,30 @@ dump_logs() {
   head -80 logcat-crash.txt || true
   echo "ALIVE=$ALIVE"
   echo "ALIVE=$ALIVE" >> "$GITHUB_ENV"
+  # ジョブサマリー（Actions の Run ページに描かれる）にも抜粋を書く。Public リポジトリなら
+  # ログイン無しで読めるので、Claude が直接読んで診断できる（ログ本体・アーティファクトは要ログイン）
+  if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+    {
+      echo "## Android smoke: ALIVE=$ALIVE"
+      echo
+      echo "### 致命例外（logcat-full）"
+      echo '```'
+      grep -n "FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|UnsatisfiedLinkError|NoClassDefFoundError|NoSuchMethodError|Process .* has died" logcat-full.txt | head -40 || true
+      echo '```'
+      echo "### JS 例外（ReactNativeJS）"
+      echo '```'
+      grep -n "ReactNativeJS" logcat-app.txt | head -40 || true
+      echo '```'
+      echo "### crash buffer 先頭 120 行"
+      echo '```'
+      head -120 logcat-crash.txt || true
+      echo '```'
+      echo "### AndroidRuntime / FATAL の前後（logcat-full から 60 行）"
+      echo '```'
+      grep -n -B5 -A40 "FATAL EXCEPTION|Fatal signal" logcat-full.txt | head -120 || true
+      echo '```'
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
 }
 trap dump_logs EXIT
 
