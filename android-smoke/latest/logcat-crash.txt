@@ -1,0 +1,15 @@
+--------- beginning of crash
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: FATAL EXCEPTION: mqt_v_native
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: Process: com.gotcha.bodylog.rn, PID: 3753
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: java.lang.NullPointerException: Parameter specified as non-null is null: method com.facebook.react.modules.appearance.AppearanceModule.setColorScheme, parameter style
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.react.modules.appearance.AppearanceModule.setColorScheme(Unknown Source:2)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.jni.NativeRunnable.run(Native Method)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:958)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadHandler.dispatchMessage(MessageQueueThreadHandler.kt:21)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:205)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:294)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.startNewBackgroundThread$lambda$0(MessageQueueThreadImpl.kt:152)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion.$r8$lambda$YYXYCFexeoKtAeDpeNYkxZZlpbA(Unknown Source:0)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at com.facebook.react.bridge.queue.MessageQueueThreadImpl$Companion$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+09-07 04:16:21.159  3753  3857 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1012)
