@@ -173,6 +173,13 @@ OS 別に分けるのは **ビルド設定と CI のワークフロー**（Codem
 - 落ちたら: Actions のそのランの **Artifacts → android-smoke-logs** → `logcat-crash.txt`（ネイティブ）／
   `logcat-app.txt`（JS 例外・safeBoot の記録）を読む。**トレースが無い状態でコードを当てにいかない**
 - 通ったら: 「Android の release ビルドが起動する」ことの機械的な保証
+- **ログイン無しで読む（Claude 向け・2026-09-07）**: ログ本体・Artifacts・ジョブサマリーは Public リポジトリでも
+  **要ログイン**（API は 403、Run ページの summary はクライアント描画）。そこで各ランの最後に
+  「クラッシュ抜粋を ci-logs ブランチへ公開」ステップが `summary.md` / `logcat-crash.txt` / `logcat-app.txt` を
+  `ci-logs` ブランチにコミットする（`jobs.smoke.permissions: contents: write`）。raw URL で誰でも読める:
+  - 最新: https://raw.githubusercontent.com/KumataEitaro/Body-log-App/ci-logs/android-smoke/latest/summary.md
+  - ラン別: `.../ci-logs/android-smoke/<run_number>/summary.md`（`logcat-crash.txt` / `logcat-app.txt` も同階層）
+  - `ci-logs` は `main` の `paths` 対象外なので再帰起動しない。**リポジトリを Private に戻したら raw URL も要認証になる**
 - autolink の一覧（`autolink-rn.json` / `autolink-expo.json`）も残るので、
   「Android に何がリンクされているか」を後から確認できる。iOS 専用ネイティブが混ざっていたら CI 自体が落ちる
 - 費用: 私有リポジトリの無料枠 2,000分/月、1回 ≒ 20〜25分。main への push が1日5回を超えるなら
