@@ -306,7 +306,8 @@ export function pfcColors(): PfcColors { return prefs.pfc; }
 let appliedScheme: 'light' | 'dark' | null = null;
 // 最後に RNAppearance.setColorScheme へ渡した値。同じ値を毎回渡すと iOS が外観変更イベントを
 // 再発火させ、リスナー → applyCurrent → setColorScheme → リスナー… の連鎖になりうる
-let lastOverride: 'light' | 'dark' | null | undefined = undefined;
+type NativeSchemeOverride = 'light' | 'dark' | 'unspecified';
+let lastOverride: NativeSchemeOverride | undefined = undefined;
 // 再入防止（setColorScheme が同期的にリスナーを呼ぶ環境でも一度しか適用しない）
 let applying = false;
 
@@ -318,13 +319,18 @@ function applyCurrent(): void {
     appliedScheme = scheme;
     applyPalette(scheme === 'dark' ? darkPaletteFor(prefs.accent) : paletteFor(prefs.accent, prefs.bg));
     // ネイティブUI（タブバー・ヘッダー・シート）も同じ明暗に固定する。
-    // mode=systemのときはOS追従（null）。これを怠るとLiquid Glassのバーだけ暗い事故が再発する。
+    // mode=system のときは OS 追従に戻す。これを怠るとLiquid Glassのバーだけ暗い事故が再発する。
     // 値が変わるときだけ呼ぶ（上の lastOverride の理由）。
-    // 型定義がnull（=OS追従に戻す）を受け付けない版があるためキャストする（ランタイムは対応済み）
-    const override = prefs.mode === 'system' ? null : prefs.mode;
+    //
+    // ⚠️ OS 追従は **'unspecified'** で表す。null を渡してはいけない（2026-09-07・Android 起動クラッシュの真因）。
+    //   Android の AppearanceModule.setColorScheme(style: String) は Kotlin の非 null 引数で、null を受けると
+    //   別スレッド（mqt_v_native）で NullPointerException → プロセス即死。JS の try/catch では捕まらず、
+    //   ErrorBoundary / safeBoot にも記録が残らない。iOS は null を黙って受けていたので iOS だけ動いていた。
+    //   'unspecified' は RN の ColorSchemeName に含まれる正規の値で、iOS/Android とも「システムに従う」になる。
+    const override: NativeSchemeOverride = prefs.mode === 'system' ? 'unspecified' : prefs.mode;
     if (override !== lastOverride) {
       lastOverride = override;
-      try { RNAppearance.setColorScheme(override as unknown as 'light' | 'dark'); } catch { /* 旧RNでは無視 */ }
+      try { RNAppearance.setColorScheme(override); } catch { /* 旧RNでは無視 */ }
     }
   } finally {
     applying = false;

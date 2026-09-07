@@ -344,7 +344,30 @@ adb logcat --buffer=crash                        # 直近のネイティブク�
 
 JSの例外なら `ReactNativeJS`、Java/Kotlin側なら `AndroidRuntime: FATAL EXCEPTION` に出る。
 **JS例外が一切出ずに `AndroidRuntime` だけが出るなら、JSに到達する前のネイティブ初期化**
-（AdMobのApp ID・ネイティブモジュールのリンク・リソース）を疑う。
+（AdMobのApp ID・ネイティブモジュールのリンク・リソース）を疑う。**ただし例外がある**（下記）。
+
+#### 2026-09-07 に確定した真因: `Appearance.setColorScheme(null)`（JS から呼んだネイティブが別スレッドで死ぬ型）
+
+android-smoke #13 の logcat（`ci-logs` ブランチ）:
+
+```
+FATAL EXCEPTION: mqt_v_native
+java.lang.NullPointerException: Parameter specified as non-null is null:
+  method com.facebook.react.modules.appearance.AppearanceModule.setColorScheme, parameter style
+```
+
+- `lib/theme.ts` が mode=system（全員の初期値）で **`RNAppearance.setColorScheme(null)`** を呼んでいた
+  （8560328 のダークモード導入以来）。Android の実装は Kotlin の非 null `String` 引数なので、null を受けた瞬間に
+  ネイティブスレッド（`mqt_v_native`）で NullPointerException → プロセス即死。
+- **JS の try/catch では捕まらない**（呼び出しは非同期にネイティブへ渡る）。ErrorBoundary・safeBoot にも残らない。
+  `ReactNativeJS` に例外が出ず `AndroidRuntime` だけが出るが、**発生源は JS からの呼び出し**だった。
+  つまり「JS 例外が無い＝ネイティブ初期化」とは限らない。**スタックの先頭のモジュール名（ここでは AppearanceModule）から
+  JS 側の呼び出し元を grep する**のが正しい手順。
+- iOS（Objective-C）は nil を黙って受けるので iOS だけ動いていた。
+- 修正: OS 追従は RN の正規の値 **`'unspecified'`** で表す（`ColorSchemeName` に含まれ、iOS/Android とも「システムに従う」）。
+  再発防止テスト: `src/lib/__tests__/themeAppearanceNative.test.ts`（spy で実際に渡る値を見る＋ソースに null の書き方が復活していないか）。
+- 教訓: **RN の JS 側の型を `as unknown as` で騙して null を通す箇所は Android で落ちる候補**。Kotlin 化された RN のネイティブモジュールは
+  引数の null を受け付けない。
 
 ### 3. Play Console でトレースを出す（内部テストでは出ない）
 
@@ -430,9 +453,11 @@ expo-print / expo-camera / react-native-purchases / AdMob まで全部モジュ�
   `react-native-screens` の `TabsContainer.kt` が **自前で `ContextThemeWrapper(..., Theme_Material3_DayNight_NoActionBar)`**
   を掛けている。つまり prebuild が生成する `AppTheme`（`Theme.AppCompat.DayNight.NoActionBar`）でも
   BottomNavigationView のインフレートは落ちない（Materialテーマ必須の古典的クラッシュには当たらない）
-- `@expo/ui`: Android実装あり（Jetpack Compose）だが `src/` からは未使用。
-  未使用のまま autolink されるので、**将来ビルドサイズやCompose依存の衝突を疑うときは
-  最初に外す候補**（今回は起動クラッシュの原因になる経路が無い）
+- `@expo/ui`: Android実装あり（Jetpack Compose・prebuilt AAR）。`src/` からは直接使っていないが、
+  **Android では expo-router の `<Stack>` が `.android.js` 経由で `@expo/ui/jetpack-compose` を起動時に評価し、
+  module scope で `requireNativeModule('ExpoUI')` が走る**（`stack-utils/toolbar/processHeaderItemsForPlatform.android.js`）。
+  iOS バンドルには無い経路。2026-09-07 の起動クラッシュの真因ではなかった（真因は上の setColorScheme(null)）が、
+  「Android だけ落ちて JS 例外が無い」ときの候補としては残る。切り分けは `_layout.tsx` の `<Stack>` を一時的に `<Slot />` にして起動するか
 
 **prebuild の生成物で確認したこと**（`npx expo prebuild --platform android --no-install`）
 
