@@ -42,6 +42,9 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # ci-logs ブランチへクラッシュ抜粋を push するため（Public リポジトリなので raw URL でログイン無しに読める）
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -119,6 +122,27 @@ jobs:
             native/autolink-rn.json
             native/autolink-expo.json
           retention-days: 14
+
+      - name: クラッシュ抜粋を ci-logs ブランチへ公開（ログイン無しで読めるように）
+        if: always()
+        run: |
+          set -e
+          [ -f smoke-summary.md ] || { echo "抜粋が無い（エミュレータ前で失敗）"; exit 0; }
+          mkdir -p /tmp/cilogs && cp smoke-summary.md /tmp/cilogs/summary.md
+          cp logcat-crash.txt /tmp/cilogs/ 2>/dev/null || true
+          cp logcat-app.txt /tmp/cilogs/ 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin ci-logs:ci-logs 2>/dev/null || git checkout --orphan ci-logs
+          git checkout ci-logs 2>/dev/null || true
+          git rm -rfq . 2>/dev/null || true
+          mkdir -p android-smoke/${GITHUB_RUN_NUMBER}
+          cp /tmp/cilogs/* android-smoke/${GITHUB_RUN_NUMBER}/
+          rm -rf android-smoke/latest && cp -r android-smoke/${GITHUB_RUN_NUMBER} android-smoke/latest
+          printf '# Android smoke logs\n\n最新: android-smoke/latest/summary.md（run #%s・%s）\n' "${GITHUB_RUN_NUMBER}" "${GITHUB_SHA}" > README.md
+          git add -A
+          git commit -qm "android-smoke #${GITHUB_RUN_NUMBER} (${GITHUB_SHA:0:7})" || echo "変更なし"
+          git push -q origin ci-logs
 
       - name: Verdict
         run: |

@@ -35,7 +35,7 @@ dump_logs() {
       echo
       echo "### 致命例外（logcat-full）"
       echo '```'
-      grep -n "FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|UnsatisfiedLinkError|NoClassDefFoundError|NoSuchMethodError|Process .* has died" logcat-full.txt | head -40 || true
+      grep -nE "FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|UnsatisfiedLinkError|NoClassDefFoundError|NoSuchMethodError|Process .* has died" logcat-full.txt | head -40 || true
       echo '```'
       echo "### JS 例外（ReactNativeJS）"
       echo '```'
@@ -47,9 +47,11 @@ dump_logs() {
       echo '```'
       echo "### AndroidRuntime / FATAL の前後（logcat-full から 60 行）"
       echo '```'
-      grep -n -B5 -A40 "FATAL EXCEPTION|Fatal signal" logcat-full.txt | head -120 || true
+      grep -nE -B5 -A40 "FATAL EXCEPTION|Fatal signal" logcat-full.txt | head -120 || true
       echo '```'
     } >> "$GITHUB_STEP_SUMMARY"
+    # ci-logs ブランチへ公開する抜粋（Public リポジトリの raw URL でログイン無しに読める）
+    cp "$GITHUB_STEP_SUMMARY" smoke-summary.md 2>/dev/null || true
   fi
 }
 trap dump_logs EXIT
