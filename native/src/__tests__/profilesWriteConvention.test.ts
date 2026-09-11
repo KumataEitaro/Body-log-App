@@ -23,7 +23,7 @@ const SRC = join(__dirname, '..');
 // 【一時的な例外】マージ後に必ず外すこと。
 // settings.tsx のプロフィール保存（`fix/qa-validation` ブランチで upsert 化している最中）。
 // 両ブランチが main に入った時点でこの配列を空にし、このテストを本来の全域チェックへ戻す。
-const TEMPORARY_ALLOW: readonly string[] = ['app/settings.tsx'];
+const TEMPORARY_ALLOW: readonly string[] = [];   // 2026-09-11 fix/qa-validation マージ済み → 空
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
