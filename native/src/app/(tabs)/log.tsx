@@ -22,6 +22,7 @@ import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
 import PlusEntry, { type LogOpenParam } from '@/components/PlusEntry';
+import ThemeRemount from '@/components/ThemeRemount';
 import { type PlusAction } from '@/components/PlusSheet';
 import { saveWeightEntry } from '@/lib/weightLog';
 import EventPlanSheet, { type EventDraft } from '@/components/EventPlanSheet';
@@ -1607,6 +1608,10 @@ export default function LogScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* テーマ世代の壁（2026-09-10・components/ThemeRemount.tsx）: 明暗・アクセントが切り替わったら
+          スクロール本体を key で丸ごと作り直す＝再描画を省く要素があっても古い色が残れない。
+          ＋・入力シート・Modal は壁の外（iOS で古いモーダルが残るため） */}
+      <ThemeRemount>
       <ScrollView
         ref={scrollRef}
         automaticallyAdjustKeyboardInsets
@@ -2108,6 +2113,7 @@ export default function LogScreen() {
 
         <View style={{ height: 16 }} />
       </ScrollView>
+      </ThemeRemount>
 
       {/* ===== 右下の＋ボタン（唯一の入力の入口。旧・下部固定ドックは 2026-09-02 に廃止） =====
           起動時の時差入場の最後（enter[3]）で浮かび上がる。トレイに書きかけがあれば件数バッジ */}

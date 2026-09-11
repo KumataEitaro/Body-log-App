@@ -38,6 +38,7 @@ import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
 import PlusEntry from '@/components/PlusEntry';
+import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
@@ -1184,6 +1185,9 @@ export default function ChangesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {/* テーマ世代の壁（2026-09-10・components/ThemeRemount.tsx）: 明暗が切り替わったら一覧/詳細の本体を
+          作り直す。スナックバー・＋・シートは壁の外 */}
+      <ThemeRemount>
       {detailKey == null && !menuLoaded && rows.length === 0 ? (
         // ===== スケルトンローディング =====
         // 初回ロード中（rowsが空でロード完了前）だけ、メニュー行の骨組みを5本見せる。
@@ -1248,7 +1252,9 @@ export default function ChangesScreen() {
             </ScrollView>
           </Animated.View>
         </GestureDetector>
-      )}      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
+      )}
+      </ThemeRemount>
+      {/* 削除のUndoスナックバー（筋トレ履歴の削除で使う。タブの上に出す） */}
       {undoBar.element}
       {/* 「広告なしで使えます →」（全画面広告が閉じ切ったあとだけ・1回・約6秒）。
           広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}

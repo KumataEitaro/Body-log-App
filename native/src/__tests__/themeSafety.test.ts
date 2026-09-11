@@ -69,4 +69,26 @@ describe('themeSafety: 再描画されない要素にテーマが届く', () => 
     }
     expect(offenders).toEqual([]);
   });
+
+  // 第3層（2026-09-10・4回目の再発で導入）: 規約と購読は「知っている抜け道」しか塞げない。
+  // 4タブのスクロール本体は ThemeRemount（世代が変わったら key で作り直す壁）で必ず包む。
+  // 壁の外に置くのは Modal・シート・＋だけ（iOS で古いモーダルが残るため）。
+  it('4タブのスクロール本体は ThemeRemount（テーマ世代の壁）で包まれている', () => {
+    for (const tab of ['log', 'training', 'coach', 'changes']) {
+      const src = read(path.join(SRC, 'app', '(tabs)', `${tab}.tsx`));
+      expect(src).toMatch(/import ThemeRemount from '@\/components\/ThemeRemount'/);
+      const opens = (src.match(/<ThemeRemount[\s>]/g) ?? []).length;
+      const closes = (src.match(/<\/ThemeRemount>/g) ?? []).length;
+      expect({ tab, opens, closes }).toEqual({ tab, opens: 1, closes: 1 });
+      // 壁の中に Modal を入れない（作り直しで iOS の古いモーダルが残る）
+      const inside = src.slice(src.indexOf('<ThemeRemount'), src.indexOf('</ThemeRemount>'));
+      expect({ tab, modalInsideWall: /<Modal[\s>]/.test(inside) }).toEqual({ tab, modalInsideWall: false });
+    }
+  });
+
+  it('ThemeRemount 自身は世代を購読し、世代 key で子を作り直す', () => {
+    const src = read(path.join(SRC, 'components', 'ThemeRemount.tsx'));
+    expect(src).toMatch(/useTheme\(\)/);
+    expect(src).toMatch(/key=\{`theme-\$\{gen\}`\}/);
+  });
 });

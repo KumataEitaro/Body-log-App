@@ -24,6 +24,7 @@ import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
 import PlusEntry from '@/components/PlusEntry';
+import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import AdSlot from '@/components/AdSlot';
 import ColumnReader from '@/components/ColumnReader';
@@ -310,6 +311,9 @@ export default function CoachScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={[s.wrap, { paddingBottom: insets.bottom + 6 }]}>
         <Text style={[s.pageTitle, { marginTop: insets.top + 8 }]}>{t('相談')}</Text>
+        {/* テーマ世代の壁（2026-09-10・components/ThemeRemount.tsx）: 明暗が切り替わったら会話/ウェルカムの
+            スクロール本体を作り直す。コンポーザーは壁の外（入力途中のフォーカスと文字を失わない） */}
+        <ThemeRemount>
         {empty ? (
           /* ===== Empty State: 中央寄せのウェルカムUI（キーボード表示中はスクロールしてロゴまで見える） ===== */
           <ScrollView
@@ -403,6 +407,7 @@ export default function CoachScreen() {
             )}
           </ScrollView>
         )}
+        </ThemeRemount>
 
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
         <AskCatalog visible={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={(q) => send(q)} />
