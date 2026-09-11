@@ -104,6 +104,9 @@ jest.mock('expo-notifications', () => ({
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
   scheduleNotificationAsync: jest.fn(() => Promise.resolve('notif-id')),
   cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+  // サインアウト時の掃除（lib/signOutCleanup.ts）が使う。予約IDのキーだけ消して
+  // 予約本体を残すと、次の人の端末で前の人のリマインダーが鳴る
+  cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
   setNotificationHandler: jest.fn(),
   setNotificationCategoryAsync: jest.fn(() => Promise.resolve()),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),

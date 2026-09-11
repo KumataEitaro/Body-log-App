@@ -2362,4 +2362,14 @@ export const EN: Record<string, string> = {
   // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
   "マイ食品を登録": "Add to My Foods",
   "マイ食品に登録しました。": "Added to My Foods.",
+  // QA 2026-09-10 の修正分（P0-2 圏外キュー / P0-3 プロフィール未設定 / P1-1 初期設定のやり直し / P1-2 初回同意）
+  "プロフィールを設定するとカロリー目標が出ます": "Set up your profile to see your calorie target",
+  "身長・年齢・体重から、1日に食べられる目安を計算します。1分で終わります。": "We estimate how much you can eat each day from your height, age and weight. It takes a minute.",
+  "プロフィールを設定する": "Set up profile",
+  "同期できなかった記録があります": "Some records could not be synced",
+  "圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。": "{n} record(s) saved while offline could not be sent to the server. Sorry - please log them again.",
+  "利用規約への同意": "Agree to the Terms of Service",
+  "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Before you start, please review the Terms of Service and Privacy Policy and give your consent.",
+  "初期設定をやり直す": "Redo initial setup",
+  "目的・身長・年齢・体重をウィザードで入れ直します": "Re-enter your goal, height, age and weight in the wizard",
 };

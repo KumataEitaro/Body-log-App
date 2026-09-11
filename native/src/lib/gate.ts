@@ -138,7 +138,25 @@ export function useGate(): Gate {
   };
 }
 
-/** テスト用: キャッシュを初期状態に戻す */
+/**
+ * サインアウト時にプラン判定を捨てる（QA P1-5・2026-09-10）。
+ *
+ * plan / unlimited はモジュールスコープの一度きりフラグなので、アプリを再起動せずに
+ * アカウントを切り替えると **前の人のプラン・管理者免除がそのまま残っていた**
+ * （無料アカウントで王冠が出ない・広告が出ない・AI相談が使える）。
+ * 購読者（useGate を呼ぶ全画面・AdSlot）には listeners で「無料に戻った」と伝える必要があるので、
+ * __resetGateForTest とは違って listeners は消さない。
+ */
+export function resetGate(): void {
+  serverPlan = null;
+  entitlementPlan = null;
+  unlimited = false;
+  fetched = false;
+  fetching = false;
+  recompute();   // plan を null に戻し、変わったら購読者へ通知する
+}
+
+/** テスト用: キャッシュを初期状態に戻す（購読者も切る） */
 export function __resetGateForTest(): void {
   serverPlan = null; entitlementPlan = null; plan = null;
   unlimited = false; fetched = false; fetching = false; listeners.clear();

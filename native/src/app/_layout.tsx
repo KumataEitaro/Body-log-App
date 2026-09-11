@@ -22,7 +22,11 @@ import { loadPurpose } from '@/lib/purpose';
 // 起床時刻（「朝に出るもの」の窓の起点）。読めなくても既定7:00で判定されるだけなので起動は止めない
 import { loadWakeTime } from '@/lib/wakeTime';
 import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
+// サインアウト時の端末データ掃除（QA P1-3 / P1-5）と、profiles行の存在保証（QA P0-3）
+import { clearLocalUserState } from '@/lib/signOutCleanup';
+import { ensureProfileRow } from '@/lib/profileRow';
+import { takeDroppedNotice } from '@/lib/offlineQueue';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
@@ -89,20 +93,50 @@ export default function RootLayout() {
 
   // 認証だけは「失敗したら画面を出さない」わけにいかないので、
   // 例外時も必ず ready=true にしてログイン画面まで進ませる（無限スプラッシュを作らない）
+  //
+  // ここが「アカウントの境界」を引く唯一の場所（2026-09-10・QA P0-3 / P1-3 / P1-5）:
+  //  ・認証が確立したら profiles 行を1回だけ用意する（無いと保存が0行更新で黙って捨てられる）
+  //  ・SIGNED_OUT で端末のユーザーデータを消す（次にログインした人に前の人の会話・
+  //    アレルギー設定・体重推移・プランが見えないように）
   useEffect(() => {
     const sub = safeBoot('auth.subscribe', () => {
       supabase.auth.getSession().then(({ data }) => {
         setAuthed(!!data.session);
         setReady(true);
+        const uid = data.session?.user?.id;
+        if (uid) ensureProfileRow(uid).catch(() => {});
       }, (e: unknown) => {
         recordBootError('auth.getSession', e);
         setReady(true);   // セッションが読めない＝未ログイン扱いでログイン画面へ
       });
-      return supabase.auth.onAuthStateChange((_ev, session) => setAuthed(!!session)).data;
+      return supabase.auth.onAuthStateChange((ev, session) => {
+        setAuthed(!!session);
+        if (ev === 'SIGNED_OUT') {
+          // ログアウト・アカウント切替・退会（settings.tsx の deleteAccount も最後に
+          // signOut を呼ぶ）のすべてがこの1本を通る
+          clearLocalUserState().catch(() => {});
+          return;
+        }
+        const uid = session?.user?.id;
+        if (uid) ensureProfileRow(uid).catch(() => {});
+      }).data;
     });
     if (!sub) setReady(true);   // 購読すら張れなかった（＝Supabase初期化不良）ときも画面は出す
     return () => { try { sub?.subscription.unsubscribe(); } catch { /* 解除失敗は無視 */ } };
   }, []);
+
+  // 圏外キューから捨てざるを得なかった記録があれば、次の起動で1度だけ伝える（QA P0-2）。
+  // 「保存しました」と言った記録を黙って消さないための最小の導線
+  useEffect(() => {
+    if (!ready || !authed) return;
+    takeDroppedNotice().then((n) => {
+      if (n <= 0) return;
+      Alert.alert(
+        t('同期できなかった記録があります'),
+        t('圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。', { n }),
+      );
+    }).catch(() => {});
+  }, [ready, authed]);
 
   useEffect(() => {
     if (!ready) return;

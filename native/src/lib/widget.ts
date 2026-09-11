@@ -45,3 +45,18 @@ export async function updateWidgetData(): Promise<void> {
     // ウィジェットは付随機能。失敗してもアプリ本体に影響させない
   }
 }
+
+/**
+ * サインアウト時にウィジェットの表示を空にする（QA P1-3・2026-09-10）。
+ * ホーム画面のウィジェットはロック画面からも見えるので、前の人の残量・ストリークを
+ * 端末に残さない。行を消すのではなく「未計算」の payload を書く（Swift側は null を
+ * 「まだ計算していない」として既定の見た目に戻す）。
+ */
+export function clearWidgetData(): void {
+  try {
+    const empty: WidgetPayload = {
+      date: todayJST(), left: null, goal: null, eaten: null, streak: 0, asOf: '',
+    };
+    setWidgetData(JSON.stringify(empty));
+  } catch { /* 付随機能。失敗しても掃除全体は続ける */ }
+}

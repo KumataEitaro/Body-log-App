@@ -16,7 +16,7 @@ import { deleteConfirmMatches } from '@/lib/guard';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare, RotateCcw } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import FeedbackSheet from '@/components/FeedbackSheet';
@@ -868,6 +868,15 @@ export default function SettingsScreen() {
                  { text: t('切り替える'), onPress: () => { supabase.auth.signOut({ scope: 'local' }).catch(() => {}); } },
                ],
              )} />
+        <View style={s.sep} />
+        {/* 初期設定のやり直し（QA P1-1・2026-09-10）。
+            オンボーディングのウィザードで「あとで設定」を押すと bl-onboard-done が立ち、
+            以後どこからもウィザードに入れなくなっていた（入口は GuideTour の1か所だけで、
+            そこは bl-onboard-done が false のときにしか行かない）＝スキップした人の復帰路が無い。
+            ここを唯一の戻り口にする（replace ではなく push なので、やめても設定に戻れる） */}
+        <Row icon={<RotateCcw color={C.teal} size={ICON.xl} />} label={t('初期設定をやり直す')}
+             sub={t('目的・身長・年齢・体重をウィザードで入れ直します')}
+             onPress={() => router2.push('/onboarding' as never)} />
       </View>
 
       {/* アクション */}

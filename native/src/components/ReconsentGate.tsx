@@ -8,12 +8,15 @@
 //  - 閉じる手段は「同意する」か「ログアウト」だけ（×で回避できると意味がない）
 //  - 判定できないとき（列が無い・圏外）は**出さない**＝誤爆で全員を止めない
 //  - 記録は consent_log に履歴として積む（上書きしない＝後日の紛争で再現できる）
+//  - **初回同意と改定の再同意で文言を分ける**（QA P1-2・2026-09-10）。
+//    登録した直後の人に「更新しました」「主な変更点」を出すのは、法務文言として誤りであり
+//    初回体験も壊す（何も使っていないのに「変更点」を読まされる）
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
-import { needsReconsent, recordConsent } from '@/lib/consent';
+import { needsReconsent, recordConsent, type ReconsentMode } from '@/lib/consent';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 
@@ -21,12 +24,13 @@ const TERMS_URL = 'https://bodylog-orcin.vercel.app/terms';
 const PRIVACY_URL = 'https://bodylog-orcin.vercel.app/privacy';
 
 export default function ReconsentGate() {
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<ReconsentMode>(false);
   const [busy, setBusy] = useState(false);
   const [read, setRead] = useState(false);   // 「読みました」のチェック（同意の質を上げる）
+  const isUpdate = mode === 'update';
 
   useEffect(() => {
-    needsReconsent().then(setOpen).catch(() => {});
+    needsReconsent().then(setMode).catch(() => {});
   }, []);
 
   async function agree() {
@@ -34,27 +38,32 @@ export default function ReconsentGate() {
     setBusy(true);
     try {
       await recordConsent('terms');
-      setOpen(false);
+      setMode(false);
     } finally { setBusy(false); }
   }
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet"
+    <Modal visible={mode !== false} animationType="slide" presentationStyle="pageSheet"
            onRequestClose={() => { /* 閉じさせない（同意かログアウトのみ） */ }}>
       <ScrollView style={{ flex: 1, backgroundColor: C.bg }}
                   contentContainerStyle={[s.wrap, { paddingTop: sheetTopPad(20) }]}>
         <Animated.View entering={FadeInDown.duration(320)}>
-          <Text style={s.h1}>{t('利用規約を更新しました')}</Text>
+          <Text style={s.h1}>{isUpdate ? t('利用規約を更新しました') : t('利用規約への同意')}</Text>
           <Text style={s.body}>
-            {t('安心して使っていただくために、利用規約とプライバシーポリシーを更新しました。内容をご確認のうえ、同意をお願いします。')}
+            {isUpdate
+              ? t('安心して使っていただくために、利用規約とプライバシーポリシーを更新しました。内容をご確認のうえ、同意をお願いします。')
+              : t('はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。')}
           </Text>
 
-          <View style={s.card}>
-            <Text style={s.cardH}>{t('主な変更点')}</Text>
-            <Text style={s.li}>{t('・「食事の制約（食べないものの検知）」は推定であり、アレルギーや医学的な食事制限の安全確認には使えないことを明記しました。')}</Text>
-            <Text style={s.li}>{t('・本サービスが医療機器ではなく、専門家の助言の代替ではないことを、あらためて明確にしました。')}</Text>
-            <Text style={s.li}>{t('・責任の範囲、紛争の解決方法、規約変更時の通知方法を具体的に定めました。')}</Text>
-          </View>
+          {/* 「主な変更点」は改定の再同意のときだけ。初回の人には見せない（変更点が無いため） */}
+          {isUpdate && (
+            <View style={s.card}>
+              <Text style={s.cardH}>{t('主な変更点')}</Text>
+              <Text style={s.li}>{t('・「食事の制約（食べないものの検知）」は推定であり、アレルギーや医学的な食事制限の安全確認には使えないことを明記しました。')}</Text>
+              <Text style={s.li}>{t('・本サービスが医療機器ではなく、専門家の助言の代替ではないことを、あらためて明確にしました。')}</Text>
+              <Text style={s.li}>{t('・責任の範囲、紛争の解決方法、規約変更時の通知方法を具体的に定めました。')}</Text>
+            </View>
+          )}
 
           <Pressable style={s.linkRow} onPress={() => WebBrowser.openBrowserAsync(TERMS_URL)}>
             <Text style={s.link}>{t('利用規約を読む')}</Text>

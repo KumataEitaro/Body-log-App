@@ -30,8 +30,30 @@ export const AI_LIMITS_ENABLED = false;
 
 // AI回数無制限のアカウント（管理者）。上限チェックのみスキップし、使用回数の記録など他の挙動は全ユーザー共通
 export const UNLIMITED_EMAILS = ['gotcha429@gmail.com'];
+
+/**
+ * **AI利用上限の免除**だけを判定する（認可には使わない）。
+ * AI_LIMITS_ENABLED=false の間は全員が上限免除＝ここは true を返す。
+ *
+ * 【重要】この関数を「管理者か」の判定に流用しないこと。
+ * 上限撤廃中の短絡（`if (!AI_LIMITS_ENABLED) return true`）が、たまたま同じ関数を
+ * 認可に使っていた `/api/admin/overview` を全ログインユーザーに開けていた（QA P0-1・2026-09-10）。
+ * 管理者判定は下の isAdmin() を使う。tests/adminAuth.test.ts が両者の分離を固定している。
+ */
 export function isUnlimited(email?: string | null): boolean {
   if (!AI_LIMITS_ENABLED) return true;   // 上限撤廃中は全員が無制限
+  return !!email && UNLIMITED_EMAILS.includes(email.toLowerCase());
+}
+
+/**
+ * 管理者か（管理コンソール・管理APIの認可）。UNLIMITED_EMAILS の照合のみで、
+ * **AI_LIMITS_ENABLED による短絡を持たない**＝上限の点火状態に一切依存しない。
+ *
+ * 注: UNLIMITED_EMAILS の値は公開ページ（app/privacy/page.tsx）にも載るため、
+ * 「誰が管理者か」は公知になる。身元そのものはSupabaseのセッションで担保している。
+ * 将来はサーバー専用の環境変数（ADMIN_EMAILS）かDBのロール列へ寄せる（QA P0-1 修正案2）。
+ */
+export function isAdmin(email?: string | null): boolean {
   return !!email && UNLIMITED_EMAILS.includes(email.toLowerCase());
 }
 
