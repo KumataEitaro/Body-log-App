@@ -23,7 +23,7 @@ https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィ
 > `AppearanceModule.setColorScheme` の NullPointerException を確認。`lib/theme.ts` が OS 追従のときに
 > `Appearance.setColorScheme(null)` を呼んでいた（ダークモード導入以来）。Android は非 null 引数なので
 > 別スレッドで即死、JS の try/catch では捕まらない。`'unspecified'` に修正＋再発防止テスト。
-> 詳細 docs/ANDROID.md「2026-09-07 に確定した真因」。**次の rn-android ビルド（1.1.1）で端末確認 → A3 完了**。
+> 詳細 docs/ANDROID.md「2026-09-07 に確定した真因」。**次の rn-android ビルド（1.1.2）で端末確認 → A3 完了**。
 > android-smoke #14 が緑なら機械的にも確認できる。ログは
 > https://raw.githubusercontent.com/KumataEitaro/Body-log-App/ci-logs/android-smoke/latest/summary.md
 >
@@ -297,6 +297,16 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 ---
 
 ## C. 完了（1行記録・2026-09-04）
+
+- **2026-09-10〜11（v1.1.2）**
+  - **Android 起動クラッシュの真因修正**（`Appearance.setColorScheme(null)` → `'unspecified'`・android-smoke #14 で初の緑）
+  - **歩数・睡眠の過去日**: 概要の詳細に食事/運動と同じ日付セレクタ。選んだ日の歩数・その夜の睡眠ステージ・時間帯別・7日表（feat/health-history）
+  - **＋ボタンを4タブ共通化**（components/PlusEntry.tsx）: 運動・概要・相談にも配置。相談はコンポーザーの上・キーボード中は非表示。
+    シートに「マイ食品を登録」行を追加（feat/plus-everywhere）
+  - **PFC バーに摂取済み/目標g の上段**を追加（食事タブ・ヒーロー）
+  - **テーマ世代の壁 ThemeRemount**: 4タブの本体を key で作り直す第3層。「週と月の収支」の見出しだけ古い色で残る事故（4回目）の構造的な再発防止。
+    themeRemount.test（対照実験）＋themeSafety（4タブに壁・壁の中に Modal 無し）
+  - Android smoke のクラッシュ抜粋を `ci-logs` ブランチへ公開（ログイン無しで読める）
 
 - **体の写真が保存できない → supabase/fix-body-photos.sql（apply-pending v16 相当・body_photos＋RLS＋バケット）を実行して解消**（2026-09-05）。保存失敗時の画面に DB エラー本文を出すよう変更
 
