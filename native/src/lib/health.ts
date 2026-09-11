@@ -14,6 +14,7 @@ import {
 } from './healthLink';
 import { setHealthLinkState, setHealthLastSync, bumpHealthVersion, healthStoreState } from './healthStore';
 import { jstYmd, jstHour } from './jst';
+import { activityRange } from './healthHistory';
 
 type HK = typeof import('@kingstinct/react-native-healthkit');
 
@@ -373,10 +374,19 @@ export type ActiveEnergyDay = { date: string; kcal: number };
  * readHourlySteps / readSleepStages と同じ流儀。
  */
 export async function readActiveEnergy(days: number): Promise<ActiveEnergyDay[] | null> {
+  const end = new Date();
+  return readActiveEnergyBetween(new Date(end.getTime() - days * 86400000), end);
+}
+
+/**
+ * 任意の窓 [start, end) のアクティブエネルギー（日別合計kcal・JST）。
+ * 過去日の詳細（feat/health-history）が「選んだ日を末尾とする7日」を読むために切り出した。
+ * 今日を含む窓は readActiveEnergyCached（TTL付き）を使い、過去だけの窓はこちらを直接呼ぶ
+ * （過去日の値は変わらないが、日付ごとにキャッシュを持つほど頻繁には読まない）
+ */
+export async function readActiveEnergyBetween(start: Date, end: Date): Promise<ActiveEnergyDay[] | null> {
   if (!hk) return null;
   try {
-    const end = new Date();
-    const start = new Date(end.getTime() - days * 86400000);
     const samples = await hk.queryQuantitySamples('HKQuantityTypeIdentifierActiveEnergyBurned', {
       unit: 'kcal', limit: -1, ascending: true,
       filter: { date: { startDate: start, endDate: end } },
@@ -427,17 +437,27 @@ export function invalidateActiveEnergyCache(): void {
 // 直近days日の歩数（日別合計）と睡眠時間（日別h）とアクティブkcal — 表示用サマリー
 export type HealthDaySummary = { date: string; steps: number; sleepH: number; activeKcal: number };
 
-export async function readActivitySummary(days: number): Promise<HealthDaySummary[] | { error: string }> {
+/**
+ * @param days    何日ぶんか
+ * @param endDate 末尾の日（'YYYY-MM-DD'・JST）。省略時は従来どおり「今日から直近days日」（end=now）。
+ *                指定時は endDate を末尾とする days 日の暦日窓（lib/healthHistory.ts activityRange）で読む
+ *                （feat/health-history・過去日の詳細用。既存の呼び出しは無変更で同じ結果）
+ */
+export async function readActivitySummary(days: number, endDate?: string): Promise<HealthDaySummary[] | { error: string }> {
   if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
   try {
-    const end = new Date();
-    const start = new Date(end.getTime() - days * 86400000);
+    const now = new Date();
+    const isToday = !endDate || endDate === dateKeyJST(now);
+    const range = endDate ? activityRange(days, endDate) : null;
+    const end = range ? range.end : now;
+    const start = range ? range.start : new Date(now.getTime() - days * 86400000);
     const filter = { date: { startDate: start, endDate: end } };
     const [steps, sleep, active] = await Promise.all([
       hk.queryQuantitySamples('HKQuantityTypeIdentifierStepCount', { unit: 'count', limit: -1, ascending: true, filter }),
       hk.queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', { limit: -1, ascending: true, filter }),
-      // アクティブkcalはキャッシュ経由（食事タブのヒーローも同じ値を使う＝読み取りは1本に集約）
-      readActiveEnergyCached(Math.max(days, 14)),
+      // アクティブkcalはキャッシュ経由（食事タブのヒーローも同じ値を使う＝読み取りは1本に集約）。
+      // 過去日だけの窓はキャッシュ（今日から数える）に乗らないので、その窓を直接読む
+      isToday ? readActiveEnergyCached(Math.max(days, 14)) : readActiveEnergyBetween(start, end),
     ]);
     const map = new Map<string, HealthDaySummary>();
     const get = (d: string) => {
@@ -459,9 +479,12 @@ export async function readActivitySummary(days: number): Promise<HealthDaySummar
     const minDate = dateKeyJST(start);
     for (const a of active ?? []) {
       if (a.date < minDate) continue;
+      if (endDate && a.date > endDate) continue;   // 過去日の窓: 末尾より先の日は入れない
       get(a.date).activeKcal = a.kcal;
     }
     return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+      // 過去日の窓では、窓の末尾の夜に始まり翌朝に終わる睡眠が「翌日」の行を作るので末尾で切る
+      .filter((v) => !endDate || v.date <= endDate)
       .map((v) => ({ ...v, steps: Math.round(v.steps), sleepH: Math.round(v.sleepH * 10) / 10 }));
   } catch {
     return { error: t('ヘルスケアの読み取りに失敗しました。許可設定を確認してください。') };

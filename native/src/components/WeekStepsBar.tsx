@@ -41,11 +41,14 @@ export function weekStepsOf(days: { date: string; steps: number }[], today: stri
   return days.filter((d) => d.date >= mon && d.date <= today).reduce((a, d) => a + d.steps, 0);
 }
 
-/** 週プログレス1本。「今週 42,300 / 70,000歩」＋スプリングで満ちるバー（達成でteal） */
-export default function WeekStepsBar({ days, today, goal }: {
+/** 週プログレス1本。「今週 42,300 / 70,000歩」＋スプリングで満ちるバー（達成でteal）
+ *  weekLabel を渡すと「今週」の代わりにその語を出す（過去の週を見ている概要の歩数・睡眠詳細用・
+ *  feat/health-history）。省略時は従来どおり */
+export default function WeekStepsBar({ days, today, goal, weekLabel }: {
   days: { date: string; steps: number }[];
   today: string;
   goal: number;
+  weekLabel?: string;
 }) {
   const steps = weekStepsOf(days, today);
   const pctN = Math.min(100, (steps / goal) * 100);
@@ -62,7 +65,9 @@ export default function WeekStepsBar({ days, today, goal }: {
       <View style={s.head}>
         <Text style={s.label}>{t('歩数の週目標')}</Text>
         <Text style={[s.val, done && { color: C.successInk }]}>
-          {t('今週 {n} / {g}歩', { n: steps.toLocaleString(), g: goal.toLocaleString() })}
+          {weekLabel
+            ? t('{w} {n} / {g}歩', { w: weekLabel, n: steps.toLocaleString(), g: goal.toLocaleString() })
+            : t('今週 {n} / {g}歩', { n: steps.toLocaleString(), g: goal.toLocaleString() })}
           {done ? ' 🎉' : ''}
         </Text>
       </View>

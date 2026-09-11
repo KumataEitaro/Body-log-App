@@ -2273,4 +2273,12 @@ export const ID: Record<string, string> = {
   "種目を選んで時間を回す": "Pilih latihan dan jalankan timer",
   "たたむ": "Tutup",
   "週の歩数・時間帯別をみる": "Lihat langkah mingguan & per jam",
+  "きょう": "Hari ini",
+  "睡眠": "Tidur",
+  "アクティブ": "Aktif",
+  "この日の記録はありません": "Tidak ada catatan pada hari tersebut",
+  "{m}/{d} の睡眠": "Tidur {m}/{d}",
+  "{md}の週": "Minggu {md}",
+  "{a}〜{b}の7日": "7 hari: {a}-{b}",
+  "{w} {n} / {g}歩": "{w} {n} / {g} langkah",
 };

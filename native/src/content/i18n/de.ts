@@ -2273,4 +2273,12 @@ export const DE: Record<string, string> = {
   "種目を選んで時間を回す": "Übung wählen und Zeit stoppen",
   "たたむ": "Einklappen",
   "週の歩数・時間帯別をみる": "Wöchentliche Schritte & Tageszeiten ansehen",
+  "きょう": "Heute",
+  "睡眠": "Schlaf",
+  "アクティブ": "Aktiv",
+  "この日の記録はありません": "Keine Aufzeichnungen für diesen Tag",
+  "{m}/{d} の睡眠": "Schlaf am {m}/{d}",
+  "{md}の週": "Woche ab {md}",
+  "{a}〜{b}の7日": "7 Tage: {a}-{b}",
+  "{w} {n} / {g}歩": "{w} {n} / {g} Schritte",
 };

@@ -2273,4 +2273,12 @@ export const VI: Record<string, string> = {
   "種目を選んで時間を回す": "Chọn bài tập và bấm giờ",
   "たたむ": "Thu gọn",
   "週の歩数・時間帯別をみる": "Xem số bước và khung giờ trong tuần",
+  "きょう": "Hôm nay",
+  "睡眠": "Giấc ngủ",
+  "アクティブ": "Vận động",
+  "この日の記録はありません": "Không có dữ liệu cho ngày này",
+  "{m}/{d} の睡眠": "Giấc ngủ ngày {m}/{d}",
+  "{md}の週": "Tuần {md}",
+  "{a}〜{b}の7日": "7 ngày: {a}-{b}",
+  "{w} {n} / {g}歩": "{w} {n} / {g} bước",
 };

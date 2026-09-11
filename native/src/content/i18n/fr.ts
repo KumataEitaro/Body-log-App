@@ -2273,4 +2273,12 @@ export const FR: Record<string, string> = {
   "種目を選んで時間を回す": "Choisir un exercice et lancer le chrono",
   "たたむ": "Réduire",
   "週の歩数・時間帯別をみる": "Voir les pas de la semaine et par créneau",
+  "きょう": "Aujourd'hui",
+  "睡眠": "Sommeil",
+  "アクティブ": "Actif",
+  "この日の記録はありません": "Aucun enregistrement pour ce jour",
+  "{m}/{d} の睡眠": "Sommeil du {m}/{d}",
+  "{md}の週": "Semaine du {md}",
+  "{a}〜{b}の7日": "7 jours : {a}-{b}",
+  "{w} {n} / {g}歩": "{w} {n} / {g} pas",
 };
