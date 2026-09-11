@@ -14,9 +14,9 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
-import { Plus, Moon, Camera, Salad, Trophy, ChevronLeft, Flame } from 'lucide-react-native';
+import { Plus, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Svg, { Polyline, Line, Rect } from 'react-native-svg';
+import Svg, { Polyline, Line } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
 import { useRouter, useFocusEffect, useNavigation, useLocalSearchParams } from 'expo-router';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
@@ -52,9 +52,10 @@ import StatusBarMask from '@/components/StatusBarMask';
 import { LiftKpiCard, LiftCalendarCard, LiftChartCard, BalanceCard, PartVolumeCard, PersonalBestCard } from '@/components/LiftingProgress';
 import LiftHistoryCard from '@/components/LiftHistoryCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { healthAvailable, linkHealth, readActivitySummary, readSleepStages, type HealthDaySummary, type SleepStages } from '@/lib/health';
+import { healthAvailable, readActivitySummary, type HealthDaySummary } from '@/lib/health';
 import { useHealthLinkState, useHealthVersion } from '@/lib/healthStore';
-import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
+// 歩数・睡眠の詳細（日付選択つき・過去日の記録も見られる）。中身は components/HealthDetail.tsx（feat/health-history）
+import HealthDetail from '@/components/HealthDetail';
 import { mifflinBMR, targetKcal, todayJST, judge, type ExLevel } from '@/lib/calc';
 import { type Goal } from '@/lib/goal';
 import { buildItemDays, foodWeightEffects, type FoodEffect } from '@/lib/insights';
@@ -329,13 +330,9 @@ export default function ChangesScreen() {
     setBodyTableOpen(true);
   }
 
+  // 直近7日の歩数（メニュー行の要約「きょうN歩」と詳細ヘッダーの大数字・トレンド文に使う）。
+  // 詳細カードの中身（日付選択・睡眠ステージ・時間帯別・7日表）は HealthDetail が自前で読む
   const [activity, setActivity] = useState<HealthDaySummary[] | null>(null);
-  const [healthBusy, setHealthBusy] = useState(false);
-  const [healthMsg, setHealthMsg] = useState<string | null>(null);
-  // 昨夜の睡眠のステージ内訳（B-14a）。null=hk無し/ステージ計測なし＝合計だけの従来表示
-  const [sleepStages, setSleepStages] = useState<SleepStages | null>(null);
-  // 歩数の週目標（B-15・オフ=null）。health詳細にも「きょうの動き」と同じ週プログレスを出す
-  const weekStepsGoal = useWeekStepsGoal();
   // 週次レビュー（N4）で「この目標にする」を押した週の進捗。週のふりかえり行に小さく出す。
   // 材料は日次特徴量のキャッシュだけ（readCachedDayFeatures＝通信もHealthKitも触らない）。
   // 週次レビュー画面から戻ってきた瞬間に反映されるよう、フォーカスごとに読み直す
@@ -437,21 +434,13 @@ export default function ChangesScreen() {
   // 押されたら linkHealth（許可→フラグ→自動同期開始）→そのまま読み込む
   const healthLink = useHealthLinkState();
   const healthVer = useHealthVersion();
+  // 連携ボタン・エラー文言・睡眠ステージは HealthDetail（詳細カード）へ移した。ここは要約用の7日ぶんだけ
   const readActivity = useCallback(async () => {
-    setHealthBusy(true); setHealthMsg(null);
     try {
       const res = await readActivitySummary(7);
-      if ('error' in res) { setHealthMsg(res.error); return; }
-      setActivity(res);
-      if (res.length === 0) setHealthMsg(t('直近7日のデータが見つかりませんでした。'));
-      // 昨夜の睡眠（今朝起きたぶん）のステージ内訳。ステージが無い端末はnull＝従来表示のまま
-      try { setSleepStages(await readSleepStages(todayJST())); } catch { /* ステージは飾り */ }
-    } finally { setHealthBusy(false); }
+      if (!('error' in res)) setActivity(res);
+    } catch { /* 要約行は「歩数・睡眠をヘルスケアから」の誘い文のまま */ }
   }, []);
-  async function loadActivity() {
-    if (healthLink !== 'linked' && !(await linkHealth())) { setHealthMsg(t('ヘルスケアへのアクセスが許可されませんでした。')); return; }
-    await readActivity();
-  }
   // 連携済み: 画面表示時＋ヘルスケアの変更イベントごとに自動で読み直す（ユーザー操作なし）
   useEffect(() => { if (healthLink === 'linked') readActivity(); }, [healthLink, healthVer, readActivity]);
 
@@ -768,88 +757,10 @@ export default function ChangesScreen() {
         );
       })();
 
+  // 歩数・睡眠の詳細: 日付選択（DateStrip）つきで過去日の記録も見られる HealthDetail（feat/health-history）。
+  // iOS 以外（HealthKit 無し）は従来どおり案内文だけ（行自体も unavailable で出ない）
   const healthCard = healthAvailable() ? (
-        <View style={s.card}>
-          <View style={s.h2Row}><Footprints size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('歩数・睡眠（直近7日）')}</Text></View>
-          {/* 週間歩数目標（B-15）: 「きょうの動き」と同じ週プログレス。目標オフ/未読込時は出さない */}
-          {weekStepsGoal != null && activity != null && activity.length > 0 && (
-            <View style={{ marginTop: -4, marginBottom: 12 }}>
-              <WeekStepsBar days={activity} today={today} goal={weekStepsGoal} />
-            </View>
-          )}
-          {/* 昨夜の睡眠（B-14a・ヘルスケアの円グラフ相当）: 合計の大表示＋ステージ横帯。
-              ステージデータが無い端末（Apple Watch無し等）はsleepStages=null＝下の7日表だけの従来表示 */}
-          {sleepStages != null && (() => {
-            const st = sleepStages;
-            const asleepH = st.deepH + st.coreH + st.remH;   // 「睡眠時間」は覚醒を除いた合計
-            if (asleepH <= 0.01) return null;
-            const fmtHM = (h: number) => {
-              const m = Math.round(h * 60);
-              return m >= 60 ? t('{h}時間{m}分', { h: Math.floor(m / 60), m: m % 60 }) : t('{n}分', { n: m });
-            };
-            // ステージの配色はC.tealの濃淡3段（深いほど濃い）＋覚醒だけ淡いcoral
-            const segs = [
-              { k: 'deep', label: t('深い睡眠'), h: st.deepH, color: C.teal },
-              { k: 'core', label: t('コア睡眠'), h: st.coreH, color: rgba(C.teal, 0.55) },
-              { k: 'rem', label: t('レム睡眠'), h: st.remH, color: rgba(C.teal, 0.3) },
-              { k: 'awake', label: t('覚醒'), h: st.awakeH, color: rgba(C.coral, 0.4) },
-            ].filter((x) => x.h > 0.01);
-            const totalAll = segs.reduce((a, x) => a + x.h, 0);
-            const bw = Math.max(60, winW - 60);   // 画面幅 − ページ余白32 − カード内余白28
-            let x = 0;
-            return (
-              <View style={s.slpBox}>
-                <Text style={s.slpTitle}>{t('昨夜の睡眠')}</Text>
-                <Text style={s.slpVal} maxFontSizeMultiplier={1.3}>{fmtHM(asleepH)}</Text>
-                <View style={s.slpBarWrap}>
-                  <Svg width={bw} height={14}>
-                    {segs.map((sg) => {
-                      const w = (sg.h / totalAll) * bw;
-                      const r = <Rect key={sg.k} x={x} y={0} width={w} height={14} fill={sg.color} />;
-                      x += w;
-                      return r;
-                    })}
-                  </Svg>
-                </View>
-                <View style={s.slpLegend}>
-                  {segs.map((sg) => (
-                    <View key={sg.k} style={s.slpLegendItem}>
-                      <View style={[s.slpDot, { backgroundColor: sg.color }]} />
-                      <Text style={s.slpLegendT}>{sg.label} {fmtHM(sg.h)}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          })()}
-          {activity === null ? (
-            // 未連携のときだけ連携ボタン。連携済みは自動で読むので、読み込み中の一言だけ
-            healthLink === 'unlinked' ? (
-              <Pressable style={s.actBtn} onPress={loadActivity} disabled={healthBusy}>
-                <Text style={s.actBtnT}>{healthBusy ? t('読み込み中…') : t('ヘルスケアと連携する')}</Text>
-              </Pressable>
-            ) : (
-              <Text style={s.note}>{healthBusy ? t('読み込み中…') : t('ヘルスケアのデータを待っています')}</Text>
-            )
-          ) : (
-            <>
-              {activity.map((a) => (
-                <View key={a.date} style={s.actRow}>
-                  <Text style={s.actDate}>{a.date.slice(5).replace('-', '/')}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Footprints size={13} color={C.sub} /><Text style={s.actVal}>{a.steps.toLocaleString()}歩</Text></View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Moon size={13} color={C.sub} /><Text style={s.actVal}>{a.sleepH > 0 ? `${a.sleepH}h` : '—'}</Text></View>
-                  {/* アクティブkcal（ヘルスケア実測・歩行や日常活動を含む）。
-                      歩数だけでは「動いた量」がカロリーで見えないため列を足した */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Flame size={13} color={C.sub} /><Text style={s.actVal}>{a.activeKcal > 0 ? `${a.activeKcal.toLocaleString()}kcal` : '—'}</Text></View>
-                </View>
-              ))}
-              {activity.some((a) => a.activeKcal > 0) && (
-                <Text style={s.note}>{t('アクティブは安静時を超えて消費したぶんの実測です（歩行・日常の動きを含み、アプリ記録ぶんも含まれることがあります）。')}</Text>
-              )}
-            </>
-          )}
-          {healthMsg && <Text style={[s.note, { color: C.coral }]}>{healthMsg}</Text>}
-        </View>
+    <HealthDetail />
   ) : emptyDetail(t('ヘルスケア連携はiOSのTestFlight版で使えます。連携すると、直近7日の歩数と睡眠がここに並びます。'));
 
   // 統合行は詳細ページで旧カードを縦に積む（各カードのmarginBottom:12がそのまま余白になる）。
@@ -1396,20 +1307,7 @@ const s = themed(() => ({
   moveLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
   moveBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.line, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   moveBtnT: { fontSize: 17, fontWeight: '800', color: C.accentInk },
-  actBtn: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, paddingVertical: 11, alignItems: 'center', marginTop: 4 },
-  actBtnT: { fontSize: 13, fontWeight: '800', color: C.ink },
-  actRow: { flexDirection: 'row', gap: 12, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: C.line, alignItems: 'center' },
   // 昨夜の睡眠（B-14a）: 合計の大表示＋ステージ横帯＋凡例
-  slpBox: { marginBottom: 12 },
-  slpTitle: { fontSize: 11, fontWeight: '800', color: C.sub, letterSpacing: 0.2 },
-  slpVal: { fontSize: 26, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'], marginTop: 2 },
-  slpBarWrap: { borderRadius: 7, overflow: 'hidden', marginTop: 8, backgroundColor: C.track },
-  slpLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
-  slpLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  slpDot: { width: 8, height: 8, borderRadius: 4 },
-  slpLegendT: { fontSize: 11, color: C.sub, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  actDate: { fontSize: 13, color: C.faint, fontWeight: '700', width: 40, fontVariant: ['tabular-nums'] },
-  actVal: { fontSize: 13, color: C.ink, fontVariant: ['tabular-nums'] },
   kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   kpi: { flex: 1, backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.panel, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: 12 },
   kpiL: { fontSize: 11, fontWeight: '700', color: C.sub },

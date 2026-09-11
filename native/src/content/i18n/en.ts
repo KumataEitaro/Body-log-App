@@ -2351,4 +2351,12 @@ export const EN: Record<string, string> = {
   "種目を選んで時間を回す": "Pick an exercise & start the timer",
   "たたむ": "Collapse",
   "週の歩数・時間帯別をみる": "View weekly steps by time of day",
+  "きょう": "Today",
+  "睡眠": "Sleep",
+  "アクティブ": "Active",
+  "この日の記録はありません": "No records for this day",
+  "{m}/{d} の睡眠": "Sleep on {m}/{d}",
+  "{md}の週": "Week of {md}",
+  "{a}〜{b}の7日": "7 days: {a}-{b}",
+  "{w} {n} / {g}歩": "{w} {n} / {g} steps",
 };
