@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { t, apiLang } from '@/lib/i18n';
 import { C, sheetTopPad, themed, RADIUS, ICON } from '@/lib/ui';
+import { parseDecimal } from '@/lib/parseNum';
 import { OptionButton } from '@/components/ui/Selectable';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
@@ -161,9 +162,18 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
   function saveManual() {
     const nm = name.trim();
     if (!nm) { setMsg({ ok: false, text: t('名前を入力してください。') }); return; }
-    const kc = Number(kcal);
-    if (!(kc > 0)) { setMsg({ ok: false, text: t('カロリーを入力してください。') }); return; }
-    persist({ name: nm, unit: unit.trim(), kcal: kc, p: Number(p) || 0, f: Number(f) || 0, c: Number(c) || 0, kind: 'food' });
+    // QA B-1: Number() 直呼びだと「72,5」「７２．５」がNaN。kcalは弾き、PFCは0扱いになっていた
+    const kc = parseDecimal(kcal);
+    if (kc == null || !(kc > 0)) { setMsg({ ok: false, text: t('カロリーを入力してください。') }); return; }
+    // PFCは任意入力なので、空欄は0のまま。打ったのに読めない値だけは理由を出す
+    const macros: Record<'p' | 'f' | 'c', number> = { p: 0, f: 0, c: 0 };
+    for (const [k, raw] of [['p', p], ['f', f], ['c', c]] as const) {
+      if (raw.trim() === '') continue;
+      const v = parseDecimal(raw);
+      if (v == null || v < 0) { setMsg({ ok: false, text: t('P・F・Cは数字で入力してください。') }); return; }
+      macros[k] = v;
+    }
+    persist({ name: nm, unit: unit.trim(), kcal: kc, ...macros, kind: 'food' });
   }
 
   // ===== 手入力の補助: 成分表示の写真（表記どおりの数値が入る）／バーコード（公式DB・AI枠を使わない） =====

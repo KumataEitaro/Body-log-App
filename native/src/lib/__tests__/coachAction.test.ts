@@ -223,3 +223,59 @@ describe('meal（献立をトレイへ）', () => {
     if (v.ok && v.plan.table === 'tray') expect(v.plan.items[0].qty).toBe('×1');
   });
 });
+
+// QA P1-6: 目標パネルには BMI下限・減量ペース・妊娠授乳中のガードがあるのに、
+// AIコーチの承認カードは target_weight ∈ [25,300] と日付しか見ていなかった。
+// 「2週間で10kg落とす目標にして」で BMI13 の目標が goals にそのまま書き込めた。
+describe('体重目標の安全ガード（プロフィールを渡したとき）', () => {
+  // 165cm・60kg。BMI18.5の下限は 50.4kg
+  const PROF = { heightCm: 165, currentKg: 60, maternity: false, purpose: 'cut_std' };
+
+  it('プロフィールを渡さなければ従来どおり（既存の呼び出しを壊さない）', () => {
+    expect(validateAction({ kind: 'weight', target_weight: 40, label: 'x' }, TODAY).ok).toBe(true);
+  });
+
+  it('BMI18.5未満の目標体重を弾く', () => {
+    const r = validateAction({ kind: 'weight', target_weight: 40, label: 'x' }, TODAY, PROF);
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.reason).toContain('BMI18.5');
+  });
+
+  it('妊娠・授乳中の減量方向の提案を弾く', () => {
+    const r = validateAction({ kind: 'weight', target_weight: 57, label: 'x' }, TODAY, { ...PROF, maternity: true });
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.reason).toContain('妊娠');
+  });
+
+  it('週1kg超の減量ペースを弾く（2週間で10kg）', () => {
+    const r = validateAction(
+      { kind: 'weight', target_weight: 50.5, target_date: '2026-09-04', label: 'x' },
+      '2026-08-21', PROF,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.reason).toContain('速すぎ');
+  });
+
+  it('無理のない提案は通る', () => {
+    const r = validateAction(
+      { kind: 'weight', target_weight: 57, target_date: '2026-12-21', label: 'x' },
+      TODAY, PROF,
+    );
+    expect(r).toEqual({ ok: true, plan: { table: 'goals', patch: { target_weight: 57, target_date: '2026-12-21' } } });
+  });
+
+  it('やや速いペース（週0.5〜1kg）は通しつつ注意文を返す', () => {
+    // 60→55kg を58日（約8.3週）＝週0.6kg
+    const r = validateAction(
+      { kind: 'weight', target_weight: 55, target_date: '2026-10-18', label: 'x' },
+      '2026-08-21', PROF,
+    );
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.warn).toBeTruthy();
+  });
+
+  it('PFCや筋トレの提案にはガードを掛けない（体重目標だけの壁）', () => {
+    expect(validateAction({ kind: 'pfc', protein_per_kg: 2, label: 'x' }, TODAY, PROF).ok).toBe(true);
+    expect(validateAction({ kind: 'training', name: 'ベンチ', target_kg: 100, label: 'x' }, TODAY, PROF).ok).toBe(true);
+  });
+});

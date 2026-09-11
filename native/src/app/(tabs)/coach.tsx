@@ -29,7 +29,7 @@ import { FAB_CLEARANCE } from '@/components/PlusFab';
 import AdSlot from '@/components/AdSlot';
 import ColumnReader from '@/components/ColumnReader';
 import { featuredQuestions } from '@/content/askExamples';
-import { validateAction, isApplicable, type CoachAction, type ApplyPlan } from '@/lib/coachAction';
+import { validateAction, isApplicable, type CoachAction, type ApplyPlan, type CoachProfile } from '@/lib/coachAction';
 import { setPendingMeal } from '@/lib/pendingMeal';
 import { todayJST } from '@/lib/calc';
 import { useReduceMotion } from '@/lib/motion';
@@ -136,15 +136,31 @@ export default function CoachScreen() {
   // 制約プロフィール（profiles.constraints_note）が未設定の人にだけ「前提を設定」導線を見せる。
   // 列が無い旧DB（migration-22未適用）ではエラー → 保存できない導線を出さないためリンクも出さない
   const [hasConstraints, setHasConstraints] = useState(true);
+  // 安全ガード用の本人の値（QA P1-6）。AIの目標変更を承認する前に、目標パネルと同じ
+  // BMI下限・減量ペース・妊娠授乳中の判定を通すために必要
+  const [goalProfile, setGoalProfile] = useState<CoachProfile>({});
   useFocusEffect(useCallback(() => {
     let alive = true;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      const { data, error } = await supabase.from('profiles').select('constraints_note').eq('id', uid).maybeSingle();
-      if (!alive || error) return;
-      setHasConstraints(!!String((data as { constraints_note?: string | null } | null)?.constraints_note ?? '').trim());
+      // select('*')なら maternity / constraints_note 列が無い旧DBでもクエリごと落ちない（GoalPanelと同じ流儀）
+      const [profRes, wRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
+        supabase.from('entries').select('weight').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
+      ]);
+      if (!alive) return;
+      const pr = (profRes.data ?? null) as
+        { constraints_note?: string | null; height_cm?: number | null; maternity?: boolean | null; init_weight?: number | null; purpose?: string | null } | null;
+      if (!profRes.error) setHasConstraints(!!String(pr?.constraints_note ?? '').trim());
+      const latest = (wRes.data as { weight: number | null }[] | null)?.[0]?.weight;
+      setGoalProfile({
+        heightCm: pr?.height_cm != null ? Number(pr.height_cm) : null,
+        currentKg: latest != null ? Number(latest) : (pr?.init_weight != null ? Number(pr.init_weight) : null),
+        maternity: pr?.maternity === true,
+        purpose: pr?.purpose ?? null,
+      });
     })();
     return () => { alive = false; };
   }, []));
@@ -252,11 +268,15 @@ export default function CoachScreen() {
    */
   function applyAction(a: CoachAction) {
     if (applying) return;
-    const v = validateAction(a, todayJST());
+    // 安全ガードは「ボタンを消す」のではなく「押したときに理由を出す」で守る。
+    // 上の isApplicable（プロフィールを渡さない＝形と範囲だけ見る）でボタンは出したまま、
+    // ここで初めて弾く。黙って押せないボタンにすると理由が誰にも伝わらない
+    const v = validateAction(a, todayJST(), goalProfile);
     if (!v.ok) {
       note(v.reason + t('（「概要」タブの目標から手動で設定できます）'));
       return;
     }
+    if (v.warn) note(v.warn);
     // 献立はトレイに載せるだけ（確定は食事タブの✓保存）なので確認ダイアログを挟まない
     if (v.plan.table === 'tray') {
       setPendingMeal(v.plan.items);

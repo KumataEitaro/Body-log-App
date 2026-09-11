@@ -1,8 +1,12 @@
-// ヘルスケア連携の「判断」だけを集めた純関数群（ネイティブ依存なし・jestで固定する）。
+// ヘルスケア連携の「判断」だけを集めた純関数群（jestで固定する）。
 //
 // 実際のHealthKit呼び出しは lib/health.ts、購読者への通知は lib/healthStore.ts。
 // ここには「連携状態をどう決めるか」「再許可が要るか」「体重をどちらを正とするか」
 // という規則だけを置く。規則が1か所にあると、画面ごとの判定がズレない。
+//
+// 体重の許容範囲だけは lib/guard の WEIGHT_RANGE を参照する（QA B-2: 入力口ごとに
+// 20/300 の直値が散っていて、体写真カードのように抜けている口があった）。
+import { inWeightRange } from './guard';
 
 /** 連携状態。unavailable=HealthKitが無い環境（Android・Expo Go）／unlinked=未連携／linked=連携済み */
 export type HealthLinkState = 'unavailable' | 'unlinked' | 'linked';
@@ -66,7 +70,7 @@ export type WeightImportDecision =
  */
 export function decideWeightImport(i: WeightImportInput): WeightImportDecision {
   const kg = Number(i.hk.kg);
-  if (!Number.isFinite(kg) || kg < 20 || kg > 300 || !Number.isFinite(i.hk.at)) return 'skip-invalid';
+  if (!inWeightRange(kg) || !Number.isFinite(i.hk.at)) return 'skip-invalid';
   if (i.manual) {
     if (i.preferManual) return 'skip-prefer-manual';
     if (i.hk.at <= i.manual.at) return 'skip-manual-newer';

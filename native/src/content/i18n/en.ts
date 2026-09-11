@@ -2362,4 +2362,10 @@ export const EN: Record<string, string> = {
   // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
   "マイ食品を登録": "Add to My Foods",
   "マイ食品に登録しました。": "Added to My Foods.",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Enter height, age and weight as numbers.",
+  "身長・年齢は数字で入力してください。": "Enter height and age as numbers.",
+  "身長・年齢の値を確認してください。": "Please check your height and age.",
+  "P・F・Cは数字で入力してください。": "Enter P, F and C as numbers.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Enter a body fat percentage between {min} and {max}%.",
 };

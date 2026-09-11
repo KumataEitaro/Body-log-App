@@ -13,6 +13,7 @@ import {
   type HealthLinkState,
 } from './healthLink';
 import { setHealthLinkState, setHealthLastSync, bumpHealthVersion, healthStoreState } from './healthStore';
+import { inWeightRange } from './guard';
 import { jstYmd, jstHour } from './jst';
 import { activityRange } from './healthHistory';
 
@@ -178,6 +179,22 @@ function dateKeyJST(d: Date): string {
   return jstYmd(d.getTime()); // YYYY-MM-DD（Intl非依存・lib/jst.ts の理由コメント参照）
 }
 
+/**
+ * 手動取込の仕分け（純関数・jestで固定）。
+ *  ・体重として現実的でない値（lib/guard.WEIGHT_RANGE 外）は取り込まない。
+ *    ヘルスケアには他アプリの試し書きや単位違いの値が混ざる（QA B-2: 入力口ごとに
+ *    範囲がバラバラで、ここだけノーガードだった）
+ *  ・既にアプリ側で体重が入っている日は尊重する（手入力を正とする）
+ */
+export function filterImportable(
+  byDate: Map<string, number>,
+  hasWeight: Set<string>,
+): { date: string; weight: number }[] {
+  return [...byDate.entries()]
+    .filter(([d, w]) => !hasWeight.has(d) && inWeightRange(w))
+    .map(([date, weight]) => ({ date, weight }));
+}
+
 // 体重の過去分をヘルスケア→entriesへ取込（日ごとの最終値・既存の体重は上書きしない）
 export async function importWeights(uid: string, days: number): Promise<{ imported: number } | { error: string }> {
   if (!hk) return { error: t('この機能はTestFlight版でのみ使えます（Expo Goでは動きません）。') };
@@ -196,8 +213,7 @@ export async function importWeights(uid: string, days: number): Promise<{ import
     const { data: existing } = await supabase.from('entries')
       .select('date,weight').in('date', [...byDate.keys()]);
     const has = new Set((existing || []).filter((e: { weight: number | null }) => e.weight != null).map((e: { date: string }) => e.date));
-    const rows = [...byDate.entries()].filter(([d]) => !has.has(d))
-      .map(([date, weight]) => ({ user_id: uid, date, weight }));
+    const rows = filterImportable(byDate, has).map((r) => ({ user_id: uid, ...r }));
     if (rows.length === 0) return { imported: 0 };
     const { error } = await supabase.from('entries').upsert(rows, { onConflict: 'user_id,date' });
     if (error) return { error: t('保存に失敗しました。もう一度お試しください。') };

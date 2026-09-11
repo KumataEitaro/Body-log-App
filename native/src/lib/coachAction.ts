@@ -10,7 +10,11 @@
 //     呼び出し側が黙って return できる余地を作らない。
 //  2. AIの出力は信用しない。桁を間違えた値（たんぱく質 22g/kg 等）や
 //     存在しない日付（2026-13-45）を、そのまま目標として書き込ませない。
+//  3. 目標パネル（GoalPanel）と同じ安全ガードを通す（QA P1-6）。
+//     ここは目標パネルと同じ goals 行を書く2本目の経路なので、
+//     BMI18.5下限・週1kg超の減量ペース・妊娠授乳中の減量方向を lib/guard に集約して共有する。
 import { t } from './i18n';
+import { assessWeightGoal } from './guard';
 
 /** AIが提案した献立の1品（食事トレイの品目と同じ形） */
 export type MealItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
@@ -29,7 +33,19 @@ export type ApplyPlan =
   // 献立はDBに書かない。食事トレイに載せるだけで、確定は本人の✓保存
   | { table: 'tray'; items: MealItem[] };
 
-export type Validated = { ok: true; plan: ApplyPlan } | { ok: false; reason: string };
+export type Validated = { ok: true; plan: ApplyPlan; warn?: string } | { ok: false; reason: string };
+
+/**
+ * 安全ガードに必要な本人の値（QA P1-6）。
+ * 渡さない・欠けている項目のぶんだけ判定がスキップされるので、
+ * 呼び出し側は「取れた値は必ず渡す」こと（取れないから素通し、を既定にしない）。
+ */
+export type CoachProfile = {
+  heightCm?: number | null;
+  currentKg?: number | null;
+  maternity?: boolean | null;
+  purpose?: string | null;
+};
 
 // 値の許容範囲。AIが桁を間違えた提案をそのまま目標にしないための下限・上限。
 // 極端な人でも収まる幅にしてあり、これを外れる提案は提案そのものがおかしい。
@@ -81,7 +97,7 @@ function checkTargetDate(v: unknown, todayISO: string): { ok: true; date: string
  * AIの提案を検証し、書き込める形にして返す。
  * 弾く場合は必ず理由を返す（呼び出し側が無言で終われないようにするため）。
  */
-export function validateAction(a: unknown, todayISO: string): Validated {
+export function validateAction(a: unknown, todayISO: string, profile?: CoachProfile): Validated {
   if (a == null || typeof a !== 'object') return { ok: false, reason: t('提案の内容を読み取れませんでした。') };
   const act = a as Record<string, unknown>;
 
@@ -127,7 +143,22 @@ export function validateAction(a: unknown, todayISO: string): Validated {
       if (Object.keys(patch).length === 0) {
         return { ok: false, reason: t('変更する値が提案に含まれていませんでした。') };
       }
-      return { ok: true, plan: { table: 'goals', patch } };
+      // 目標パネルと同じ安全ガード（G1: BMI下限・減量ペース / G3: 妊娠授乳中）。
+      // 目標体重だけ・目標日だけの提案でも、もう片方は現在の目標側の値で判定できるよう
+      // 呼び出し側が profile.currentKg / 既存の目標日を渡す設計にしてある
+      const verdict = assessWeightGoal({
+        heightCm: profile?.heightCm,
+        currentKg: profile?.currentKg,
+        targetKg: typeof patch.target_weight === 'number' ? patch.target_weight : null,
+        targetDate: typeof patch.target_date === 'string' ? patch.target_date : null,
+        today: todayISO,
+        maternity: profile?.maternity,
+        purpose: profile?.purpose,
+      });
+      if (!verdict.ok) return { ok: false, reason: verdict.reason };
+      return verdict.warn
+        ? { ok: true, plan: { table: 'goals', patch }, warn: verdict.warn }
+        : { ok: true, plan: { table: 'goals', patch } };
     }
 
     case 'training': {
@@ -180,6 +211,6 @@ export function validateAction(a: unknown, todayISO: string): Validated {
 }
 
 /** 表示できる提案か（押しても何も起きないボタンを出さないための事前判定） */
-export function isApplicable(a: unknown, todayISO: string): boolean {
-  return validateAction(a, todayISO).ok;
+export function isApplicable(a: unknown, todayISO: string, profile?: CoachProfile): boolean {
+  return validateAction(a, todayISO, profile).ok;
 }

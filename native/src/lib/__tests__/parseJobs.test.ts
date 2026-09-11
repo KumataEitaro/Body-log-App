@@ -8,13 +8,15 @@ import {
 } from '../parseJobs';
 
 const NOW = 1_800_000_000_000;
+const ME = 'uid-me';
 const base = (over: Partial<ParseJob> = {}): ParseJob => ({
-  id: 'a', text: 'バナナ', photoUris: [], date: '2026-09-01', createdAt: NOW, state: 'running', ...over,
+  id: 'a', uid: ME, text: 'バナナ', photoUris: [], date: '2026-09-01', createdAt: NOW, state: 'running', ...over,
 });
 
 describe('ジョブの生成と更新', () => {
   it('送信内容をそのまま持ち、解析中で始まる', () => {
-    const j = makeJob({ text: 'カレー', photoUris: ['file:///a.jpg'], date: '2026-09-01' }, NOW, () => 0.5);
+    const j = makeJob({ uid: ME, text: 'カレー', photoUris: ['file:///a.jpg'], date: '2026-09-01' }, NOW, () => 0.5);
+    expect(j.uid).toBe(ME);
     expect(j.text).toBe('カレー');
     expect(j.photoUris).toEqual(['file:///a.jpg']);
     expect(j.date).toBe('2026-09-01');
@@ -24,8 +26,8 @@ describe('ジョブの生成と更新', () => {
   });
 
   it('同じ瞬間の連投でもidが衝突しない', () => {
-    const a = makeJob({ text: 'A', photoUris: [], date: '2026-09-01' }, NOW, () => 0.11);
-    const b = makeJob({ text: 'B', photoUris: [], date: '2026-09-01' }, NOW, () => 0.87);
+    const a = makeJob({ uid: ME, text: 'A', photoUris: [], date: '2026-09-01' }, NOW, () => 0.11);
+    const b = makeJob({ uid: ME, text: 'B', photoUris: [], date: '2026-09-01' }, NOW, () => 0.87);
     expect(a.id).not.toBe(b.id);
   });
 
@@ -73,9 +75,19 @@ describe('端末の文字列の読み書き', () => {
   it('形の合わない1件だけを落として残りは活かす', () => {
     const raw = JSON.stringify([
       base({ id: 'ok' }),
-      { id: 'no-date', text: 'x', createdAt: NOW },          // dateが無い
-      { id: 'empty', text: '', photoUris: [], date: '2026-09-01', createdAt: NOW },  // 中身が無い
+      { id: 'no-date', uid: ME, text: 'x', createdAt: NOW },          // dateが無い
+      { id: 'empty', uid: ME, text: '', photoUris: [], date: '2026-09-01', createdAt: NOW },  // 中身が無い
       null,
+    ]);
+    expect(decodeJobs(raw).map((j) => j.id)).toEqual(['ok']);
+  });
+
+  it('uidを持たない旧形式のジョブは読み込まない（誰のものか判定できないため）', () => {
+    // QA P1-4: uid導入前に端末へ残っていたジョブを、次にログインした人のトレイへ積まない
+    const raw = JSON.stringify([
+      base({ id: 'ok' }),
+      { id: 'legacy', text: 'カレー', photoUris: [], date: '2026-09-01', createdAt: NOW, state: 'running' },
+      { id: 'blank-uid', uid: '', text: 'カレー', photoUris: [], date: '2026-09-01', createdAt: NOW },
     ]);
     expect(decodeJobs(raw).map((j) => j.id)).toEqual(['ok']);
   });
@@ -89,7 +101,7 @@ describe('復元時の仕分け', () => {
       base({ id: 'yesterday', date: '2026-08-31' }),
       base({ id: 'stale', createdAt: NOW - MAX_AGE_MS - 1 }),
     ];
-    const { resume, keep, drop } = triageJobs(list, '2026-09-01', NOW);
+    const { resume, keep, drop } = triageJobs(list, '2026-09-01', NOW, ME);
     expect(resume.map((j) => j.id)).toEqual(['run']);
     expect(keep.map((j) => j.id)).toEqual(['fail']);
     expect(drop.map((j) => j.id)).toEqual(['yesterday', 'stale']);
@@ -97,7 +109,32 @@ describe('復元時の仕分け', () => {
 
   it('端末の時計が巻き戻っていても未来のジョブを抱え込まない', () => {
     const list = [base({ id: 'future', createdAt: NOW + 10 * 60_000 })];
-    expect(triageJobs(list, '2026-09-01', NOW).drop.map((j) => j.id)).toEqual(['future']);
+    expect(triageJobs(list, '2026-09-01', NOW, ME).drop.map((j) => j.id)).toEqual(['future']);
+  });
+
+  // QA P1-4: 同じ端末でアカウントを切り替えると、前の人の食事写真の解析が
+  // 次の人のトレイに積まれていた（保存すれば次の人の記録になる）
+  it('別のuidのジョブは resume にも keep にも入らない', () => {
+    const list = [
+      base({ id: 'mine-run', state: 'running' }),
+      base({ id: 'mine-fail', state: 'failed', error: 'だめ' }),
+      base({ id: 'theirs-run', uid: 'uid-other', state: 'running' }),
+      base({ id: 'theirs-fail', uid: 'uid-other', state: 'failed', error: 'だめ' }),
+    ];
+    const { resume, keep, drop } = triageJobs(list, '2026-09-01', NOW, ME);
+    expect(resume.map((j) => j.id)).toEqual(['mine-run']);
+    expect(keep.map((j) => j.id)).toEqual(['mine-fail']);
+    expect(drop.map((j) => j.id)).toEqual(['theirs-run', 'theirs-fail']);
+  });
+
+  it('uidが取れていない（未ログイン・セッション復元前）ときは全部捨てる', () => {
+    const list = [base({ id: 'run' }), base({ id: 'fail', state: 'failed' })];
+    for (const who of [null, undefined, '']) {
+      const { resume, keep, drop } = triageJobs(list, '2026-09-01', NOW, who);
+      expect(resume).toEqual([]);
+      expect(keep).toEqual([]);
+      expect(drop).toHaveLength(2);
+    }
   });
 });
 

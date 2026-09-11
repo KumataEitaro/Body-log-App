@@ -24,6 +24,12 @@ export type JobState = 'running' | 'failed';
 
 export type ParseJob = {
   id: string;
+  /**
+   * 送信した本人のuid。復元時に「自分のジョブか」を確かめるために持つ（QA P1-4）。
+   * ジョブは端末に置かれるので、同じ端末で別アカウントに切り替えると
+   * 前の人の食事写真が次の人のトレイに積まれてしまっていた。
+   */
+  uid: string;
   /** 入力テキスト（写真だけの送信では空） */
   text: string;
   /** 圧縮済みJPEGのローカルURI。復元時はここから読み直す */
@@ -39,13 +45,14 @@ export type ParseJob = {
 
 /** 送信1回ぶんのジョブを作る。nowとrandを渡すのはテストで固定するため */
 export function makeJob(
-  input: { text: string; photoUris: string[]; date: string },
+  input: { uid: string; text: string; photoUris: string[]; date: string },
   now: number,
   rand: () => number,
 ): ParseJob {
   const tail = Math.floor(rand() * 1e9).toString(36);
   return {
     id: `j${now.toString(36)}-${tail}`,
+    uid: input.uid,
     text: input.text,
     photoUris: [...input.photoUris],
     date: input.date,
@@ -84,12 +91,15 @@ function validJob(v: unknown): ParseJob | null {
   if (typeof o.id !== 'string' || o.id === '') return null;
   if (typeof o.date !== 'string') return null;
   if (typeof o.createdAt !== 'number' || !Number.isFinite(o.createdAt)) return null;
+  // uidを持たないのは旧形式（QA P1-4 以前）のジョブ。誰のものか判定できない以上、
+  // 誰かのトレイに積むより捨てる方が安全なので、ここで落とす
+  if (typeof o.uid !== 'string' || o.uid === '') return null;
   const uris = Array.isArray(o.photoUris) ? o.photoUris.filter((u): u is string => typeof u === 'string') : [];
   const text = typeof o.text === 'string' ? o.text : '';
   // テキストも写真も無いジョブは再送しても意味がない
   if (text === '' && uris.length === 0) return null;
   return {
-    id: o.id, text, photoUris: uris, date: o.date, createdAt: o.createdAt,
+    id: o.id, uid: o.uid, text, photoUris: uris, date: o.date, createdAt: o.createdAt,
     state: o.state === 'failed' ? 'failed' : 'running',
     error: typeof o.error === 'string' ? o.error : undefined,
   };
@@ -113,15 +123,19 @@ export function isSlow(job: ParseJob, now: number): boolean {
   return job.state === 'running' && now - job.createdAt > SLOW_MS;
 }
 
-/** 復元時の仕分け: resume=自動で再送する / keep=失敗表示のまま残す / drop=捨てる */
+/** 復元時の仕分け: resume=自動で再送する / keep=失敗表示のまま残す / drop=捨てる。
+ *  uid は「いま開いている人」。別人のジョブは resume にも keep にも入れず drop する（QA P1-4）。
+ *  uid を渡さない呼び方はできない（引数必須）＝呼び出しを足した人が本人確認を忘れられない */
 export function triageJobs(
-  list: ParseJob[], today: string, now: number,
+  list: ParseJob[], today: string, now: number, uid: string | null | undefined,
 ): { resume: ParseJob[]; keep: ParseJob[]; drop: ParseJob[] } {
   const resume: ParseJob[] = [];
   const keep: ParseJob[] = [];
   const drop: ParseJob[] = [];
   for (const j of list) {
-    if (j.date !== today || now - j.createdAt > MAX_AGE_MS || now < j.createdAt - 60_000) drop.push(j);
+    // uid が取れていない（未ログイン・セッション復元前）ときも、誰のものか確かめられないので捨てる
+    if (!uid || j.uid !== uid) drop.push(j);
+    else if (j.date !== today || now - j.createdAt > MAX_AGE_MS || now < j.createdAt - 60_000) drop.push(j);
     else if (j.state === 'running') resume.push(j);
     else keep.push(j);
   }

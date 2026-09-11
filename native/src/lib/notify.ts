@@ -20,6 +20,18 @@ import { getPurpose } from './purpose';
 // 起床時刻は「未選択時の既定値の算出」にだけ使う（wakeTime は notify を import しないので循環しない）
 import { WAKE_DEFAULT_HM, WAKE_TIME_KEY, defaultReminderHour, wakeOrDefault } from './wakeTime';
 
+/**
+ * smart リマインダーの予約キー（QA A-2）。
+ *
+ * 通知は端末ローカル時刻の hour:00 に鳴るので、キーも**端末ローカル日付**で作る。
+ * 以前は予約側がローカル日付・取消側が todayJST() で、非JSTの人は
+ * 「記録したのに今夜の通知が消えず、明日のぶんが消える」状態だった（A-2）。
+ * 予約と取消の両方が必ずこの1関数を通るようにして、食い違いを構造的に潰す。
+ */
+export function reminderDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const IDS_KEY = 'bl-notif-ids';         // { daily?: string; weekly?: string }
 const SMART_KEY = 'bl-notif-smart-ids'; // { 'YYYY-MM-DD': notificationId }
 const MODE_KEY = 'bl-notif-daily-mode'; // 'off' | 'smart' | 'always'
@@ -147,11 +159,14 @@ export async function applyDailyReminder(): Promise<boolean> {
     const map: Record<string, string> = {};
     const now = new Date();
     for (let i = 0; i < SMART_HORIZON; i++) {
-      const d = new Date(now.getTime() + i * 86400000);
+      // 「1日ぶんのミリ秒を足す」書き方だと、夏時間の切替をまたぐ日に1時間ずれて
+      // 「同じ日が2回・ある日が抜ける」が起きる。setDate は暦の日付を進めるのでDSTに影響されない（QA A-2）
+      const d = new Date(now.getTime());
+      d.setDate(now.getDate() + i);
       d.setHours(hour, 0, 0, 0);
       if (d.getTime() <= Date.now()) continue;              // 今日の時刻がもう過ぎている
       if (i === 0 && skipToday) continue;                   // 今日はもう記録済み
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dateKey = reminderDateKey(d);
       const id = await Notifications.scheduleNotificationAsync({
         content: { ...copies[i % copies.length], data: { url: 'bodylog://log?quick=1' }, categoryIdentifier: DAILY_CATEGORY },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: d },
@@ -168,7 +183,8 @@ export async function applyDailyReminder(): Promise<boolean> {
 export async function skipTodayReminder(): Promise<void> {
   try {
     const map = await getSmartIds();
-    const today = todayJST();
+    // 予約キーと同じ関数で作る（todayJST() を使うと非JSTの人で1日ずれる。QA A-2）
+    const today = reminderDateKey(new Date());
     const id = map[today];
     if (!id) return;
     await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
@@ -293,7 +309,7 @@ export function nextWeeklyReviewAt(now: Date): Date {
 function weekKeyOf(d: Date): string {
   const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  return reminderDateKey(dt);   // 日付の組み立てはこのファイルで1か所だけ（QA A-2）
 }
 
 /** 予約中の週次レビュー通知を取り消す（リマインダーOFF時・積み直しの前） */

@@ -2284,4 +2284,10 @@ export const ID: Record<string, string> = {
   // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
   "マイ食品を登録": "Tambah ke Makanan Saya",
   "マイ食品に登録しました。": "Disimpan ke Makanan Kustom.",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Masukkan tinggi, usia, dan berat dalam angka.",
+  "身長・年齢は数字で入力してください。": "Masukkan tinggi dan usia dalam angka.",
+  "身長・年齢の値を確認してください。": "Periksa kembali nilai tinggi dan usia.",
+  "P・F・Cは数字で入力してください。": "Masukkan P, F, dan C dalam angka.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Masukkan lemak tubuh antara {min} dan {max}%.",
 };
