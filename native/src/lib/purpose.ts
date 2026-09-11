@@ -67,7 +67,8 @@ export function setPurpose(key: PurposeKey): void {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
-      await supabase.from('profiles').update({ purpose: key }).eq('id', uid);
+      // upsert（update ではない）: profiles 行が無いと update は 0行更新で静かに落ちる（QA P0-3）
+      await supabase.from('profiles').upsert({ id: uid, purpose: key }, { onConflict: 'id' });
       // サイクル履歴（B-5）もベストエフォート。失敗しても端末保存は成功のまま
       await recordPurposePeriod(uid, key);
     } catch { /* 端末保存が主なので無視 */ }

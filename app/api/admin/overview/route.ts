@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { isUnlimited, todayJST } from '@/lib/calc';
+import { isAdmin, todayJST } from '@/lib/calc';
 
 // 管理者専用: 全ユーザーの利用状況サマリー
 // プライバシー方針: 体写真・食事メモの中身は返さない（アプリ内で「本人以外見られない」と明言しているため）
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !isUnlimited(user.email)) {
+  // 認可は isAdmin（UNLIMITED_EMAILS の照合のみ）で行う。
+  // **AI利用上限の免除判定を認可に流用しないこと**: あちらは AI_LIMITS_ENABLED=false の間
+  // 全員 true を返す短絡を持つため、このAPIが全ログインユーザーに開いていた（QA P0-1・2026-09-10）。
+  // tests/adminAuth.test.ts が「app/api/admin/** にあの識別子が現れたら fail」で機械的に止める。
+  if (!user || !isAdmin(user.email)) {
     return NextResponse.json({ ok: false, error: '権限がありません。' }, { status: 403 });
   }
 
@@ -71,6 +75,9 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, users, generatedAt: today });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    // 例外の生文字列は返さない（テーブル名・接続文字列・service roleの失敗理由が漏れる）。
+    // 原因はサーバーログにだけ残し、クライアントへは固定文言を返す（QA P0-1 修正案3）
+    console.error('[admin/overview]', e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ ok: false, error: '集計に失敗しました。時間をおいて再度お試しください。' }, { status: 500 });
   }
 }

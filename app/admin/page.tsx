@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { isUnlimited } from '@/lib/calc';
+import { isAdmin } from '@/lib/calc';
 
 type Row = {
   email: string; name: string; signedUp: string; lastSignIn: string;
@@ -24,7 +24,9 @@ export default function AdminPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
-      if (!isUnlimited(user.email)) { router.push('/dashboard'); return; }
+      // 管理者判定は isAdmin（AI上限の免除判定は認可に使わない・QA P0-1）。
+      // ここは体感のための早期リダイレクトで、実際の防御はAPI側（/api/admin/overview）にある
+      if (!isAdmin(user.email)) { router.push('/dashboard'); return; }
       setEmail(user.email || '');
       const res = await fetch('/api/admin/overview');
       const j = await res.json();

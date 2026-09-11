@@ -2284,4 +2284,14 @@ export const ID: Record<string, string> = {
   // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
   "マイ食品を登録": "Tambah ke Makanan Saya",
   "マイ食品に登録しました。": "Disimpan ke Makanan Kustom.",
+  // QA 2026-09-10 の修正分（P0-2 圏外キュー / P0-3 プロフィール未設定 / P1-1 初期設定のやり直し / P1-2 初回同意）
+  "プロフィールを設定するとカロリー目標が出ます": "Atur profil untuk melihat target kalorimu",
+  "身長・年齢・体重から、1日に食べられる目安を計算します。1分で終わります。": "Kami hitung berapa yang bisa kamu makan tiap hari dari tinggi, usia, dan berat badan. Cukup satu menit.",
+  "プロフィールを設定する": "Atur profil",
+  "同期できなかった記録があります": "Ada catatan yang gagal disinkronkan",
+  "圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。": "{n} catatan yang disimpan saat offline gagal dikirim ke server. Mohon catat ulang.",
+  "利用規約への同意": "Persetujuan ketentuan layanan",
+  "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Sebelum mulai, silakan baca ketentuan layanan dan kebijakan privasi, lalu berikan persetujuanmu.",
+  "初期設定をやり直す": "Ulangi pengaturan awal",
+  "目的・身長・年齢・体重をウィザードで入れ直します": "Masukkan ulang tujuan, tinggi, usia, dan berat lewat panduan",
 };

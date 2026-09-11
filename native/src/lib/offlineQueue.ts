@@ -15,6 +15,9 @@ export type PendingLog = {
 };
 
 const KEY = 'bl-offline-logs';
+// 「DBに受け付けられず捨てた件数」の控え（QA P0-2）。次回の起動で1度だけ本人に伝える。
+// 黙って消すと「保存しました」と言われた記録が理由も分からず消えたように見える
+const DROPPED_KEY = 'bl-offline-dropped';
 const MAX_ITEMS = 50;                          // 無限に貯めない（超えたら古いものから破棄）
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;    // 7日で破棄（破棄時は静かに）
 
@@ -57,10 +60,53 @@ async function writeQueue(items: PendingLog[]): Promise<void> {
  * バリデーション・RLS・スキーマ違反はここに該当しないので従来どおり失敗表示に回る。
  */
 export function isNetworkError(e: unknown): boolean {
-  const msg = typeof e === 'string' ? e
-    : e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message)
-    : String(e);
-  return /network|fetch|internet|offline|timed?\s*out|timeout|socket|ECONN|abort/i.test(msg);
+  return /network|fetch|internet|offline|timed?\s*out|timeout|socket|ECONN|abort/i.test(errText(e));
+}
+
+function errText(e: unknown): string {
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object') {
+    const o = e as { message?: unknown; code?: unknown };
+    return `${String(o.message ?? '')} ${String(o.code ?? '')}`;
+  }
+  return String(e);
+}
+
+/**
+ * 権限・RLS 由来の拒否か（QA P0-2）。
+ *
+ * これは「再送しても直らない毒饅頭」ではない: 別アカウントでログイン中・JWTの期限切れ・
+ * ポリシー未適用など、**あとで通る**理由で弾かれているだけのことが多い。
+ * ここに該当する行は捨てずに残す（捨てると本人の記録が黙って消える）。
+ * 42501 = insufficient_privilege（PostgreSQL）。supabase-js は message にRLS文言を載せる。
+ */
+export function isPermissionError(e: unknown): boolean {
+  // 「violates」単体は入れない: not-null / check / foreign key 制約違反（＝本当に再送しても直らない行）
+  // まで保持してしまう。RLS の文言は "violates row-level security policy" なので、そこだけ拾う
+  return /row[- ]level security|permission denied|not authorized|unauthorized|42501|\bJWT\b/i.test(errText(e));
+}
+
+/** 破棄した件数を控える（次回起動で takeDroppedNotice() が1度だけ読み出す） */
+async function noteDropped(n: number): Promise<void> {
+  if (n <= 0) return;
+  try {
+    const prev = Number(await AsyncStorage.getItem(DROPPED_KEY)) || 0;
+    await AsyncStorage.setItem(DROPPED_KEY, String(prev + n));
+  } catch { /* 控えられなくても本体は進める */ }
+  // 端末に控えが残らなかった場合でも、少なくとも開発者向けの手がかりは残す
+  console.warn(`[offlineQueue] DBに受け付けられなかった記録を${n}件破棄しました`);
+}
+
+/**
+ * 「同期できなかった記録が N 件あります」を伝えるための件数を読み出し、控えを消す。
+ * 起動時に1度だけ呼ぶ（native/src/app/_layout.tsx）。0 なら何も出さない。
+ */
+export async function takeDroppedNotice(): Promise<number> {
+  try {
+    const n = Number(await AsyncStorage.getItem(DROPPED_KEY)) || 0;
+    if (n > 0) await AsyncStorage.removeItem(DROPPED_KEY);
+    return n;
+  } catch { return 0; }
 }
 
 /** 送信に失敗した1行をキューへ積む。戻り値は積んだあとの未同期件数 */
@@ -85,9 +131,17 @@ let flushing = false;
 
 /**
  * 先頭から順にsupabaseへinsertする。成功した日付は syncEntriesForDate で日次サマリーも直す。
- * ネットワーク失敗（まだ圏外）ならそこで止めて残りは次回へ。
- * ネットワーク以外の失敗（バリデーション等）はその行だけ静かに落とす
- * （毒饅頭が先頭に居座ってキュー全体を詰まらせないため）。
+ *
+ * 送らない・捨てないの線引き（QA P0-2・2026-09-10）:
+ *  ・**現在のセッションのuidと違う行は送らない**（保持したまま次の行へ）。
+ *    圏外で記録 → 別アカウントでログイン、の順で操作されると、以前は B のセッションから
+ *    A の user_id を insert して RLS に弾かれ、その行を「毒饅頭」として捨てていた
+ *    （A の記録が、エラーも出さずに消えていた）
+ *  ・**RLS・権限エラーの行も捨てない**。JWTの期限切れ・ポリシー未適用など、あとで通る理由が多い
+ *  ・ネットワーク失敗（まだ圏外）はそこで止めて残り全部を次回へ
+ *  ・それ以外（列違反などの本当に再送しても直らない行）だけ落とし、件数を控えて次回起動で伝える
+ *
+ * 未ログイン中は「誰の行か」を判定できないので1件も送らない（安全側）。
  */
 export async function flush(): Promise<{ sent: number; left: number }> {
   if (flushing) return { sent: 0, left: await pendingCount() };
@@ -95,10 +149,30 @@ export async function flush(): Promise<{ sent: number; left: number }> {
   try {
     let items = await readQueue();
     await writeQueue(items);   // pruneの結果を確定させつつ件数を通知
+
+    // セッションはflushの先頭で1回だけ読む（1行ごとに読み直すとログアウトと競合する）
+    let uid: string | null = null;
+    try {
+      const { data } = await supabase.auth.getSession();
+      uid = data.session?.user?.id ?? null;
+    } catch { uid = null; }
+    if (!uid) return { sent: 0, left: items.length };
+
     let sent = 0;
+    let dropped = 0;
+    const held: PendingLog[] = [];                   // 送らずに残す行（別アカウント・権限エラー）
     const syncTargets = new Map<string, string>();   // date -> user_id
+    const persist = async () => { await writeQueue(held.concat(items)); };
+
     while (items.length > 0) {
       const head = items[0];
+      // 別アカウントの行: このセッションでは送れない。持ち主が次にログインしたときに送る
+      if (head.row.user_id !== uid) {
+        held.push(head);
+        items = items.slice(1);
+        await persist();
+        continue;
+      }
       let error: { message: string } | null = null;
       try {
         ({ error } = await supabase.from('logs').insert(head.row));
@@ -111,19 +185,27 @@ export async function flush(): Promise<{ sent: number; left: number }> {
         error = { message: String((e as Error)?.message ?? e) };
       }
       if (error && isNetworkError(error)) break;      // まだ圏外。残して次回に任せる
+      if (error && isPermissionError(error)) {        // RLS・権限。捨てずに残す（あとで通る）
+        held.push(head);
+        items = items.slice(1);
+        await persist();
+        continue;
+      }
       if (!error) {
         sent += 1;
         syncTargets.set(head.row.date, head.row.user_id);
+      } else {
+        dropped += 1;   // 本当に再送しても直らない行（列違反など）。件数だけ控えて本人に伝える
       }
-      // 成功、またはDB側で受け付けられない行（再送しても直らない）はキューから外す
       items = items.slice(1);
-      await writeQueue(items);
+      await persist();
     }
+    await noteDropped(dropped);
     // 日次サマリーは日付ごとに1回でよい（同じ日の複数件をまとめる）
-    for (const [date, uid] of syncTargets) {
-      try { await syncEntriesForDate(uid, date); } catch { /* logsは入っている。次の保存時に再同期される */ }
+    for (const [date, u] of syncTargets) {
+      try { await syncEntriesForDate(u, date); } catch { /* logsは入っている。次の保存時に再同期される */ }
     }
-    return { sent, left: items.length };
+    return { sent, left: held.length + items.length };
   } finally {
     flushing = false;
   }

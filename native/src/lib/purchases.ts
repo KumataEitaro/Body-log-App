@@ -32,7 +32,29 @@ const RC_KEY = Platform.OS === 'android'
 // SDKは遅延ロード（キー未設定のビルドやAndroidで起動時クラッシュさせない）
 type RC = typeof import('react-native-purchases').default;
 let rc: RC | null = null;
-let configured = false;
+// configure 済みの appUserID。null = 未 configure。
+// 以前は boolean の一度きりフラグだったため、アプリを再起動せずにアカウントを切り替えると
+// RevenueCat の appUserID が **前の人のまま** になり、次の人が購入すると webhook が
+// 前の人の profiles.plan を更新していた（QA P1-5・2026-09-10）
+let configuredUid: string | null | undefined = undefined;
+
+/**
+ * RevenueCat の identity をどう合わせるかの判断（純関数・lib/__tests__/purchasesIdentity.test.ts で固定）。
+ *
+ * configure は1プロセスに1回しか呼べないので、2人目以降は logIn / logOut で差し替える。
+ * ここを「一度きりの boolean」で持っていたために、アプリを再起動せずアカウントを切り替えると
+ * appUserID が前の人のままになり、次の人の購入 webhook が **前の人の profiles.plan** を
+ * 更新していた（QA P1-5・2026-09-10）。
+ *
+ * @param configuredUid 直近に configure/logIn した appUserID。undefined = まだ configure していない
+ * @param uid           いまログインしている Supabase ユーザーID（未ログインは null）
+ */
+export type RcIdentityAction = 'configure' | 'logIn' | 'logOut' | 'none';
+export function rcIdentityAction(configuredUid: string | null | undefined, uid: string | null): RcIdentityAction {
+  if (configuredUid === undefined) return 'configure';   // 初回
+  if (uid === configuredUid) return 'none';              // 同じ人。触らない
+  return uid != null ? 'logIn' : 'logOut';               // 別の人 / サインアウト
+}
 
 async function ensureConfigured(): Promise<RC | null> {
   // キーがある＝そのOS用のキー（RC_KEYの選択ロジック参照）。iOS/Android以外(web等)は常にnull
@@ -40,15 +62,34 @@ async function ensureConfigured(): Promise<RC | null> {
   if (!rc) {
     try { rc = (await import('react-native-purchases')).default; } catch { return null; }
   }
-  if (!configured) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const uid = user?.id ?? null;
+    switch (rcIdentityAction(configuredUid, uid)) {
       // appUserID=SupabaseのユーザーID。webhookがこのIDでprofiles.planを更新する
-      rc.configure({ apiKey: RC_KEY, appUserID: user?.id ?? null });
-      configured = true;
-    } catch { return null; }
-  }
+      case 'configure': rc.configure({ apiKey: RC_KEY, appUserID: uid }); break;
+      case 'logIn': await rc.logIn(uid as string); break;
+      case 'logOut': await rc.logOut(); break;
+      case 'none': return rc;
+    }
+    configuredUid = uid;
+  } catch { return null; }
   return rc;
+}
+
+/**
+ * サインアウト時に RevenueCat の identity を切る（QA P1-5）。
+ * 以後の購入は匿名IDに紐づき、次のログインで ensureConfigured が logIn(uid) し直す。
+ * RCキー未設定ビルド・SDK未ロードでは no-op。
+ */
+export async function logOutPurchases(): Promise<void> {
+  // 一度も configure していない（SDK未ロード・キー未設定）なら何もしない＝undefined のまま。
+  // 次回の ensureConfigured が configure から始める
+  if (!RC_KEY || !rc || configuredUid === undefined) return;
+  try { await rc.logOut(); } catch { /* 既に匿名IDだと例外を投げる実装がある。無視 */ }
+  // logOut 後は匿名ID。次に誰かがログインしたら configure ではなく logIn(uid) で差し替える
+  // （configure は1プロセス1回。2度目を呼ぶと警告を出す実装がある）
+  configuredUid = null;
 }
 
 /** 課金機能が使える状態か（そのOS用のキーが設定済みのiOS/Androidのみ） */

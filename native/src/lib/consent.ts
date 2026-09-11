@@ -16,8 +16,19 @@ export const TERMS_VERSION = '2026-09-01';
 
 const LOCAL_KEY = 'bl-terms-version';   // オフライン時のフォールバック
 
-/** 再同意が必要か。列が無い/通信できない場合は false（＝出さない。誤爆で全員を止めない） */
-export async function needsReconsent(): Promise<boolean> {
+/**
+ * 同意ゲートの出し方（QA 2026-09-10 P1-2）。
+ *  false      : 出さない（同意済み・未ログイン・判定不能）
+ *  'initial'  : **初回の同意**。terms_version が null＝この規約にまだ一度も同意していない
+ *  'update'   : **改定の再同意**。過去に別バージョンへ同意済み
+ *
+ * 以前は両方 true で返していたため、登録した直後の人にまで
+ * 「利用規約を**更新**しました」＋「主な変更点」が全画面で出ていた（法務文言として誤り）。
+ */
+export type ReconsentMode = false | 'initial' | 'update';
+
+/** 同意ゲートが要るか。列が無い/通信できない場合は false（＝出さない。誤爆で全員を止めない） */
+export async function needsReconsent(): Promise<ReconsentMode> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const uid = session?.user?.id;
@@ -26,17 +37,16 @@ export async function needsReconsent(): Promise<boolean> {
     const { data, error } = await supabase
       .from('profiles').select('terms_version').eq('id', uid).maybeSingle();
     if (error) {
-      // 列が無い（migration未適用）等。端末側の記録だけで判断する
+      // 列が無い（migration未適用）等。端末側の記録だけで判断する。
+      // 端末に記録が無い＝この端末で一度も同意していないが、DBも読めない以上
+      // 「改定」と断定できないので出さない（従来どおり誤爆させない）
       const local = await AsyncStorage.getItem(LOCAL_KEY);
-      return local != null && local !== TERMS_VERSION;
+      return local != null && local !== TERMS_VERSION ? 'update' : false;
     }
     const v = (data as { terms_version?: string | null } | null)?.terms_version ?? null;
-    if (v == null) {
-      // 初回: この端末で既に同意済みならDBへ書き戻すだけにする（既存ユーザーを驚かせない
-      // のではなく、ここは「未同意」として扱う＝改定版に同意を取り直すのが目的）
-      return true;
-    }
-    return v !== TERMS_VERSION;
+    // null = この規約にまだ同意していない（新規登録・profiles行が無い）→ 初回として求める
+    if (v == null) return 'initial';
+    return v !== TERMS_VERSION ? 'update' : false;
   } catch {
     return false;   // 判定できないときは通す（起動不能にしない）
   }
@@ -52,9 +62,11 @@ export async function recordConsent(kind: 'terms' | 'privacy' | 'diet' = 'terms'
     // 履歴（失敗しても本体は進める）
     await supabase.from('consent_log')
       .insert({ user_id: uid, version: TERMS_VERSION, kind }).then(() => {}, () => {});
+    // upsert（update ではない）: profiles 行がまだ無いユーザーだと update は 0行更新・error null で
+    // 「成功」に見え、次回起動でまた同意を求める無限ループになっていた（QA P0-3・2026-09-10）
     const { error } = await supabase.from('profiles')
-      .update({ terms_version: TERMS_VERSION, terms_agreed_at: new Date().toISOString() })
-      .eq('id', uid);
+      .upsert({ id: uid, terms_version: TERMS_VERSION, terms_agreed_at: new Date().toISOString() },
+              { onConflict: 'id' });
     if (error) {
       // 列が無い環境では端末側の記録だけで運用する（機能を止めない）
       return true;

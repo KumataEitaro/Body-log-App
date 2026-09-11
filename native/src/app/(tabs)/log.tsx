@@ -230,6 +230,9 @@ export default function LogScreen() {
   const undoBar = useUndoSnackbar(insets.bottom + 80);
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // 「まだ読んでいない」と「読んだが行が無い」を区別する。前者で空状態を出すと
+  // 起動のたびに一瞬「プロフィールを設定してください」が閃く（QA P0-3 修正案4）
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [events, setEvents] = useState<(PlanEvent & { id: string })[]>([]);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
@@ -474,6 +477,7 @@ export default function LogScreen() {
       listMyMeals(),   // テーブル未作成なら空（セットのチップが出ないだけ）
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
+    if (!profRes.error) setProfileLoaded(true);   // 通信できた＝「行が無い」も確定した情報として扱える
     if (goalRes.data) setGoal(goalRes.data as Goal);
     setEvents((evRes.data as (PlanEvent & { id: string })[]) || []);
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
@@ -1787,6 +1791,24 @@ export default function LogScreen() {
           </Animated.View>
         )}
 
+        {/* プロフィール未設定の空状態（QA P0-3 修正案4）。
+            オンボーディングで「あとで設定」を押した人は profile が null のまま着地し、
+            ヒーローも収支カードも `&& profile` で消える＝画面から何も出ない理由が分からなかった。
+            消えている理由と、その場から設定へ行ける導線を小さく置く */}
+        {profileLoaded && !profile && (
+          <Animated.View style={[s.card, enter[1]]}>
+            <Text style={s.setupT}>{t('プロフィールを設定するとカロリー目標が出ます')}</Text>
+            <Text style={s.setupSub}>{t('身長・年齢・体重から、1日に食べられる目安を計算します。1分で終わります。')}</Text>
+            <Pressable style={({ pressed }) => [s.setupBtn, pressed && { opacity: 0.8 }]}
+                       onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}
+                       accessibilityRole="button"
+                       accessibilityLabel={t('プロフィールを設定する')}>
+              <Text style={s.setupBtnT}>{t('プロフィールを設定する')}</Text>
+              <Text style={s.setupBtnArrow}>›</Text>
+            </Pressable>
+          </Animated.View>
+        )}
+
         {/* 無料プラン向けバナー広告（課金有効ビルド×無料プランのときだけ高さが生まれる）。
             位置＝**ヒーロー（「あと食べられる」＋残量）の直後**（2026-09-04 移設。以前は
             「今日の記録」の直下＝スクロール2〜3画面目で、ほとんど見られていなかった）。
@@ -2626,6 +2648,16 @@ const s = themed(() => ({
   },
   eatBtnT: { flex: 1, fontSize: 14, fontWeight: '800', color: C.accentInk },
   eatBtnArrow: { fontSize: 17, fontWeight: '700', color: C.accentInk },
+  // プロフィール未設定の空状態（QA P0-3）。ヒーローの代わりに出るので、驚かせない静かな面にする
+  setupT: { fontSize: 15, fontWeight: '800', color: C.ink, lineHeight: 23 },
+  setupSub: { fontSize: 13, color: C.sub, lineHeight: 20, marginTop: 6 },
+  setupBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
+    paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.input,
+    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
+  },
+  setupBtnT: { flex: 1, fontSize: 14, fontWeight: '800', color: C.accentInk },
+  setupBtnArrow: { fontSize: 17, fontWeight: '700', color: C.accentInk },
   // N3 司令塔ブロック（解釈1行＋CTA＋N2への1行）。上に細い区切りを置いて「数字」と「意味」を分ける
   cmdBlock: { marginTop: 12, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 12 },
   cmdLine: { fontSize: 14.5, fontWeight: '700', color: C.ink, lineHeight: 22 },

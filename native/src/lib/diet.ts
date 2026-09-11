@@ -100,11 +100,15 @@ export async function saveDiet(next: DietProfile): Promise<{ ok: boolean; reason
     const { data: { session } } = await supabase.auth.getSession();
     const uid = session?.user?.id;
     if (!uid) return { ok: false, reason: 'no_session' };
-    const { error } = await supabase.from('profiles').update({
+    // upsert（update ではない）: profiles 行が無いユーザーでは update が 0行更新・error null で
+    // 返り、アレルギー等の制約が保存されないまま「保存できた」ことになる（QA P0-3・2026-09-10）。
+    // 安全に直結する設定なので、行が無ければ作って書く
+    const { error } = await supabase.from('profiles').upsert({
+      id: uid,
       diet_modes: next.modes,
       diet_custom: next.custom.trim() || null,
       diet_consent_at: next.consentAt,
-    }).eq('id', uid);
+    }, { onConflict: 'id' });
     if (error) {
       // migration-26 未適用: 機能ごと使えないことを呼び出し側に伝える（黙って成功に見せない）
       if (/diet_modes|diet_custom|diet_consent_at|column|schema/i.test(error.message)) {
@@ -126,7 +130,21 @@ export function useDiet(): DietProfile {
   return p;
 }
 
-/** テスト用: キャッシュを初期状態に戻す */
+/**
+ * サインアウト時に食事の制約を捨てる（QA P1-3・2026-09-10）。
+ * ここを残すと、次にログインした人の食事に **前の人のアレルギー設定で警告が出る**
+ * （かつ本人のアレルギーでは出ない）＝安全に直結する取り違えになる。
+ * 端末キャッシュ（'bl-diet'）の削除は lib/signOutCleanup.ts が担当する。
+ * 購読者には「制約なしに戻った」と伝えるので listeners は消さない。
+ */
+export function resetDiet(): void {
+  cached = EMPTY_DIET;
+  loaded = false;
+  loading = false;
+  emit();
+}
+
+/** テスト用: キャッシュを初期状態に戻す（購読者も切る） */
 export function __resetDietForTest(): void {
   cached = EMPTY_DIET; loaded = false; loading = false; listeners.clear();
 }

@@ -2284,4 +2284,14 @@ export const VI: Record<string, string> = {
   // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
   "マイ食品を登録": "Thêm vào Món của tôi",
   "マイ食品に登録しました。": "Đã lưu vào Món của tôi.",
+  // QA 2026-09-10 の修正分（P0-2 圏外キュー / P0-3 プロフィール未設定 / P1-1 初期設定のやり直し / P1-2 初回同意）
+  "プロフィールを設定するとカロリー目標が出ます": "Thiết lập hồ sơ để xem mục tiêu calo",
+  "身長・年齢・体重から、1日に食べられる目安を計算します。1分で終わります。": "Chúng tôi tính lượng ăn mỗi ngày từ chiều cao, tuổi và cân nặng. Chỉ mất một phút.",
+  "プロフィールを設定する": "Thiết lập hồ sơ",
+  "同期できなかった記録があります": "Có bản ghi chưa đồng bộ được",
+  "圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。": "{n} bản ghi đã lưu khi ngoại tuyến không gửi được lên máy chủ. Phiền bạn ghi lại giúp nhé.",
+  "利用規約への同意": "Đồng ý với điều khoản sử dụng",
+  "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Trước khi bắt đầu, vui lòng đọc điều khoản sử dụng và chính sách quyền riêng tư rồi đồng ý.",
+  "初期設定をやり直す": "Làm lại thiết lập ban đầu",
+  "目的・身長・年齢・体重をウィザードで入れ直します": "Nhập lại mục tiêu, chiều cao, tuổi và cân nặng bằng trình hướng dẫn",
 };
