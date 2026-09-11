@@ -1727,13 +1727,20 @@ export default function LogScreen() {
                         <GhostPair eaten={eat} others={split(key).others} focus={split(key).focus}
                                    target={tgt} color={col} pulse={pulse} />
                       </View>
-                      {bulkP ? (
-                        <Text style={[s.pfcT, { fontWeight: '800', color: eat >= tgt ? C.teal : C.ink }]}>
-                          {t('{n}%達成', { n: Math.min(999, Math.round((eat / Math.max(1, tgt)) * 100)) })}
+                      {/* 右列は2行: 上=「摂取済み/目標g」（2026-09-10・熊田さん「摂取済みグラム数もわかるように」）、
+                          下=残り／超過／達成率（従来の1行）。数字は tabular で桁が揃う */}
+                      <View style={s.pfcCol}>
+                        <Text style={s.pfcT} maxFontSizeMultiplier={1.2} testID={`pfc-eaten-${key}`}>
+                          {Math.round(eat)}<Text style={s.pfcTgt}>/{Math.round(tgt)}g</Text>
                         </Text>
-                      ) : (
-                        <Text style={[s.pfcT, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
-                      )}
+                        {bulkP ? (
+                          <Text style={[s.pfcSub, { fontWeight: '800', color: eat >= tgt ? C.teal : C.ink }]}>
+                            {t('{n}%達成', { n: Math.min(999, Math.round((eat / Math.max(1, tgt)) * 100)) })}
+                          </Text>
+                        ) : (
+                          <Text style={[s.pfcSub, over && { color: C.coral }]}>{over ? t('+{n}g超過', { n: eat - tgt }) : t('あと{n}g', { n: tgt - eat })}</Text>
+                        )}
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -2833,6 +2840,10 @@ const s = themed(() => ({
   pfcBar: { flex: 1, height: 7, backgroundColor: C.track, borderRadius: 4, overflow: 'hidden' },
   pfcFill: { height: '100%', borderRadius: 4 },
   pfcT: { width: 96, fontSize: 13, fontWeight: '800', color: C.ink, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  // 右列（摂取済み/目標 の上に、残り・超過・達成率の下段）。幅は pfcT と同じ 96 で桁を揃える
+  pfcCol: { width: 96, alignItems: 'flex-end', gap: 1 },
+  pfcTgt: { fontSize: 11, fontWeight: '700', color: C.faint },
+  pfcSub: { fontSize: 11.5, fontWeight: '700', color: C.sub, textAlign: 'right', fontVariant: ['tabular-nums'] },
   hint: { fontSize: 11, color: C.faint, textAlign: 'right', marginTop: 6 },
   thumbWrap: { marginRight: 8 },
   thumb: { width: 64, height: 64, borderRadius: RADIUS.input, borderWidth: 1, borderColor: C.line },
