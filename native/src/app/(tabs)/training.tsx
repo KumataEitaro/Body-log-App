@@ -37,6 +37,8 @@ import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import RestDial, { fmtRest } from '@/components/RestDial';
 import ActivityLogSheet from '@/components/ActivityLogSheet';
 import PlusEntry from '@/components/PlusEntry';
+import ThemeRemount from '@/components/ThemeRemount';
+import HourlyStepsChart from '@/components/HourlyStepsChart';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import { enqueue, flush, pendingCount, subscribePendingCount, isNetworkError } from '@/lib/offlineQueue';
 import { LIFT_SESSION_KEY, REST_CHOICES, REST_DEFAULT_SEC, parseSessionState } from '@/lib/liftSession';
@@ -581,36 +583,11 @@ export default function TrainingScreen() {
                 })}
               </View>
             )}
-            {/* 時間帯別の歩数（0-23時・ヘルスケア式）。高さは 44→32 に縮小 */}
-            {moveMore && hourlySteps != null && hourlySteps.some((v) => v > 0) && (() => {
-              const nowH = jstHourNow();
-              const isToday = viewDate === todayJST();
-              const maxHr = Math.max(1, ...hourlySteps);
-              return (
-                <View style={s.hrWrap}>
-                  <Text style={s.hrTitle}>{t('時間帯別の歩数')}</Text>
-                  <View style={s.hrBars}>
-                    {hourlySteps.map((v, h) => {
-                      const future = isToday && h > nowH;
-                      return (
-                        <View key={h} style={s.hrCol}>
-                          {future ? (
-                            <View style={s.hrEmpty} />
-                          ) : (
-                            <View style={[s.hrBar, { height: v > 0 ? 3 + Math.round(29 * (v / maxHr)) : 2 }, v === 0 && { backgroundColor: C.line }]} />
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <View style={s.hrAxis}>
-                    {[0, 6, 12, 18].map((h) => (
-                      <Text key={h} style={s.hrAxisT}>{t('{n}時', { n: h })}</Text>
-                    ))}
-                  </View>
-                </View>
-              );
-            })()}
+            {/* 時間帯別の歩数（0-23時・ヘルスケア式・高さ32）。概要タブの「歩数・睡眠」詳細と同じ
+                components/HourlyStepsChart.tsx（2026-09-10 に共通化。描画ロジックは同一） */}
+            {moveMore && hourlySteps != null && hourlySteps.some((v) => v > 0) && (
+              <HourlyStepsChart hours={hourlySteps} date={viewDate} today={todayJST()} barHeight={32} />
+            )}
           </Animated.View>
           {/* 広告枠（運動タブ・1枠）: 「きょうの動き」＝閲覧領域の直下、記録カード群の手前に置く。
               記録ボタンの直上には置かない（誤タップ防止・審査上の配置判断）。
@@ -698,6 +675,9 @@ export default function TrainingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+    {/* テーマ世代の壁（2026-09-10・components/ThemeRemount.tsx）: 明暗が切り替わったら本体を作り直す。
+        Modal・シート・＋は壁の外 */}
+    <ThemeRemount>
     {/* カードの並び替え（概要タブと同じ ReorderableCards）。見出し＋日付ストリップは stickyHeader で上端固定 */}
     <ReorderableCards
       editing={editing}
@@ -716,6 +696,7 @@ export default function TrainingScreen() {
       onScroller={(fn) => guide.registerScroller('/training', fn)}
       scrollProps={{ keyboardShouldPersistTaps: 'handled', keyboardDismissMode: 'on-drag' }}
     />
+    </ThemeRemount>
 
     {/* ===== ヘルスケア取込モーダル ===== */}
     <Modal visible={hkOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHkOpen(false)}>
