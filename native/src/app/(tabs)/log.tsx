@@ -21,8 +21,9 @@ import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
-import PlusFab from '@/components/PlusFab';
-import PlusSheet, { type PlusAction } from '@/components/PlusSheet';
+import PlusEntry, { type LogOpenParam } from '@/components/PlusEntry';
+import { type PlusAction } from '@/components/PlusSheet';
+import { saveWeightEntry } from '@/lib/weightLog';
 import EventPlanSheet, { type EventDraft } from '@/components/EventPlanSheet';
 import { nextEvent, eventBandText } from '@/lib/eventPlan';
 import { scheduleCheatDayEve } from '@/lib/notify';
@@ -50,7 +51,7 @@ import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL } from '@/lib/pfcAdvice';
 import { pfcColors, useThemeRefresh } from '@/lib/theme';
-import { useUnits, displayToKg, kgToDisplay, fmtWeight } from '@/lib/units';
+import { useUnits, kgToDisplay, fmtWeight } from '@/lib/units';   // 表示単位→kgの換算は lib/weightLog.ts が持つ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -246,8 +247,7 @@ export default function LogScreen() {
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
-  // ===== ＋ボタン → 2段シート → 入力シート =====
-  const [plusOpen, setPlusOpen] = useState(false);
+  // ===== ＋ボタン → シート → 入力シート（＋とシートの開閉は components/PlusEntry.tsx が持つ） =====
   // 先の予定（飲み会・外食・チートデイ）のシート。＋シートの「先の予定を入れる」から開く
   const [eventPlanOpen, setEventPlanOpen] = useState(false);
   const [eventPlanBusy, setEventPlanBusy] = useState(false);
@@ -348,35 +348,46 @@ export default function LogScreen() {
     else if (p === 'library') pickPhotos();
     else if (inputMode === 'text') setTimeout(() => inputRef.current?.focus(), 60);
   }
-  // ＋シートの1段目/2段目で選んだ行動の振り分け。運動・体の写真は既存の画面へ渡す
-  function onPlusAction(a: PlusAction) {
-    switch (a) {
-      case 'meal:text': openInput('text'); break;
-      case 'meal:myfood': openInput('myfood'); break;
-      case 'meal:library': openInput('library'); break;
-      case 'meal:camera': openInput('camera'); break;
+  // 食事タブ内で完結する行動（open= の値で受ける。＋シートからも他タブからの遷移からも同じ経路）
+  function openFromParam(open: LogOpenParam) {
+    switch (open) {
+      case 'text': case 'myfood': case 'library': case 'camera': openInput(open); break;
       // 何を食べる？: 食事タブ内のAI相談シート（＋シートが閉じ切ってから届くので pageSheet を直接開ける）
-      case 'meal:whattoeat': setEatOpen(true); break;
-      // 運動: 運動タブへ移り、「運動を記録する」（種目を選ぶ→時間ダイアル）のシートが開いた状態で着地
-      // （training.tsx が open=activity を受ける。筋トレは運動タブの「筋トレを記録する」から全画面へ）
-      case 'exercise':
-        router.navigate({ pathname: '/training', params: { open: 'activity', ts: String(Date.now()) } } as never);
-        break;
-      // 体の写真: 概要タブの体写真ページを開き、既存のカメラ→体脂肪率→保存の流れへ（changes.tsx が open=photos を受ける）
-      case 'bodyphoto':
-        router.navigate({ pathname: '/changes', params: { open: 'photos', shoot: '1', ts: String(Date.now()) } } as never);
-        break;
+      case 'whattoeat': setEatOpen(true); break;
       // 先の予定（飲み会・外食・チートデイ）。＋シートが閉じ切ってから届くので pageSheet を直接開ける
       case 'plan': setEventPlanOpen(true); break;
     }
   }
+  // ＋シートで選んだ行動のうち、このタブで自前処理できるもの（true を返して PlusEntry の共通処理を横取り）。
+  // 運動・体の写真・マイ食品の登録は PlusEntry の共通処理（運動タブ／概要タブへ遷移・AddFoodSheet）に任せる
+  function onPlusLocal(a: PlusAction): boolean {
+    switch (a) {
+      case 'meal:text': openFromParam('text'); return true;
+      case 'meal:myfood': openFromParam('myfood'); return true;
+      case 'meal:library': openFromParam('library'); return true;
+      case 'meal:camera': openFromParam('camera'); return true;
+      case 'meal:whattoeat': openFromParam('whattoeat'); return true;
+      case 'plan': openFromParam('plan'); return true;
+      default: return false;
+    }
+  }
 
   // ウィジェット/ディープリンク・通知タップ（bodylog://log?quick=1）→ 「食事 › テキストで入力」を直接開く
-  const { quick } = useLocalSearchParams<{ quick?: string }>();
+  // 他タブの＋シートから（/log?open=text|myfood|library|camera|whattoeat|plan&ts=…）→ 同じシートを開く。
+  // ts は同じ行動を続けて選んでも毎回開き直すためのノンス。400ms はタブ切替のアニメが落ち着くまでの間
+  const { quick, open: openParam, ts: openTs } = useLocalSearchParams<{ quick?: string; open?: string; ts?: string }>();
   useEffect(() => {
     if (quick) setTimeout(() => openInput('text'), 400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quick]);
+  useEffect(() => {
+    if (!openParam) return;
+    const known: LogOpenParam[] = ['text', 'myfood', 'library', 'camera', 'whattoeat', 'plan'];
+    if (!known.includes(openParam as LogOpenParam)) return;
+    const h = setTimeout(() => openFromParam(openParam as LogOpenParam), 400);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, openTs]);
 
   // 初回ガイドツアー: 未実施なら自動起動（完了/スキップでbl-guide-doneが立つ）
   const guide = useGuide();
@@ -1045,28 +1056,23 @@ export default function LogScreen() {
     }
   }
 
-  // 体重の保存本体（体重カードと＋シートの「体重」の両方から呼ぶ）。
-  // 戻り値: null=成功／文字列=エラー文（＋シートは自分の中に出す・カードは画面のメッセージ欄へ）
+  // 体重の保存本体（体重カードから呼ぶ。＋シートの「体重」は PlusEntry が同じ lib/weightLog.ts で保存し、
+  // 成功を onWeightSaved で受けて同じ再読込・メッセージを出す）。
+  // 戻り値: null=成功／文字列=エラー文（カードは画面のメッセージ欄へ）。判定・書き込みの規則は lib/weightLog.ts
   async function saveWeightValue(text: string): Promise<string | null> {
-    // 入力は表示単位（kg/lb）。DBは常にkgで保存する
-    const w = displayToKg(Number(text), units.weight);
-    if (!uid || !(w > 20 && w < 300)) return t('体重の値を確認してください。');
-    // G8: 前回から±15%以上ずれた値は誤入力の可能性が高い。保存前に一度だけ確かめる
-    if (!(await confirmOutlierWeight(latestWeight, w))) return '';   // 本人が取り消した＝メッセージ無し
     setSaving(true);
     try {
-      const { error } = await supabase.from('logs').insert({
-        user_id: uid, date: today, items: [], kcal: null, p: null, f: null, c: null,
-        weight: Math.round(w * 10) / 10, ex: 'オフ', adj: 0, mood: '', text: '', photo_urls: [],
-      });
-      if (error) return t('保存に失敗しました。もう一度お試しください。');
-      await syncEntriesForDate(uid, today);
-      await load();
-      setMsg({ ok: true, text: t('体重 {w} を記録しました。', { w: fmtWeight(w) }) });
+      const r = await saveWeightEntry(text, { uid, date: today, unit: units.weight, latestWeight });
+      if (!r.ok) return r.msg;
+      await onWeightSaved(r.kg);
       return null;
     } finally {
       setSaving(false);
     }
+  }
+  async function onWeightSaved(kg: number) {
+    await load();
+    setMsg({ ok: true, text: t('体重 {w} を記録しました。', { w: fmtWeight(kg) }) });
   }
   // 体重カードのエラーはカードの中に出す（画面上部のメッセージ欄はカードから遠く、気づけない）
   const [wErr, setWErr] = useState<string | null>(null);
@@ -2099,16 +2105,19 @@ export default function LogScreen() {
       {/* ===== 右下の＋ボタン（唯一の入力の入口。旧・下部固定ドックは 2026-09-02 に廃止） =====
           起動時の時差入場の最後（enter[3]）で浮かび上がる。トレイに書きかけがあれば件数バッジ */}
       <Animated.View style={[StyleSheet.absoluteFill, enter[3]]} pointerEvents="box-none">
-        <PlusFab onPress={() => { setMsg(null); setPlusOpen(true); }} badge={parsed?.items.length ?? 0} />
+        {/* ＋とそのシート（記録の種類→食事は入力シート直行・体重はシート内保存・マイ食品の登録）。
+            4タブ共通の components/PlusEntry.tsx。食事タブだけガイド照射 'dock' を登録し、
+            meal:*／whattoeat／plan は onPlusLocal でこのタブの中で開く */}
+        <PlusEntry
+          guideKey="dock"
+          badge={parsed?.items.length ?? 0}
+          onOpen={() => setMsg(null)}
+          onLocal={onPlusLocal}
+          latestWeight={latestWeight} date={today}
+          onWeightSaved={onWeightSaved}
+          onMyFoodSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に登録しました。下のチップから1タップで足せます。') }); }}
+        />
       </Animated.View>
-
-      {/* 1段目「食事／運動／体の写真／体重」→ 2段目（食事: 入力方法4つ・体重: シート内で保存） */}
-      <PlusSheet
-        visible={plusOpen} onClose={() => setPlusOpen(false)} onAction={onPlusAction}
-        onSaveWeight={saveWeightValue}
-        weightUnit={units.weight}
-        weightPlaceholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
-      />
 
       {/* 先の予定（飲み会・外食・チートデイ）。登録すると computePlan が自動で吸収する。
           目標日と吸収方式を渡すのは「登録前に何が起きるか」をシート内で見せるため */}

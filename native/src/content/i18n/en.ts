@@ -2351,4 +2351,7 @@ export const EN: Record<string, string> = {
   "種目を選んで時間を回す": "Pick an exercise & start the timer",
   "たたむ": "Collapse",
   "週の歩数・時間帯別をみる": "View weekly steps by time of day",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Add to My Foods",
+  "マイ食品に登録しました。": "Added to My Foods.",
 };

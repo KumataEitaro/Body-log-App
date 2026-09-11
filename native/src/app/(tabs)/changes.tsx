@@ -37,6 +37,8 @@ import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
 import BodyPhotosCard from '@/components/BodyPhotosCard';
+import PlusEntry from '@/components/PlusEntry';
+import { FAB_CLEARANCE } from '@/components/PlusFab';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
 import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
@@ -271,7 +273,9 @@ export default function ChangesScreen() {
   const [menuLoaded, setMenuLoaded] = useState(false);
   // 削除のUndoスナックバー（筋トレ履歴カードに貸す。カード内の絶対配置では
   // 画面下部に固定できないため、画面側で1つだけ持つ）
-  const undoBar = useUndoSnackbar(insets.bottom + 16);
+  // 2026-09-10: 右下に＋を置いたので、食事タブと同じ insets.bottom + 80（＝12＋FAB56＋12）へ上げる
+  // （+16 のままだと「元に戻す」が＋の下に潜って押せない）
+  const undoBar = useUndoSnackbar(insets.bottom + 80);
 
   // ===== エッジスワイプで戻る（iOS標準の戻りジェスチャ・Material 3のpredictive backと同方向） =====
   // 画面左端(32px)から始まった右スワイプだけを拾い、指に追従して詳細ページをスライドさせる。
@@ -1043,7 +1047,7 @@ export default function ChangesScreen() {
   // 全画面広告が閉じ切ったあとだけ、控えめに「広告なしで使えます →」を1回。
   // AdMobポリシー: 広告ビューに重ねない・閉じるボタンを模倣しない・表示を妨げない
   // （閉じ切ってから別UIとして出すのは適合）。文言・頻度の規約は AdPitchSnackbar.tsx
-  const adPitch = useAdPitch(insets.bottom + 24);
+  const adPitch = useAdPitch(insets.bottom + 80);   // ＋（右下）の上に出す（Undoバーと同じ高さ・2026-09-10）
   const interstitial = useInterstitial({ onClosed: adPitch.pitch });
   function openDetail(key: string) {
     Haptics.selectionAsync().catch(() => {});
@@ -1273,7 +1277,7 @@ export default function ChangesScreen() {
         // ===== スケルトンローディング =====
         // 初回ロード中（rowsが空でロード完了前）だけ、メニュー行の骨組みを5本見せる。
         // 空白よりも「ここに行リストが出る」ことが先に伝わり、体感の待ちが短くなる
-        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 24 }]} stickyHeaderIndices={STICKY_FIRST}>
+        <ScrollView contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + FAB_CLEARANCE }]} stickyHeaderIndices={STICKY_FIRST}>
           {stickyHeaderJSX}
           {headerJSX}
           {[0, 1, 2, 3, 4].map((i) => (
@@ -1293,8 +1297,8 @@ export default function ChangesScreen() {
           style={{ flex: 1 }}
           stickyHeaderIndices={STICKY_FIRST}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
-          // 上端の余白はスティッキーヘッダー自身が持つ（insets.top）ので、ここは 0
-          contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + 24 }]}
+          // 上端の余白はスティッキーヘッダー自身が持つ（insets.top）ので、ここは 0。下端は右下の＋の下を通れるぶん
+          contentContainerStyle={[s.scroll, { paddingTop: 0, paddingBottom: insets.bottom + FAB_CLEARANCE }]}
           onScroll={(e) => { listY.current = e.nativeEvent.contentOffset.y; }}
           scrollEventThrottle={32}
         >
@@ -1309,7 +1313,7 @@ export default function ChangesScreen() {
           <Animated.View style={[{ flex: 1 }, detailSlide]}>
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}
+              contentContainerStyle={[s.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + FAB_CLEARANCE }]}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
             >
               <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
@@ -1338,6 +1342,17 @@ export default function ChangesScreen() {
       {/* 「広告なしで使えます →」（全画面広告が閉じ切ったあとだけ・1回・約6秒）。
           広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}
       {adPitch.element}
+      {/* 右下の＋（2026-09-10・食事タブと同じ components/PlusEntry.tsx）。
+          「体の写真」はこのタブにいるので遷移せず、その場で体写真の詳細ページを開いて撮影へ（onLocal で横取り）。
+          食事系・先の予定は食事タブへ、運動は運動タブへ、マイ食品の登録はその場で（PlusEntry の共通処理）。
+          ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない） */}
+      <PlusEntry onLocal={(a) => {
+        if (a !== 'bodyphoto') return false;
+        detailTx.value = 0;                        // 前回スワイプ途中の位置が残らないようにする
+        setDetailKey('photos');
+        setPhotoShootTs(String(Date.now()));       // BodyPhotosCard に「すぐ撮影」を伝えるノンス
+        return true;
+      }} />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />

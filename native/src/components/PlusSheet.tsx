@@ -1,7 +1,10 @@
 // ＋ボタンのボトムシート（2026-09-04・「食事だけ大きいカード＋残りはリスト行」へ再設計）
 //
 // 構成: 食事＝高さ84の大カード（使用頻度が圧倒的に高い主導線）／運動・体の写真・体重＝高さ56のリスト行／
-//       区切り線を挟んで「何を食べる？」（記録ではなく相談なので性質で分ける）
+//       区切り線を挟んで「マイ食品を登録」「何を食べる？」「先の予定」（記録ではなく準備・相談なので性質で分ける）
+// 2026-09-10: このシートは食事タブ専用ではなくなった。4タブ全部の右下＋（components/PlusEntry.tsx）から開き、
+//       行動の振り分け（その場で処理／食事タブへ遷移して同じシートを開く）は PlusEntry が持つ。
+//       シートの高さ: 428pt → **486pt**（＋insets.bottom。行1本＝52＋行間6）
 // 体重だけシート内でもう1段（数値を入れて保存。画面を移らずに済ませる）。
 // 運動・体の写真はシートを閉じて既存の画面へ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
 //
@@ -26,7 +29,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus,
+  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,18 +44,23 @@ import { t } from '@/lib/i18n';
  *    運動         Dumbbell       タブは「筋トレする人」。旧 Activity（心拍の波線）は運動に見えなかった
  *    体の写真     PersonStanding カメラは食事撮影で既に使っており、同じ絵に別の意味を持たせない
  *    体重         Scale          体重計として読みやすい（旧 Weight は分銅で伝わらない）
- *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持） */
-const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan', LucideIcon> = {
+ *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持）
+ *    マイ食品を登録 BookmarkPlus 「あとで1タップで呼び出せるように取っておく」＝ブックマーク＋。
+ *                                食事の Utensils（記録）とも、相談タブの SquarePen（新しい相談）や
+ *                                NotebookPen（ノート＝記録に見える）とも意味が被らない（2026-09-10） */
+const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
   meal: Utensils,
   exercise: Dumbbell,
   bodyphoto: PersonStanding,
   weight: Scale,
   whattoeat: Sparkles,
   plan: CalendarPlus,
+  myfoodAdd: BookmarkPlus,
 };
 
-/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート） */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto' | 'plan';
+/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート）。
+ *  'myfood:add' はマイ食品の登録シート（components/AddFoodSheet.tsx・どのタブでもその場で開く） */
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto' | 'plan' | 'myfood:add';
 export type PlusStep = 'root' | 'meal' | 'weight';
 
 export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
@@ -177,6 +185,11 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                     ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
                 <View style={s.divider} />
                 <View style={s.rows}>
+                  {/* マイ食品の登録（2026-09-10・熊田さん「そのプラスボタンからマイ食品を登録できるようにして」）。
+                      「食べた」の記録ではなく**次からの1タップのための準備**なので、記録4行と分けて区切り線の下に置く。
+                      従来は 設定 › マイ食品の管理 › ＋ か、保存後の案内からしか登録できなかった。
+                      シートが閉じ切ってから AddFoodSheet（pageSheet）が開く＝iOSのModal兄弟問題を踏まない */}
+                  <Row icon="myfoodAdd" label={t('マイ食品を登録')} onPress={() => pick('myfood:add')} testID="plus-myfood-add" />
                   <Row icon="whattoeat" label={t('あとのカロリーで何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
                   {/* 先の予定（飲み会・チートデイ）。「明日 飲み会がある」と気づくのは記録中か
                       予定を思い出したときで、設定画面を開いている時ではない。従来は設定の奥（4タップ以上）

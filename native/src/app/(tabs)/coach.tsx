@@ -23,6 +23,8 @@ import VoiceHintButton from '@/components/VoiceHintButton';
 import { t, apiLang } from '@/lib/i18n';
 import { useRouter } from 'expo-router';
 import AskCatalog from '@/components/AskCatalog';
+import PlusEntry from '@/components/PlusEntry';
+import { FAB_CLEARANCE } from '@/components/PlusFab';
 import AdSlot from '@/components/AdSlot';
 import ColumnReader from '@/components/ColumnReader';
 import { featuredQuestions } from '@/content/askExamples';
@@ -99,6 +101,10 @@ export default function CoachScreen() {
   const [histOpen, setHistOpen] = useState(false);
   const [histQ, setHistQ] = useState('');
   const [hist, setHist] = useState<HistEntry[]>([]);
+  // 下端のコンポーザー（王冠バナー＋入力行＋免責行）の実測の高さ。右下の＋をこの上へ持ち上げるのに使う。
+  // 高さは可変（バナーの有無・複数行入力・免責文の折り返し・文字サイズ設定）なので定数では足りず、
+  // onLayout で測る。測る前（0）は＋を描かない＝入力欄に重なった1フレームを見せない
+  const [dockH, setDockH] = useState(0);
 
   // 入力欄の縁パルス（食事タブの入力ドックと同じ流儀）。
   // 全開の縁を重ねてopacityだけをネイティブで往復させる（色補間はJS負荷が高いため）
@@ -338,8 +344,9 @@ export default function CoachScreen() {
             </View>
           </ScrollView>
         ) : (
-          /* ===== 会話タイムライン ===== */
-          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
+          /* ===== 会話タイムライン =====
+             下端は右下の＋（コンポーザーの上に浮く）ぶん空ける＝最後の吹き出しが＋に隠れない */
+          <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 4, paddingBottom: FAB_CLEARANCE }}
                       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {/* 広告枠（相談タブ・1枠）: 会話リストの最上部。入力ドックの近くには置かない（誤タップ防止）。
                 新しい返答で scrollToEnd すると一緒に上へ流れる＝会話を邪魔しない */}
@@ -400,50 +407,63 @@ export default function CoachScreen() {
         {/* 入力ドック（食事タブと同じ見た目に統一。テーマ色で発光する） */}
         <AskCatalog visible={catalogOpen} onClose={() => setCatalogOpen(false)} onPick={(q) => send(q)} />
 
-        {/* 王冠バナー: ロック中も入力欄は隠さない（書ける→送る瞬間に誘う）。タップでもペイウォールへ */}
-        {coachLocked && (
-          <Pressable style={({ pressed }) => [s.gateBanner, pressed && { opacity: 0.8 }]} onPress={openCoachPaywall}>
-            <CrownBadge size={14} />
-            <Text style={s.gateBannerT}>{t('AI相談はスタンダードから。1つの相談の中は往復無制限です')}</Text>
-          </Pressable>
-        )}
+        {/* ===== 下端のコンポーザー一式（王冠バナー＋入力行＋免責行） =====
+            右下の＋（2026-09-10・PlusEntry）をこの上へ浮かせるため、高さを onLayout で測る。
+            バナーの有無・複数行入力・免責文の折り返し・文字サイズ設定で高さが変わるので定数では足りない */}
+        <View testID="coach-dock" onLayout={(e) => setDockH(Math.round(e.nativeEvent.layout.height))}>
+          {/* 王冠バナー: ロック中も入力欄は隠さない（書ける→送る瞬間に誘う）。タップでもペイウォールへ */}
+          {coachLocked && (
+            <Pressable style={({ pressed }) => [s.gateBanner, pressed && { opacity: 0.8 }]} onPress={openCoachPaywall}>
+              <CrownBadge size={14} />
+              <Text style={s.gateBannerT}>{t('AI相談はスタンダードから。1つの相談の中は往復無制限です')}</Text>
+            </Pressable>
+          )}
 
-        <View style={s.inRow}>
-          {/* 発光レイヤ: 食事タブの入力ドックと同じ縁パルス（opacityのみネイティブ駆動） */}
-          <Animated.View pointerEvents="none" style={[s.inGlow, { opacity: glow }]} />
-          {kbVisible ? (
-            <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
-              <ChevronDown color={C.teal} size={ICON.xl} strokeWidth={ICON.stroke} />
+          <View style={s.inRow}>
+            {/* 発光レイヤ: 食事タブの入力ドックと同じ縁パルス（opacityのみネイティブ駆動） */}
+            <Animated.View pointerEvents="none" style={[s.inGlow, { opacity: glow }]} />
+            {kbVisible ? (
+              <Pressable style={s.pencilBadge} onPress={() => Keyboard.dismiss()} hitSlop={6}>
+                <ChevronDown color={C.teal} size={ICON.xl} strokeWidth={ICON.stroke} />
+              </Pressable>
+            ) : (
+              <View style={s.pencilBadge}>
+                <MessageCircle color={C.teal} size={ICON.md} strokeWidth={ICON.stroke} />
+              </View>
+            )}
+            <TextInput ref={inputRef} style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
+                       value={input} onChangeText={setInput} multiline />
+            {/* 音声入力の道しるべ（食事タブの入力ドックと同じ流儀）。文字を打ち始めたら畳んで
+                テキストに幅を渡す */}
+            {!(kbVisible && input.trim().length > 0) && (
+              <VoiceHintButton mode="coach" onFocusInput={() => inputRef.current?.focus()} />
+            )}
+            <Pressable
+              style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
+              onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>
+              <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
             </Pressable>
-          ) : (
-            <View style={s.pencilBadge}>
-              <MessageCircle color={C.teal} size={ICON.md} strokeWidth={ICON.stroke} />
-            </View>
-          )}
-          <TextInput ref={inputRef} style={s.input} placeholder={t('相談してみる…')} placeholderTextColor={C.sub}
-                     value={input} onChangeText={setInput} multiline />
-          {/* 音声入力の道しるべ（食事タブの入力ドックと同じ流儀）。文字を打ち始めたら畳んで
-              テキストに幅を渡す */}
-          {!(kbVisible && input.trim().length > 0) && (
-            <VoiceHintButton mode="coach" onFocusInput={() => inputRef.current?.focus()} />
-          )}
-          <Pressable
-            style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
-            onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>
-            <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
-          </Pressable>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <Text style={[s.disclaimer, { flex: 1 }]}>{t('医療的な診断はできません。深刻な不調が続く場合は医療機関へ。')}</Text>
-          {/* 制約プロフィール未設定のときだけの導線（プロフィール編集シートへディープリンク） */}
-          {!hasConstraints && (
-            <Pressable hitSlop={8}
-                       onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}>
-              <Text style={s.presetLink}>{t('前提を設定（アレルギー・苦手など）')}</Text>
-            </Pressable>
-          )}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <Text style={[s.disclaimer, { flex: 1 }]}>{t('医療的な診断はできません。深刻な不調が続く場合は医療機関へ。')}</Text>
+            {/* 制約プロフィール未設定のときだけの導線（プロフィール編集シートへディープリンク） */}
+            {!hasConstraints && (
+              <Pressable hitSlop={8}
+                         onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}>
+                <Text style={s.presetLink}>{t('前提を設定（アレルギー・苦手など）')}</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
+      {/* 右下の＋（2026-09-10・4タブ共通の components/PlusEntry.tsx）。
+          相談タブだけは下端のコンポーザーにかぶるので、実測した高さのぶん持ち上げる:
+          ＋の下端 = insets.bottom + 12 + bottomOffset／コンポーザーの上端 = insets.bottom + 6 + dockH
+          → bottomOffset = dockH + 2 で 8pt の隙間になる。
+          キーボード表示中（kbVisible）は書く手を邪魔しないので出さない。
+          このタブで自前処理する行動は無い（食事・先の予定は食事タブ、運動は運動タブ、体の写真は概要タブへ。
+          マイ食品の登録と体重はどのタブでも PlusEntry がその場で処理する） */}
+      <PlusEntry bottomOffset={dockH + 2} hidden={kbVisible || dockH === 0} />
       <StatusBarMask />
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>
@@ -494,7 +514,9 @@ export default function CoachScreen() {
 
 const s = themed(() => ({
   wrap: { flex: 1, paddingHorizontal: SPACE.screen, paddingBottom: 6 },
-  welcomeScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 10 },
+  // 下端は右下の＋のぶん空ける（2026-09-10）。中央寄せのまま、クイック質問の右下カードや
+  // 「ほかに何が聞ける？」が＋に隠れないように内容全体が少し上へ寄る
+  welcomeScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: FAB_CLEARANCE },
   welcomeWrap: { alignItems: 'center', paddingBottom: 30 },
   welcomeIcon: {
     width: 76, height: 76, borderRadius: 38, backgroundColor: C.panel,

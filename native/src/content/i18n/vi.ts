@@ -2273,4 +2273,7 @@ export const VI: Record<string, string> = {
   "種目を選んで時間を回す": "Chọn bài tập và bấm giờ",
   "たたむ": "Thu gọn",
   "週の歩数・時間帯別をみる": "Xem số bước và khung giờ trong tuần",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Thêm vào Món của tôi",
+  "マイ食品に登録しました。": "Đã lưu vào Món của tôi.",
 };

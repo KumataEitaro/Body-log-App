@@ -2273,4 +2273,7 @@ export const ID: Record<string, string> = {
   "種目を選んで時間を回す": "Pilih latihan dan jalankan timer",
   "たたむ": "Tutup",
   "週の歩数・時間帯別をみる": "Lihat langkah mingguan & per jam",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Tambah ke Makanan Saya",
+  "マイ食品に登録しました。": "Disimpan ke Makanan Kustom.",
 };

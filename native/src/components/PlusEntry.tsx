@@ -1,0 +1,197 @@
+// ＋ボタンの入口をひとまとめにした部品（2026-09-10・feat/plus-everywhere）
+//
+// 熊田さん「運動タブ、概要タブ、相談タブにもプラスボタン（食事運動などを記録する用のやつ）を。同じUIでね。
+// 相談タブだけ、テキストボックスにかぶらない位置に調整して。あとそのプラスボタンからマイ食品を登録できるようにして」
+//
+// 中身: PlusFab（右下の＋）＋ PlusSheet（記録の種類を選ぶシート）＋ 行動の振り分け ＋
+//       AddFoodSheet（マイ食品の登録）＋ 体重の保存（lib/weightLog.ts）＋ 小さなトースト。
+// 4タブが同じ部品を描くので、見た目・並び・挙動は必ず一致する（タブごとに＋を作り直さない）。
+//
+// 【行動の振り分け（onAction）】
+//   ① まず onLocal(a) をそのタブに問い合わせる。そのタブで自前処理できる行動（運動タブの exercise・
+//      概要タブの bodyphoto・食事タブの meal:*／whattoeat／plan）は true を返して横取りする。
+//   ② 残りはここで共通処理:
+//        meal:text/myfood/library/camera・meal:whattoeat・plan → 食事タブへ遷移し、同じシートを開く
+//          （/log?open=text|myfood|library|camera|whattoeat|plan&ts=…。log.tsx が受けて 400ms 後に開く）
+//        exercise → /training?open=activity（運動タブが「運動を記録する」シートを開いた状態で着地）
+//        bodyphoto → /changes?open=photos&shoot=1（体写真ページ＋カメラ即起動）
+//        myfood:add → その場で AddFoodSheet（どのタブでも登録できる。遷移しない）
+//        体重 → PlusSheet の2段目で保存（遷移しない）
+//   PlusSheet は「閉じ切ってから onAction」を保証しているので、ここで開く Modal（AddFoodSheet）や
+//   遷移先で開く pageSheet が、表示中の Modal の兄弟にならない（iOSの制約）。
+//
+// 【位置】既定は食事タブと同じ右下（insets.bottom + 12）。相談タブだけ bottomOffset でコンポーザーの上へ。
+//        hidden=true のとき（相談タブのキーボード表示中）は描かない。
+// 【ガイド照射】'dock' の登録は食事タブ（guideKey='dock'）だけ。他タブは登録しない（PlusFab.tsx 冒頭）。
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Animated, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PlusFab, { FAB_SIZE } from '@/components/PlusFab';
+import PlusSheet, { type PlusAction } from '@/components/PlusSheet';
+import AddFoodSheet from '@/components/AddFoodSheet';
+import { supabase } from '@/lib/supabase';
+import { useUnits, kgToDisplay, fmtWeight } from '@/lib/units';
+import { todayJST } from '@/lib/calc';
+import { saveWeightEntry } from '@/lib/weightLog';
+import { C, RADIUS, themed } from '@/lib/ui';
+import { t } from '@/lib/i18n';
+
+/** 食事タブ側で受ける open= の値（PlusAction から 'meal:' を外したもの） */
+export type LogOpenParam = 'text' | 'myfood' | 'library' | 'camera' | 'whattoeat' | 'plan';
+
+/** PlusAction → /log?open= の値。食事タブへ渡さない行動は null */
+export function logOpenParamOf(a: PlusAction): LogOpenParam | null {
+  switch (a) {
+    case 'meal:text': return 'text';
+    case 'meal:myfood': return 'myfood';
+    case 'meal:library': return 'library';
+    case 'meal:camera': return 'camera';
+    case 'meal:whattoeat': return 'whattoeat';
+    case 'plan': return 'plan';
+    default: return null;
+  }
+}
+
+export type PlusEntryProps = {
+  /** ガイドツアーの照射キー。食事タブだけ 'dock'（複数タブで登録すると照射がずれる） */
+  guideKey?: 'dock' | null;
+  /** 既定位置からさらに持ち上げる高さ（相談タブ: コンポーザー＋免責行の実測高さ＋余白） */
+  bottomOffset?: number;
+  /** true のとき＋を描かない（相談タブのキーボード表示中）。シート類は開いていれば残る */
+  hidden?: boolean;
+  /** ＋の左上に出す件数（食事タブ: 保存前のトレイの品目数） */
+  badge?: number;
+  /** そのタブで自前処理できる行動は true を返して横取りする */
+  onLocal?: (a: PlusAction) => boolean;
+  /** ＋を押した瞬間（食事タブ: 画面のメッセージを消す） */
+  onOpen?: () => void;
+  /** マイ食品を登録できたとき。渡さなければここで短いトーストを出す */
+  onMyFoodSaved?: () => void;
+  /** 体重を保存できたとき（kg）。渡さなければここで短いトーストを出す */
+  onWeightSaved?: (kg: number) => void;
+  /** 直近の体重kg（外れ値の確認とプレースホルダに使う）。省略ならシートを開くときに entries から読む */
+  latestWeight?: number | null;
+  /** 体重の記録先の日付（食事タブ: 表示中の日付）。省略なら今日 */
+  date?: string;
+};
+
+export default function PlusEntry({
+  guideKey = null, bottomOffset = 0, hidden = false, badge = 0,
+  onLocal, onOpen, onMyFoodSaved, onWeightSaved, latestWeight, date,
+}: PlusEntryProps) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const units = useUnits();
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  // 直近の体重: 親が持っていれば親の値、無ければシートを開くたびに読む（古い値で外れ値判定しない）
+  const [fetchedWeight, setFetchedWeight] = useState<number | null>(null);
+  const latest = latestWeight !== undefined ? latestWeight : fetchedWeight;
+  useEffect(() => {
+    if (!plusOpen || latestWeight !== undefined) return;
+    let alive = true;
+    supabase.from('entries').select('weight,date').not('weight', 'is', null)
+      .order('date', { ascending: false }).limit(1)
+      .then(({ data }) => {
+        const rows = (data as { weight: number | null }[] | null) ?? [];
+        if (alive && rows.length && rows[0].weight != null) setFetchedWeight(Number(rows[0].weight));
+      });
+    return () => { alive = false; };
+  }, [plusOpen, latestWeight]);
+
+  // ===== トースト（他タブでの「登録しました」。食事タブは自分のメッセージ欄を使うので出さない） =====
+  const [toast, setToast] = useState<string | null>(null);
+  const toastOp = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((text: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(text);
+    Animated.timing(toastOp, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastOp, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setToast(null));
+    }, 2600);
+  }, [toastOp]);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // ===== 行動の振り分け（PlusSheet が閉じ切ってから届く） =====
+  function onAction(a: PlusAction) {
+    if (onLocal?.(a)) return;
+    const ts = String(Date.now());   // 同じ行動を続けて選んでも毎回開き直すためのノンス
+    const open = logOpenParamOf(a);
+    if (open) {
+      router.navigate({ pathname: '/log', params: { open, ts } } as never);
+      return;
+    }
+    switch (a) {
+      case 'exercise':
+        router.navigate({ pathname: '/training', params: { open: 'activity', ts } } as never);
+        break;
+      case 'bodyphoto':
+        router.navigate({ pathname: '/changes', params: { open: 'photos', shoot: '1', ts } } as never);
+        break;
+      case 'myfood:add':
+        setAddOpen(true);
+        break;
+    }
+  }
+
+  // ===== 体重（シート内2段目）。null=成功／''=取り消し／文字列=エラー文（PlusSheet の契約） =====
+  async function saveWeight(text: string): Promise<string | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const r = await saveWeightEntry(text, {
+      uid: session?.user?.id, date: date ?? todayJST(), unit: units.weight, latestWeight: latest,
+    });
+    if (!r.ok) return r.msg;
+    if (onWeightSaved) onWeightSaved(r.kg);
+    else showToast(t('体重 {w} を記録しました。', { w: fmtWeight(r.kg) }));
+    // 次に外れ値を見るときの基準を更新（親が持っていない場合）
+    setFetchedWeight(r.kg);
+    return null;
+  }
+
+  function myFoodSaved() {
+    if (onMyFoodSaved) onMyFoodSaved();
+    else showToast(t('マイ食品に登録しました。'));
+  }
+
+  const fabBottom = insets.bottom + 12 + bottomOffset;
+  let toastEl: ReactNode = null;
+  if (toast) {
+    toastEl = (
+      <Animated.View pointerEvents="none" style={[s.toast, { bottom: fabBottom + FAB_SIZE + 12, opacity: toastOp }]}>
+        <Text style={s.toastT} numberOfLines={2} maxFontSizeMultiplier={1.2}>{toast}</Text>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <>
+      {!hidden && (
+        <PlusFab
+          onPress={() => { onOpen?.(); setPlusOpen(true); }}
+          badge={badge} guideKey={guideKey} bottomOffset={bottomOffset}
+        />
+      )}
+      {toastEl}
+      <PlusSheet
+        visible={plusOpen} onClose={() => setPlusOpen(false)} onAction={onAction}
+        onSaveWeight={saveWeight}
+        weightUnit={units.weight}
+        weightPlaceholder={latest != null ? kgToDisplay(latest, units.weight).toFixed(1) : '—'}
+      />
+      {/* マイ食品の登録（pageSheet）。PlusSheet が閉じ切ってから visible になるので兄弟Modalの問題を踏まない */}
+      <AddFoodSheet visible={addOpen} draft={null} onClose={() => setAddOpen(false)} onSaved={myFoodSaved} />
+    </>
+  );
+}
+
+const s = themed(() => ({
+  // ink地に明文字（PlusFab のバッジと同じ反転トーン）。＋のすぐ上・右寄せで、押した指の近くに出る
+  toast: {
+    position: 'absolute', right: 18, maxWidth: '70%', zIndex: 21,
+    backgroundColor: C.ink, borderRadius: RADIUS.tile, paddingHorizontal: 14, paddingVertical: 10,
+    shadowColor: C.shadow, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  },
+  toastT: { fontSize: 13, fontWeight: '700', color: C.panel },
+}));

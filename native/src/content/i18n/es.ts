@@ -2342,4 +2342,7 @@ export const ES: Record<string, string> = {
   "種目を選んで時間を回す": "Elige un ejercicio y pon en marcha el tiempo",
   "たたむ": "Plegar",
   "週の歩数・時間帯別をみる": "Ver pasos semanales y por franjas horarias",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Añadir a Mis alimentos",
+  "マイ食品に登録しました。": "Guardado en Mis alimentos.",
 };
