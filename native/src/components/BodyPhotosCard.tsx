@@ -14,6 +14,8 @@ import { apiPost } from '@/lib/api';
 import { OptionButton } from '@/components/ui/Selectable';
 import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
+import { parseDecimal } from '@/lib/parseNum';
+import { inBodyfatRange, BODYFAT_RANGE } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
 
 type PhotoRow = { id: string; date: string; path: string; bodyfat: number | null };
@@ -115,6 +117,14 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
 
   async function save() {
     if (!pendingImg) return;
+    // QA B-1/B-2: Number() 直呼びで全角・カンマ小数がNaNになり、範囲ガードも無かったため
+    // 「1234」がそのまま入ってグラフが潰れていた。読み取りと範囲は lib に一本化する。
+    // アップロードの前に弾く（先に上げてから失敗させると通信量と待ち時間が無駄になる）
+    const bf = bfInput.trim() === '' ? null : parseDecimal(bfInput);
+    if (bfInput.trim() !== '' && !inBodyfatRange(bf)) {
+      setMsg(t('体脂肪率は{min}〜{max}%の範囲で入力してください。', { min: BODYFAT_RANGE.min, max: BODYFAT_RANGE.max }));
+      return;
+    }
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -131,7 +141,6 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
           : t('写真の保存に失敗しました。')) + ` [${String(upErr.message).slice(0, 120)}]`);
         return;
       }
-      const bf = bfInput.trim() === '' ? null : Number(bfInput);
       const { error: insErr } = await supabase.from('body_photos')
         .insert({ user_id: uid, date, path, bodyfat: bf });
       if (insErr) {

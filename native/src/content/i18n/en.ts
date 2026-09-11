@@ -2372,4 +2372,10 @@ export const EN: Record<string, string> = {
   "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Before you start, please review the Terms of Service and Privacy Policy and give your consent.",
   "初期設定をやり直す": "Redo initial setup",
   "目的・身長・年齢・体重をウィザードで入れ直します": "Re-enter your goal, height, age and weight in the wizard",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Enter height, age and weight as numbers.",
+  "身長・年齢は数字で入力してください。": "Enter height and age as numbers.",
+  "身長・年齢の値を確認してください。": "Please check your height and age.",
+  "P・F・Cは数字で入力してください。": "Enter P, F and C as numbers.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Enter a body fat percentage between {min} and {max}%.",
 };

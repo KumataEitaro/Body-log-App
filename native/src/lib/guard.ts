@@ -5,6 +5,45 @@
 // 判定と確認ダイアログをここに一本化する。
 import { Alert } from 'react-native';
 import { t } from './i18n';
+import { MAX_WEEKLY_LOSS_KG, FAST_WEEKLY_LOSS_KG } from './deficit';
+
+/**
+ * 体重として受け付ける範囲(kg)。両端は含めない（20kg以下・300kg以上は打ち間違い）。
+ * QA B-2: 体重の入力口が4つ（クイック入力・おかえりフロー・オンボーディング・ヘルスケア取込）
+ * あり、それぞれ別々の閾値を持っていた。ここを唯一の正本にする。
+ */
+export const WEIGHT_RANGE = { min: 20, max: 300 } as const;
+
+export function inWeightRange(kg: number | null | undefined): boolean {
+  return kg != null && Number.isFinite(kg) && kg > WEIGHT_RANGE.min && kg < WEIGHT_RANGE.max;
+}
+
+/**
+ * 体脂肪率として受け付ける範囲(%)。両端を含む。
+ * 下限3%は男性の生存限界（必須脂肪）、上限70%は極端な高度肥満でも超えない値。
+ * QA B-2: 体写真カードには範囲ガードが無く、「1234」を入れるとグラフが潰れていた。
+ */
+export const BODYFAT_RANGE = { min: 3, max: 70 } as const;
+
+export function inBodyfatRange(pct: number | null | undefined): boolean {
+  return pct != null && Number.isFinite(pct) && pct >= BODYFAT_RANGE.min && pct <= BODYFAT_RANGE.max;
+}
+
+/**
+ * プロフィールの身長cm・年齢の範囲（両端を含む）。基礎代謝(Mifflin)の入力なので、
+ * ここが別人の値だと「あと食べられる量」まで全部ズレる。
+ * 100〜250cm はギネス級の身長も収まる幅、10〜120歳は利用規約の年齢下限より広い幅。
+ */
+export const HEIGHT_RANGE = { min: 100, max: 250 } as const;
+export const AGE_RANGE = { min: 10, max: 120 } as const;
+
+export function inHeightRange(cm: number | null | undefined): boolean {
+  return cm != null && Number.isFinite(cm) && cm >= HEIGHT_RANGE.min && cm <= HEIGHT_RANGE.max;
+}
+
+export function inAgeRange(years: number | null | undefined): boolean {
+  return years != null && Number.isFinite(years) && years >= AGE_RANGE.min && years <= AGE_RANGE.max;
+}
 
 /**
  * BMI18.5に相当する体重(kg)。目標体重のハード下限に使う。
@@ -22,6 +61,73 @@ export function weeklyLossPace(currentKg: number, targetKg: number, fromDate: st
   const days = (Date.parse(toDate) - Date.parse(fromDate)) / 86400000;
   if (!(days > 0) || !(currentKg > targetKg)) return null;
   return (currentKg - targetKg) / (days / 7);
+}
+
+/**
+ * 体重目標の安全判定（G1: BMI下限・減量ペース / G3: 妊娠・授乳中）。
+ *
+ * なぜ集約したか（QA P1-6）: 同じ `goals.target_weight` を書く経路が2つ（目標パネルと
+ * AIコーチの承認カード）あるのに、判定式を持っていたのは目標パネルだけだった。
+ * AIに「2週間で10kg落として」と頼めば BMI13 の目標がそのまま書き込めてしまう。
+ * 判定を1本にして、書き込み経路が増えても同じ壁を通るようにする。
+ *
+ * 返り値は「弾く（ok:false）」か「通す（ok:true・注意文つきのことがある）」の2つだけ。
+ * 呼び出し側が無言で終われないよう、弾くときは必ず理由を持たせる。
+ */
+export type WeightGoalInput = {
+  /** 身長cm。未登録（null）ならBMI下限の判定だけスキップする */
+  heightCm?: number | null;
+  /** 現在の体重kg。未取得（null）ならペースと妊娠中の判定をスキップする */
+  currentKg?: number | null;
+  /** 目標体重kg */
+  targetKg?: number | null;
+  /** 目標日 YYYY-MM-DD。未指定（null）ならペース判定をスキップする */
+  targetDate?: string | null;
+  /** 判定の基準日 YYYY-MM-DD（JST） */
+  today: string;
+  /** 妊娠中・授乳中（profiles.maternity） */
+  maternity?: boolean | null;
+  /** ダイエット目的（lib/purpose の PurposeKey）。増量目的では減量ペースを見ない */
+  purpose?: string | null;
+};
+
+export type WeightGoalAssessment =
+  /** warn: 保存は通すが一言添える（週0.5〜1kgのやや速いペース） */
+  | { ok: true; warn?: string }
+  | { ok: false; reason: string };
+
+export function assessWeightGoal(input: WeightGoalInput): WeightGoalAssessment {
+  const { heightCm, currentKg, targetKg, targetDate, today, maternity, purpose } = input;
+  if (targetKg == null || !Number.isFinite(targetKg)) return { ok: true };
+
+  // G1: BMI18.5未満になる目標はハードロック（身長未登録ならこのチェックだけスキップ）
+  if (heightCm != null && Number.isFinite(heightCm) && heightCm > 0) {
+    const floor = bmiFloorKg(heightCm);
+    if (targetKg < floor) {
+      return {
+        ok: false,
+        reason: t('その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。', { kg: floor.toFixed(1) }),
+      };
+    }
+  }
+
+  // G3: 妊娠・授乳中は減量方向の目標（目標体重<現在体重）を受け付けない
+  if (maternity === true && currentKg != null && targetKg < currentKg) {
+    return { ok: false, reason: t('妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。') };
+  }
+
+  // G1: 週1kg超の減量ペースはハードロック。週0.5〜1kgは警告だけ添えて保存は許可。
+  // 増量目的（bulk）は減量方向の目標自体が例外なので、ペースの上限は当てない
+  if (currentKg != null && targetDate && purpose !== 'bulk') {
+    const pace = weeklyLossPace(currentKg, targetKg, today, targetDate);
+    if (pace != null && pace > MAX_WEEKLY_LOSS_KG) {
+      return { ok: false, reason: t('そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。') };
+    }
+    if (pace != null && pace >= FAST_WEEKLY_LOSS_KG) {
+      return { ok: true, warn: t('やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。', { n: pace.toFixed(1) }) };
+    }
+  }
+  return { ok: true };
 }
 
 /**

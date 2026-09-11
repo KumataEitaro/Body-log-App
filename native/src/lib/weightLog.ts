@@ -3,22 +3,24 @@
 // 呼び出し元は3つ: 食事タブの体重カード／＋シートの「体重」2段目（全タブ）／（将来）ウィジェット。
 // どこから呼んでも同じ規則で保存されるように、判定と書き込みをここに1本化する。
 //   ・入力は表示単位（kg/lb）の文字列。DBは常にkg（小数1桁）で保存する
-//   ・20kg未満・300kg以上は誤入力として弾く（従来の log.tsx の範囲をそのまま維持）
+//   ・数値の読み取りは lib/parseNum.parseDecimal に一本化（全角・カンマ小数・単位つき。QA B-1）
+//   ・範囲は lib/guard.WEIGHT_RANGE が正本（入力口ごとに閾値がズレないため。QA B-2）
 //   ・G8: 前回から±15%以上ずれた値は保存前に一度だけ確認する（lib/guard.ts confirmOutlierWeight）
 //   ・保存後は同日の entries を同期（体重グラフ・概要の要約行が同じ値を見る）
 // 副作用（Supabase・Alert）は deps で差し替えられるので jest では純関数として検証できる。
 import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
-import { confirmOutlierWeight } from '@/lib/guard';
+import { confirmOutlierWeight, inWeightRange } from '@/lib/guard';
+import { parseDecimal } from '@/lib/parseNum';
 import { displayToKg, type WeightUnit } from '@/lib/units';
 import { t } from '@/lib/i18n';
 
 /** 表示単位の入力文字列を kg に直す。範囲外・数値でないなら null */
 export function parseWeightInput(text: string, unit: WeightUnit): number | null {
-  const n = Number(String(text).trim().replace(/,/g, '.'));
-  if (!Number.isFinite(n)) return null;
+  const n = parseDecimal(text);
+  if (n == null) return null;
   const kg = displayToKg(n, unit);
-  return kg > 20 && kg < 300 ? Math.round(kg * 10) / 10 : null;
+  return inWeightRange(kg) ? Math.round(kg * 10) / 10 : null;
 }
 
 export type SaveWeightResult =

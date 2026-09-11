@@ -17,6 +17,8 @@ import { setFirstRunFlag } from '@/lib/firstrun';
 import { supabase } from '@/lib/supabase';
 import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
+import { parseDecimal, parseInteger } from '@/lib/parseNum';
+import { inWeightRange, inHeightRange, inAgeRange } from '@/lib/guard';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import GoalPanel from '@/components/GoalPanel';
@@ -88,6 +90,19 @@ export default function Onboarding() {
     if (!height.trim() || !age.trim() || !weight.trim()) {
       setMsg(t('身長・年齢・現在の体重を入力してください。')); return;
     }
+    // QA B-1: 以前は `Number(height) || 170` で、全角「１７０」やカンマ小数「72,5」が
+    // NaN → 既定値へ黙って倒れ、170cm/30歳の別人として基礎代謝が計算されていた。
+    // 読めない値は保存せず、その場で理由を出す（黙って既定値にしない）
+    const heightCm = parseInteger(height);
+    const ageY = parseInteger(age);
+    const weightKg = parseDecimal(weight);
+    if (heightCm == null || ageY == null || weightKg == null) {
+      setMsg(t('身長・年齢・体重は数字で入力してください。')); return;
+    }
+    if (!inHeightRange(heightCm) || !inAgeRange(ageY)) {
+      setMsg(t('身長・年齢の値を確認してください。')); return;
+    }
+    if (!inWeightRange(weightKg)) { setMsg(t('体重の値を確認してください。')); return; }
     setBusy(true); setMsg('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -95,12 +110,12 @@ export default function Onboarding() {
       if (!uid) return;
       const { error } = await supabase.from('profiles').upsert({
         id: uid, display_name: name.trim() || t('あなた'), sex,
-        height_cm: Number(height) || 170, age: Number(age) || 30,
-        life_factor: life, init_weight: Number(weight) || null,
+        height_cm: heightCm, age: ageY,
+        life_factor: life, init_weight: weightKg,
       });
       if (error) { setMsg(t('保存に失敗しました。もう一度お試しください。')); return; }
       await supabase.from('entries').upsert(
-        { user_id: uid, date: todayJST(), weight: Number(weight) }, { onConflict: 'user_id,date' });
+        { user_id: uid, date: todayJST(), weight: weightKg }, { onConflict: 'user_id,date' });
       go(1);
     } finally { setBusy(false); }
   }

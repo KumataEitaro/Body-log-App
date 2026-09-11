@@ -2294,4 +2294,10 @@ export const VI: Record<string, string> = {
   "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Trước khi bắt đầu, vui lòng đọc điều khoản sử dụng và chính sách quyền riêng tư rồi đồng ý.",
   "初期設定をやり直す": "Làm lại thiết lập ban đầu",
   "目的・身長・年齢・体重をウィザードで入れ直します": "Nhập lại mục tiêu, chiều cao, tuổi và cân nặng bằng trình hướng dẫn",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Hãy nhập chiều cao, tuổi và cân nặng bằng số.",
+  "身長・年齢は数字で入力してください。": "Hãy nhập chiều cao và tuổi bằng số.",
+  "身長・年齢の値を確認してください。": "Hãy kiểm tra lại chiều cao và tuổi.",
+  "P・F・Cは数字で入力してください。": "Hãy nhập P, F, C bằng số.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Hãy nhập tỷ lệ mỡ cơ thể trong khoảng {min}–{max}%.",
 };

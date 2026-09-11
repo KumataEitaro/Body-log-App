@@ -733,8 +733,12 @@ export default function LogScreen() {
     (async () => {
       const stored = await loadJobs();
       if (!alive || stored.length === 0) return;
-      const { resume, keep } = triageJobs(stored, todayJST(), Date.now());
-      // 別の日のぶん・24時間より古いぶんは黙って捨てる（勝手に今日へ積まない）
+      // 本人確認はstateのuidを待たずにセッションから直接取る（マウント直後はまだnullのため）。
+      // 別アカウントのジョブを引き取らないための必須引数（QA P1-4）
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!alive) return;
+      const { resume, keep } = triageJobs(stored, todayJST(), Date.now(), session?.user?.id);
+      // 別人のぶん・別の日のぶん・24時間より古いぶんは黙って捨てる（勝手に今日へ積まない）
       const kept = [...resume.map((j) => ({ ...j, state: 'running' as const, error: undefined })), ...keep];
       jobsRef.current = kept;
       setJobs(kept);
@@ -766,7 +770,7 @@ export default function LogScreen() {
     // 送信できたことを指先で返す（AIの返事を待たずに次の行動へ移ってよい、という合図）
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     inputRef.current?.focus(); // キーボードを閉じずに次の入力へ（連投）
-    const job = makeJob({ text, photoUris: uris, date: viewDate }, Date.now(), Math.random);
+    const job = makeJob({ uid, text, photoUris: uris, date: viewDate }, Date.now(), Math.random);
     putJobs((l) => addJob(l, job));
     claimOnce(startedRef.current, job.id);
     await runJob(job, imgs);   // 初回は手元のbase64をそのまま使う（ファイル読み直し不要）

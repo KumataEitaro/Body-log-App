@@ -20,7 +20,8 @@ import { syncEntriesForDate } from '@/lib/sync';
 import { invalidateStreak } from '@/lib/achievements';
 import { todayJST } from '@/lib/calc';
 import { useUnits, displayToKg } from '@/lib/units';
-import { confirmOutlierWeight } from '@/lib/guard';
+import { confirmOutlierWeight, inWeightRange } from '@/lib/guard';
+import { parseDecimal } from '@/lib/parseNum';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import MoodFace from '@/components/MoodFace';
@@ -81,9 +82,12 @@ export default function ComebackSheet({ onSaved }: {
     if (busy || done) return;
     const raw = weight.trim();
     if (!raw) { close(); return; }
-    // 入力は表示単位（kg/lb）。DBは常にkgで保存する（体重クイック入力と同じ流儀）
-    const w = displayToKg(Number(raw), units.weight);
-    if (!uid || !(w > 20 && w < 300)) { setErr(t('体重の値を確認してください。')); return; }
+    // 入力は表示単位（kg/lb）。DBは常にkgで保存する（体重クイック入力と同じ流儀）。
+    // 読み取りは parseDecimal（全角・カンマ小数・単位つきに対応。QA B-1）、
+    // 範囲は lib/guard の WEIGHT_RANGE が正本（QA B-2）
+    const parsed = parseDecimal(raw);
+    const w = parsed == null ? NaN : displayToKg(parsed, units.weight);
+    if (!uid || !inWeightRange(w)) { setErr(t('体重の値を確認してください。')); return; }
     setBusy(true);
     try {
       // G8: 空白明けは特に打ち間違いが起きやすい（久しぶりで単位や桁の感覚がズレる）。

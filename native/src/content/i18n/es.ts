@@ -2363,4 +2363,10 @@ export const ES: Record<string, string> = {
   "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Antes de empezar, revisa los términos del servicio y la política de privacidad y da tu consentimiento.",
   "初期設定をやり直す": "Rehacer la configuración inicial",
   "目的・身長・年齢・体重をウィザードで入れ直します": "Vuelve a introducir objetivo, altura, edad y peso en el asistente",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Introduce estatura, edad y peso como números.",
+  "身長・年齢は数字で入力してください。": "Introduce estatura y edad como números.",
+  "身長・年齢の値を確認してください。": "Revisa los valores de estatura y edad.",
+  "P・F・Cは数字で入力してください。": "Introduce P, F y C como números.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Introduce un porcentaje de grasa corporal entre {min} y {max}%.",
 };

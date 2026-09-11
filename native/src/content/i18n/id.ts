@@ -2294,4 +2294,10 @@ export const ID: Record<string, string> = {
   "はじめる前に、利用規約とプライバシーポリシーをご確認のうえ、同意をお願いします。": "Sebelum mulai, silakan baca ketentuan layanan dan kebijakan privasi, lalu berikan persetujuanmu.",
   "初期設定をやり直す": "Ulangi pengaturan awal",
   "目的・身長・年齢・体重をウィザードで入れ直します": "Masukkan ulang tujuan, tinggi, usia, dan berat lewat panduan",
+  // 数値入力のエラー文（QA B-1 / B-2・parseNum + guard の範囲ガード）
+  "身長・年齢・体重は数字で入力してください。": "Masukkan tinggi, usia, dan berat dalam angka.",
+  "身長・年齢は数字で入力してください。": "Masukkan tinggi dan usia dalam angka.",
+  "身長・年齢の値を確認してください。": "Periksa kembali nilai tinggi dan usia.",
+  "P・F・Cは数字で入力してください。": "Masukkan P, F, dan C dalam angka.",
+  "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Masukkan lemak tubuh antara {min} dan {max}%.",
 };

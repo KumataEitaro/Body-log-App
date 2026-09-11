@@ -12,7 +12,8 @@ import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, e
 // 起床時刻（「朝に出るもの」の窓の起点・lib/wakeTime.ts）
 import { WAKE_STEP_MIN, setWakeTime, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
 import { usePurpose } from '@/lib/purpose';
-import { deleteConfirmMatches } from '@/lib/guard';
+import { deleteConfirmMatches, inHeightRange, inAgeRange } from '@/lib/guard';
+import { parseDecimal, parseInteger } from '@/lib/parseNum';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
@@ -396,26 +397,42 @@ export default function SettingsScreen() {
   }
 
   async function saveProfile() {
+    // QA B-1: `Number(height) || 170` は全角「１７０」やカンマ小数をNaN→既定値へ黙って倒していた。
+    // 読めない値は保存せず理由を出す（基礎代謝が別人の値になるのを防ぐ）
+    const heightCm = parseInteger(height);
+    const ageY = parseInteger(age);
+    if (heightCm == null || ageY == null) {
+      setMsg({ ok: false, text: t('身長・年齢は数字で入力してください。') }); return;
+    }
+    if (!inHeightRange(heightCm) || !inAgeRange(ageY)) {
+      setMsg({ ok: false, text: t('身長・年齢の値を確認してください。') }); return;
+    }
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid) return;
       const base = {
+        id: uid,
         display_name: name.trim(), sex,
-        height_cm: Number(height) || 170, age: Number(age) || 30,
-        life_factor: Number(life) || 1.3,
+        height_cm: heightCm, age: ageY,
+        life_factor: parseDecimal(life) ?? 1.3,
       };
+      // QA P0-3: update だと profiles 行がまだ無い人（オンボーディングを「あとで設定」で
+      // 抜けた人）に対して 0行更新・error===null になり、「保存しました。」を出して入力を捨てていた。
+      // upsert なら行が無ければ作る。送る列は patch に含まれるものだけなので、
+      // 他の列（init_weight・purpose 等）を default で潰さない
+      const up = (patch: Record<string, unknown>) =>
+        supabase.from('profiles').upsert(patch, { onConflict: 'id' });
       // maternity/constraints_note列が無い旧DBでは列を減らして再実行し、プロフィール保存自体は成立させる
-      let { error } = await supabase.from('profiles')
-        .update({ ...base, maternity, constraints_note: constraintsNote.trim() || null }).eq('id', uid);
+      let { error } = await up({ ...base, maternity, constraints_note: constraintsNote.trim() || null });
       if (error && /constraints_note|maternity|column|schema/i.test(error.message)) {
         // migration-22未適用: constraints_noteを外して再実行
-        ({ error } = await supabase.from('profiles').update({ ...base, maternity }).eq('id', uid));
+        ({ error } = await up({ ...base, maternity }));
       }
       if (error && /maternity|column|schema/i.test(error.message)) {
         // migration-21も未適用: 基本項目だけで再実行
-        ({ error } = await supabase.from('profiles').update(base).eq('id', uid));
+        ({ error } = await up(base));
       }
       setMsg(error ? { ok: false, text: t('保存に失敗しました。もう一度お試しください。') } : { ok: true, text: t('保存しました。') });
     } finally { setBusy(false); }
@@ -539,7 +556,7 @@ export default function SettingsScreen() {
     } finally { setBusy(false); }
   }
 
-  const bmr = mifflinBMR(sex, latestWeight ?? 70, Number(height) || 0, Number(age) || 0);
+  const bmr = mifflinBMR(sex, latestWeight ?? 70, parseInteger(height) ?? 0, parseInteger(age) ?? 0);
 
   // 1行メニュー（アイコン＋ラベル＋chevron）
   function Row({ icon, label, sub, onPress, danger, badge }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; danger?: boolean; badge?: number }) {
@@ -595,7 +612,7 @@ export default function SettingsScreen() {
           <Text style={s.sumName}>{name || t('ニックネーム未設定')}</Text>
           <Text style={s.sumMail}>{email || '—'}</Text>
           <Text style={s.sumMeta}>
-            {fmtHeight(Number(height))}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ {t('基礎代謝 約')}{Math.round(bmr)}kcal
+            {fmtHeight(parseInteger(height) ?? 0)}{latestWeight != null ? ` ・ ${fmtWeight(latestWeight)}` : ''} ・ {t('基礎代謝 約')}{Math.round(bmr)}kcal
           </Text>
         </View>
       </View>

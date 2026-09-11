@@ -24,7 +24,7 @@ import { isBodyweightLift, loadCustomLifts } from '@/lib/lifts';
 import { parseLiftText } from '@/lib/liftLog';
 import LiftPicker from '@/components/LiftPicker';
 import { PURPOSES, setPurpose, usePurpose, purposeOf } from '@/lib/purpose';
-import { bmiFloorKg, weeklyLossPace } from '@/lib/guard';
+import { bmiFloorKg, assessWeightGoal } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
@@ -148,32 +148,15 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       setMsg({ ok: false, text: t('目標日と目標体重を入力してください。') }); return;
     }
     const targetW = Number(gWeight);
-    // G1: BMI18.5未満になる目標はハードロック（身長未登録ならこのチェックだけスキップ）
-    if (heightCm != null) {
-      const floor = bmiFloorKg(heightCm);
-      if (targetW < floor) {
-        setMsg({ ok: false, text: t('その目標は体に負担が大きすぎます。BMI18.5（{kg}kg）を下回る目標は設定できません。', { kg: floor.toFixed(1) }) });
-        return;
-      }
-    }
     const currentW = latestWeight ?? initWeight;
-    // G3: 妊娠・授乳中は減量方向の目標（目標体重<現在体重）を受け付けない
-    if (maternity && currentW != null && targetW < currentW) {
-      setMsg({ ok: false, text: t('妊娠・授乳中は減量目標を設定できません。いまは維持と栄養が最優先です。') });
-      return;
-    }
-    // G1: 週1kg超の減量ペースはハードロック。週0.5〜1kgは警告だけ添えて保存は許可
-    let paceWarn = '';
-    if (currentW != null) {
-      const pace = weeklyLossPace(currentW, targetW, todayJST(), gDate);
-      if (pace != null && pace > 1) {
-        setMsg({ ok: false, text: t('そのペースは速すぎます。週1kg以内になるよう、日付か目標を調整してください。') });
-        return;
-      }
-      if (pace != null && pace >= 0.5) {
-        paceWarn = t('やや速いペースです（週あたり約{n}kg）。体調の変化に気をつけて進めましょう。', { n: pace.toFixed(1) });
-      }
-    }
+    // G1/G3の判定は lib/guard.assessWeightGoal に集約してある（AIコーチの承認カードと同じ壁を通す）。
+    // ここに式のコピーを戻さないこと: 片方だけ緩む形での再発が QA P1-6 の指摘そのもの
+    const verdict = assessWeightGoal({
+      heightCm, currentKg: currentW, targetKg: targetW, targetDate: gDate,
+      today: todayJST(), maternity, purpose: purposeKey,
+    });
+    if (!verdict.ok) { setMsg({ ok: false, text: verdict.reason }); return; }
+    const paceWarn = verdict.warn ?? '';
     setBusy(true); setMsg(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
