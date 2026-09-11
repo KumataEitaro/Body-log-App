@@ -35,5 +35,5 @@ export default function ThemeRemount({ children, style }: { children: ReactNode;
   );
 }
 
-// 色を持たない寸法だけの定義なので themed() は不要
+// 色を持たない寸法だけの定義なので themed は使わない（コメントにも「themed 開き括弧」の並びを書かない＝規約テストが誤検出する）
 const styles = { fill: { flex: 1 } as ViewStyle };
