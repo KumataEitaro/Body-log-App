@@ -298,8 +298,18 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 
 ### B14. 🔴 QA レポート（docs/QA-2026-09-10.md）の対応
 
-職業テスター視点の全体監査（ペルソナ14人・P0 3／P1 12／P2 26／P3 20）。**P0/P1 は 2026-09-11 に修正着手**
-（ブランチ `fix/qa-auth-data`＝認可・セッション・データ整合、`fix/qa-validation`＝検証・数値・計測）。
+職業テスター視点の全体監査（ペルソナ14人・P0 3／P1 12／P2 26／P3 20）。**P0 3件・P1 12件は 2026-09-11 に修正して main へ**
+（`fix/qa-auth-data`＝認可・セッション・データ整合、`fix/qa-validation`＝検証・数値・計測。v1.1.3）。
+残りは **①SQL `supabase/migration-33.sql` の実行（熊田さん・下の A13）** と **②`ai_usage` の加算を service role へ寄せる**（P1-7 の後半・A9 前）。
+
+### A13. 🔴 SQL: migration-33（profiles 行の自動作成＋プラン列の凍結）を実行する
+
+- 実行先: https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
+- ファイル: `supabase/migration-33.sql` を丸ごと貼って Run（冪等・何度流しても同じ）
+- 内容: ①`auth.users` への insert で `profiles` 行を作るトリガ `handle_new_user` ②既存ユーザーのバックフィル
+  ③`profiles.plan / plan_until / photo_trial_used` を anon/authenticated から書けなくする before トリガ ④`notify pgrst`
+- 確認: 同ファイル末尾の (a)〜(d)。特に `missing_profiles = 0`
+- **小澤さんの「プロフィールが消える／規約が毎回出る」はアプリ側の保険（起動時 upsert）でも直るが、正しい直しはこの SQL**
 
 - **P0-1** Web `/api/admin/overview` の認可が `isUnlimited`（上限撤廃中は全員 true）に依存し全ログインユーザーに開放 → `isAdmin` を分離
 - **P0-2** オフラインキューが別アカウントでログイン後、前の人の未送信記録を無言で捨てる → uid 判定・RLS エラーは保持

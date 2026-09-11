@@ -2083,3 +2083,54 @@ PFC スウォッチのベリーは超過の赤と同値なので、選ぶと設�
 - 「何を食べる？」の入口名を **「あとのカロリーで何を食べる？」** に（＋シートの行・シートの見出し・ロック文言）
 - 「食べたらどうなる？」の入口③（何も入れていない段階でヒーロー直下に出ていたリンク）を撤去。
   入口①（相談の案から）と入口②（トレイの解析結果から）で足りる
+
+## 2026-09-11 の変更（QA レポート docs/QA-2026-09-10.md の P0/P1 対応・v1.1.3）
+
+### アカウントの境界（`app/_layout.tsx`・唯一の場所）
+- **profiles 行の保証（P0-3）**: 認証が確立したら `lib/profileRow.ts ensureProfileRow(uid)` が `profiles.upsert({ id }, { ignoreDuplicates: true })` を1回だけ投げる。
+  行が無いと `.update().eq('id')` が 0 行更新・error null（PostgREST 204）で「保存しました。」を出して入力を捨て、規約同意も記録されず
+  再同意ゲートが毎起動出ていた（テスター報告の真因候補）。正しい直しは DB 側 `supabase/migration-33.sql`（`handle_new_user` トリガ＋バックフィル）。
+  あわせて consent / diet / purpose / settings の `profiles` 書き込みを **upsert** に統一し、`profilesWriteConvention.test.ts` が
+  「`from('profiles')` の `update(` は `.select(` を伴う、または upsert」を機械的に見張る
+- **サインアウト時の端末データ掃除（P1-3 / P1-5）**: `onAuthStateChange` の `SIGNED_OUT` で `lib/signOutCleanup.ts clearLocalUserState()`。
+  **許可リスト方式**（残すのはテーマ・言語・単位・起動エラー記録・リモートコンテンツ・食品DBキャッシュ・未送信オフラインキューだけ）で
+  それ以外の AsyncStorage を全消去、予約通知の取消、gate/diet/profileRow のキャッシュ初期化、RevenueCat `logOut`、ウィジェットの消去。
+  `signOutCleanup.test.ts` が「`native/src` に現れる全 `'bl-*'` キーは KEEP か CLEARED に必ず載る」を強制（新キーを足した人に分類を考えさせる）。
+  以前は何も消しておらず、別アカウントで AI相談の全会話・アレルギー設定・90日分の体重が見えていた。
+  `lib/purchases.ts` は `rcIdentityAction`（configure / logIn / logOut / none）で uid が変わったら identity を差し替える
+- **オフラインキュー（P0-2）**: `flush()` は先頭でセッション uid を1回読み、別人の行は送らず保持。RLS・権限エラー（`row-level security` / `permission denied` /
+  `42501` / JWT）は捨てない。捨てるのは制約違反など再送しても直らない行だけで、件数を `bl-offline-dropped` に控え、次回起動で1度だけ
+  「同期できなかった記録が N 件」と伝える（`takeDroppedNotice`）
+- **解析ジョブに uid（P1-4）**: `ParseJob.uid` を必須にし `triageJobs(list, today, now, uid)` が別人・uid 無し（旧形式）を drop。
+  同じ端末で別アカウントに切り替えても前の人の食事写真がトレイに積まれない
+- **同意ゲート（P1-2）**: `needsReconsent()` は `false | 'initial' | 'update'`。初回（`terms_version` null）は見出し「利用規約への同意」で
+  「主な変更点」を出さない。「更新しました」は改定の再同意のときだけ
+
+### Web 管理API の認可（P0-1・`lib/calc.ts`）
+- `isAdmin(email)`（`UNLIMITED_EMAILS` 照合のみ）を新設し、`/api/admin/overview` と `/admin` の認可はこちら。`isUnlimited` は AI 上限免除専用
+  （`AI_LIMITS_ENABLED=false` の間は全員 true を返す短絡があり、認可に流用していたため全ログインユーザーに開いていた）。
+  例外の生文字列は返さず固定文言。`tests/adminAuth.test.ts` が「`app/api/admin/**` に `isUnlimited` が現れたら fail」
+
+### 安全ガードの集約（P1-6・`lib/guard.ts`）
+- `assessWeightGoal({ heightCm, currentKg, targetKg, targetDate, today, maternity, purpose })`: BMI18.5 下限（G1）・週1kg 超の減量ペース（G1・0.5〜1kg は警告のみ）・
+  妊娠授乳中の減量方向（G3）。**目標パネルと AI コーチの承認カードの両経路**が同じ判定を通る（以前はコーチ側が 25〜300kg の範囲だけ）。
+  `coachAction.validateAction(a, today, profile)`、`coach.tsx` はプロフィールと直近体重を渡す。`goalsWriteConvention.test.ts` が `goals` への書き込み経路を許可リストで固定
+- 範囲の正本: `WEIGHT_RANGE`（20〜300 排他）・`BODYFAT_RANGE`（3〜70）・`HEIGHT_RANGE`（100〜250）・`AGE_RANGE`（10〜120）。
+  クイック入力・おかえり・オンボーディング・体写真・ヘルスケア取込（`filterImportable`）が同じ値を使う（B-2）
+
+### 数値入力（B-1・`lib/parseNum.ts`）
+- `parseDecimal` / `parseInteger`: 全角→半角、カンマ小数（`72,5`）、単位つき（`72.5 kg`）を読む。読めなければ null。
+  体重・身長・年齢・PFC・kcal の入力口（weightLog・ComebackSheet・GoalPanel・onboarding・AddFoodSheet・settings）を置換。
+  `Number(x) || 170` のように NaN を既定値へ黙って倒す書き方を廃止し、読めない値はその場で理由を出す
+
+### クラッシュ計測（P1-8・`lib/crash.ts`）
+- 未処理 Promise 拒否を本番でも計測: Hermes は `HermesInternal.enablePromiseRejectionTracker`、それ以外は `promise/setimmediate/rejection-tracking`。
+  `__DEV__` は RN の LogBox 版を残す。連投ガードは name+message 単位（種類が違うクラッシュを取りこぼさない）
+
+### smart リマインダー（A-2・`lib/notify.ts`）
+- 予約キーと取消キーを `reminderDateKey(d)`（端末ローカル日付）1関数に統一。非 JST の人で「記録したのに今夜鳴り、明日のぶんが消える」を解消。
+  先積みは `setDate(+i)` で DST 安全
+
+### 画面
+- 食事タブ: `profile` が無い（オンボーディング「あとで設定」）とき、ヒーローの代わりに「プロフィールを設定するとカロリー目標が出ます →」の空状態
+- 設定 › アカウント: 「初期設定をやり直す」（`/onboarding` へ push・P1-1）
