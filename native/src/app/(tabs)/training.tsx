@@ -36,6 +36,8 @@ import DateStrip from '@/components/DateStrip';
 import WeekStepsBar, { useWeekStepsGoal } from '@/components/WeekStepsBar';
 import RestDial, { fmtRest } from '@/components/RestDial';
 import ActivityLogSheet from '@/components/ActivityLogSheet';
+import PlusEntry from '@/components/PlusEntry';
+import { FAB_CLEARANCE } from '@/components/PlusFab';
 import { enqueue, flush, pendingCount, subscribePendingCount, isNetworkError } from '@/lib/offlineQueue';
 import { LIFT_SESSION_KEY, REST_CHOICES, REST_DEFAULT_SEC, parseSessionState } from '@/lib/liftSession';
 import { activityName, activityKcal, type Activity as ActivityKind } from '@/lib/activities';
@@ -709,7 +711,8 @@ export default function TrainingScreen() {
       footer={footerJSX}
       onEnterEdit={() => setEditing(true)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); invalidateActiveEnergyCache(); await Promise.all([load(), loadMove(viewDate), loadHealth(), loadHourly(viewDate)]); setRefreshing(false); }} />}
-      contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 24 }]}
+      // 下端は右下の＋（56px）の下を通れるぶん空ける（食事タブと同じ FAB_CLEARANCE）
+      contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + FAB_CLEARANCE }]}
       onScroller={(fn) => guide.registerScroller('/training', fn)}
       scrollProps={{ keyboardShouldPersistTaps: 'handled', keyboardDismissMode: 'on-drag' }}
     />
@@ -757,6 +760,11 @@ export default function TrainingScreen() {
         </ScrollView>
       </View>
     </Modal>
+
+    {/* 右下の＋（2026-09-10・食事タブと同じ components/PlusEntry.tsx）。
+        「運動」はこのタブにいるので遷移せず、その場で「運動を記録する」シートを開く（onLocal で横取り）。
+        食事系・先の予定は食事タブへ、体の写真は概要タブへ、マイ食品の登録はその場で（PlusEntry の共通処理） */}
+    <PlusEntry onLocal={(a) => { if (a === 'exercise') { setActSheet(true); return true; } return false; }} />
 
     {/* 運動を記録するシート（種目を毎回選ぶ → 時間ダイアル → 保存） */}
     <ActivityLogSheet visible={actSheet} onClose={() => setActSheet(false)} weightKg={myWeight} freq={actFreq} busy={actSaving} onSave={saveActivity} />

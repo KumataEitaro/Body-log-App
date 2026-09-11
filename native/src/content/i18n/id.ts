@@ -2281,4 +2281,7 @@ export const ID: Record<string, string> = {
   "{md}の週": "Minggu {md}",
   "{a}〜{b}の7日": "7 hari: {a}-{b}",
   "{w} {n} / {g}歩": "{w} {n} / {g} langkah",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Tambah ke Makanan Saya",
+  "マイ食品に登録しました。": "Disimpan ke Makanan Kustom.",
 };

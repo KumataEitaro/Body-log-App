@@ -2281,4 +2281,7 @@ export const FR: Record<string, string> = {
   "{md}の週": "Semaine du {md}",
   "{a}〜{b}の7日": "7 jours : {a}-{b}",
   "{w} {n} / {g}歩": "{w} {n} / {g} pas",
+  // ＋ボタンの「マイ食品を登録」（2026-09-10・4タブ共通の＋から登録できるようにした）
+  "マイ食品を登録": "Ajouter à Mes aliments",
+  "マイ食品に登録しました。": "Ajouté à Mes aliments.",
 };

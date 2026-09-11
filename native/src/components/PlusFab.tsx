@@ -10,6 +10,10 @@
 //   「書きかけがある」ことが見えるように。閉じた＝捨てた、ではない）
 // - ガイドツアーの照射対象 'dock'（旧・入力ドックのキー）をこのボタンに引き継ぐ。
 //   旧ドック向けの章の文言は content/guideChapters.ts 側で「＋から」に書き換えた
+// - 2026-09-10: 運動・概要・相談タブにも同じ＋を置いた（components/PlusEntry.tsx が束ねる）。
+//   照射キー 'dock' を登録するのは**食事タブの1つだけ**（guideKey='dock'）。複数のタブが同じキーを
+//   登録すると、あとから登録した（別タブの・画面外の）ボタンへ照射がずれる。他タブは guideKey 省略＝未登録
+// - 相談タブはコンポーザー（テキストボックス＋↑送信）にかぶらないよう bottomOffset でその上へ持ち上げる
 import { useRef } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { Plus } from 'lucide-react-native';
@@ -20,14 +24,25 @@ import { useGuideTarget } from '@/components/GuideTour';
 import { t } from '@/lib/i18n';
 
 export const FAB_SIZE = 56;
+/** スクロール内容の下端が＋に隠れないための余白（insets.bottom に足す）。食事タブの 84（=56+28）に揃える */
+export const FAB_CLEARANCE = FAB_SIZE + 28;
+/** 照射キーを登録しないタブ用のダミーキー（どの章も参照しない）。フックは条件付きで呼べないため */
+const GUIDE_KEY_NONE = 'plus-fab:unlit';
 
-export default function PlusFab({ onPress, badge = 0 }: { onPress: () => void; badge?: number }) {
+export default function PlusFab({ onPress, badge = 0, guideKey = null, bottomOffset = 0 }: {
+  onPress: () => void;
+  badge?: number;
+  /** ガイドツアーの照射キー。食事タブだけ 'dock'。省略＝登録しない */
+  guideKey?: 'dock' | null;
+  /** 既定位置（insets.bottom + 12）からさらに持ち上げる高さ（相談タブ: コンポーザーの高さ） */
+  bottomOffset?: number;
+}) {
   const insets = useSafeAreaInsets();
-  const target = useGuideTarget('dock');
+  const target = useGuideTarget(guideKey ?? GUIDE_KEY_NONE);
   const sc = useRef(new Animated.Value(1)).current;
   const press = (v: number) => Animated.spring(sc, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
   return (
-    <View style={[s.wrap, { bottom: insets.bottom + 12 }]} ref={target} collapsable={false}>
+    <View style={[s.wrap, { bottom: insets.bottom + 12 + bottomOffset }]} ref={target} collapsable={false}>
       <Pressable
         accessibilityRole="button" accessibilityLabel={t('記録を追加')}
         onPressIn={() => press(0.92)} onPressOut={() => press(1)}
