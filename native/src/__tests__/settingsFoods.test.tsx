@@ -12,6 +12,10 @@ import { GuideProvider } from '../components/GuideTour';
 
 jest.useFakeTimers();
 
+// この suite は設定画面（1,000行超・シート多数）を2回まるごと描くので、単体でも十数秒かかる。
+// jest の既定（1テスト5秒）では並列実行時に超えて落ちるため、package.json の jest.testTimeout を
+// 60秒にしてある（この suite だけの話ではなく、画面を丸ごと描く suite に共通の問題・2026-09-14）
+
 async function mount(el: React.ReactElement): Promise<ReactTestRenderer> {
   let tree!: ReactTestRenderer;
   await act(async () => { tree = renderer.create(el); });

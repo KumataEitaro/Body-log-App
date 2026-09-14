@@ -802,7 +802,9 @@ export default function LogScreen() {
       }, fd.name, viewDate, mealAt);   // 時刻はトレイのチップと同じ解決（過去日に現在時刻を入れない）
       if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      setMsg({ ok: true, text: t('「{name}」を記録しました（長押しで即記録）', { name: fd.name }) });
+      setMsg(r.queued
+        ? { ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。') }
+        : { ok: true, text: t('「{name}」を記録しました（長押しで即記録）', { name: fd.name }) });
       await load();
     } finally { setSaving(false); }
   }
@@ -1014,8 +1016,11 @@ export default function LogScreen() {
       }
       // 食べた時間（トレイのチップ）。「いま」なら null → DBの now()。過去日は既定12:00か選んだ時刻が必ず入る。
       // 保存先の日付は saveDate（「前日として記録」を押しているときだけ前日・既定は表示中の日）
-      const res = await saveParsed(uid, parsed, stagedNote, saveDate, mealAt);
+      // 書き換え（editingId あり）は圏外でもキューに積まない: 新しい行がキューの中にある間に
+      // 古い行を消すと、送れなかったときにその食事が消える（下の delete と対）
+      const res = await saveParsed(uid, parsed, stagedNote, saveDate, mealAt, { queueOffline: editingId == null });
       if (!res.ok) { setMsg({ ok: false, text: res.error }); return false; }
+      const queued = res.queued === true;   // 圏外で端末に積んだ＝まだフィードには出ない
       const savedToPrevDay = saveDate !== viewDate;
       // 編集モードなら、新しい記録が入ったあとに元の記録を消す（この順なら失敗しても記録が消えない）
       let delFailed = false;
@@ -1038,6 +1043,9 @@ export default function LogScreen() {
       await load();
       setMsg(delFailed
         ? { ok: false, text: t('新しい内容は保存しましたが、元の記録を消せませんでした。重複した行を長押しで削除してください。') }
+        // 圏外で端末に積んだとき: フィードにまだ出ないので、その理由を必ず言う（消えたように見せない）
+        : queued
+          ? { ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。') }
         // 前日へ寄せたときは、今日のフィードに出てこないので行き先を必ず言う（黙って消えたように見せない）
         : savedToPrevDay
           ? { ok: true, text: t('{date}の記録として保存しました。日付を戻すとフィードで確認できます。', { date: dateLabelOf(saveDate) }) }

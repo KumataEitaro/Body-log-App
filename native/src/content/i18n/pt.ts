@@ -2300,4 +2300,10 @@ export const PT: Record<string, string> = {
   "身長・年齢の値を確認してください。": "Verifique os valores de altura e idade.",
   "P・F・Cは数字で入力してください。": "Digite P, F e C em números.",
   "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Digite uma gordura corporal entre {min} e {max}%.",
+  // 食事の保存エラーを診断できる文言に（2026-09-14）
+  "ログインの有効期限が切れているようです。アプリを開き直すか、ログインし直してから、もう一度保存してください。（{msg}）": "Sua sessão parece ter expirado. Reabra o app ou entre novamente e salve outra vez. ({msg})",
+  "データベースの更新が未適用のようです。この文言をそのまま開発者に伝えてください。（{msg}）": "Parece faltar uma atualização do banco de dados. Envie esta mensagem como está para a pessoa desenvolvedora. ({msg})",
+  "保存に失敗しました。（{msg}）": "Não foi possível salvar. ({msg})",
+  "圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。": "Você está sem conexão, então salvamos no aparelho. Vai sincronizar e aparecer no seu registro quando o sinal voltar.",
+  "通信できませんでした。電波が届くところで、もう一度お試しください。": "Sem conexão. Tente de novo onde houver sinal.",
 };

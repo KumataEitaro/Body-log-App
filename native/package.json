@@ -84,6 +84,7 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/"
-    ]
+    ],
+    "testTimeout": 60000
   }
 }

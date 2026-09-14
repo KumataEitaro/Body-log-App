@@ -2300,4 +2300,10 @@ export const VI: Record<string, string> = {
   "身長・年齢の値を確認してください。": "Hãy kiểm tra lại chiều cao và tuổi.",
   "P・F・Cは数字で入力してください。": "Hãy nhập P, F, C bằng số.",
   "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Hãy nhập tỷ lệ mỡ cơ thể trong khoảng {min}–{max}%.",
+  // 食事の保存エラーを診断できる文言に（2026-09-14）
+  "ログインの有効期限が切れているようです。アプリを開き直すか、ログインし直してから、もう一度保存してください。（{msg}）": "Phiên đăng nhập có vẻ đã hết hạn. Hãy mở lại ứng dụng hoặc đăng nhập lại rồi lưu lần nữa. ({msg})",
+  "データベースの更新が未適用のようです。この文言をそのまま開発者に伝えてください。（{msg}）": "Có vẻ thiếu một bản cập nhật cơ sở dữ liệu. Vui lòng gửi nguyên văn thông báo này cho nhà phát triển. ({msg})",
+  "保存に失敗しました。（{msg}）": "Không lưu được. ({msg})",
+  "圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。": "Bạn đang ngoại tuyến nên bản ghi đã lưu trên máy. Nó sẽ đồng bộ và hiện trong nhật ký khi có sóng trở lại.",
+  "通信できませんでした。電波が届くところで、もう一度お試しください。": "Không kết nối được. Hãy thử lại ở nơi có sóng.",
 };
