@@ -3,8 +3,9 @@
 import { apiPost } from './api';
 import { supabase } from './supabase';
 import { syncEntriesForDate } from './sync';
+import { enqueue, isNetworkError, isPermissionError } from './offlineQueue';
 import { sumItems, type FoodItem } from './items';
-import { todayJST, type ExLevel } from './calc';
+import { todayJST, EX_LEVELS, type ExLevel } from './calc';
 import { t, apiLang } from './i18n';
 
 export type QuickImage = { data: string; mime: string };
@@ -31,6 +32,14 @@ export type ParsedResult = {
 
 /** プラン上限（429 plan_limit）で止まった種類。ペイウォールの文脈src（limit_text等）に使う */
 export type LimitKind = 'text' | 'photo' | 'coach';
+
+/**
+ * 保存の結果（2026-09-14）。
+ *  { ok: true }                → DBに入った
+ *  { ok: true, queued: true }  → 圏外なので端末のキューに積んだ。電波が戻ったら自動で送る
+ *  { ok: false, error }        → DBに拒否された。error には**理由の本文**が入る
+ */
+export type SaveOutcome = { ok: true; queued?: boolean } | { ok: false; error: string };
 
 // テキスト/写真をAIで解析（保存はしない）
 export async function analyzeFood(
@@ -90,21 +99,70 @@ export async function analyzeFood(
  * @param at 食べた時刻（UTCのISO・トレイの「食べた時間」チップで組む）。省略/nullなら
  *           DBの now()（＝「いま」）。過去日に現在時刻を入れないため、過去日は呼び出し側が必ず渡す
  */
-export async function saveParsed(uid: string, p: ParsedResult, note: string, date?: string, at?: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function saveParsed(
+  uid: string, p: ParsedResult, note: string, date?: string, at?: string | null,
+  opts?: { queueOffline?: boolean },
+): Promise<SaveOutcome> {
   const total = sumItems(p.items);
   const hasMeal = p.items.length > 0;
   const today = date || todayJST();
-  const { error } = await supabase.from('logs').insert({
+  // logs.ex には check 制約（オフ/軽い/通常/高/特大）がある。AIが範囲外の値
+  // （'中'・'moderate' 等）を返すと、その1語のために**食事まるごと**が保存できない。
+  // 運動の強度は食事の記録の主役ではないので、読めない値は黙って「オフ」に落とす（2026-09-14）
+  const ex: ExLevel = p.ex != null && (EX_LEVELS as readonly string[]).includes(p.ex) ? p.ex : 'オフ';
+  const row = {
     user_id: uid, date: today,
     ...(at ? { at } : {}),
     items: p.items,
     kcal: hasMeal ? total.kcal : null,
     p: hasMeal ? total.p : null, f: hasMeal ? total.f : null, c: hasMeal ? total.c : null,
     weight: p.weight, waist: p.waist,
-    ex: p.ex ?? 'オフ', adj: p.adj, mood: p.mood || '',
+    ex, adj: p.adj, mood: p.mood || '',
     text: note, photo_urls: [],
-  });
-  if (error) return { ok: false, error: t('保存に失敗しました。もう一度お試しください。') };
-  await syncEntriesForDate(uid, today);
-  return { ok: true };
+  };
+
+  let error: { message: string } | null = null;
+  try {
+    ({ error } = await supabase.from('logs').insert(row));
+  } catch (e) {
+    // supabase-js は普通 { error } を返すが、fetch 自体が投げることがある（圏外・DNS失敗）
+    error = { message: String((e as Error)?.message ?? e) };
+  }
+  if (!error) {
+    await syncEntriesForDate(uid, today);
+    return { ok: true };
+  }
+
+  // 圏外: 端末のキューに積んで、電波が戻ったら自動で送る（運動タブと同じ流儀）。
+  // 以前はここで「保存に失敗しました」と出すだけで、**書いた食事がそのまま失われていた**。
+  //
+  // 記録の**書き換え**（editingId あり）のときだけ queueOffline: false で呼ぶ。
+  // 書き換えは「新しい行を入れてから古い行を消す」順なので、新しい行がキューの中にある間に
+  // 古い行を消すと、キューが送れなかった場合にその食事が消える。圏外では書き換えを断る方が安全
+  if (isNetworkError(error)) {
+    if (opts?.queueOffline === false) {
+      return { ok: false, error: t('通信できませんでした。電波が届くところで、もう一度お試しください。') };
+    }
+    await enqueue(row);
+    return { ok: true, queued: true };
+  }
+  return { ok: false, error: saveErrorText(error.message) };
+}
+
+/**
+ * 保存できなかった理由を、本人が次の行動を選べる文にする（2026-09-14）。
+ *
+ * 以前は理由を問わず「保存に失敗しました。もう一度お試しください。」の一文だけで、
+ * 何度押しても同じ結果になる原因（ログイン切れ・DBの列不足）でも同じ文言だった。
+ * 体の写真で同じ問題を踏んだときと同じく、**DBのエラー本文を必ず添える**。
+ * 原因の切り分けがユーザーの1回の報告で終わる。
+ */
+export function saveErrorText(message: string): string {
+  if (isPermissionError({ message })) {
+    return t('ログインの有効期限が切れているようです。アプリを開き直すか、ログインし直してから、もう一度保存してください。（{msg}）', { msg: message });
+  }
+  if (/column|schema cache|does not exist/i.test(message)) {
+    return t('データベースの更新が未適用のようです。この文言をそのまま開発者に伝えてください。（{msg}）', { msg: message });
+  }
+  return t('保存に失敗しました。（{msg}）', { msg: message });
 }

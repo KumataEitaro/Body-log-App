@@ -22,11 +22,11 @@ import { loadPurpose } from '@/lib/purpose';
 // 起床時刻（「朝に出るもの」の窓の起点）。読めなくても既定7:00で判定されるだけなので起動は止めない
 import { loadWakeTime } from '@/lib/wakeTime';
 import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
-import { Alert, Linking } from 'react-native';
+import { Alert, AppState, Linking } from 'react-native';
 // サインアウト時の端末データ掃除（QA P1-3 / P1-5）と、profiles行の存在保証（QA P0-3）
 import { clearLocalUserState } from '@/lib/signOutCleanup';
 import { ensureProfileRow } from '@/lib/profileRow';
-import { takeDroppedNotice } from '@/lib/offlineQueue';
+import { takeDroppedNotice, flush as flushOfflineQueue } from '@/lib/offlineQueue';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
@@ -136,6 +136,18 @@ export default function RootLayout() {
         t('圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。', { n }),
       );
     }).catch(() => {});
+  }, [ready, authed]);
+
+  // 圏外キューの送信をアプリ全体で1か所から起こす（2026-09-14）。
+  // 以前は運動タブと筋トレ記録画面でしか flush していなかったため、食事タブから圏外で積んだ記録は
+  // 「運動タブを開くまで同期されない」状態だった。起動時と前景復帰時に必ず試みる。
+  // flush() 自身が二重実行を防ぎ、圏外ならそのまま残すので、呼びすぎても害はない
+  useEffect(() => {
+    if (!ready || !authed) return;
+    const run = () => { flushOfflineQueue().catch(() => {}); };
+    run();
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') run(); });
+    return () => sub.remove();
   }, [ready, authed]);
 
   useEffect(() => {

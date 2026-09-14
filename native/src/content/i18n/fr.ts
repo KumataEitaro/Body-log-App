@@ -2300,4 +2300,10 @@ export const FR: Record<string, string> = {
   "身長・年齢の値を確認してください。": "Vérifiez les valeurs de taille et d’âge.",
   "P・F・Cは数字で入力してください。": "Saisissez P, F et C en chiffres.",
   "体脂肪率は{min}〜{max}%の範囲で入力してください。": "Saisissez un taux de masse grasse entre {min} et {max}%.",
+  // 食事の保存エラーを診断できる文言に（2026-09-14）
+  "ログインの有効期限が切れているようです。アプリを開き直すか、ログインし直してから、もう一度保存してください。（{msg}）": "Votre session semble avoir expiré. Rouvrez l’app ou reconnectez-vous, puis enregistrez à nouveau. ({msg})",
+  "データベースの更新が未適用のようです。この文言をそのまま開発者に伝えてください。（{msg}）": "Une mise à jour de la base de données semble manquante. Transmettez ce message tel quel au développeur. ({msg})",
+  "保存に失敗しました。（{msg}）": "Enregistrement impossible. ({msg})",
+  "圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。": "Vous êtes hors ligne : l’entrée est enregistrée sur l’appareil. Elle se synchronisera et apparaîtra dans votre journal au retour du réseau.",
+  "通信できませんでした。電波が届くところで、もう一度お試しください。": "Connexion impossible. Réessayez là où vous avez du réseau.",
 };
