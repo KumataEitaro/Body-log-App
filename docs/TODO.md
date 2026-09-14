@@ -300,16 +300,8 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 
 職業テスター視点の全体監査（ペルソナ14人・P0 3／P1 12／P2 26／P3 20）。**P0 3件・P1 12件は 2026-09-11 に修正して main へ**
 （`fix/qa-auth-data`＝認可・セッション・データ整合、`fix/qa-validation`＝検証・数値・計測。v1.1.3）。
-残りは **①SQL `supabase/migration-33.sql` の実行（熊田さん・下の A13）** と **②`ai_usage` の加算を service role へ寄せる**（P1-7 の後半・A9 前）。
-
-### A13. 🔴 SQL: migration-33（profiles 行の自動作成＋プラン列の凍結）を実行する
-
-- 実行先: https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
-- ファイル: `supabase/migration-33.sql` を丸ごと貼って Run（冪等・何度流しても同じ）
-- 内容: ①`auth.users` への insert で `profiles` 行を作るトリガ `handle_new_user` ②既存ユーザーのバックフィル
-  ③`profiles.plan / plan_until / photo_trial_used` を anon/authenticated から書けなくする before トリガ ④`notify pgrst`
-- 確認: 同ファイル末尾の (a)〜(d)。特に `missing_profiles = 0`
-- **小澤さんの「プロフィールが消える／規約が毎回出る」はアプリ側の保険（起動時 upsert）でも直るが、正しい直しはこの SQL**
+**SQL `supabase/migration-33.sql` は 2026-09-14 に実行済み**（`missing_profiles = 0` を確認）。
+残るのは **`ai_usage` の加算を service role へ寄せる**（P1-7 の後半・A9 課金点火の前に必須）。
 
 - **P0-1** Web `/api/admin/overview` の認可が `isUnlimited`（上限撤廃中は全員 true）に依存し全ログインユーザーに開放 → `isAdmin` を分離
 - **P0-2** オフラインキューが別アカウントでログイン後、前の人の未送信記録を無言で捨てる → uid 判定・RLS エラーは保持
@@ -324,6 +316,14 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 
 ## C. 完了（1行記録・2026-09-04）
 
+- **2026-09-14: `supabase/migration-33.sql` を実行**（QA P0-3 / P1-7）。`auth.users` への insert で `profiles` 行を作る
+  `handle_new_user` トリガ、既存ユーザーのバックフィル（`missing_profiles = 0` を確認）、`plan / plan_until /
+  photo_trial_used` を anon/authenticated から凍結する before トリガ、`notify pgrst`。
+  トリガ2本（`on_auth_user_created` / users・`profiles_protect_entitlements` / profiles）を確認済み。
+  **プラン列の凍結は SQL Editor では確認できない**（エディタは postgres ロールで走り、管理者の手作業として意図的に通す設計）
+- **2026-09-11（v1.1.3）: QA レポートの P0 3件・P1 12件を修正**（`fix/qa-auth-data` / `fix/qa-validation`）。
+  認可の分離・オフラインキューの uid 判定・profiles 行の保証・サインアウト時の端末データ掃除・解析ジョブの uid・
+  目標変更の安全ガード集約・未処理 Promise 拒否の計測・数値入力の正規化・リマインダーのキー統一。android-smoke #16 緑
 - **2026-09-10〜11（v1.1.2）**
   - **Android 起動クラッシュの真因修正**（`Appearance.setColorScheme(null)` → `'unspecified'`・android-smoke #14 で初の緑）
   - **歩数・睡眠の過去日**: 概要の詳細に食事/運動と同じ日付セレクタ。選んだ日の歩数・その夜の睡眠ステージ・時間帯別・7日表（feat/health-history）
