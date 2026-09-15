@@ -65,10 +65,13 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
         go,
       );
     } else {
+      // Android の Alert は**配列の末尾**から positive（右端・強調）→ negative → neutral に割り当てる。
+      // iOS と同じ [撮影する, 写真から選ぶ, キャンセル] の順だと **「キャンセル」が強調ボタン**になる
+      // （2026-09-15・Android 監査）。並びを逆にして「撮影する」を右端に置く
       Alert.alert(t('体の写真を追加'), undefined, [
-        { text: t('撮影する'), onPress: () => go(0) },
-        { text: t('写真から選ぶ'), onPress: () => go(1) },
         { text: t('キャンセル'), style: 'cancel' },
+        { text: t('写真から選ぶ'), onPress: () => go(1) },
+        { text: t('撮影する'), onPress: () => go(0) },
       ]);
     }
   }

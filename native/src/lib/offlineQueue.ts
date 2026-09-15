@@ -98,15 +98,20 @@ async function noteDropped(n: number): Promise<void> {
 }
 
 /**
- * 「同期できなかった記録が N 件あります」を伝えるための件数を読み出し、控えを消す。
- * 起動時に1度だけ呼ぶ（native/src/app/_layout.tsx）。0 なら何も出さない。
+ * 「同期できなかった記録が N 件あります」の件数を**読むだけ**（消さない）。
+ *
+ * 読むのと消すのを分けているのは、Android で Alert が出せないことがあるため（2026-09-15 監査）。
+ * Android の Alert は現在の Activity が取れないと**何も表示せず console.warn だけ**して終わり、
+ * JS には失敗が返らない。読んだ時点で消す作りだと、**伝わっていないのに控えだけ消える**。
+ * 呼び出し側は「出せたと分かってから」 clearDroppedNotice() を呼ぶこと。
  */
-export async function takeDroppedNotice(): Promise<number> {
-  try {
-    const n = Number(await AsyncStorage.getItem(DROPPED_KEY)) || 0;
-    if (n > 0) await AsyncStorage.removeItem(DROPPED_KEY);
-    return n;
-  } catch { return 0; }
+export async function peekDroppedNotice(): Promise<number> {
+  try { return Number(await AsyncStorage.getItem(DROPPED_KEY)) || 0; } catch { return 0; }
+}
+
+/** 本人に伝えられたので控えを消す。伝える前に呼ばないこと */
+export async function clearDroppedNotice(): Promise<void> {
+  try { await AsyncStorage.removeItem(DROPPED_KEY); } catch { /* 次回また伝えるだけ */ }
 }
 
 /** 送信に失敗した1行をキューへ積む。戻り値は積んだあとの未同期件数 */

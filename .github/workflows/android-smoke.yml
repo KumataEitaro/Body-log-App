@@ -159,6 +159,7 @@ jobs:
           cp "${GITHUB_WORKSPACE}/smoke-summary.md" "$DEST/summary.md"
           cp "${GITHUB_WORKSPACE}/logcat-crash.txt" "$DEST/" 2>/dev/null || true
           cp "${GITHUB_WORKSPACE}/logcat-app.txt" "$DEST/" 2>/dev/null || true
+          cp "${GITHUB_WORKSPACE}/ui-summary.txt" "$DEST/" 2>/dev/null || true
           rm -rf android-smoke/latest && cp -r "$DEST" android-smoke/latest
           printf '# Android smoke logs\n\n最新: android-smoke/latest/summary.md（run #%s・%s）\n' "${GITHUB_RUN_NUMBER}" "${GITHUB_SHA}" > README.md
           git add -A

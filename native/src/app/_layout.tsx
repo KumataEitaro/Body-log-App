@@ -22,11 +22,11 @@ import { loadPurpose } from '@/lib/purpose';
 // 起床時刻（「朝に出るもの」の窓の起点）。読めなくても既定7:00で判定されるだけなので起動は止めない
 import { loadWakeTime } from '@/lib/wakeTime';
 import { reregisterAll, attachNotificationTapRouting } from '@/lib/notify';
-import { Alert, AppState, Linking } from 'react-native';
+import { Alert, AppState, InteractionManager, Linking } from 'react-native';
 // サインアウト時の端末データ掃除（QA P1-3 / P1-5）と、profiles行の存在保証（QA P0-3）
 import { clearLocalUserState } from '@/lib/signOutCleanup';
 import { ensureProfileRow } from '@/lib/profileRow';
-import { takeDroppedNotice, flush as flushOfflineQueue } from '@/lib/offlineQueue';
+import { peekDroppedNotice, clearDroppedNotice, flush as flushOfflineQueue } from '@/lib/offlineQueue';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
@@ -126,16 +126,31 @@ export default function RootLayout() {
   }, []);
 
   // 圏外キューから捨てざるを得なかった記録があれば、次の起動で1度だけ伝える（QA P0-2）。
-  // 「保存しました」と言った記録を黙って消さないための最小の導線
+  // 「保存しました」と言った記録を黙って消さないための最小の導線。
+  //
+  // 2026-09-15（Android 監査）: 以前は「読んだ時点で控えを消す」→ Alert、の順だった。
+  // Android の Alert は Activity が取れないと**何も出さず console.warn だけ**で終わり、
+  // JS には失敗が返らない。起動直後（スプラッシュ中・規約ゲートが開く瞬間）はまさにその状況になりうるので、
+  //   ① 画面の描画が落ち着くまで待つ（InteractionManager）
+  //   ② 読むだけ → 出す → **出したあとに消す**
+  // の順に変えた。これで「伝わっていないのに控えだけ消える」経路が無くなる。
   useEffect(() => {
     if (!ready || !authed) return;
-    takeDroppedNotice().then((n) => {
-      if (n <= 0) return;
-      Alert.alert(
-        t('同期できなかった記録があります'),
-        t('圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。', { n }),
-      );
-    }).catch(() => {});
+    let alive = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (!alive) return;
+      peekDroppedNotice().then((n) => {
+        if (!alive || n <= 0) return;
+        Alert.alert(
+          t('同期できなかった記録があります'),
+          t('圏外のあいだに保存した記録のうち{n}件が、サーバーに登録できませんでした。お手数ですが、もう一度記録してください。', { n }),
+          // 本人が閉じた＝伝わったので、そこで初めて控えを消す。閉じられなければ次の起動でまた出る
+          [{ text: t('OK'), onPress: () => { clearDroppedNotice().catch(() => {}); } }],
+          { onDismiss: () => { clearDroppedNotice().catch(() => {}); } },
+        );
+      }).catch(() => {});
+    });
+    return () => { alive = false; task.cancel(); };
   }, [ready, authed]);
 
   // 圏外キューの送信をアプリ全体で1か所から起こす（2026-09-14）。

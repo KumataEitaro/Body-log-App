@@ -147,6 +147,17 @@ export function isOutlierWeight(prev: number | null | undefined, next: number): 
 export function confirmOutlierWeight(prev: number | null | undefined, next: number): Promise<boolean> {
   if (!isOutlierWeight(prev, next)) return Promise.resolve(true);
   return new Promise((resolve) => {
+    // **必ず1回だけ決着させる**（2026-09-15・Android 監査）。
+    // この確認は ＋シート（Modal 表示中）からも呼ばれる。Android の Alert は
+    // 現在の Activity が取れないと **何も表示せず console.warn だけ**して終わる
+    // （ReactAndroid DialogModule → Libraries/Alert/Alert.js の errorCallback）。
+    // JS 側には失敗が返らないので、ボタンの onPress でしか resolve しない作りだと
+    // Promise が永久に pending になり、「体重を記録」ボタンが押しっぱなしで固まる。
+    // 表示できなかった場合の逃げ道として onDismiss と保険のタイマーを置く。
+    let done = false;
+    const settle = (v: boolean) => { if (done) return; done = true; clearTimeout(timer); resolve(v); };
+    // 出せなかった／ユーザーが触れない状態が続いたら「保存しない」に倒す（誤入力の可能性が高い場面なので安全側）
+    const timer = setTimeout(() => settle(false), 30_000);
     Alert.alert(
       t('前回から大きく変わっています（{prev}kg → {next}kg）。この値で合っていますか？', {
         prev: Number(prev).toFixed(1), next: Number(next).toFixed(1),
@@ -154,10 +165,11 @@ export function confirmOutlierWeight(prev: number | null | undefined, next: numb
       undefined,
       [
         // 「入力し直す」を先頭（cancel）に置く: 誤入力の可能性が高い場面では戻る方を選びやすく
-        { text: t('入力し直す'), style: 'cancel', onPress: () => resolve(false) },
-        { text: t('保存する'), onPress: () => resolve(true) },
+        { text: t('入力し直す'), style: 'cancel', onPress: () => settle(false) },
+        { text: t('保存する'), onPress: () => settle(true) },
       ],
-      { cancelable: false },
+      // Android で戻るキー等により閉じられたときも必ず決着させる
+      { cancelable: false, onDismiss: () => settle(false) },
     );
   });
 }

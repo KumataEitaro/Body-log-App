@@ -35,7 +35,7 @@ jest.mock('@/lib/sync', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { enqueue, flush, pendingCount, isNetworkError, isPermissionError, takeDroppedNotice } from '../offlineQueue';
+import { enqueue, flush, pendingCount, isNetworkError, isPermissionError, peekDroppedNotice, clearDroppedNotice } from '../offlineQueue';
 
 const row = (over: Partial<Row> = {}): Row => ({ user_id: 'user-A', date: '2026-09-10', kcal: 300, ...over });
 
@@ -112,7 +112,7 @@ describe('flush（エラー別のふるまい）', () => {
     expect(r.sent).toBe(0);
     expect(r.left).toBe(1);
     expect(await pendingCount()).toBe(1);        // が、捨てていない
-    expect(await takeDroppedNotice()).toBe(0);   // 「破棄した」とも数えない
+    expect(await peekDroppedNotice()).toBe(0);   // 「破棄した」とも数えない
   });
 
   it('ネットワークエラーでその場で止める（後続を送らない）', async () => {
@@ -142,7 +142,12 @@ describe('flush（エラー別のふるまい）', () => {
     mockState.errors.push({ message: 'invalid input syntax for type numeric' });
     const r = await flush();
     expect(r).toEqual({ sent: 1, left: 0 });
-    expect(await takeDroppedNotice()).toBe(1);
-    expect(await takeDroppedNotice()).toBe(0);   // 一度読んだら消える（毎起動で言わない）
+    // 読むだけでは消えない（2026-09-15・Android 監査）。Android の Alert は表示に失敗しても
+    // JS に知らせないので、「読んだ時点で消す」作りだと**伝わっていないのに控えだけ消える**。
+    // 本人に伝えられたことを確認してから clearDroppedNotice() を呼ぶ
+    expect(await peekDroppedNotice()).toBe(1);
+    expect(await peekDroppedNotice()).toBe(1);   // 何度読んでも残る
+    await clearDroppedNotice();
+    expect(await peekDroppedNotice()).toBe(0);   // 伝えたあとに消す
   });
 });
