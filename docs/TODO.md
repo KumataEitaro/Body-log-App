@@ -11,6 +11,21 @@
 > 2026-09-06: これを忘れて「規約画面が毎回出る／プロフィールが消える／体の写真が保存できない」が同時発生した。
 > まとめ SQL（migration-23-32-all.sql / fix-body-photos.sql）の末尾には組み込み済み。
 
+### A14. 🔴 Gemini の残高を補充する（**いま AI が全断している**）
+
+2026-09-15 に AI（食事の解析・相談・献立・体の写真の分析・翻訳）が全部止まった。
+`gemini-diag-qa` で実測したところ、**全モデルが HTTP 429
+`Your prepayment credits are depleted`**。コードではなく Google 側の残高切れ。
+
+- 対応: https://aistudio.google.com/ → 左下の歯車 or Billing → プロジェクトの支払い方法を確認して補充
+  （エラー本文が案内する先は https://ai.studio/projects ）
+- 併せて **予算アラート**を設定しておく（次に黙って止まらないように）:
+  https://console.cloud.google.com/billing → 予算とアラート
+- 補充したら `/api/parse-food-qa` に `{"text":"バナナ1本と卵2個"}` を投げて 200 を確認する
+  （手順は docs/PROJECT-STATUS.md「『AIが使えない』ときの調べ方」）
+- アプリ側は 2026-09-15 に「枯渇のときは**再試行しても直らない**と伝える」よう修正して本番反映済み
+  （`lib/gemini.ts isBillingExhausted`・サーバのみ・アプリの再ビルド不要）
+
 ### A2. 🔴 iOS: TestFlight のクラッシュを見る
 https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィードバック → クラッシュ**
 - **KishimotoYumi さんの端末で 1.1.0 (81) がクラッシュ2件**・フィードバック3件が届いている

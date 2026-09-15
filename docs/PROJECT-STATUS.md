@@ -48,3 +48,58 @@
 - docs/monetization.md — フリーミアム設計と広告の鉄の掟
 - docs/ux-principles.md — HIG/Nielsen準拠チェックリスト
 - supabase/apply-pending.sql — 未適用マイグレーションの一括版（冪等）
+
+## 「AIが使えない」ときの調べ方（2026-09-15 に実際に使った手順）
+
+AI（食事の解析・相談・献立・体の写真の分析・翻訳）は**すべて `lib/gemini.ts` の `callGemini` 1本**を通る。
+どれか1つが死んだら全部死んでいると思ってよい。切り分けは次の順で、**推測せず実測する**。
+
+### 1. Gemini の各モデルの生死を直接見る
+
+`app/api/gemini-diag-qa/route.ts` が、本番と同じ発見ロジック・同じ試行順で1モデルずつ叩いて結果を返す。
+
+```js
+// QA_SECRET は必ずファイルから読む（チャットにも引数にも出さない）
+const SECRET = require('fs').readFileSync('C:/Users/hashi/Documents/BodyLog-secrets/qa-secret.txt', 'utf8').trim();
+const r = await fetch('https://bodylog-orcin.vercel.app/api/gemini-diag-qa', {
+  method: 'POST',
+  headers: { authorization: 'Bearer ' + SECRET, 'content-type': 'application/json' },
+  body: '{}', signal: AbortSignal.timeout(290000),
+});
+console.log(r.status, await r.text());
+```
+
+読み方:
+
+| 返ってくるもの | 意味 | 直し方 |
+|---|---|---|
+| `HTTP 429 ... prepayment credits are depleted` | **Google の残高切れ**。待っても直らない | AI Studio で支払いを補充（下記） |
+| `HTTP 429 ... overloaded / try again later` | 一時的な過負荷 | 数分待つ。ヘッジと候補の多様性で大抵は吸収される |
+| `HTTP 404 ... is not found` が**全モデル** | Google の世代交代でモデルが消えた | `STATIC_FALLBACK` を更新（発見ロジックが主・静的リストは保険） |
+| `HTTP 400` | リクエスト形が非互換 | `thinkingConfig` の扱いを疑う（`tryModel` が自動で1回外して再試行する） |
+| `no key` / 500 | `GEMINI_API_KEY` 未設定 | Vercel の環境変数 |
+
+### 2. サーバとQA鍵の疎通だけ見たいとき
+
+`/api/parse-food-qa` に `{}` を POST して **400 `text required`** が返れば、サーバも QA_SECRET も生きている。
+**404 `not found`** なら鍵が違う（Vercel の `QA_SECRET` と手元のファイルがずれている）。
+
+### 3. 利用者に出る文言
+
+`callGemini` は失敗の山を `isBillingExhausted()` で切り分ける（2026-09-15 追加）。
+
+- 枯渇 → 「AIの利用枠が上限に達しているため、いまは解析できません。**再試行しても直りません**。…」＋ サーバログに `console.error`
+- それ以外 → 「AIが一時的に使えませんでした。少し待って再試行してください。」
+
+**待っても直らないものに「待って」と言わない**。2026-09-15 はこれができておらず、利用者が何度も押し続け、
+報告も「AIが使えない」止まりで原因に辿り着くまで時間がかかった。判定は `tests/gemini.test.ts` が固定している。
+
+### 4. 直したあとの確認
+
+`/api/parse-food-qa` に実際の文章（例 `{"text":"バナナ1本と卵2個"}`）を投げて 200 が返ることを見る。
+`error` と `detail` の両方を出力すると、直っていない場合に次の一手がすぐ決まる。
+
+### 注意: 修正はサーバ側だけで効く
+
+文言も分岐も `lib/gemini.ts` にあり、アプリは API が返す `error` をそのまま出すだけ。
+**アプリの再ビルドは不要**で、`npx vercel deploy --prod --yes` だけで全利用者に反映される。
