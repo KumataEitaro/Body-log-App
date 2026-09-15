@@ -1,0 +1,16 @@
+== 前面のアプリ ==
+  mCurrentFocus=Window{809be2e u0 com.gotcha.bodylog.rn/com.gotcha.bodylog.rn.MainActivity}
+  mFocusedApp=ActivityRecord{aa8b2be u0 com.gotcha.bodylog.rn/.MainActivity t8}
+
+== 画面に出ていたテキスト ==
+text="Choose from saved accounts"
+text="Continue with Google"
+text="Email"
+text="English"
+text="G"
+text="Password"
+text="Sign in"
+text="Sign up"
+text="Welcome back. Keep your streak going."
+text="or"
+text="▍BodyLog"

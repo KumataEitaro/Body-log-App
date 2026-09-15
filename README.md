@@ -1,3 +1,3 @@
 # Android smoke logs
 
-最新: android-smoke/latest/summary.md（run #19・2ae1b92cb3c7700418396b1998b163e45ba35e7f）
+最新: android-smoke/latest/summary.md（run #20・44b2f4bf7a51ffcdd7092373d131cb427a177109）
