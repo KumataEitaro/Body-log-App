@@ -119,6 +119,8 @@ jobs:
             logcat-full.txt
             logcat-app.txt
             logcat-crash.txt
+            ui-dump.xml
+            screen-*.png
             native/autolink-rn.json
             native/autolink-expo.json
           retention-days: 14
@@ -160,7 +162,12 @@ jobs:
       - name: Verdict
         run: |
           if [ "${ALIVE}" != "1" ]; then
-            echo "❌ アプリが起動12秒後に生きていません。Artifacts の logcat-crash.txt / logcat-full.txt を読む" >&2
+            echo "❌ アプリが生きていません。Artifacts の logcat-crash.txt / logcat-full.txt を読む" >&2
+            exit 1
+          fi
+          # どの操作で落ちたかはスクリプトが STEPS_FAILED に積む（起動／ダーク切替／回転／前景復帰／描画）
+          if [ -n "${STEPS_FAILED}" ]; then
+            echo "❌ 通らなかった操作: ${STEPS_FAILED}" >&2
             exit 1
           fi
           # 生きていても致命例外が出ていたら落とす（ErrorBoundary が拾って画面だけ出ている可能性）
@@ -168,4 +175,4 @@ jobs:
             echo "❌ プロセスは生きているが致命例外のログがある" >&2
             exit 1
           fi
-          echo "✅ Android release ビルドが起動し、12秒後も生きている"
+          echo "✅ 起動・画面の描画・ダークモード切替・画面の回転・前景復帰をすべて通過"
