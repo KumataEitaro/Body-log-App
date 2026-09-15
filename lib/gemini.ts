@@ -3,11 +3,23 @@
 // モデル名がGoogle側で変わっても自動追従する（404が全滅したらキャッシュを捨てて再発見）。
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-// 発見に失敗した時の保険（-latest系を先頭に。旧世代IDはGoogle側で随時廃止されるため保険は薄く）
-// 2026-08-30更新: 実在確認済みの名前に刷新（3-flash/2.5系は404、lite系はスパイク時の生存率が高い）
+// 発見に失敗した時の保険。**費用の安い順**に並べる（下の rank も同じ方針）。
+//
+// 2026-09-15 更新（新しいプロジェクトの API キーで全モデルを実測した結果）:
+//  ・`gemini-2.5-flash-lite`（$0.10/$0.40）と `gemini-2.5-flash` は
+//    **"no longer available to new users" で 404**。作り直したプロジェクトでは使えない
+//  ・**新しい世代ほど高い**。`gemini-flash-latest` は実体が `gemini-3.8-flash`（$0.75/$3.75）で、
+//    しかも **2027-01-01 に $1.50/$7.50 へ倍増が公式告知済み**。「新しい順」は費用の観点では逆効果
+//  ・`gemini-flash-lite-latest` の実体は `gemini-3.5-flash-lite`（$0.30/$2.50）
+//  ・実測で通った最安は **`gemini-3.1-flash-lite`（$0.25/$1.50）**
+//  ・3.5-flash-lite 系は `thinkingConfig` を 400 で拒否する（tryModel が自動で外して再試行するので動くが、
+//    1往復むだになる）。3.1-flash-lite は受け付ける
+// 価格の一次情報は docs/llm-pricing-2026-09.md、方針は docs/LLM-PROVIDERS.md
 const STATIC_FALLBACK = [
-  'gemini-flash-latest', 'gemini-flash-lite-latest',
-  'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-pro-latest',
+  'gemini-3.1-flash-lite',    // $0.25/$1.50 実測で通る最安
+  'gemini-3.5-flash-lite',    // $0.30/$2.50
+  'gemini-flash-lite-latest', // → 3.5-flash-lite の別名（名前が生き残る側の保険）
+  'gemini-flash-latest',      // → 3.8-flash（$0.75/$3.75・高い）。ここまで落ちたら可用性優先
 ];
 
 let cachedModels: string[] | null = null;
@@ -19,7 +31,13 @@ export function _setModelsForTest(models: string[] | null): void {
   badUntil.clear();
 }
 
-// モデル名のスコアリング（flash優先・新しいバージョン優先・埋め込み等は除外）
+// モデル名のスコアリング（**安い順**・埋め込み等は除外）。
+//
+// 2026-09-15 に方針を反転した。それまでは lite に -6 のペナルティを付けて
+// 「品質重視で lite は後回し」にしていたが、Google の価格は**新しい世代ほど高い**ため、
+// この並びだと自動的に最も高いモデル（`gemini-flash-latest` = 3.8-flash・$0.75/$3.75）が
+// 選ばれ続ける。用途は「JSONの抽出」であって最前線の推論ではないので、lite で足りる。
+// 新しさの加点は 404（世代交代でモデルが消える）の保険として残すが、**lite の加点より弱くする**。
 function rank(nameRaw: string): number {
   const n = nameRaw.replace('models/', '');
   // テキスト生成以外（画像生成系の gemini-2.5-flash-image 等も含めて）除外
@@ -27,10 +45,10 @@ function rank(nameRaw: string): number {
   let s = 0;
   if (n.includes('flash')) s += 50;
   if (n.includes('pro')) s += 20;
+  if (n.includes('lite')) s += 40;  // **安いので最優先**（2026-09-15 に -6 から反転）
   if (n.includes('latest')) s += 15;
   const m = n.match(/(\d+(?:\.\d+)?)/);
-  if (m) s += parseFloat(m[1]) * 3; // 新バージョンを少し優先（"gemini-3-flash"のような小数なし表記にも対応）
-  if (n.includes('lite')) s -= 6;   // 品質重視でliteは後回し（保険には残す）
+  if (m) s += parseFloat(m[1]) * 1.5; // 新バージョンをわずかに優先（廃止済みIDを掴まないための保険）
   if (/preview|exp/i.test(n)) s -= 4;
   return s;
 }
