@@ -28,11 +28,30 @@ Google の公式規約（https://ai.google.dev/gemini-api/terms ・2026-09-15 �
 一方 `app/privacy/page.tsx` は利用者に「**機能提供の目的に限られます**」「目的外の第三者提供は行いません」と約束している。
 **無料枠の規約とこの約束は両立しない。**
 
-- 手順: https://aistudio.google.com/ → プロジェクトに**支払い方法を紐付けて有料枠(Paid tier)にする**
-  （A14 の残高補充と同じ画面。**補充だけでなく「有料枠になっているか」を必ず確認する**）
-- 確認: 有料枠のプロジェクトでは AI Studio 上の表示が Paid になる。切替後に
-  `/api/parse-food-qa` に `{"text":"バナナ1本と卵2個"}` を投げて 200 を確認
+> ⚠️ **前提（2026-09-15 判明）: いまの `GEMINI_API_KEY` は会社アカウント `kumatae@dialog-inc.com` の
+> プロジェクトで発行されている。** 他の全サービス（Apple・Play・AdMob・RevenueCat・Codemagic・Vercel・GitHub）は
+> `gotcha429@gmail.com`。**Gemini だけが例外**で、退職・異動・Workspace 管理者のポリシー変更で鍵ごと消える。
+> これは熊田さんが心配していた「叩く先が無くなるかも」の最も具体的な形。
+> **有料枠化と同時に、個人アカウントへ作り直す**（プロジェクトの移管はせず新規作成のほうが速い）。
+
+#### 手順（この順番なら無停止で切り替わる）
+
+1. **`gotcha429@gmail.com` でログイン**して https://aistudio.google.com/api-keys を開く
+2. 「**Create API key**」→ **新しいプロジェクト**を作る（例: `bodylog-ai`）
+3. 一覧のそのプロジェクトの行、**Billing Tier** 列の「**Set up billing**」を押す
+   → 請求先アカウントを作成（前払いなら最低 $5 のクレジット購入）
+4. https://aistudio.google.com/projects で Billing Tier が **Tier 1** 等になっていることを確認
+   （「Set up billing」のままなら無料枠＝規約の問題が残っている）
+5. 新しいキーを **`C:\Users\hashi\Documents\BodyLog-secrets\gemini-api-key.txt`** に保存する
+   （**チャットに貼らない**。Claude はファイルパス経由で Vercel に流し込む）
+6. Claude が Vercel の `GEMINI_API_KEY`（Production と Preview の両方）を差し替えて再デプロイし、
+   `/api/parse-food-qa` で 200 を確認する
+7. **確認が取れてから**、会社アカウント側の古いキーを **Delete** する（先に消すと止まる）
+
 - 併せて**予算アラート**: https://console.cloud.google.com/billing → 予算とアラート
+
+> ⚠️ Playground の「**Continue to upgrade**」は押さない。あれは **Google AI Plan（個人向け月額サブスク）**で、
+> Playground 画面の上限が上がるだけ。**API キーは無料枠のままで、規約も変わらない**（別物）。
 
 ### A14. 🔴 Gemini の残高を補充する（**いま AI が全断している**）
 
