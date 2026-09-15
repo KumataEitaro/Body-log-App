@@ -65,7 +65,14 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # packages を明示するのは 2026-09-15 の外部起因の故障への対処（run #18 がここで7秒で落ちた）。
+      # このアクションの既定は 'tools platform-tools' だが、Google が **deprecated な `tools` パッケージの
+      # 配信を停止した**ため sdkmanager が exit 1 になる（android-actions/setup-android#537・同日起票）。
+      # 本家の回避策どおり `platform-tools` だけを要求する。ビルドに必要な platform / build-tools は
+      # Gradle が自前で入れるので、これで足りる。上流が既定を直したらこの行は消してよい。
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - uses: gradle/actions/setup-gradle@v4
 
