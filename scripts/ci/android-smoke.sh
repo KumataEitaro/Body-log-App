@@ -33,7 +33,7 @@ dump_logs() {
   adb logcat -d "*:S" ReactNative:V ReactNativeJS:V AndroidRuntime:E DEBUG:F libc:F > logcat-app.txt 2>/dev/null || true
   adb logcat -d --buffer=crash > logcat-crash.txt 2>/dev/null || true
   echo "== 致命例外 =="
-  grep -n "FATAL EXCEPTION\|Fatal signal\|SIGSEGV\|SIGABRT\|UnsatisfiedLinkError\|NoClassDefFoundError\|NoSuchMethodError\|Process .* has died" logcat-full.txt | head -40 || true
+  grep -n "FATAL EXCEPTION\|Fatal signal\|SIGSEGV\|SIGABRT\|UnsatisfiedLinkError\|NoClassDefFoundError\|NoSuchMethodError\|Process $PKG .* has died" logcat-full.txt | head -40 || true
   echo "== JS 例外 =="
   grep -n "ReactNativeJS" logcat-app.txt | grep -i "error\|exception\|invariant" | head -20 || true
   echo "== crash buffer 先頭 =="
@@ -55,7 +55,7 @@ dump_logs() {
       echo
       echo "### 致命例外（logcat-full）"
       echo '```'
-      grep -nE "FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|UnsatisfiedLinkError|NoClassDefFoundError|NoSuchMethodError|Process .* has died" logcat-full.txt | head -40 || true
+      grep -nE "FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|UnsatisfiedLinkError|NoClassDefFoundError|NoSuchMethodError|Process $PKG .* has died" logcat-full.txt | head -40 || true
       echo '```'
       echo "### JS 例外（ReactNativeJS）"
       echo '```'
@@ -72,6 +72,11 @@ dump_logs() {
     } >> "$GITHUB_STEP_SUMMARY"
     # ci-logs ブランチへ公開する抜粋（Public リポジトリの raw URL でログイン無しに読める）
     cp "$GITHUB_STEP_SUMMARY" smoke-summary.md 2>/dev/null || true
+    # 画面ダンプと前面アプリも公開する（描画の判定が外れたときに、実際に何が出ていたかを読むため）
+    { echo "== 前面のアプリ =="; cat focus.txt 2>/dev/null;
+      echo; echo "== 画面に出ていたテキスト ==";
+      grep -oE 'text="[^"]{1,40}"' ui-dump.xml 2>/dev/null | sort -u | head -40;
+    } > ui-summary.txt 2>/dev/null || true
   fi
 }
 trap dump_logs EXIT
@@ -112,19 +117,33 @@ sleep 12
 check "起動" || exit 0
 
 # ---- 2) 画面が実際に描けているか ----
-# 白画面・赤箱（RedBox）だと pidof は通るのに何も見えない。ログイン画面の文言で確かめる。
-# uiautomator が使えない環境でも落とさない（確認できなければ警告だけ）
-adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 && adb pull /sdcard/ui.xml ui-dump.xml >/dev/null 2>&1
-if [ -f ui-dump.xml ]; then
-  if grep -q "ログイン\|メールアドレス\|アカウントを作成" ui-dump.xml; then
-    echo "✅ ログイン画面が描けている"
-  else
-    STEPS_FAILED="$STEPS_FAILED [描画:ログイン画面の文言が無い]"
-    echo "❌ 画面にログイン画面の文言がありません（白画面／赤箱の疑い）"
-    head -c 2000 ui-dump.xml
+# 白画面・赤箱（RedBox）だと pidof は通るのに何も見えない。
+#
+# 判定は**文言では見ない**（2026-09-15 #19 の教訓）。起動イントロのアニメーション中だったり、
+# 言語が日本語以外だったり、React Native のテキストが読み上げツリーに出る形が変わったりすると、
+# 特定の文言を探す判定は簡単に誤検知する。代わりに次の2つだけを見る:
+#   ・前面のアプリが自分か（dumpsys window の mCurrentFocus）
+#   ・画面ダンプに**自分のパッケージのノード**があり、**空でないテキストが1つ以上**ある
+# 起動直後はまだ描けていないことがあるので、10秒ぶん数回やり直す。
+DRAWN=0
+for i in 1 2 3 4 5; do
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml ui-dump.xml >/dev/null 2>&1
+  if [ -f ui-dump.xml ] && grep -q "package=\"$PKG\"" ui-dump.xml && grep -qE 'text="[^"]+"' ui-dump.xml; then
+    DRAWN=1; break
   fi
+  sleep 2
+done
+adb shell dumpsys window 2>/dev/null | grep -i "mCurrentFocus\|mFocusedApp" | head -3 > focus.txt || true
+cat focus.txt || true
+if [ "$DRAWN" = "1" ]; then
+  echo "✅ 画面が描けている（自分のパッケージのノードとテキストがある）"
+  # どの画面だったかは後から読めるように残す（判定には使わない）
+  grep -oE 'text="[^"]{1,30}"' ui-dump.xml | sort -u | head -20 || true
 else
-  echo "⚠️ uiautomator dump が取れませんでした（描画の確認はスキップ）"
+  STEPS_FAILED="$STEPS_FAILED [描画:自分の画面にテキストが無い]"
+  echo "❌ 画面ダンプに自分のパッケージのテキストがありません（白画面／赤箱の疑い）"
+  head -c 2000 ui-dump.xml 2>/dev/null || echo "(ダンプが取れていません)"
 fi
 adb exec-out screencap -p > screen-1-launch.png 2>/dev/null || true
 

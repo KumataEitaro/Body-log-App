@@ -82,7 +82,14 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
 
   // 開くたびに1段目から（前回の途中状態を引き継がない）
   useEffect(() => {
-    if (visible) { setStep('root'); setWeight(''); setBusy(false); setErr(null); ty.value = 0; }
+    if (visible) {
+      setStep('root'); setWeight(''); setBusy(false); setErr(null); ty.value = 0;
+      // 前回の「閉じ切ってから渡す予定の行動」を捨てる（2026-09-15・Android 監査）。
+      // Android には Modal の onDismiss が無いので 350ms のタイマーが唯一の経路。
+      // 閉じてすぐ（350ms以内）に開き直すと cleanup でタイマーだけ消えて pending が残り、
+      // **何も選ばずに閉じたのに、あとから選んでいない画面が勝手に開く**。
+      pending.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
