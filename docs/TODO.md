@@ -94,6 +94,16 @@ https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィ
 
 ### A3. 🔴 Android: 起動クラッシュの検証（対策ビルドで再検証）
 
+> **2026-09-15 時点の確定事項（CI・エミュレータ）**: android-smoke #20 で
+> **起動・画面の描画・ダークモード切替・画面の回転・前景復帰のすべてを通過**（致命例外ゼロ）。
+> スモークは 2026-09-15 に「起動して12秒待つだけ」から拡張済みで、2026-09-07 に全断した
+> 明暗切替の経路も通している。**コード側は直っていると機械的に言える。**
+> あわせて実機限定の不具合4件を修正（docs/ANDROID-AUDIT-2026-09-15.md・v1.1.5）。
+>
+> **残っているのは端末での確認だけ。** 9ea34ac（2026-09-07 の修正）以降、
+> **Codemagic の rn-android が走った記録が無い**。端末が 1.1.0 / versionCode 119 のままなら、
+> 直っていない版をテストし続けていることになる。下の 1〜6 を実施して versionCode を確認すること。
+
 > **2026-09-07 真因確定・修正投入（fix/android-appearance-null）**: android-smoke #13 の logcat で
 > `AppearanceModule.setColorScheme` の NullPointerException を確認。`lib/theme.ts` が OS 追従のときに
 > `Appearance.setColorScheme(null)` を呼んでいた（ダークモード導入以来）。Android は非 null 引数なので
