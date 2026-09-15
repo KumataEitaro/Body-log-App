@@ -279,6 +279,38 @@ export async function callGemini(
 
   if (result) return result;
   if (sawStale) cachedModels = null; // 全滅時は次回再発見
+  const detail = errs.slice(-3).join(' / ');
   // ユーザー向けは日本語のみ（選択言語へはDOM翻訳が担当）。技術詳細はdetailに分離してログ用に返す
-  return { ok: false, status: 502, error: 'AIが一時的に使えませんでした。少し待って再試行してください。', detail: errs.slice(-3).join(' / ') };
+  //
+  // 「待てば直る」と「待っても直らない」を区別する（2026-09-15）。
+  // 実際に踏んだ事故: Gemini のプリペイド残高が尽き、全モデルが 429
+  // "Your prepayment credits are depleted" を返した。それでも画面には
+  // 「少し待って再試行してください」と出ていたため、利用者は何度も押し続け、
+  // 熊田さんにも「AIが使えない」としか伝わらず、原因に辿り着くまで時間がかかった。
+  if (isBillingExhausted(errs)) {
+    console.error(`[gemini] 課金枠の枯渇でAIが全断: ${detail}`);
+    return {
+      ok: false, status: 502, detail,
+      error: 'AIの利用枠が上限に達しているため、いまは解析できません。再試行しても直りません。復旧までお待ちください（開発者に通知が届いています）。',
+    };
+  }
+  return { ok: false, status: 502, error: 'AIが一時的に使えませんでした。少し待って再試行してください。', detail };
+}
+
+/**
+ * 失敗の山が「支払い・利用枠の枯渇」か（＝再試行しても直らない）。
+ *
+ * Google はこの状態を 429 で返すが、同じ 429 には「一時的な過負荷」も混ざる。
+ * 本文の文言で切り分ける。過負荷は待てば直るので、従来どおりの案内に落とす。
+ * 判定は純関数にして tests/gemini.test.ts で固定する（文言が増えたらここに足す）。
+ */
+export function isBillingExhausted(errs: string[]): boolean {
+  if (errs.length === 0) return false;
+  const pat = /credits are depleted|billing|quota exceeded|exceeded your current quota|RESOURCE_EXHAUSTED|free tier|insufficient.*(credit|fund)/i;
+  const http429 = errs.filter((e) => /HTTP 429/.test(e));
+  // 429 が1件も無いなら過負荷でも枯渇でもない（404 の世代交代など）
+  if (http429.length === 0) return false;
+  // 429 のうち1件でも枯渇の文言を含むなら枯渇として扱う。
+  // 枯渇はプロジェクト単位で起きるので、一部のモデルだけ過負荷という混在はまず無い
+  return http429.some((e) => pat.test(e));
 }
