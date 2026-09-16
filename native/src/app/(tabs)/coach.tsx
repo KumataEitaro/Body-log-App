@@ -35,6 +35,7 @@ import { todayJST } from '@/lib/calc';
 import { useReduceMotion } from '@/lib/motion';
 import { coachInsightsBlock } from '@/lib/laws';
 import { buildDayFeatures } from '@/lib/features';
+import { navFrom } from '@/lib/navHeader';
 
 type Msg = { role: 'user' | 'ai'; text: string; action?: CoachAction; applied?: boolean; upgrade?: boolean };
 
@@ -409,7 +410,7 @@ export default function CoachScreen() {
                         </Pressable>
                         {m.action.kind !== 'meal' && (
                           <Pressable style={s.actionAlt}
-                                     onPress={() => router.push({ pathname: '/settings', params: { open: 'goal', ts: String(Date.now()) } })}>
+                                     onPress={() => router.push({ pathname: '/settings', params: navFrom('coach', { open: 'goal' }) })}>
                             <Text style={s.actionAltT}>{t('⚙ 設定で細かく調整')}</Text>
                           </Pressable>
                         )}
@@ -474,7 +475,7 @@ export default function CoachScreen() {
             {/* 制約プロフィール未設定のときだけの導線（プロフィール編集シートへディープリンク） */}
             {!hasConstraints && (
               <Pressable hitSlop={8}
-                         onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}>
+                         onPress={() => router.push({ pathname: '/settings', params: navFrom('coach', { open: 'profile' }) })}>
                 <Text style={s.presetLink}>{t('前提を設定（アレルギー・苦手など）')}</Text>
               </Pressable>
             )}

@@ -2327,4 +2327,6 @@ export const DE: Record<string, string> = {
   "追加の完了処理に失敗しました。もう一度お試しください。": "Abschluss fehlgeschlagen. Bitte erneut versuchen.",
   "追加に失敗しました: {reason}": "Hinzufügen fehlgeschlagen: {reason}",
   "OK": "OK",
+  // 概要タブ最上部のブロック見出し（2026-09-16・中身が設定だけではないので改称）
+  "あなたの記録と設定": "Deine Daten & Einstellungen",
 };

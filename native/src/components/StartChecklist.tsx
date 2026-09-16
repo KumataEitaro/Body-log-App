@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { getDailyReminderPrefs } from '@/lib/notify';
 import { MinusBadge } from '@/components/CardLayout';
+import { navFrom } from '@/lib/navHeader';
 
 // 全完了した瞬間のepoch(ms)。これを起点に「翌日から自動で消える」を判定する
 const DONE_KEY = 'bl-start-checklist-done';
@@ -122,12 +123,12 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
 
   // 未完了行のタップ→該当機能へ誘導（既存の遷移手段だけを使う）
   const go: Record<CheckId, () => void> = {
-    profile: () => router.push({ pathname: '/settings', params: { open: missingProfile.current ? 'profile' : 'goal', ts: String(Date.now()) } }),
+    profile: () => router.push({ pathname: '/settings', params: navFrom('log', { open: missingProfile.current ? 'profile' : 'goal' }) }),
     meal: onFocusInput,
     photo: onTakePhoto,
     weight: onFocusWeight,
     coach: () => router.push('/coach' as never),
-    notify: () => router.push('/settings' as never),
+    notify: () => router.push({ pathname: '/settings', params: navFrom('log') } as never),
   };
   const labels: Record<CheckId, string> = {
     profile: t('プロフィールと目標を設定する'),

@@ -18,6 +18,7 @@ import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { CARDIO_GREEN, type DayMark } from '@/components/MonthCalendar';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
+import { navFrom } from '@/lib/navHeader';
 
 function shiftDate(d: string, n: number): string {
   const dt = new Date(d + 'T00:00:00');
@@ -163,7 +164,7 @@ export function LiftKpiCard() {
       {minOk > 0 && <Text style={s.muted}>{t('※ {n}分以上の運動を1回とカウントしています', { n: minOk })}</Text>}
       {!hasGoal && (
         <OptionButton style={{ marginTop: 10 }} variant="tonal" label={t('週の目標を決める（設定 → 運動の目標）')}
-                      onPress={() => router.push('/settings' as never)} />
+                      onPress={() => router.push({ pathname: '/settings', params: navFrom('changes') } as never)} />
       )}
     </View>
   );

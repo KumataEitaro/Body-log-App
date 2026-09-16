@@ -15,6 +15,7 @@ import { maybeAskReview } from '@/lib/reviewPrompt';
 import { shareInvite } from '@/lib/invite';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
 import BadgeIcon from '@/components/BadgeIcon';
+import { useStackHeader } from '@/lib/navHeader';
 
 // 祝祭オーバーレイの表示時間。記録の流れを止めないよう、黙っていても自動で引く
 const CELEBRATE_MS = 2600;
@@ -86,8 +87,13 @@ function CelebrateOverlay({ badges, retroCount, onShare, onClose }: {
   );
 }
 
-// カテゴリ見出し（概要タブのセクション見出しと同じ流儀）。メダルの色相もこの4分割に対応する
-const CATS: BadgeCat[] = ['streak', 'action', 'body', 'move'];
+// カテゴリ見出し（概要タブのセクション見出しと同じ流儀）。メダルの色相もこの4分割に対応する。
+//
+// 並びは **体重 → 運動 → 記録 → 継続**（2026-09-16・熊田さんの指定）。
+// 以前は逆順（継続 → 記録 → 運動 → 体重）で、**いちばん見たい「体重」が最下段**にあった。
+// 上から「結果（体重）→ そのための行動（運動）→ 手段（記録）→ 積み重ね（継続）」の順で、
+// 概要タブのセクション（からだ → 食事 → 運動）と同じ「結果が先」の考え方に揃える。
+const CATS: BadgeCat[] = ['body', 'move', 'action', 'streak'];
 const CAT_LABEL = (): Record<BadgeCat, string> => ({
   streak: t('継続'), action: t('記録'), body: t('体重'), move: t('運動'),
 });
@@ -123,6 +129,7 @@ function BadgeSheet({ badge, onShare, onClose }: { badge: BadgeState; onShare: (
 }
 
 export default function AchievementsScreen() {
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const [report, setReport] = useState<AchievementReport | null>(null);
   const [sticker, setSticker] = useState<StickerData | null>(null);
@@ -176,7 +183,7 @@ export default function AchievementsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <Stack.Screen options={stackHeader} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         <Text style={s.h}>{t('実績')}</Text>
 

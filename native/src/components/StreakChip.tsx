@@ -11,6 +11,7 @@ import { TodoBadge } from '@/components/NotificationCenter';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { quickStreak, maybeEvaluateBadges, unseenBadgeCount } from '@/lib/achievements';
+import { navFrom } from '@/lib/navHeader';
 
 /** inline=true: ヒーローの見出し行の右端に置く用（外側の余白なし・少し小さく）。
  *  2026-09-04: 単独で浮いていた「12日連続」を、意味が読める「記録 12日連続」にしてヒーローへ埋め込んだ */
@@ -33,7 +34,7 @@ export default function StreakChip({ inline = false }: { inline?: boolean } = {}
   return (
     <View style={inline ? undefined : { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
       <Pressable style={({ pressed }) => [s.chip, inline && s.chipInline, unseen > 0 && s.chipNew, pressed && { opacity: 0.7 }]}
-                 onPress={() => router.push('/achievements' as never)} hitSlop={6}>
+                 onPress={() => router.push({ pathname: '/achievements', params: navFrom('log') } as never)} hitSlop={6}>
         {days > 0 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Flame size={13} color={C.teal} fill={C.teal} />

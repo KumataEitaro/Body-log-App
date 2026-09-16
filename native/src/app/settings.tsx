@@ -60,6 +60,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import * as Clipboard from 'expo-clipboard';
 import { readBootErrors, clearBootErrors, formatBootErrors, type BootError } from '@/lib/boot';
+import { fromLabel, useNavFromParam, navFrom } from '@/lib/navHeader';
 
 // マイ食品（単品）の一覧行。items は複数食材をAIで合算した登録の内訳（migration-31・列が無いDBでは undefined）
 type MyFoodLite = { id: string; name: string; kcal: number; items?: unknown; created_at?: string | null };
@@ -182,6 +183,7 @@ const bt = themed(() => ({
 }));
 
 export default function SettingsScreen() {
+  const backFrom = useNavFromParam();   // 戻るラベルを「どこから来たか」で決める（lib/navHeader.ts）
   const router2 = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -611,7 +613,7 @@ export default function SettingsScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
     {/* タブ外のスタック画面になったため、戻る導線はネイティブヘッダーで出す（タイトルは本文側のまま） */}
     <Stack.Screen options={{
-      headerShown: true, title: '', headerBackTitle: t('戻る'),
+      headerShown: true, title: '', headerBackTitle: fromLabel(backFrom),
       headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
       // 大型タイトル領域もテーマに合わせる。ここが未指定だとダークで
       // 「戻る」の下に白い帯が残る（βフィードバック 2026-09-01）
@@ -656,12 +658,12 @@ export default function SettingsScreen() {
       {/* アカウント設定 */}
       <Text style={s.groupLabel}>{t('アカウント設定')}</Text>
       <View style={s.group}>
-        <Row icon={<Crown color={C.teal} size={ICON.xl} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push('/paywall' as never)} />
+        <Row icon={<Crown color={C.teal} size={ICON.xl} />} label={t('プラン')} sub={t('プランの確認・変更・購入の復元')} onPress={() => router2.push({ pathname: '/paywall', params: navFrom('settings') } as never)} />
         <View style={s.sep} />
         {/* クーポン: プラン行の隣に置く（コード配布キャンペーンの入口。適用はサーバー直付与） */}
         <Row icon={<Ticket color={C.teal} size={ICON.xl} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
         <View style={s.sep} />
-        <Row icon={<Award color={C.teal} size={ICON.xl} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push('/achievements' as never)} />
+        <Row icon={<Award color={C.teal} size={ICON.xl} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push({ pathname: '/achievements', params: navFrom('settings') } as never)} />
         <View style={s.sep} />
         <Row icon={<UserRound color={C.teal} size={ICON.xl} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
@@ -1039,7 +1041,7 @@ export default function SettingsScreen() {
                   <Text style={s.dietName}>{dietModeLabel(r.key)}</Text>
                   {/* 王冠は行から機能を隠さない目印（無料でも内容は読めてONにできる） */}
                   {dietGated && (
-                    <Pressable hitSlop={8} onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+                    <Pressable hitSlop={8} onPress={() => { setSheet(null); router2.push({ pathname: '/paywall', params: navFrom('settings', { src: 'diet' }) } as never); }}>
                       <CrownBadge size={14} />
                     </Pressable>
                   )}
@@ -1053,7 +1055,7 @@ export default function SettingsScreen() {
 
           {/* §4: 無料でONにしたときの1行。何が動いていて何が有料かを隠さない */}
           {dietGated && diet.modes.length > 0 && (
-            <Pressable style={s.dietUpsell} onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+            <Pressable style={s.dietUpsell} onPress={() => { setSheet(null); router2.push({ pathname: '/paywall', params: navFrom('settings', { src: 'diet' }) } as never); }}>
               <CrownBadge size={14} />
               <Text style={s.dietUpsellT}>
                 {t('かんたん判定（辞書のみ）で動いています。AIによる読み取りとメニューの判定はスタンダード以上です。')}
@@ -1068,7 +1070,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={[s.note, { marginBottom: 4 }]}>{t('自分の言葉で書けます。AIが解析のときに読みます（スタンダード以上）。')}</Text>
           {dietGated ? (
-            <Pressable onPress={() => { setSheet(null); router2.push('/paywall?src=diet' as never); }}>
+            <Pressable onPress={() => { setSheet(null); router2.push({ pathname: '/paywall', params: navFrom('settings', { src: 'diet' }) } as never); }}>
               <View style={[s.input, s.dietInputLocked]}>
                 <Text style={s.dietLockedT}>{t('例: えび・かにを避けています。パクチーも無理です。')}</Text>
               </View>

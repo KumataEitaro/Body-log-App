@@ -23,6 +23,7 @@ import CouponSheet from '@/components/CouponSheet';
 import { applyEntitlement } from '@/lib/gate';
 import { shouldShowImpressionCount } from '@/lib/ads';
 import { readWeeklyImpressions } from '@/lib/adImpressions';
+import { useStackHeader } from '@/lib/navHeader';
 import {
   purchasesAvailable, fetchOffers, purchase, restore, currentPlan,
   PAYWALL_PLANS, defaultSelection, preferredPeriod,
@@ -144,6 +145,7 @@ const CARDS = PLAN_INFO.filter((i) => PAYWALL_PLANS.includes(i.plan));
 const HERO: Plan = 'premium';
 
 export default function PaywallScreen() {
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const { src } = useLocalSearchParams<{ src?: string }>();
@@ -360,7 +362,7 @@ export default function PaywallScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <Stack.Screen options={stackHeader} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         {(() => {
           // 文脈見出し（srcが未知・未指定なら従来の汎用文言）

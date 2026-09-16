@@ -41,12 +41,14 @@ import SetDial from '@/components/SetDial';
 import RestDial, { fmtRest } from '@/components/RestDial';
 import PlateCalc from '@/components/PlateCalc';
 import { OptionButton } from '@/components/ui/Selectable';
+import { fromLabel, useNavFromParam } from '@/lib/navHeader';
 
 type HistRow = { id: string; date: string; text: string };
 
 const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
 
 export default function LiftSessionScreen() {
+  const backFrom = useNavFromParam();   // 戻るラベルを「どこから来たか」で決める（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -317,7 +319,7 @@ export default function LiftSessionScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{
-        headerShown: true, title: t('筋トレを記録'), headerBackTitle: t('戻る'),
+        headerShown: true, title: t('筋トレを記録'), headerBackTitle: fromLabel(backFrom),
         headerTintColor: C.teal, headerShadowVisible: false,
         headerStyle: { backgroundColor: C.bg }, headerTitleStyle: { color: C.ink },
       }} />
