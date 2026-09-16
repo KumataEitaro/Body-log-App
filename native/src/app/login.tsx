@@ -1,7 +1,7 @@
 // ログイン / 新規登録（Web版と同じSupabaseアカウント）＋Google SSO
 import { useThemeRefresh } from '@/lib/theme';
 import { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, Modal, ScrollView, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -20,6 +20,14 @@ try {
   WebBrowser.maybeCompleteAuthSession();
 } catch { /* ネイティブでは未対応・no-opでも問題ない */ }
 const OAUTH_REDIRECT = 'bodylog://auth-callback';
+// パスワード再設定メールの戻り先（2026-09-16）。**アプリのディープリンクではなく Web** にする。
+// 再設定メールを PC で開く人が必ずいて、bodylog:// は PC では開けず行き止まりになるため。
+// Web で設定し直したあと、アプリで新しいパスワードでログインしてもらう。
+const PASSWORD_RESET_URL = 'https://bodylog-orcin.vercel.app/reset-password';
+// ログインできない人が唯一たどり着ける連絡先。アプリ内サポートはログイン後にしか無いので、
+// **ログイン画面に出しておくことに意味がある**。
+// プライバシーポリシー（app/privacy/page.tsx:15）に公開済みの窓口と同じものを使う
+const SUPPORT_MAIL = 'gotcha429@gmail.com';
 
 // Apple/Google両方のプロバイダ設定完了（2026-08-26）。両ボタン表示ON。
 // （GoogleのみONはApp Store Review 4.8違反になるため、必ずAppleとセットで運用する）
@@ -124,6 +132,32 @@ export default function LoginScreen() {
       setMsg(t('ログインに失敗しました。通信環境を確認してください。'));
     } finally {
       setBusy(false);   // 例外でもボタンを必ず戻す（回り続けると操作不能になる）
+    }
+  }
+
+  /**
+   * パスワード再設定メールを送る（2026-09-16 追加）。
+   *
+   * 戻り先を**アプリのディープリンクではなく Web のページ**にしているのは、
+   * 再設定メールを PC で開く人がいるため。`bodylog://` は PC では開けず行き止まりになる。
+   * Web なら端末を問わず完了でき、そのあとアプリで新しいパスワードでログインできる。
+   *
+   * メールアドレスが登録済みかどうかは**返事を変えない**（列挙攻撃対策・ログイン失敗時と同じ流儀）。
+   * 送れても送れなくても同じ案内を出す。
+   */
+  const [resetBusy, setResetBusy] = useState(false);
+  async function sendReset() {
+    const mail = email.trim();
+    if (!mail) {
+      setMsg(t('メールアドレスを入力してから「パスワードをお忘れですか？」を押してください。'));
+      return;
+    }
+    setResetBusy(true); setMsg(''); setInfo('');
+    try {
+      await supabase.auth.resetPasswordForEmail(mail, { redirectTo: PASSWORD_RESET_URL });
+    } catch { /* 理由は見せない（登録の有無を推測させない） */ } finally {
+      setResetBusy(false);
+      setInfo(t('{mail} 宛に再設定用のメールを送りました。メール内のリンクから新しいパスワードを設定して、もう一度ログインしてください。届かないときは迷惑メールもご確認ください。', { mail }));
     }
   }
 
@@ -313,6 +347,30 @@ export default function LoginScreen() {
         {info ? <Text style={s.info}>{info}</Text> : null}
         <OptionButton style={{ marginTop: 8 }} label={isLogin ? t('ログイン') : t('アカウントを作成')}
                       onPress={isLogin ? login : signup} busy={busy} />
+
+        {/* パスワードを忘れた人の出口（2026-09-16 追加）。
+            これが無いと、メール＋パスワードで登録した人がパスワードを忘れた時点で
+            体重・食事・写真の全記録に二度と辿り着けない。ログインできない人は
+            アプリ内のサポートにも到達できないので、**ログイン画面に置くことに意味がある**。 */}
+        {isLogin && (
+          <Pressable onPress={sendReset} disabled={resetBusy} hitSlop={8}
+                     accessibilityRole="button" accessibilityLabel={t('パスワードをお忘れですか？')}
+                     style={{ alignSelf: 'center', marginTop: 14 }}>
+            <Text style={s.forgotT}>
+              {resetBusy ? t('送信中…') : t('パスワードをお忘れですか？')}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* ログインできない人の最後の出口。アプリ内の「設定 → サポート」はログイン後にしか無く、
+            ここに書いておかないと**連絡する手段が1つも無い**（2026-09-16） */}
+        {isLogin && (
+          <Pressable onPress={() => { Linking.openURL(`mailto:${SUPPORT_MAIL}?subject=${encodeURIComponent('BodyLog ログインについて')}`).catch(() => {}); }}
+                     hitSlop={8} accessibilityRole="link"
+                     style={{ alignSelf: 'center', marginTop: 8 }}>
+            <Text style={s.supportT}>{t('どうしても入れないときは {mail} へ', { mail: SUPPORT_MAIL })}</Text>
+          </Pressable>
+        )}
         {/* Appleでサインイン（iOSのみ）。審査ガイドライン上、他のSSOを出すなら必須 */}
         {SHOW_APPLE_SSO && appleAvail && (
           <>
@@ -427,6 +485,9 @@ const s = themed(() => ({
   pickHint: { fontSize: 12.5, color: C.sub, lineHeight: 18, marginBottom: 6 },
   err: { color: C.coral, fontSize: 15, marginBottom: 6 },
   info: { color: C.accentInk, fontSize: 15, marginBottom: 6, lineHeight: 21 },
+  // パスワード再設定・サポート窓口への導線（2026-09-16）。主導線より一段弱く、しかし確実に読める大きさ
+  forgotT: { fontSize: 14, fontWeight: "700", color: C.accentInk, textDecorationLine: "underline" },
+  supportT: { fontSize: 12.5, color: C.sub, textAlign: "center", lineHeight: 18 },
   btn: { backgroundColor: C.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   btnT: { color: C.panel, fontSize: 17, fontWeight: '800', letterSpacing: 1 },  // ink地（ダーク=明色）に追従（現状未使用スタイル）
   terms: { fontSize: 13, color: C.faint, marginTop: 8, lineHeight: 18, textAlign: 'center' },

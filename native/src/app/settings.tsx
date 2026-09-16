@@ -13,11 +13,13 @@ import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, e
 import { WAKE_STEP_MIN, setWakeTime, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
 import { usePurpose } from '@/lib/purpose';
 import { deleteConfirmMatches, inHeightRange, inAgeRange } from '@/lib/guard';
+// ログイン方法の追加（2026-09-16）。入り口を2つにして「パスワードを忘れたら終わり」を無くす
+import { linkProvider, listIdentities, linkStatusText, type LinkProvider } from '@/lib/identityLink';
 import { parseDecimal, parseInteger } from '@/lib/parseNum';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import { ACTIVE_KCAL_TO_GOAL_KEY } from '@/lib/activeKcal';
 import { isCycleEnabled, setCycleEnabled } from '@/lib/cycle';
-import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare, RotateCcw } from 'lucide-react-native';
+import { UserRound, Salad, HeartPulse, LogOut, Trash2, ChevronRight, CircleHelp, Target, BookOpen, Languages, Palette, Crown, Award, Smile, Ticket, Pencil, UtensilsCrossed, Ban, Users, UserPlus, MessageSquare, RotateCcw, KeyRound } from 'lucide-react-native';
 import { listMyMeals, deleteMyMeal, renameMyMeal, mealKcal, type MyMeal } from '@/lib/meals';
 import CouponSheet from '@/components/CouponSheet';
 import FeedbackSheet from '@/components/FeedbackSheet';
@@ -556,6 +558,24 @@ export default function SettingsScreen() {
     } finally { setBusy(false); }
   }
 
+  // いま紐付いているログイン方法（メール＋パスワード以外）。行の説明文に出す
+  const [linkedIds, setLinkedIds] = useState<LinkProvider[]>([]);
+  const reloadIdentities = useCallback(() => { listIdentities().then(setLinkedIds).catch(() => {}); }, []);
+  useEffect(() => { reloadIdentities(); }, [reloadIdentities]);
+
+  /** いまのアカウントに Google / Apple を足す。成否は必ず画面に出す（無反応を作らない） */
+  async function addLogin(p: LinkProvider) {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await linkProvider(p);
+      if (r.ok) {
+        reloadIdentities();
+        setMsg({ ok: true, text: t('ログイン方法を追加しました。次からはこちらでも入れます。') });
+      } else if (!('cancelled' in r)) {
+        setMsg({ ok: false, text: r.reason });
+      }
+    } finally { setBusy(false); }
+  }
   const bmr = mifflinBMR(sex, latestWeight ?? 70, parseInteger(height) ?? 0, parseInteger(age) ?? 0);
 
   // 1行メニュー（アイコン＋ラベル＋chevron）
@@ -874,6 +894,31 @@ export default function SettingsScreen() {
       {/* アカウント */}
       <Text style={s.groupLabel}>{t('アカウント')}</Text>
       <View style={s.group}>
+        {/* ログイン方法の追加（2026-09-16）。入り口を2つにしておくための行。
+            メール＋パスワードだけの人は、パスワードを忘れた瞬間に入り口がゼロになる。
+            再設定メールが本線だが、登録したメールアドレス自体が使えなくなる人もいる
+            （会社のアドレスで登録して退職した等）。すでに追加済みの人には勧めない */}
+        <Row icon={<KeyRound color={C.teal} size={ICON.xl} />} label={t('ログイン方法を追加する')}
+             sub={linkStatusText(linkedIds)}
+             onPress={() => {
+               const opts: { text: string; onPress?: () => void; style?: 'cancel' }[] = [{ text: t('キャンセル'), style: 'cancel' }];
+               if (!linkedIds.includes('google')) {
+                 opts.push({ text: t('Googleを追加'), onPress: () => addLogin('google') });
+               }
+               if (Platform.OS === 'ios' && !linkedIds.includes('apple')) {
+                 opts.push({ text: t('Appleを追加'), onPress: () => addLogin('apple') });
+               }
+               if (opts.length === 1) {
+                 Alert.alert(t('ログイン方法を追加する'), t('追加できるログイン方法はもうありません。'));
+                 return;
+               }
+               Alert.alert(
+                 t('ログイン方法を追加する'),
+                 t('いまのアカウントに、別のログイン方法を足します。記録はそのまま引き継がれます。'),
+                 opts,
+               );
+             }} />
+        <View style={s.sep} />
         <Row icon={<Users color={C.teal} size={ICON.xl} />} label={t('アカウントを切り替える')}
              sub={t('いまのアカウントからサインアウトして、ログイン画面に戻ります')}
              onPress={() => Alert.alert(
