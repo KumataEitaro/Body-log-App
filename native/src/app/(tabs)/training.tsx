@@ -667,7 +667,7 @@ export default function TrainingScreen() {
         <Text style={s.goalRowGo}>›</Text>
       </Pressable>
       {history.length > 0 && (
-        <Pressable style={s.moveNoteRow} onPress={() => router.push('/(tabs)/changes')} hitSlop={6}>
+        <Pressable style={s.moveNoteRow} onPress={() => router.navigate('/changes' as never)} hitSlop={6}>
           <Text style={s.moveNote}>{t('筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
         </Pressable>
       )}

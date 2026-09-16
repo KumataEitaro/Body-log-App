@@ -4,7 +4,7 @@
 // ② 目的（減量3種＋増量。PFC係数の既定とAI相談の前提を決める）
 // ③ 目標（体重・期日・体脂肪率は任意。減らす人も増やす人も同じ逆算）
 // ④ 筋トレ目標（任意・スキップ可）
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, {
@@ -13,7 +13,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { setFirstRunFlag } from '@/lib/firstrun';
+import { setFirstRunFlag, getFirstRunFlag } from '@/lib/firstrun';
 import { supabase } from '@/lib/supabase';
 import { C, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
@@ -74,9 +74,24 @@ export default function Onboarding() {
     })();
   }, []);
 
+  // 「初回の登録直後」か「設定からやり直しに来た」かで、離脱のしかたを変える（2026-09-16・D-01）。
+  //
+  // それまでは常に `replace('/(tabs)/log')` だった。初回はそれで正しいが、
+  // 設定 › アカウント › 「初期設定をやり直す」から push で来た人が「あとで設定」を押すと、
+  // **設定画面ごと履歴から消えて食事タブに放り出される**。設定に戻るにはタブを渡り歩いて入り直すしかない。
+  // 呼び出し元（settings.tsx）のコメントは「push なので、やめても設定に戻れる」と書いてあったが、
+  // **やめる操作そのものが replace** なので嘘になっていた。
+  const reentry = useRef(false);
+  useEffect(() => {
+    // 画面に入った時点で bl-onboard-done が既に立っていれば「やり直し」で来た人
+    getFirstRunFlag(DONE_KEY).then((v) => { reentry.current = v != null; }).catch(() => {});
+  }, []);
+
   function done() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setFirstRunFlag(DONE_KEY, '1').catch(() => {});
+    // やり直しで来た人は、来た場所（設定）へ戻す。初回だけタブへ置き換える
+    if (reentry.current && router.canGoBack()) { router.back(); return; }
     router.replace('/(tabs)/log' as never);
     // 目標を決めた直後が課金の意思決定に最適なタイミング（2026年の実測でも
     // オンボーディング直後ペイウォールが最良構成）。スキップ可のソフト型として重ねる。
@@ -144,7 +159,7 @@ export default function Onboarding() {
           {step === 0 && (
             <>
               <Text style={s.h1}>{t('あなたの現在地点')}</Text>
-              <Text style={s.sub}>{t('基礎代謝と消費カロリーの計算に使います。あとで⚙からいつでも変更できます。')}</Text>
+              <Text style={s.sub}>{t('基礎代謝と消費カロリーの計算に使います。あとで「概要」タブの設定からいつでも変更できます。')}</Text>
               <Text style={s.label}>{t('ニックネーム（任意）')}</Text>
               <TextInput style={s.input} placeholder={t('例: くまさん')} placeholderTextColor={C.faint} value={name} onChangeText={setName} />
               <Text style={s.label}>{t('性別')}</Text>
@@ -176,7 +191,7 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <Text style={s.h1}>{t('なんのために使う？')}</Text>
-              <Text style={s.sub}>{t('減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「設定→体重の目標」からいつでも変えられます。')}</Text>
+              <Text style={s.sub}>{t('減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「概要」タブの「目標設定」からいつでも変えられます。')}</Text>
               {PURPOSES.map((pu) => {
                 const on = purpose === pu.key;
                 return (

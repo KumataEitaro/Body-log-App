@@ -312,7 +312,7 @@ export default function WeeklyReviewScreen() {
 
         {/* ⑦ 数字の一覧は既存の詳細ページの役割。ここからは入口だけを渡す */}
         <Pressable style={({ pressed }) => [s.moreRow, pressed && { backgroundColor: C.pressed }]}
-                   onPress={() => { Haptics.selectionAsync().catch(() => {}); router.push('/(tabs)/changes?open=week' as never); }}>
+                   onPress={() => { Haptics.selectionAsync().catch(() => {}); router.navigate({ pathname: '/changes', params: { open: 'week', ts: String(Date.now()) } } as never); }}>
           <TrendingUp size={ICON.md} color={C.teal} />
           <View style={{ flex: 1 }}>
             <Text style={s.moreT}>{t('くわしく見る')}</Text>

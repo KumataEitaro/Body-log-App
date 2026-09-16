@@ -36,7 +36,7 @@ export default function NotificationCenter({ visible, onClose }: { visible: bool
 
   function go(todo: Todo) {
     onClose();
-    setTimeout(() => router.push(todo.route as never), 250);
+    setTimeout(() => router.navigate(todo.route as never), 250);
   }
 
   const urgencyStyle = (u: Todo['urgency']) =>

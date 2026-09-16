@@ -2329,4 +2329,7 @@ export const VI: Record<string, string> = {
   "OK": "OK",
   // 概要タブ最上部のブロック見出し（2026-09-16・中身が設定だけではないので改称）
   "あなたの記録と設定": "Ghi chép và cài đặt của bạn",
+  // オンボーディングの案内文（2026-09-16・廃止された⚙への言及を実在する経路名へ）
+  "基礎代謝と消費カロリーの計算に使います。あとで「概要」タブの設定からいつでも変更できます。": "Dùng để tính chuyển hóa cơ bản và lượng tiêu hao. Bạn có thể đổi bất cứ lúc nào trong Cài đặt ở tab Tổng quan.",
+  "減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「概要」タブの「目標設定」からいつでも変えられます。": "Dù muốn giảm hay tăng cân đều bắt đầu ở đây. Chúng tôi đặt mục tiêu đạm và chất béo theo mục đích của bạn. Có thể đổi bất cứ lúc nào trong Mục tiêu ở tab Tổng quan.",
 };
