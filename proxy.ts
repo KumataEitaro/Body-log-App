@@ -31,6 +31,10 @@ export async function proxy(request: NextRequest) {
     || path === '/sunset' // ブラウザ版クローズの案内ページ
     || path === '/invite' // 招待ランディング（アプリの「友だちを誘う」の着地点。未ログインの初対面が見る）
     || path === '/delete-account' // アカウント削除案内（Google Play必須のアプリ外URL）
+    // パスワード再設定（2026-09-16）。**未ログインでないと意味が無いページ**。
+    // アプリの「パスワードをお忘れですか？」が送る再設定メールの戻り先で、
+    // ここを塞ぐと「消す導線はあるのに取り戻す導線が無い」状態に戻る
+    || path === '/reset-password'
     || (path.startsWith('/dev-preview') && process.env.NODE_ENV !== 'production') // UI確認用（開発時のみ）
     || path.startsWith('/dev-preview/concept') // UIコンセプト比較モック（静的・データなし・実機確認用に公開）
     || path.startsWith('/dev-preview/fonts'); // フォント比較（静的・実機確認用に公開）

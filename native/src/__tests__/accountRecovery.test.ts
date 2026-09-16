@@ -79,6 +79,13 @@ describe('Web に再設定ページがある', () => {
     expect(src).toMatch(/resetPasswordForEmail\(/);
   });
 
+  it('ブラウザ版クローズの振り分け（proxy.ts）で /reset-password を塞いでいない', () => {
+    // 2026-09-16: 作った直後、sunset ページへリダイレクトされて機能しなかった。
+    // 未ログインでないと意味が無いページなので、公開ページの許可リストに必ず載せる
+    const proxy = read(path.join(REPO, 'proxy.ts'));
+    expect(proxy).toContain("path === '/reset-password'");
+  });
+
   it('Web のログイン画面からも再設定へ行ける', () => {
     expect(read(path.join(REPO, 'app', 'login', 'page.tsx'))).toMatch(/\/reset-password/);
   });
