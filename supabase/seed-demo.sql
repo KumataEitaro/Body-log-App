@@ -302,7 +302,7 @@ begin
          jsonb_build_object('name','オートミール','qty','60g','kcal',225,'p',8.2,'f',3.4,'c',41.0,'salt',0.0,'fib',5.6,'sug',1,'k',160,'ca',28,'mg',60,'fe',2.3,'zn',1.2,'vd',0.0,'vc',0),
          jsonb_build_object('name','プロテイン','qty','1杯','kcal',125,'p',24.0,'f',2.0,'c',3.0,'salt',0.2,'fib',0.6,'sug',1,'k',260,'ca',130,'mg',45,'fe',0.4,'zn',1.2,'vd',0.0,'vc',0),
          jsonb_build_object('name','ブルーベリー','qty','80g','kcal',39,'p',0.4,'f',0.1,'c',10.0,'salt',0.0,'fib',2.7,'sug',8,'k',56,'ca',6,'mg',4,'fe',0.2,'zn',0.1,'vd',0.0,'vc',8),
-         jsonb_build_object('name','くるみ','qty','20g','kcal',134,'p',3.0,'f',13.8,'c',2.3,'salt',0.0,'fib',1.5,'sug',1,'k',108,'ca',17,'mg',30,'fe',0.5,'zn',0.5,'vd',0.0,'vc',0)), ((today - 46 + time '10:20') at time zone 'Asia/Tokyo')));
+         jsonb_build_object('name','くるみ','qty','20g','kcal',134,'p',3.0,'f',13.8,'c',2.3,'salt',0.0,'fib',1.5,'sug',1,'k',108,'ca',17,'mg',30,'fe',0.5,'zn',0.5,'vd',0.0,'vc',0)), ((today - 46 + time '10:20') at time zone 'Asia/Tokyo'));
   end if;
 
   -- ===== 先の予定（食事タブ「先の予定」の帯・目標タブのチートデイ一覧）=====
