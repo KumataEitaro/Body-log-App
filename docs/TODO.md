@@ -86,6 +86,18 @@ Google の公式規約（https://ai.google.dev/gemini-api/terms ・2026-09-15 �
 
 </details>
 
+### A16. 🔴 Supabase: Manual linking を有効にする（ログイン方法の追加に必要）
+
+設定 › アカウント › 「ログイン方法を追加する」（2026-09-16 追加）が動くために要る。
+無効のままだと「準備中です（サーバー側の設定待ち）」と出るだけで、アプリは壊れない。
+
+- 実行先: https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/auth/providers
+  → 下の方の **Manual Linking**（Advanced 内）を ON にして保存
+- 確認: アプリで 設定 → アカウント → ログイン方法を追加する → Google を追加 → 成功メッセージが出る
+- **なぜ要るか**: メール＋パスワードだけの人は、登録したメールアドレス自体が使えなくなると
+  （会社のアドレスで登録して退職した等）再設定メールも届かず、入り口がゼロになる。
+  Google / Apple を足しておけば入り口が2つになる
+
 ### A2. 🔴 iOS: TestFlight のクラッシュを見る
 https://appstoreconnect.apple.com/apps → BodyLoger → TestFlight → **フィードバック → クラッシュ**
 - **KishimotoYumi さんの端末で 1.1.0 (81) がクラッシュ2件**・フィードバック3件が届いている

@@ -66,6 +66,13 @@ export default function LoginPage() {
             <>初めての方は <a href="#" onClick={(e) => { e.preventDefault(); setMode('signup'); setMsg(null); }}>アカウント作成</a></>
           )}
         </p>
+        {/* パスワードを忘れた人の出口（2026-09-16）。これが無いと、メール＋パスワードで
+            登録した人は忘れた時点で全記録に二度と辿り着けなかった */}
+        {mode === 'login' && (
+          <p className="center" style={{ marginTop: 10 }}>
+            <a href="/reset-password">パスワードをお忘れですか？</a>
+          </p>
+        )}
         <p className="center muted" style={{ marginTop: 10, fontSize: 12 }}>
           登録・利用により<a href="/terms">利用規約</a>および<a href="/privacy">プライバシーポリシー</a>に同意したものとみなされます。<br />
           本アプリは医療機器ではなく、表示される数値はAIによる推定です。
