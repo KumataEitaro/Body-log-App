@@ -2407,4 +2407,7 @@ export const EN: Record<string, string> = {
   "OK": "OK",
   // 概要タブ最上部のブロック見出し（2026-09-16・中身が設定だけではないので改称）
   "あなたの記録と設定": "Your records & settings",
+  // オンボーディングの案内文（2026-09-16・廃止された⚙への言及を実在する経路名へ）
+  "基礎代謝と消費カロリーの計算に使います。あとで「概要」タブの設定からいつでも変更できます。": "Used to calculate your basal metabolism and daily burn. You can change this any time from Settings on the Overview tab.",
+  "減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「概要」タブの「目標設定」からいつでも変えられます。": "For losing weight or gaining it. We set your protein and fat targets to match your goal. You can change this any time from Goals on the Overview tab.",
 };

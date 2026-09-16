@@ -282,7 +282,7 @@ export default function CoachScreen() {
     if (v.plan.table === 'tray') {
       setPendingMeal(v.plan.items);
       setMsgs((m) => m.map((x) => (x.action === a ? { ...x, applied: true } : x)));
-      router.push('/(tabs)/log');
+      router.navigate('/log' as never);
       return;
     }
     Alert.alert(t('目標を更新しますか？'), a.label, [
