@@ -524,11 +524,18 @@ begin
         if lift_kg < 20 then lift_kg := 20; end if;
         is_pr := lift_kg > best_kg[ei];
         if is_pr then best_kg[ei] := lift_kg; pr_hit := true; end if;
-        lift_txt := lift_txt || lift_names[ei] || ' ' || trim_scale(lift_kg) || 'kg×' || reps || '×3'
-                    || (case when is_pr then ' 🎉自己ベスト更新' else '' end);
+        -- ⚠️ 種目の断片は「名前 ○kg×回×セット」で**終わらせる**こと。
+        --    native/src/lib/liftLog.ts parseLiftText の正規表現は行末 `$` で終端を固定していて、
+        --    後ろに何か足すと**その種目ごと黙って捨てられる**（2026-09-16 に実際に踏んだ）。
+        --    「🎉自己ベスト更新」を付けていたため、**自己ベストを出した種目ほど履歴から消えていた**。
+        --    自己ベストはアプリが記録から自分で計算する（app/lift-session.tsx・実績ページ）ので、
+        --    テキストに書く必要がそもそも無い。
+        lift_txt := lift_txt || lift_names[ei] || ' ' || trim_scale(lift_kg) || 'kg×' || reps || '×3';
         if li = 1 then lift_txt := lift_txt || '、'; end if;
       end loop;
-      if phase = 3 and d <> pr_day then lift_txt := lift_txt || '（デロード週）'; end if;
+      -- 補足も種目の断片にせず、独立した「、」区切りの1片にする。
+      -- parseLiftText は読めない片を静かに落とすので、種目の解析は壊れない
+      if phase = 3 and d <> pr_day then lift_txt := lift_txt || '、（デロード週）'; end if;
       -- ex='通常'（＝EX_ADD 150kcal・筋トレ1時間の既定）。adj=0 にして二重計上しない
       insert into public.logs (user_id, date, at, items, ex, adj, text, ex_minutes)
       values (uid, d, (d + time '18:40' + (random() * interval '70 min')) at time zone 'Asia/Tokyo',
