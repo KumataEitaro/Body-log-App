@@ -123,6 +123,7 @@ import { confirmOutlierWeight } from '@/lib/guard';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { arbitrateAttention } from '@/lib/logCards';
 import { useTodayRollover } from '@/lib/rollover';
+import { navFrom } from '@/lib/navHeader';
 
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number; display_name: string };
 type MyFood = MyFoodRow & { id: string };
@@ -577,7 +578,7 @@ export default function LogScreen() {
   const overLv = isBulk ? 'none' : overLevel(-left);
   const overColor = overLv === 'none' ? null : overLv === 'high' ? C.coral : C.amber;
   const overBar = overLv === 'high' ? C.coral : overLv === 'mild' ? rgba(C.amber, 0.7) : C.amber;
-  const openGoalHub = () => router.push({ pathname: '/settings', params: { open: 'goal', ts: String(Date.now()) } });
+  const openGoalHub = () => router.push({ pathname: '/settings', params: navFrom('log', { open: 'goal' }) });
   const macros = profile ? macroTargets(
     weightForBmr, goalKcal,
     goal?.protein_per_kg ?? purposePreset?.p,
@@ -899,7 +900,7 @@ export default function LogScreen() {
       // マイ食品（セット）: 品目内訳のある食事だけ登録できる（気分・体重だけの行では出さない）
       ...(items.length > 0 ? [{ text: t('マイ食品に登録'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
       // 食材ナビ: 品目のどれかに置き換え候補があるときだけ（栄養ランキング図鑑のその品目へ）
-      ...(swapTarget ? [{ text: t('置き換え候補を見る'), onPress: () => router.push({ pathname: '/nutrient-rank', params: { food: swapTarget } } as never) }] : []),
+      ...(swapTarget ? [{ text: t('置き換え候補を見る'), onPress: () => router.push({ pathname: '/nutrient-rank', params: navFrom('log', { food: swapTarget }) } as never) }] : []),
       { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
     ]);
   }
@@ -1201,7 +1202,7 @@ export default function LogScreen() {
     setFirstLaw(false);
     if (goSee) {
       Haptics.selectionAsync().catch(() => {});
-      router.push('/laws' as never);
+      router.push({ pathname: '/laws', params: navFrom('log') } as never);
     }
   }
 
@@ -1222,7 +1223,7 @@ export default function LogScreen() {
     setBadgeIds([]);
     if (goSee) {
       Haptics.selectionAsync().catch(() => {});
-      router.push('/achievements' as never);
+      router.push({ pathname: '/achievements', params: navFrom('log') } as never);
     }
   }
 
@@ -1251,7 +1252,7 @@ export default function LogScreen() {
     const link = lawLinkForAlert(a, insightAlerts.insightsById.get(a.ruleId));
     if (!link) return;
     Haptics.selectionAsync().catch(() => {});
-    router.push({ pathname: '/law-detail', params: { kind: link.kind, p: JSON.stringify(link.p), at: today } } as never);
+    router.push({ pathname: '/law-detail', params: navFrom('log', { kind: link.kind, p: JSON.stringify(link.p), at: today }) } as never);
   }
 
   // 統合カードの「気をつける」「+200kcal緩める」は、既存の過食リスクと今日の気づき（caution）をまとめて閉じる
@@ -1812,7 +1813,7 @@ export default function LogScreen() {
             <Text style={s.setupT}>{t('プロフィールを設定するとカロリー目標が出ます')}</Text>
             <Text style={s.setupSub}>{t('身長・年齢・体重から、1日に食べられる目安を計算します。1分で終わります。')}</Text>
             <Pressable style={({ pressed }) => [s.setupBtn, pressed && { opacity: 0.8 }]}
-                       onPress={() => router.push({ pathname: '/settings', params: { open: 'profile', ts: String(Date.now()) } })}
+                       onPress={() => router.push({ pathname: '/settings', params: navFrom('log', { open: 'profile' }) })}
                        accessibilityRole="button"
                        accessibilityLabel={t('プロフィールを設定する')}>
               <Text style={s.setupBtnT}>{t('プロフィールを設定する')}</Text>
@@ -2452,7 +2453,7 @@ export default function LogScreen() {
                   const delta = swapKcalDelta(sw);
                   return (
                     <Pressable style={({ pressed }) => [s.swapRow, pressed && { opacity: 0.7 }]}
-                               onPress={() => router.push({ pathname: '/nutrient-rank', params: { food: parsed.items[focusItem].name } } as never)}
+                               onPress={() => router.push({ pathname: '/nutrient-rank', params: navFrom('log', { food: parsed.items[focusItem].name }) } as never)}
                                accessibilityRole="button" accessibilityLabel={t('かしこい置き換え')}>
                       <Text style={s.swapLabel}>{t('かしこい置き換え')}</Text>
                       <Text style={s.swapT} numberOfLines={2}>
@@ -2605,7 +2606,7 @@ export default function LogScreen() {
         primaryLabel={t('設定してみる')}
         onPrimary={() => {
           setDietTip(false);
-          router.push({ pathname: '/settings', params: { open: 'diet', ts: String(Date.now()) } });
+          router.push({ pathname: '/settings', params: navFrom('log', { open: 'diet' }) });
         }}
         secondaryLabel={t('いまはしない')}
         onSecondary={() => {

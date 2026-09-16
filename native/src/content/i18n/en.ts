@@ -2405,4 +2405,6 @@ export const EN: Record<string, string> = {
   "追加の完了処理に失敗しました。もう一度お試しください。": "Couldn't finish adding it. Please try again.",
   "追加に失敗しました: {reason}": "Adding failed: {reason}",
   "OK": "OK",
+  // 概要タブ最上部のブロック見出し（2026-09-16・中身が設定だけではないので改称）
+  "あなたの記録と設定": "Your records & settings",
 };

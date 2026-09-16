@@ -27,6 +27,7 @@ import {
 } from '@/content/nutrientDb';
 import { swapsFor, swapsForFood, swapLine, emojiText, countText, swapKcalDelta, nutrientLabel, type Swap, type SwapMode } from '@/lib/smartSwap';
 import { TIERS, tierTable, tierReason, tierOf, type Tier } from '@/content/proteinTiers';
+import { useStackHeader } from '@/lib/navHeader';
 
 type Tab = 'rank' | 'tiers';
 type Basis = 'serving' | '100g';
@@ -88,6 +89,7 @@ function SwapList({ swaps }: { swaps: Swap[] }) {
 }
 
 export default function NutrientRankScreen() {
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const params = useLocalSearchParams<{ tab?: string; nutrient?: string; food?: string }>();
   useRemoteContent();   // リモートの栄養データが届いたら組み直す
@@ -123,7 +125,7 @@ export default function NutrientRankScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <Stack.Screen options={stackHeader} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         <Text style={s.h}>{t('栄養ランキング')}</Text>
         <Text style={s.lead}>{t('日本の一般食材 約{n}品の目安値（日本食品標準成分表 八訂ベース）。同じ栄養をより少ないカロリーで取る「かしこい置き換え」も見られます。', { n: getNutrientDb().length })}</Text>

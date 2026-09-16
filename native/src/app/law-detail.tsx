@@ -23,6 +23,7 @@ import CrownBadge from '@/components/CrownBadge';
 import { LAW_KINDS, lawText, lawVariant, type LawKind, type LawParams } from '@/lib/laws';
 import { conditionLabel } from '@/lib/correlate';
 import { getLawArticle, sourceNumber, pickArticleText, COMMON_CAUTIONS, type LawArticle, type EvidenceSource } from '@/content/evidence';
+import { useStackHeader } from '@/lib/navHeader';
 
 const DOW_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -136,6 +137,7 @@ function SourceRow({ n, src }: { n: number; src: EvidenceSource }) {
 }
 
 export default function LawDetailScreen() {
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
@@ -165,7 +167,7 @@ export default function LawDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <Stack.Screen options={stackHeader} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         {/* 見出し（法則の一人称の発見文） */}
         <Text style={s.kicker}>{t('あなたの法則')}</Text>

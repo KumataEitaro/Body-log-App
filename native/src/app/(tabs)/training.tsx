@@ -49,6 +49,7 @@ import { OptionButton } from '@/components/ui/Selectable';
 import AdSlot from '@/components/AdSlot';
 import { t } from '@/lib/i18n';
 import * as Haptics from 'expo-haptics';
+import { navFrom } from '@/lib/navHeader';
 
 type HistRow = { id: string; date: string; text: string };
 
@@ -375,7 +376,7 @@ export default function TrainingScreen() {
   /** 筋トレ記録画面（全画面）を開く。見ている日付を記録先として渡す */
   function openLiftSession() {
     // typed routesの生成型が新画面を知らないため as never（laws.tsx/changes.tsxと同じ流儀）
-    router.push({ pathname: '/lift-session', params: { date: viewDate } } as never);
+    router.push({ pathname: '/lift-session', params: navFrom('training', { date: viewDate }) } as never);
   }
 
   // ===== 固定ヘッダー（見出し＋日付ストリップ）: 食事・概要タブと共通の TabHeader（stickyHeaderIndices で上端に固定） =====

@@ -18,6 +18,7 @@ import { t } from '@/lib/i18n';
 import { useGate } from '@/lib/gate';
 import CrownBadge from '@/components/CrownBadge';
 import { refreshLaws, markLawsSeen, lawKindHint, LAW_KINDS, type Law, type LawKind } from '@/lib/laws';
+import { useStackHeader } from '@/lib/navHeader';
 
 // スタンダード未満（無料・ライト）で通常表示する枚数（最新から数える）。それ以降は王冠つきのぼかし表示
 const FREE_VISIBLE = 3;
@@ -69,6 +70,7 @@ function CelebrateOverlay({ laws, onClose }: { laws: Law[]; onClose: () => void 
 }
 
 export default function LawsScreen() {
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
@@ -152,7 +154,7 @@ export default function LawsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: t('戻る'), headerTintColor: C.teal, headerShadowVisible: false, ...(Platform.OS === 'ios' ? { headerTransparent: true } : { headerStyle: { backgroundColor: C.bg } }) }} />
+      <Stack.Screen options={stackHeader} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={s.scroll}>
         <View style={s.headRow}>
           <Text style={s.h}>{t('あなたの法則')}</Text>

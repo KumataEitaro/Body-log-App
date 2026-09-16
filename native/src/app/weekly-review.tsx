@@ -34,6 +34,7 @@ import { latestLawRaw, lawText } from '@/lib/laws';
 import { PROTEIN_PER_KG_DEFAULT } from '@/lib/goal';
 import { getPurpose } from '@/lib/purpose';
 import { WEEK_STEPS_GOAL_KEY } from '@/components/WeekStepsBar';
+import { fromLabel, useNavFromParam } from '@/lib/navHeader';
 import {
   buildWeekReviewInput, nextWeekGoal, pickReviewWeek, readWeekGoal, saveWeekGoal,
   shiftDays, weekGoalProgress, weekGoalText, weekGoalUnit, weeklyVerdict, weekStats,
@@ -63,6 +64,7 @@ type Loaded = {
 };
 
 export default function WeeklyReviewScreen() {
+  const backFrom = useNavFromParam();   // 戻るラベルを「どこから来たか」で決める（lib/navHeader.ts）
   useThemeRefresh(); // テーマ変更で再描画（再マウントはしない・lib/theme.ts）
   const router = useRouter();
   const gate = useGate();
@@ -168,7 +170,7 @@ export default function WeeklyReviewScreen() {
 
   const header = (
     <Stack.Screen options={{
-      headerShown: true, title: '', headerBackTitle: t('戻る'),
+      headerShown: true, title: '', headerBackTitle: fromLabel(backFrom),
       headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
     }} />
   );

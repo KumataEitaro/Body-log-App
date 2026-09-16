@@ -84,6 +84,7 @@ import {
 type Row = { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; target: number; diff: number | null };
 import { type FoodItem } from '@/lib/items';
 import { t } from '@/lib/i18n';
+import { navFrom } from '@/lib/navHeader';
 type DayDetail = { id: string; at: string | null; text: string; kcal: number | null; items: FoodItem[] | null; weight: number | null; ex: string | null; mood: string | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
 
@@ -1068,7 +1069,7 @@ export default function ChangesScreen() {
                    // カレンダー）は、その画面の「くわしく見る」からこの詳細ページへ入る
                    if (key === 'week') {
                      Haptics.selectionAsync().catch(() => {});
-                     router.push('/weekly-review' as never);
+                     router.push({ pathname: '/weekly-review', params: navFrom('changes') } as never);
                      // 遷移を出したあとに全画面広告の判定（週のふりかえりは対象・週1回程度の
                      // 頻度なので体験を壊しにくい）。王冠つきでも遷移は止めない＝広告も同じ流儀
                      interstitial.maybeShow('week');
@@ -1078,13 +1079,13 @@ export default function ChangesScreen() {
                    // （実績と同じ「別ページに住む機能」なのでdetailKeyには入れない）
                    if (key === 'laws') {
                      Haptics.selectionAsync().catch(() => {});
-                     router.push('/laws' as never);
+                     router.push({ pathname: '/laws', params: navFrom('changes') } as never);
                      return;
                    }
                    // nutrients も同じく別ページに住む機能（食材ナビの栄養ランキング図鑑）
                    if (key === 'nutrients') {
                      Haptics.selectionAsync().catch(() => {});
-                     router.push('/nutrient-rank' as never);
+                     router.push({ pathname: '/nutrient-rank', params: navFrom('changes') } as never);
                      return;
                    }
                    openDetail(key);
@@ -1140,18 +1141,21 @@ export default function ChangesScreen() {
   const openSettings = (open?: string) => router.push(
     (open ? `/settings?open=${open}&ts=${Date.now()}` : '/settings') as never,
   );
+  // 概要タブ最上部のブロック（2026-09-04・右上の⚙を廃止してここへ集約）。
+  //
+  // 2026-09-16 に見出しと並びを直した（熊田さん指摘）。それまでは:
+  //   ・見出しが「設定」なのに、中身は 目標設定／実績／通知センター／設定 の4つ。
+  //     **設定は4つのうち1つだけ**で、日本語として見出しが中身を言い表していなかった
+  //   ・その「設定」が**いちばん下**にあった。見出しと同じ名前の行が最後に出てくるのは座りが悪い
+  // 見出しを「あなたの記録と設定」に変え、並びを **よく押す順**（実績 → 通知 → 目標 → 設定）にする。
+  // 設定はいちばん奥＝最後で正しいので、位置はそのまま。見出しが変わったことで違和感が消える。
   const settingsBlock = (
     <View>
-      <Text style={s.sectionH}>{t('設定')}</Text>
-      {settingsRow({
-        key: 'goal', icon: <Target size={17} color={C.teal} />, label: t('目標設定'),
-        sub: t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC'),
-        onPress: () => openSettings('goal'),
-      })}
+      <Text style={s.sectionH}>{t('あなたの記録と設定')}</Text>
       {settingsRow({
         key: 'achievements', icon: <Award size={17} color={C.teal} />, label: t('実績'),
         sub: t('ストリーク・バッジ・ストーリー共有'), badge: unseenBadges,
-        onPress: () => router.push('/achievements' as never),
+        onPress: () => router.push({ pathname: '/achievements', params: navFrom('changes') } as never),
       })}
       {settingsRow({
         key: 'notice', icon: <BellRing size={17} color={C.teal} />, label: t('通知センター'),
@@ -1160,6 +1164,11 @@ export default function ChangesScreen() {
           : t('いま対応が必要な項目はありません'),
         badge: todo.count,
         onPress: () => openSettings('notice'),
+      })}
+      {settingsRow({
+        key: 'goal', icon: <Target size={17} color={C.teal} />, label: t('目標設定'),
+        sub: t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC'),
+        onPress: () => openSettings('goal'),
       })}
       {settingsRow({
         key: 'settings', icon: <SettingsIcon size={17} color={C.teal} />, label: t('設定'),
@@ -1176,7 +1185,7 @@ export default function ChangesScreen() {
       <HighlightCard
         rows={rows} today={today} ready={menuLoaded}
         onOpen={(target: HighlightTarget) => {
-          if (target === 'laws') { router.push('/laws' as never); return; }
+          if (target === 'laws') { router.push({ pathname: '/laws', params: navFrom('changes') } as never); return; }
           openDetail(target);
         }}
       />
