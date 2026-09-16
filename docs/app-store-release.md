@@ -70,7 +70,8 @@ BodyLogは「記録が続かない人」のための減量トラッカーです�
 ## あなたの作業（順番どおり）
 
 1. **Supabase SQL実行（未実施なら）**: `supabase/apply-pending.sql` をSQL Editorで実行（体脂肪率・写真・運動目標の列）
-2. **デモアカウント作成**: アプリでメール新規登録（例: bodylog.review@gmail.com等の捨てアドレス）→ プロフィール入力 → 食事2〜3件・体重・運動を数日分記録（審査員が空画面を見ないように）
+2. **デモアカウント作成**: アプリでメール新規登録（例: bodylog.review@gmail.com等の捨てアドレス）→ プロフィール入力 → `supabase/seed-demo.sql` をSQL Editorで実行して1年分の記録を流し込む（手入力は不要。手順の詳細は `docs/release-steps.md` STEP 3）
+2-b. **体の写真だけは手で入れる**: `body_photos` は画像の実体がStorageに要るのでSQLでは入らない。概要タブ →「体の写真」→ 撮影 を4〜5回（`docs/release-steps.md` STEP 3-b）。やらない場合はスクショに「体の写真」カードを写さない
 3. **Codemagicで再ビルド**: rn-testflight を実行（今日の全修正入り）。ビルド番号が上がったことを確認
 4. **App Store Connectで公開設定**:
    - My Apps → BodyPlatform → 「App Store」タブ → 「+」でバージョン 1.0 を作成
