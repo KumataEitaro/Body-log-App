@@ -13,6 +13,7 @@ import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { badgeIconOf } from '@/components/BadgeIcon';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 // ステッカーに載せる内容（種類ごとに1画面で完結する最小の情報だけ）。
 // 共有スコープは **バッジ・筋トレ実績（自己ベスト）・体重変化グラフ** の3種に限定
@@ -160,6 +161,7 @@ function StickerBody({ data, tone, showValues }: { data: StickerData; tone: Tone
 
 /** ステッカー作成モーダル。visibleで開き、白黒切替→コピー/保存 */
 export default function ShareStickerModal({ data, visible, onClose }: { data: StickerData | null; visible: boolean; onClose: () => void }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [tone, setTone] = useState<Tone>('light');
   const [busy, setBusy] = useState(false);
   // 体重ステッカーの「実数（開始・現在の体重）を載せる」。既定OFF＝G7 実数マスク。モーダルを開くたびにOFFへ戻る

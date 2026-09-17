@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, RADIUS, SPACE, ICON, themed } from '@/lib/ui';
 import { OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 段ごとのアイコンを**1箇所**に集約する（差し替えが1行で済むように）。
  *  タブバーは SF Symbols（食事 fork.knife／運動 figure.strengthtraining.traditional）だが、
@@ -74,6 +75,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
   weightUnit: string;
   weightPlaceholder: string;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<PlusStep>('root');
   const [weight, setWeight] = useState('');

@@ -22,6 +22,7 @@ import { useDiet, isDietOff } from '@/lib/diet';
 import { mergeAlerts, rulesFor, type DietLevel } from '@/lib/dietCheck';
 import { DietEstimateNote, DietSilenceNote, dietBadgeLabel } from '@/components/DietNotes';
 import { useGate } from '@/lib/gate';
+import { useThemeRefresh } from '@/lib/theme';
 
 type Pick = { name: string; estKcal: number; reason: string; dietFlag?: DietLevel; dietModes?: string[] };
 type AdviceResult = { picks: Pick[]; note: string };
@@ -34,6 +35,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
   /** 「これにする」で品名を受け取る（入力欄への充填は呼び出し側の責務） */
   onPick: (name: string) => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);

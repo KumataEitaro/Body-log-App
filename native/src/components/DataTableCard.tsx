@@ -11,6 +11,7 @@ import { kgToDisplay, useUnits } from '@/lib/units';
 import { Chip } from '@/components/ui/Selectable';
 import { parse1RMs, epley1RM } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
+import { useThemeRefresh } from '@/lib/theme';
 
 type Row = { date: string; weight: number | null; waist: number | null; bodyfat: number | null };
 type Metric = 'weight' | 'waist' | 'bodyfat';
@@ -21,6 +22,7 @@ const UNIT: Record<Metric, string> = { weight: '', waist: 'cm', bodyfat: '%' };
 export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
   visible: boolean; onClose: () => void; initialMetric?: Metric;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const units = useUnits();
   const [rows, setRows] = useState<Row[]>([]);

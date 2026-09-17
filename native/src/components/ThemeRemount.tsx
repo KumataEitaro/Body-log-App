@@ -21,13 +21,13 @@
 // ときだけなので許容する。
 import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import { themeGeneration } from '@/lib/ui';
+import { useThemeGeneration } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
 
 export default function ThemeRemount({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   // 自分で世代を購読する（親が再描画を省いても、ここは必ず再描画される）
   useTheme();
-  const gen = themeGeneration();
+  const gen = useThemeGeneration();   // ← 関数呼び出しではなく**フック**。理由は lib/ui.ts
   return (
     <View key={`theme-${gen}`} style={style ?? styles.fill} testID="theme-remount">
       {children}

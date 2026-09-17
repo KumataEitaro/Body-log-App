@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { platesFor, plateRemainder, BAR_OPTIONS } from '@/lib/plateCalc';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** プレートの見た目（kg→高さ・幅）。重いほど背が高く厚い、実物の比率に寄せる */
 function plateSize(kg: number): { h: number; w: number } {
@@ -26,6 +27,7 @@ export default function PlateCalc({ initial, onClose }: {
   initial: number;
   onClose: () => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [totalText, setTotalText] = useState(initial > 0 ? String(initial) : '');
   const [bar, setBar] = useState<number>(20);   // 既定はオリンピックバー20kg

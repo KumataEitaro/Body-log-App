@@ -1,0 +1,41 @@
+# native/ の型チェックとテストを push のたびに走らせる（2026-09-17）。
+#
+# これまで tsc / jest は**手元で走らせたときだけ**だった。テーマのまだらバグは
+# 「テストはあるのに、実際には走っていない／本番と違う変換で走っていた」という形で
+# 5回再発している（docs/THEME.md）。検査は「書いてあること」ではなく
+# 「必ず実行されること」で初めて再発防止になる。
+#
+# jest の変換は jest.config.js が app.json（experiments.reactCompiler）から決めるので、
+# ここで走るのは**実機に載るのと同じプログラム**。
+name: native-check
+
+on:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/native-check.yml'
+  pull_request:
+    paths:
+      - 'native/**'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: native/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test

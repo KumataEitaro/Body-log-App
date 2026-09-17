@@ -24,6 +24,7 @@ import { OptionButton } from '@/components/ui/Selectable';
 import { useReduceMotion } from '@/lib/motion';
 import { t } from '@/lib/i18n';
 import GuideArt from '@/components/GuideArt';
+import { useThemeRefresh } from '@/lib/theme';
 import {
   GUIDE_CHAPTERS, FIRST_CHAPTER,
   type GuideChapter, type GuideChapterId, type GuideStep,
@@ -69,6 +70,7 @@ export function useGuideTarget(key: string) {
 }
 
 export function GuideProvider({ children }: { children: ReactNode }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [active, setActive] = useState(false);
   const [mode, setMode] = useState<GuideMode>('menu');
   const targets = useRef(new Map<string, RefObject<View | null>>());

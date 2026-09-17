@@ -9,8 +9,10 @@ import { supabase } from '@/lib/supabase';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import GoalPanel from '@/components/GoalPanel';
+import { useThemeRefresh } from '@/lib/theme';
 
 export default function GoalSummaryCard({ mode }: { mode: 'weight' | 'training' }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [open, setOpen] = useState(false);
   const [line, setLine] = useState(t('読み込み中…'));
   const Icon = mode === 'weight' ? Target : Dumbbell;

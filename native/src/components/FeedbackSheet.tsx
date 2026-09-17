@@ -20,6 +20,7 @@ import { C, sheetTopPad, RADIUS, themed } from '@/lib/ui';
 import { t, getLocale } from '@/lib/i18n';
 import { apiPost } from '@/lib/api';
 import { markBugReported } from '@/lib/reviewPrompt';
+import { useThemeRefresh } from '@/lib/theme';
 
 const SUPPORT_URL = 'https://bodylog-orcin.vercel.app/support';
 const BODY_MAX = 1000;   // サーバー側（app/api/feedback/route.ts）と同じ上限
@@ -30,6 +31,7 @@ export default function FeedbackSheet({ visible, onClose }: {
   visible: boolean;
   onClose: () => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [kind, setKind] = useState<Kind>('bug');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);

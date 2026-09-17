@@ -11,6 +11,7 @@ import { C, RADIUS, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { isRecent, useRemoteContent } from '@/lib/remoteContent';
 import { todayJST } from '@/lib/calc';
+import { useThemeRefresh } from '@/lib/theme';
 
 const READ_KEY = 'bl-columns-read';
 // 「NEW」を出す期間: リモート配信の記事が公開日からこの日数以内で、まだ読んでいないもの
@@ -48,6 +49,7 @@ function pickToday(read: Set<string>): Column {
 }
 
 export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 'compact' } = {}) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [open, setOpen] = useState<Column | null>(null);
   const [read, setRead] = useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();

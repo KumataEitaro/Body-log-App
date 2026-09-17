@@ -25,12 +25,14 @@ import { parseDecimal } from '@/lib/parseNum';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import MoodFace from '@/components/MoodFace';
+import { useThemeRefresh } from '@/lib/theme';
 
 const SHOWN_KEY = 'bl-comeback-shown';   // 最後に表示した際の「最終記録日」
 
 export default function ComebackSheet({ onSaved }: {
   onSaved?: () => void;   // 体重を保存して再開したとき（親のデータ再読込用）
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const units = useUnits();
   const [visible, setVisible] = useState(false);
   const [uid, setUid] = useState<string | null>(null);

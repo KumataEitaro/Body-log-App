@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 import {
   listCycleStarts, saveCycleStart, deleteCycleStart,
   cycleDay, averageCycleLength, isWaterRetentionWindow, recentCycles,
@@ -32,6 +33,7 @@ import {
 const fmtMD = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
 export default function MenstrualCycleCard({ onChanged }: { onChanged?: () => void }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [logs, setLogs] = useState<CycleLog[]>([]);
   const [uid, setUid] = useState<string | null>(null);
   const [open, setOpen] = useState(false);

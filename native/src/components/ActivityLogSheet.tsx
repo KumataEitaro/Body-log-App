@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n';
 import { ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, type Activity } from '@/lib/activities';
 import { Wheel, WheelUnit } from '@/components/Wheel';
 import { OptionButton } from '@/components/ui/Selectable';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 時間ダイアルの目盛り（5分刻み・5〜300分） */
 const MINUTES = Array.from({ length: 60 }, (_, i) => (i + 1) * 5);
@@ -32,6 +33,7 @@ export default function ActivityLogSheet({ visible, onClose, weightKg, freq, bus
   /** 保存。成功したら true（シートを閉じる） */
   onSave: (a: Activity, minutes: number, km: number | null) => Promise<boolean>;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Activity | null>(null);

@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { todayJST } from '@/lib/calc';
 import { C, rgba, themed } from '@/lib/ui';
 import { t, apiLang } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 // チップの寸法。ヘッダー行に収まるよう小ぶりに固定する
 const CHIP_W = 26;   // チップの幅
@@ -29,6 +30,7 @@ function shift(d: string, n: number): string {
 const WD = () => [t('日'), t('月'), t('火'), t('水'), t('木'), t('金'), t('土')];
 
 export default function DateStrip({ value, onChange }: { value: string; onChange: (d: string) => void }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [open, setOpen] = useState(false);
   const today = todayJST();
   const isToday = value === today;

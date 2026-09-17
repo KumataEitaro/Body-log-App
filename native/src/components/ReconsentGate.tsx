@@ -19,11 +19,13 @@ import { supabase } from '@/lib/supabase';
 import { needsReconsent, recordConsent, type ReconsentMode } from '@/lib/consent';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 const TERMS_URL = 'https://bodylog-orcin.vercel.app/terms';
 const PRIVACY_URL = 'https://bodylog-orcin.vercel.app/privacy';
 
 export default function ReconsentGate() {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [mode, setMode] = useState<ReconsentMode>(false);
   const [busy, setBusy] = useState(false);
   const [read, setRead] = useState(false);   // 「読みました」のチェック（同意の質を上げる）

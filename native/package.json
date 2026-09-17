@@ -72,22 +72,10 @@
     "test": "jest --silent",
     "i18n:keys": "node scripts/i18n-keys.js",
     "web:preview": "expo start --web --port 8082",
-    "web:serve": "npx --yes serve dist -s -l 8083"
+    "web:serve": "npx --yes serve dist -s -l 8083",
+    "test:rc": "node ./scripts/jest-react-compiler.js"
   },
   "private": true,
-  "jest": {
-    "preset": "jest-expo",
-    "setupFiles": [
-      "./jest.setup.js"
-    ],
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
-    },
-    "testPathIgnorePatterns": [
-      "/node_modules/"
-    ],
-    "testTimeout": 60000
-  },
   "overrides": {
     "@expo/ui": "~57.0.18"
   }

@@ -13,6 +13,7 @@ import {
   binPoints, smoothTrend, niceTicks, xTicks, smoothPath, linePath,
 } from '@/lib/chartMath';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 export type ChartPoint = RawPoint;
 
@@ -35,6 +36,7 @@ type Props = {
 const PAD_L = 8, PAD_R = 44, PAD_T = 10, PAD_B = 22;
 
 function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays = 90, height = 200, color = C.teal, fullscreenEnabled = true, onDaysChange, markers, bands }: Props) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [width, setWidth] = useState(0);
   const [fs, setFs] = useState(false);
 

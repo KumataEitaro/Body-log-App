@@ -1,5 +1,6 @@
 // デザイントークン。テーマ変更で「アクセントだけ」でなく、背景・枠線・文字・面の色まで
 // まとめて差し替わるよう、全色をこのオブジェクトに集約している。
+import { useMemo, useSyncExternalStore } from 'react';
 import { Platform, StatusBar, StyleSheet } from 'react-native';
 import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
 
@@ -190,9 +191,59 @@ type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 
 // テーマの世代番号。applyPalette のたびに増える
 let generation = 0;
+const genListeners = new Set<() => void>();
+function subscribeGeneration(cb: () => void): () => void {
+  genListeners.add(cb);
+  return () => { genListeners.delete(cb); };
+}
 
-/** 現在のテーマ世代。Reactツリーの再マウントキーやテストで使う */
+/**
+ * 現在のテーマ世代。**React コンポーネントからは呼ばないこと**（下の useThemeGeneration を使う）。
+ * テストと、React の外（モジュール初期化・命令的なコード）専用。
+ *
+ * ⚠️ 2026-09-17 の事故: コンポーネントの中でこれを呼んでいた（TabHeader / ThemeRemount の
+ * `key={theme-${gen}}`）。React Compiler は「引数なし・リアクティブな依存なし」の呼び出しを
+ * **初回だけ評価して永久にキャッシュ**するため、key が固定され、テーマの壁が一度も
+ * 作り直されなかった。__tests__/themeTransform.test.ts が .tsx での使用を禁止して見張る。
+ */
 export function themeGeneration(): number { return generation; }
+
+/**
+ * テーマ世代を**購読して**返すフック。
+ * フックの戻り値はリアクティブな値なので、React Compiler もこれに依存する式をキャッシュできない
+ * ＝「テーマが変わったのに古い色のまま」が構造的に起きない。
+ */
+export function useThemeGeneration(): number {
+  return useSyncExternalStore(subscribeGeneration, themeGeneration, themeGeneration);
+}
+
+/**
+ * `themed()` で作ったシートを**テーマ世代に連動した新しい参照**にして返す。
+ *
+ * `const SHEET = themed(() => ({...}))` はモジュールスコープの定数なので、
+ * `SHEET.card` の読み取りは「変わらない値」と見なされてメモ化に閉じ込められる。
+ * このフックを通すと、世代が変わるたびに**別のオブジェクト**になるため、
+ * それを使っている JSX も必ず作り直される。
+ *
+ * 使い方: `const s = useThemedSheet(SHEET);`（モジュール側の定数は大文字にして取り違えを防ぐ）
+ */
+export function useThemedSheet<T extends object>(sheet: T): T {
+  const gen = useThemeGeneration();
+  // ⚠️ gen は「本当に使う」こと。`useMemo(() => ({...sheet}), [sheet, gen])` と書くと、
+  //    React Compiler は**中で使っていない依存を削除**して gen を落とす（2026-09-17 に実際に踏んだ）。
+  //    引数として渡せば消しようがない。
+  return useMemo(() => spreadForGeneration(sheet, gen), [sheet, gen]);
+}
+
+// 同じシートを使う画面が何枚あっても、1世代につき1回だけ展開する
+const spreadCache = new WeakMap<object, { gen: number; copy: object }>();
+function spreadForGeneration<T extends object>(sheet: T, gen: number): T {
+  const hit = spreadCache.get(sheet);
+  if (hit && hit.gen === gen) return hit.copy as T;
+  const copy = { ...sheet } as T;   // Proxy を展開＝その世代の実際の値が入った素のオブジェクト
+  spreadCache.set(sheet, { gen, copy });
+  return copy;
+}
 
 /**
  * テーマに追従するスタイルシートを定義する。
@@ -238,4 +289,7 @@ export function applyPalette(next: Palette): void {
   if (!changed) return;
   Object.assign(C, next);
   generation += 1;
+  // 世代を購読しているコンポーネント（useThemeGeneration / useThemedSheet）へ知らせる。
+  // lib/theme.ts の emit() とは別系統にしてある（ui.ts が theme.ts を import すると循環するため）
+  for (const l of [...genListeners]) { try { l(); } catch { /* 1人の事故で他を巻き込まない */ } }
 }

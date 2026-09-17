@@ -17,6 +17,7 @@ import { todayJST } from '@/lib/calc';
 import { parseDecimal } from '@/lib/parseNum';
 import { inBodyfatRange, BODYFAT_RANGE } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 type PhotoRow = { id: string; date: string; path: string; bodyfat: number | null };
 type PhotoView = PhotoRow & { url: string | null };
@@ -33,6 +34,7 @@ export default function BodyPhotosCard({ autoCaptureKey }: {
    *  以前は即カメラだったが、撮り直しや過去の写真を選ぶ場面で行き止まりになるため選択式に（2026-09-05） */
   autoCaptureKey?: string;
 } = {}) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [photos, setPhotos] = useState<PhotoView[]>([]);
   const [targetBf, setTargetBf] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

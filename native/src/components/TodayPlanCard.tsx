@@ -21,6 +21,7 @@ import {
   type DayPlan, type DayPlanKind,
 } from '@/lib/dayPlan';
 import { fmtHm, parseHm, roundHm } from '@/lib/timeSlots';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 1問目の選択肢（横並びチップ）。「ない」を先頭に置く＝いちばん多い答えを最短で */
 const KINDS: readonly DayPlanKind[] = ['none', 'eatout', 'drink', 'workout'];
@@ -40,6 +41,7 @@ export default function TodayPlanCard({ onAnswer, onAskOff }: {
   /** 「聞かないで」。以後この質問を出さない */
   onAskOff: () => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   // 1問目の答え。'none' と 'workout' はその場で確定するので state に残らない
   const [kind, setKind] = useState<DayPlanKind | null>(null);
   const [at, setAt] = useState<string | null>(null);
