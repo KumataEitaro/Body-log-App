@@ -7,6 +7,7 @@ import { X, BellRing, Check } from 'lucide-react-native';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { buildTodos, badgeCount, type Todo } from '@/lib/todos';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 未対応件数を購読する（⚙や設定行のバッジ用） */
 export function useTodoBadge() {
@@ -24,6 +25,7 @@ export function useTodoBadge() {
 }
 
 export default function NotificationCenter({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [todos, setTodos] = useState<Todo[] | null>(null);

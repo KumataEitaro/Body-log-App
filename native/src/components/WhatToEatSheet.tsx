@@ -35,6 +35,7 @@ import { useGate } from '@/lib/gate';
 import { swapsFor, swapLine, emojiText, type SwapMode } from '@/lib/smartSwap';
 import { tierPromptSummary } from '@/content/proteinTiers';
 import { C, ICON, RADIUS, rgba, sheetTopPad, themed } from '@/lib/ui';
+import { useThemeRefresh } from '@/lib/theme';
 import {
   EAT_CONTEXTS, EAT_NOTE_MAX, contextLabel, contextHint, promptKindOf, remainingLine,
   validateProposal, recentTagSummary, topMyFoodNames, sampleProposal,
@@ -88,6 +89,7 @@ export default function WhatToEatSheet({ visible, onClose, remaining, myFoods, o
    */
   initialContext?: EatContext;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const router = useRouter();
   const [ctx, setCtx] = useState<EatContext>('convenience');
   const [note, setNote] = useState('');

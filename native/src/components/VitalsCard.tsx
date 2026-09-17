@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 import {
   listVitals, saveVital, deleteVital, needsDoctorNote, anyNeedsDoctorNote,
   todayJSTLocal, addDays, VITAL_RANGE, type Vital,
@@ -88,6 +89,7 @@ function MiniLines({ list, width }: { list: Vital[]; width: number }) {
 }
 
 export default function VitalsCard({ width = 300 }: { width?: number }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [list, setList] = useState<Vital[]>([]);
   const [uid, setUid] = useState<string | null>(null);
   const [open, setOpen] = useState(false);

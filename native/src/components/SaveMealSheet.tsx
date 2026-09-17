@@ -13,6 +13,7 @@ import { C, rgba, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { saveMyMeal, defaultMealName, mealKcal } from '@/lib/meals';
 import type { FoodItem } from '@/lib/items';
+import { useThemeRefresh } from '@/lib/theme';
 
 type Props = {
   visible: boolean;
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export default function SaveMealSheet({ visible, uid, items, onClose, onSaved }: Props) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');

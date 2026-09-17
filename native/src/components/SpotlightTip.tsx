@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { View, Text, Pressable, Modal, Dimensions, Animated, Easing } from 'react-native';
 import { C, RADIUS, SPACE, themed } from '@/lib/ui';
+import { useThemeRefresh } from '@/lib/theme';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -23,6 +24,7 @@ export default function SpotlightTip({
   secondaryLabel: string;
   onSecondary: () => void;              // 背景タップもこちら扱い
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [rect, setRect] = useState<Rect | null>(null);
   const fade = useRef(new Animated.Value(0)).current;
   const alive = useRef(true);

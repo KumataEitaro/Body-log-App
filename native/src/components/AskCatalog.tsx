@@ -10,12 +10,14 @@ import { X, Search, ChevronDown, ChevronRight, Sparkles } from 'lucide-react-nat
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { askCategories } from '@/content/askExamples';
+import { useThemeRefresh } from '@/lib/theme';
 
 export default function AskCatalog({ visible, onClose, onPick }: {
   visible: boolean;
   onClose: () => void;
   onPick: (question: string) => void;   // 選ぶと閉じてそのまま送信する
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);

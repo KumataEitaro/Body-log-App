@@ -9,12 +9,14 @@ import { ScanBarcode } from 'lucide-react-native';
 import { C, rgba, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { OptionButton } from '@/components/ui/Selectable';
+import { useThemeRefresh } from '@/lib/theme';
 
 export default function BarcodeScanner({ visible, onClose, onScanned }: {
   visible: boolean;
   onClose: () => void;
   onScanned: (jan: string) => void;   // 読み取ったJAN（数字のみ）
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   // 権限は既存の写真経路と同じ「開いた時に聞く」流儀（useCameraPermissionsフック）
   const [perm, requestPerm] = useCameraPermissions();
   const [asked, setAsked] = useState(false);

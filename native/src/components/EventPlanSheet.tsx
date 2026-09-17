@@ -26,6 +26,7 @@ import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { t } from '@/lib/i18n';
 import { todayJST } from '@/lib/calc';
 import { addDays, daysBetween } from '@/lib/goal';
+import { useThemeRefresh } from '@/lib/theme';
 import {
   EVENT_KINDS, EVENT_DEFAULT_KCAL, EVENT_KCAL_STEP,
   clampEventKcal, eventKindLabel, eventTitleOf, quickDates, perDayAdjust, perDayAdjustText,
@@ -54,6 +55,7 @@ export default function EventPlanSheet({
   absorbDays: number | null;
   busy?: boolean;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const today = todayJST();
   const [kind, setKind] = useState<EventKind>('drink');

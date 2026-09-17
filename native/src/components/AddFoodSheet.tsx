@@ -29,6 +29,7 @@ import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import { analyzeFood, type LimitKind } from '@/lib/quicklog';
 import { rescaleByQty, sumItems, type FoodItem } from '@/lib/items';
 import { composeMyFood, findMyFoodByName, saveMyFood, type MyFoodInput } from '@/lib/foods';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 食事タブの登録案内から渡されるプリフィル（名前と栄養値。手入力を開いた状態で出す） */
 export type MyFoodDraft = {
@@ -46,6 +47,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;            // 一覧の再読込に使う
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const router = useRouter();
   const [name, setName] = useState('');
   // ---- AIで計算（主導線） ----

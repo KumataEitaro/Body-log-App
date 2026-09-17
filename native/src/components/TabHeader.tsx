@@ -29,7 +29,7 @@
 import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, HEAD, SPACE, themed, themeGeneration } from '@/lib/ui';
+import { C, HEAD, SPACE, themed, useThemeGeneration, useThemedSheet } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
 
 export default function TabHeader({ title, right, children }: {
@@ -42,7 +42,9 @@ export default function TabHeader({ title, right, children }: {
   const insets = useSafeAreaInsets();
   // 親の再描画に依存せず、テーマの変更で自分が必ず再描画される（上のコメント参照）
   useTheme();
-  const gen = themeGeneration();
+  const gen = useThemeGeneration();   // ← 関数呼び出しではなく**フック**。理由は lib/ui.ts
+  // スタイルも世代に連動させる（key だけ変えても、この帯自身の style は作り直されない）
+  const s = useThemedSheet(SHEET);
   return (
     // key に世代を含める＝テーマが変わるとネイティブビューを作り直す（色の差分送信に頼らない）
     <View key={`theme-${gen}`} style={[s.wrap, { paddingTop: insets.top + 8 }]} testID="tab-header">
@@ -58,7 +60,7 @@ export default function TabHeader({ title, right, children }: {
 /** stickyHeaderIndices に渡す値（ヘッダーは常に先頭の子） */
 export const STICKY_FIRST = [0];
 
-const s = themed(() => ({
+const SHEET = themed(() => ({
   wrap: {
     backgroundColor: C.bg,
     marginHorizontal: -SPACE.screen, paddingHorizontal: SPACE.screen,

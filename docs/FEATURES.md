@@ -2246,3 +2246,42 @@ iOS の「通話中」バーと同じ**上端のピル**にした。タップで
 - `__tests__/platformSafety.test.ts`: `expo-widgets` を Android の autolink から外し、
   `@expo/ui` の二重インストール（[expo/expo#44707](https://github.com/expo/expo/issues/44707)）を
   `overrides` で防いでいることを見張る
+
+## テーマの「まだら」の決着 — React Compiler が世代を定数に畳んでいた（2026-09-17・v1.1.10）
+
+> 熊田さん「何がおかしいかわかる? 色だよね。しかも概要は問題ない。運動タブは問題ある。」
+
+運動タブのヘッダーが白いまま、「きょうの動き」カードは**白い背景に白い見出し**で、
+中の箱だけ暗い。**1枚のカードの中に2つのパレットが同居**していた。
+
+真因は `app.json` の `experiments.reactCompiler: true`。React Compiler は
+`themeGeneration()` のような引数なし・非リアクティブな呼び出しを**一度きりの定数**に畳むため、
+`TabHeader` と `ThemeRemount` の `key={theme-${gen}}` が初回の値で固定され、
+**テーマの壁が一度も立っていなかった**。起動直後はまだライトなので、その色が凍る。
+
+そして最悪なのは、**jest-expo が babel に `supportsReactCompiler` を渡していなかった**こと。
+テストは実機とは別のプログラムを検証していて、3回ぶんの再発防止テストが全部素通りしていた。
+
+やったこと（詳細は `docs/THEME.md`）:
+
+1. **変換をひとつにした**。`native/jest.config.js` が app.json を読んで caller を決める。
+   package.json の `jest` キーは廃止。以後どちらへ倒しても食い違わない
+2. **React Compiler を無効化**。84ファイルが「モジュールスコープの可変 `C`」前提で書かれており、
+   コンパイラの前提と構造的に両立しない。強制有効化で走らせると色どころか
+   **食事タブと相談タブがマウントすらできない**ことも判明した
+3. `useThemeGeneration()` / `useThemedSheet()` を追加し、壁をフック経由にした（将来の布石）。
+   ※ `useMemo(..., [sheet, gen])` は**コンパイラに gen を依存から削除された**。
+     人工的な依存では騙せず、引数として本当に使う必要がある
+4. **Modal を出す部品30個に購読を追加**。Modal は壁の外に出る仕様なのに、どれも
+   自分では購読せず親の再描画に賭けていた（GuideTour のウェルカムが実際に取り残されていた）
+
+再発防止:
+
+- **`__tests__/themePalette.test.tsx`（22件）**: 手口ではなく**症状**を見る。11画面を描画して
+  明暗を反転し、前のパレットの色が1つでも残っていたら落とす。失敗時は
+  「どの色が・どの要素に」残ったかを出す
+- `__tests__/themeTransform.test.ts`: テストの変換が app.json と一致していること
+- `__tests__/themeSafety.test.ts`: Modal を出す部品の購読／`.tsx` から素の `themeGeneration()` を
+  呼ばないこと
+- `.github/workflows/native-check.yml`: tsc と jest が**必ず実行される**（それまで CI では
+  走っていなかった）

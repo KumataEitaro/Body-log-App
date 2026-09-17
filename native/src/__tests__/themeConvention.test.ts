@@ -33,10 +33,11 @@ describe('スタイル定義の規約', () => {
   });
 
   it('themed の中身は必ず関数（() => ({ ... }) の形）で渡している', () => {
-    // themed(obj) と書いてしまうと評価が1度きりになり、旧方式と同じ穴が開く
+    // themed(obj) と書いてしまうと評価が1度きりになり、旧方式と同じ穴が開く。
+    // 解説コメントの中の「themed()」は数えない（コードだけを見る）
     const offenders: string[] = [];
     for (const f of FILES) {
-      const src = readFileSync(f, 'utf8');
+      const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
       for (const m of src.matchAll(/\bthemed\s*\(\s*(.)/g)) {
         if (m[1] !== '(') offenders.push(`${rel(f)}: themed(${m[1]}...`);
       }

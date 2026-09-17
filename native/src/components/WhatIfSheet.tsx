@@ -24,6 +24,7 @@ import { C, ICON, RADIUS, sheetTopPad, themed } from '@/lib/ui';
 import { findFood, kcalOf, nutrientOf } from '@/content/nutrientDb';
 import type { BalanceDay } from '@/lib/deficit';
 import { simulateWhatIf, type PfcRemaining, type WhatIfTarget } from '@/lib/whatIf';
+import { useThemeRefresh } from '@/lib/theme';
 
 /** 呼び出し側から渡す種（kcalがあればAI由来。無ければ品名から概算する） */
 export type WhatIfSeed = {
@@ -68,6 +69,7 @@ export default function WhatIfSheet({ visible, onClose, seed, remainingKcal, pfc
   /** 「これを記録する」。入力欄への充填は呼び出し側の責務（自動確定しない＝既存のステージング哲学） */
   onLog?: (name: string) => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [name, setName] = useState('');
   const [kcalText, setKcalText] = useState('');
 

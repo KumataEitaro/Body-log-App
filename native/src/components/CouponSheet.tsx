@@ -10,6 +10,7 @@ import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { apiPost } from '@/lib/api';
 import { refreshGate } from '@/lib/gate';
+import { useThemeRefresh } from '@/lib/theme';
 
 // 表示用のプラン名（サーバーはplan識別子で返す）
 function planLabel(plan: string): string {
@@ -27,6 +28,7 @@ export default function CouponSheet({ visible, onClose, onRedeemed }: {
   /** 適用成功時（プラン表示の更新などに使える。省略可） */
   onRedeemed?: (plan: string) => void;
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');

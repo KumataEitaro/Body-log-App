@@ -34,6 +34,20 @@ describe('themeSafety: 再描画されない要素にテーマが届く', () => 
     expect(offenders).toEqual([]);
   });
 
+  // 2026-09-17: Modal は ThemeRemount の壁の**外**に出る（作り直すと iOS で古いモーダルが残るため）。
+  // つまり壁に守ってもらえないので、親が再描画してくれることに賭けるしかない。
+  // 実際 GuideTour のウェルカムは、親が再描画しない経路で古い色のまま残っていた
+  // （themePalette.test.tsx が検出）。Modal を出す部品は**自分でテーマを購読する**。
+  it('Modal を出す部品は自分でテーマを購読している（壁の外なので親に頼れない）', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = read(f);
+      if (!/<Modal[\s>]/.test(src)) continue;
+      if (!/useThemeRefresh\(\)|useTheme\(\)/.test(src)) offenders.push(rel(f));
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('仮想リスト（FlatList / SectionList / FlashList）は extraData にテーマ世代を渡す', () => {
     const offenders: string[] = [];
     for (const f of files) {
@@ -51,7 +65,10 @@ describe('themeSafety: 再描画されない要素にテーマが届く', () => 
     const src = read(path.join(SRC, 'components', 'TabHeader.tsx'));
     expect(src).toMatch(/useTheme\(\)/);
     expect(src).toMatch(/key=\{`theme-\$\{gen\}`\}/);
-    expect(src).toMatch(/themeGeneration\(\)/);
+    // **フック**であること。素の themeGeneration() は React Compiler に定数へ畳まれる（2026-09-17）
+    expect(src).toMatch(/useThemeGeneration\(\)/);
+    // スタイルも世代に連動させる（key を変えても、この帯自身の style は作り直されない）
+    expect(src).toMatch(/useThemedSheet\(/);
   });
 
   it('theme.ts は AppState 復帰時に OS の明暗と再同期する（背景中の自動ダークを取りこぼさない）', () => {
@@ -90,5 +107,22 @@ describe('themeSafety: 再描画されない要素にテーマが届く', () => 
     const src = read(path.join(SRC, 'components', 'ThemeRemount.tsx'));
     expect(src).toMatch(/useTheme\(\)/);
     expect(src).toMatch(/key=\{`theme-\$\{gen\}`\}/);
+    expect(src).toMatch(/useThemeGeneration\(\)/);
+  });
+
+  // 2026-09-17: コンポーネントの中で素の themeGeneration() を呼ぶと、React Compiler が
+  // 「引数なし・非リアクティブ」と見て**一度きりの定数**へ畳む。世代 key が固定され、
+  // テーマの壁が一度も作り直されなくなる（熊田さんのスクリーンショットの直接の原因）。
+  // 画面・部品からは必ずフック（useThemeGeneration）を使う。
+  it('.tsx から素の themeGeneration() を呼んでいない（必ずフックを使う）', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      if (!f.endsWith('.tsx')) continue;
+      const src = read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      for (const m of src.matchAll(/(\w*)themeGeneration\s*\(/g)) {
+        if (m[1] !== 'use') offenders.push(`${rel(f)}: ${m[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

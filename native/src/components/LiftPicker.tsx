@@ -7,6 +7,7 @@ import { X, Search, Plus, Trash2 } from 'lucide-react-native';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { LIFTS, LIFT_PARTS, liftName, useCustomLifts, addCustomLift, removeCustomLift } from '@/lib/lifts';
+import { useThemeRefresh } from '@/lib/theme';
 
 export default function LiftPicker({ visible, onClose, onPick, history }: {
   visible: boolean;
@@ -15,6 +16,7 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
   /** 過去に記録した種目名（よく使うものを先頭に出すため） */
   history?: string[];
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   // 追加する種目が「体重が負荷になる（懸垂タイプ）」かどうか

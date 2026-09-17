@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Minus, Plus, X, Search } from 'lucide-react-native';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useThemeRefresh } from '@/lib/theme';
 
 export type CardLayout = { order: string[]; hidden: string[] };
 
@@ -170,6 +171,7 @@ export function AddCardSheet({ visible: open, onClose, hidden, labels, onShow, s
   onShow: (key: string) => void;
   shownKeys: string[];
 }) {
+  useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const match = (k: string) => (labels[k] ?? k).toLowerCase().includes(q.trim().toLowerCase());
