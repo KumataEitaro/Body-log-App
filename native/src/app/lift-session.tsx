@@ -136,7 +136,9 @@ export default function LiftSessionScreen() {
   // レストが終わっても何も起きなかった（熊田さん指摘）。
   // いまはレストの開始と同時に予約する＝画面の生き死ににも AppState にも依存しない。
   // 保存は上の useEffect がセッション状態ごと書くので persist は要らない
-  useEffect(() => { void armRest(restEndsAt, { persist: false }); }, [restEndsAt]);
+  // 種目名はダイナミックアイランドに出す。最後に足したセットの種目＝いま休んでいる種目
+  const restingLift = (st?.sets ?? [])[(st?.sets.length ?? 0) - 1]?.name ?? '';
+  useEffect(() => { void armRest(restEndsAt, { persist: false, exercise: restingLift }); }, [restEndsAt, restingLift]);
   const [restDial, setRestDial] = useState(false);
   function pickRest(sec: number) {
     AsyncStorage.setItem('bl-rest-sec', String(sec)).catch(() => {});

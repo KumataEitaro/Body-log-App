@@ -19,8 +19,9 @@
 // このアプリは setNotificationHandler を置いていないので、前景の通知は OS 側で出ない＝
 // 「アプリを見ている間はバイブ」「離れている間は通知」が自然に両立する。
 //
-// iPhone のダイナミックアイランド（アプリを閉じていても残り分数が見える）は別件。
-// この土台の上に載せる: docs/LIVE-ACTIVITY-2026-09.md
+// ④ iPhone のダイナミックアイランド／ロック画面（アプリを閉じていても残り分数が見える）も
+//    ここから出す（lib/restActivity.ts）。対応していない端末では静かに何もしない。
+//    ビルドへの入れ方と Apple 側の準備: docs/LIVE-ACTIVITY.md
 import { useEffect, useState } from 'react';
 import { Vibration } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { t } from './i18n';
 import { LIFT_SESSION_KEY, parseSessionState, serializeSessionState, restLeftSec } from './liftSession';
+import { startRestActivity, endRestActivity, cleanupRestActivities } from './restActivity';
 
 /** レスト終了時刻（epoch ms）。null=止まっている */
 let endsAt: number | null = null;
@@ -80,18 +82,22 @@ async function persist(at: number | null) {
 }
 
 /**
- * レストを始める／止める／付け替える。**通知の予約もここで完結する**。
+ * レストを始める／止める／付け替える。**通知の予約も Live Activity もここで完結する**。
  * @param at 終了時刻（epoch ms）。null で停止
- * @param opts.persist 端末の保存にも書き戻すか（既定 true。画面側が自分で保存するときは false）
+ * @param opts.persist  端末の保存にも書き戻すか（既定 true。画面側が自分で保存するときは false）
+ * @param opts.exercise 種目名。ダイナミックアイランドに出す（無くてもよい）
  */
-export async function armRest(at: number | null, opts: { persist?: boolean } = {}): Promise<void> {
+export async function armRest(at: number | null, opts: { persist?: boolean; exercise?: string } = {}): Promise<void> {
   const same = endsAt === at;
   endsAt = at;
   if (at != null && at > Date.now()) fired = null;   // 新しいレスト。また鳴らせるようにする
   if (!same) emit();
   if (opts.persist !== false) await persist(at);
-  if (at == null || at <= Date.now()) { await cancelNotif(); return; }
+  if (at == null || at <= Date.now()) { await cancelNotif(); await endRestActivity(); return; }
   await scheduleNotif(at);
+  // iPhone のダイナミックアイランド／ロック画面（対応していない端末では静かに何もしない）。
+  // カウントダウンは OS が描くので、ここで1回出すだけ＝更新もプッシュも要らない
+  if (!same) startRestActivity(Date.now(), at, opts.exercise ?? '');
 }
 
 /** レストを止める（どの画面からでも） */
@@ -99,6 +105,8 @@ export async function stopRest(): Promise<void> { await armRest(null); }
 
 /** アプリ起動時に、前回の途中のレストを拾い直す（端末を再起動しても残り時間が続く） */
 export async function hydrateRest(): Promise<void> {
+  // 強制終了などで畳み損ねた Live Activity をまず片付ける（残骸が居座らないように）
+  await cleanupRestActivities();
   try {
     const st = parseSessionState(await AsyncStorage.getItem(LIFT_SESSION_KEY));
     const at = st?.restEndsAt ?? null;
@@ -115,6 +123,7 @@ function fireIfDone() {
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   try { Vibration.vibrate(500); } catch { /* 端末設定次第 */ }
   notifId = null;   // 予約は届いた（or 前景で握り潰された）。取り消す相手はもういない
+  void endRestActivity();   // 前景で 0 を見た＝畳める（背景で終わったぶんは次の起動時に掃除する）
 }
 
 /** 残り秒を購読する。返り値は解除関数 */

@@ -9,9 +9,16 @@
 //
 // 検証: cd native && npx expo-modules-autolinking react-native-config --platform android --json
 //       → dependencies に nitro / healthkit が現れないこと（__tests__/platformSafety.test.ts が見張る）
+//
+// 【expo-widgets・2026-09-17】
+// iOS の Live Activity（ダイナミックアイランドのレスト残り時間）のためだけに入れた。
+// パッケージ自体は Android にも native module を持つが、**Android では一切呼ばない**
+// （lib/restActivity.ts が Platform.OS !== 'ios' で先に切る）。
+// 使い手ゼロのネイティブを Android に載せない、という上と同じ判断で autolink から外す。
 module.exports = {
   dependencies: {
     'react-native-nitro-modules': { platforms: { android: null } },
     '@kingstinct/react-native-healthkit': { platforms: { android: null } },
+    'expo-widgets': { platforms: { android: null } },
   },
 };
