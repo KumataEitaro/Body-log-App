@@ -163,6 +163,27 @@ workflows:
           # 拡張ターゲットをpbxprojへ注入（この後のagvtoolがウィジェットのビルド番号も揃える）
           gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
           ruby scripts/add-widget-target-rn.rb
+      - name: Live Activity の App Group を本体に足す (ENABLE_LIVE_ACTIVITY=true のみ)
+        script: |
+          # ダイナミックアイランドのレスト残り時間（docs/LIVE-ACTIVITY.md）。
+          # 拡張ターゲット自体は native/app.config.js の expo-widgets plugin が prebuild で作る。
+          # ここがやるのは「本体アプリの entitlements に App Group を入れる」ことだけ
+          # （ENABLE_WIDGET のステップと同じ内容なので、両方立っていても重複しないようにする）。
+          # ENABLE_LIVE_ACTIVITY 未設定なら何もしない＝従来ビルドと完全に同一。
+          if [ "$ENABLE_LIVE_ACTIVITY" != "true" ]; then
+            echo "ENABLE_LIVE_ACTIVITY != true → Live Activity なしでビルド（従来と同一）"
+            exit 0
+          fi
+          ENT="native/ios/BodyLog/BodyLog.entitlements"
+          if /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" "$ENT" >/dev/null 2>&1; then
+            echo "App Group は既にある（ENABLE_WIDGET のステップが入れた）"
+          else
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENT" || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.gotcha.bodylog.rn" "$ENT" || true
+          fi
+          plutil -p "$ENT"
+          # NSSupportsLiveActivities は app.config.js が infoPlist に入れる → prebuild 済みの Info.plist を確認
+          /usr/libexec/PlistBuddy -c "Print :NSSupportsLiveActivities" native/ios/BodyLog/Info.plist             || echo "⚠️ NSSupportsLiveActivities が Info.plist にありません（app.config.js のゲートを確認）"
       - name: 署名プロファイルの整合（entitlementに合わないプロファイルを捨てて作り直す）
         script: |
           # Codemagicの自動署名は既存プロファイルを再利用するため、App IDにcapabilityを足しても

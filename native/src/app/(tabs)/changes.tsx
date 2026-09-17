@@ -85,6 +85,7 @@ type Row = { date: string; intake: number | null; weight: number | null; waist: 
 import { type FoodItem } from '@/lib/items';
 import { t } from '@/lib/i18n';
 import { navFrom } from '@/lib/navHeader';
+import { detailGate, paywallPath } from '@/lib/detailGate';
 type DayDetail = { id: string; at: string | null; text: string; kcal: number | null; items: FoodItem[] | null; weight: number | null; ex: string | null; mood: string | null }[];
 type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
 
@@ -1049,8 +1050,12 @@ export default function ChangesScreen() {
     // week行だけは王冠つきでも遷移を止めない（N4）: 行き先の週次レビュー画面が
     // 「見出し＋体重変化までは無料・評価文と来週の目標はスタンダード」と自前でゲートするため、
     // ここで蹴るとロック中の人が体重変化すら見られなくなる（law-detailと同じ流儀）
-    const crowned = (key === 'week' && gate.gated('digest')) || (key === 'eating' && gate.gated('eating'));
-    const crownBlocks = crowned && key !== 'week';
+    // 王冠の判定は lib/detailGate.ts に集約（2026-09-16）。
+    // 同じ詳細ページへの入口が「メニュー行」と「きょうのハイライト」の2つあり、
+    // ハイライト側に判定が無くて**有料の機能が無料で開けていた**（NAV-AUDIT D-07）。
+    const g = detailGate(key, gate.gated);
+    const crowned = g.crowned;
+    const crownBlocks = g.blocked;
     const secTitle = sectionHeadOf.get(key);
     const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
@@ -1059,10 +1064,10 @@ export default function ChangesScreen() {
                  // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
                  ref={key === 'body' ? chartTarget : undefined} collapsable={false}
                  onPress={() => {
-                   if (crownBlocks) {
+                   if (g.blocked) {
                      Haptics.selectionAsync().catch(() => {});
                      // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
-                     router.push((key === 'eating' ? '/paywall?src=eating' : '/paywall?src=digest') as never);
+                     router.push(paywallPath(g.src) as never);
                      return;
                    }
                    // 週のふりかえり行の行き先は週次レビュー画面（N4）。数字の一覧（週間ダイジェスト＋
@@ -1186,6 +1191,15 @@ export default function ChangesScreen() {
         rows={rows} today={today} ready={menuLoaded}
         onOpen={(target: HighlightTarget) => {
           if (target === 'laws') { router.push({ pathname: '/laws', params: navFrom('changes') } as never); return; }
+          // メニュー行と**同じ王冠判定**を通す（2026-09-16・NAV-AUDIT D-07）。
+          // ここに判定が無かったため、無料のまま有料の「食べ方の分析」が開けていた。
+          // 行き先が同じなら、入口が違っても結果は同じでなければならない
+          const hg = detailGate(target, gate.gated);
+          if (hg.blocked) {
+            Haptics.selectionAsync().catch(() => {});
+            router.push(paywallPath(hg.src) as never);
+            return;
+          }
           openDetail(target);
         }}
       />
@@ -1272,7 +1286,7 @@ export default function ChangesScreen() {
           「体の写真」はこのタブにいるので遷移せず、その場で体写真の詳細ページを開いて撮影へ（onLocal で横取り）。
           食事系・先の予定は食事タブへ、運動は運動タブへ、マイ食品の登録はその場で（PlusEntry の共通処理）。
           ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない） */}
-      <PlusEntry onLocal={(a) => {
+      <PlusEntry from="changes" onLocal={(a) => {
         if (a !== 'bodyphoto') return false;
         detailTx.value = 0;                        // 前回スワイプ途中の位置が残らないようにする
         setDetailKey('photos');

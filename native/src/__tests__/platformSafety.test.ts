@@ -14,7 +14,17 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'src');
 
 /** iOS 専用ライブラリ。Android の autolink から外し、JS でも Platform で先に切ること */
-const IOS_ONLY_NATIVE = ['@kingstinct/react-native-healthkit', 'react-native-nitro-modules'];
+const IOS_ONLY_NATIVE = ['@kingstinct/react-native-healthkit', 'react-native-nitro-modules', 'expo-widgets'];
+
+/**
+ * モジュールスコープ import を**1ファイルだけ**許す例外（理由必須）。
+ * ここに足すときは「Android から絶対に require されない」ことを別のテストで証明すること。
+ */
+const IMPORT_ALLOWED: Record<string, string> = {
+  'src/liveactivity/RestActivity.tsx':
+    "Live Activity の描画本体。'widget' ディレクティブで別バンドルにコンパイルされ、"
+    + 'アプリ側からは lib/restActivity.ts の Platform.OS !== "ios" ガード越しの require でしか触らない',
+};
 
 /** 直接依存として持たないもの。
  *  - expo-glass-effect / expo-symbols: アプリで一切使っていない iOS 専用モジュール
@@ -53,11 +63,28 @@ describe('platformSafety: iOS 専用ネイティブが Android に漏れない',
       for (const name of IOS_ONLY_NATIVE) {
         // 静的 import はバンドル評価時に必ず実行される＝Android で逃げ道が無い
         if (new RegExp(`^import[^\\n]*from ['"]${name.replace(/[/\\]/g, '\\$&')}['"]`, 'm').test(src)) {
-          offenders.push(path.relative(ROOT, f) + ' → ' + name);
+          const relPath = path.relative(ROOT, f).replace(/\\/g, '/');
+          if (IMPORT_ALLOWED[relPath]) continue;   // 理由つきの例外（下のテストで安全性を別途固定する）
+          offenders.push(relPath + ' → ' + name);
         }
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('restActivity.ts は Android で Live Activity の JS を評価しない（require の前に Platform.OS !== "ios" で return）', () => {
+    // RestActivity.tsx（expo-widgets を静的 import する唯一のファイル）へ届く道はここ1本だけ。
+    // ガードが外れると Android で expo-widgets / @expo/ui のバンドルが評価される
+    const src = fs.readFileSync(path.join(SRC, 'lib', 'restActivity.ts'), 'utf8');
+    const i = src.indexOf("require('../liveactivity/RestActivity')");
+    expect(i).toBeGreaterThan(0);
+    expect(src.slice(0, i)).toMatch(/Platform\.OS !== 'ios'\) return null/);
+    // 他の場所から直に読み込んでいないこと（入口が増えると上のガードを迂回できてしまう）
+    const others = walk(SRC)
+      .filter((f2) => !/restActivity\.ts$/.test(f2))
+      .filter((f2) => /liveactivity\/RestActivity/.test(fs.readFileSync(f2, 'utf8')))
+      .map((f2) => path.relative(ROOT, f2));
+    expect(others).toEqual([]);
   });
 
   it('health.ts は Android で HealthKit の JS を評価しない（require の前に Platform.OS !== "ios" で return）', () => {

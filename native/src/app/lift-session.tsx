@@ -35,6 +35,7 @@ import {
 } from '@/lib/liftSession';
 import { epley1RM, parse1RMs, repsNeededFor } from '@/lib/rm';
 import { bumpRestCount } from '@/lib/achievements';
+import { armRest } from '@/lib/restTimer';
 import { bumpFoodFreq, readFoodFreq, foodScores } from '@/lib/foods';
 import LiftPicker from '@/components/LiftPicker';
 import SetDial from '@/components/SetDial';
@@ -114,20 +115,13 @@ export default function LiftSessionScreen() {
   const restEndsAt = st?.restEndsAt ?? null;
   const restSec = st?.restSec ?? REST_DEFAULT_SEC;
   const left = restLeftSec(restEndsAt, now);
-  const fired = useRef<number | null>(null);
   useEffect(() => {
     if (restEndsAt == null) return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, [restEndsAt]);
-  useEffect(() => {
-    // 0になった瞬間に一度だけ知らせる（同じ終了時刻で二度鳴らさない）
-    if (left === 0 && restEndsAt != null && fired.current !== restEndsAt) {
-      fired.current = restEndsAt;
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      try { Vibration.vibrate(500); } catch { /* 端末設定次第 */ }
-    }
-  }, [left, restEndsAt]);
+  // 0 になった瞬間の触覚＋バイブは lib/restTimer.ts が1回だけ鳴らす
+  // （画面とタイマーの両方で鳴らすと、この画面にいるときだけ二重に鳴る）
   function startRest() {
     update({ restEndsAt: Date.now() + restSec * 1000 });
     setNow(Date.now());
@@ -136,35 +130,15 @@ export default function LiftSessionScreen() {
   }
   function stopRest() { update({ restEndsAt: null }); }
 
-  // ===== レスト終了の通知（画面を離れているときだけ） =====
-  // 画面を見ている間は触覚＋バイブで足りる。背景に回ったときだけ、終了時刻に1回のローカル通知を予約し、
-  // 戻ってきたら取り消す（二重に鳴らさない）。通知の許可が無ければ黙って何もしない
-  // （ロック画面／Dynamic Island に常時カウントダウンを出す Live Activity は別件 docs/TODO.md B10）
-  const restNotifId = useRef<string | null>(null);
-  const cancelRestNotif = useCallback(async () => {
-    const id = restNotifId.current;
-    restNotifId.current = null;
-    if (id) { try { await Notifications.cancelScheduledNotificationAsync(id); } catch { /* 無視 */ } }
-  }, []);
-  const scheduleRestNotif = useCallback(async (endsAt: number) => {
-    await cancelRestNotif();
-    if (endsAt - Date.now() < 1500) return;
-    try {
-      const perm = await Notifications.getPermissionsAsync();
-      if (!perm.granted) return;
-      restNotifId.current = await Notifications.scheduleNotificationAsync({
-        content: { title: t('レスト終了'), body: t('次のセットへ。'), sound: true, data: { url: 'bodylog://lift-session' } },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(endsAt) },
-      });
-    } catch { /* Expo Go 等では黙って諦める */ }
-  }, [cancelRestNotif]);
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') { void cancelRestNotif(); return; }
-      if (restEndsAt != null && restEndsAt > Date.now()) void scheduleRestNotif(restEndsAt);
-    });
-    return () => { sub.remove(); void cancelRestNotif(); };
-  }, [restEndsAt, cancelRestNotif, scheduleRestNotif]);
+  // ===== レスト終了の知らせ（lib/restTimer.ts に一本化・2026-09-17） =====
+  // 以前はここで AppState を見て「背景に回った瞬間」にだけ通知を予約し、画面のアンマウントで
+  // 取り消していた。そのため**戻るボタンで画面を離れると通知が一度も予約されないまま**になり、
+  // レストが終わっても何も起きなかった（熊田さん指摘）。
+  // いまはレストの開始と同時に予約する＝画面の生き死ににも AppState にも依存しない。
+  // 保存は上の useEffect がセッション状態ごと書くので persist は要らない
+  // 種目名はダイナミックアイランドに出す。最後に足したセットの種目＝いま休んでいる種目
+  const restingLift = (st?.sets ?? [])[(st?.sets.length ?? 0) - 1]?.name ?? '';
+  useEffect(() => { void armRest(restEndsAt, { persist: false, exercise: restingLift }); }, [restEndsAt, restingLift]);
   const [restDial, setRestDial] = useState(false);
   function pickRest(sec: number) {
     AsyncStorage.setItem('bl-rest-sec', String(sec)).catch(() => {});

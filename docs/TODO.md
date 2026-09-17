@@ -358,18 +358,28 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 
 熊田さんが「それでも全画面スワイプで」なら実装する（ページャ置換・約1日）。
 
-### B10. 🟡 レストタイマーを画面外にも出す（Live Activity / Android クロノメーター通知）
-現状（2026-09-04）: 画面を離れたときだけ終了時刻に1回のローカル通知。常時のカウントダウンは無い。
-- **iOS**: Live Activity（ActivityKit）でロック画面と Dynamic Island にカウントダウン。
-  Widget Extension ターゲットが必要（codemagic.yaml に `ENABLE_WIDGET` の足場あり）。
-  候補: `expo-live-activity`／`@bacons/apple-targets`。開始・更新・終了の3 API を lift-session から呼ぶ。
-  iOS 16.2+。バックグラウンドでの更新は「終了時刻」を渡してシステム側に数えさせる（push 不要）
-- **Android**: 進行中通知に `usesChronometer` ＋ `chronometerCountDown`（`when`=終了時刻）。
-  カウントダウン表示だけなら Foreground Service は不要。候補: `@notifee/react-native`
-  （expo-notifications はクロノメーター表示を持たない）。Android 13+ は通知権限の実行時要求
-- 共通: 開始で作成・停止/やり直し/保存/破棄で終了。二重表示（Live Activity と通知）を避けるため、
-  Live Activity が使える端末では終了通知を出さない
-- 判断ゲート: 「迷いを減らす」に直結（ジムで画面を見なくてよくなる）。記録の負担は増えない
+### B10. 🟢 レストタイマーを画面外にも出す（残: Android のクロノメーター通知）
+**2026-09-17 に大半を実装した（v1.1.9）。** 残っているのは Android と、iOS 側の「点灯」だけ。
+
+済み:
+- **どの画面にいても残り時間が見える**（`components/RestTimerBar.tsx`・ルート常駐）
+- **画面を離れても終了通知が来る**（`lib/restTimer.ts`。以前は「背景に回った瞬間」にしか
+  予約しておらず、戻るボタンで離れると一度も予約されなかった）
+- **iOS の Live Activity / ダイナミックアイランド**（`src/liveactivity/RestActivity.tsx`）。
+  コードは入っている。**点灯には Apple 側の App ID 作成と `ENABLE_LIVE_ACTIVITY=true` の
+  CI ビルドが要る → docs/LIVE-ACTIVITY.md**
+
+残り:
+- **Android**: 進行中通知に `usesChronometer` ＋ `setChronometerCountDown`（`when`=終了時刻）。
+  カウントダウンだけなら Foreground Service は不要。`expo-notifications` はこの指定を持たないので、
+  `modules/widget-bridge` と同じ流儀の自前 Kotlin モジュール（`platforms:["android"]`）を推奨。
+  `@notifee/react-native` は RN 0.86 / 新アーキ対応が確認できなかったので見送り。
+  将来 Android 16 の Live Updates（`setRequestPromotedOngoing`）へ1行で乗せられる
+- iOS の実機確認（ダイナミックアイランドは iPhone 14 Pro 以降）
+
+**方針変更**: 以前ここに「Live Activity が使える端末では終了通知を出さない」と書いていたが、
+**Live Activity は音を鳴らさない**。ジムでポケットに入れている場面では
+「島＝目で見る／通知＝音と振動」で役割が違うので、**両方出す**のが正しい。
 
 ### B11. 🟡 「あとのカロリーで何を食べる？」のレシピ: 分量（g・個数・調味料）と手順を出す
 - 分量は g／個数で、調味料も含める。**手順も出す**

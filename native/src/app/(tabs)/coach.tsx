@@ -489,7 +489,7 @@ export default function CoachScreen() {
           キーボード表示中（kbVisible）は書く手を邪魔しないので出さない。
           このタブで自前処理する行動は無い（食事・先の予定は食事タブ、運動は運動タブ、体の写真は概要タブへ。
           マイ食品の登録と体重はどのタブでも PlusEntry がその場で処理する） */}
-      <PlusEntry bottomOffset={dockH + 2} hidden={kbVisible || dockH === 0} />
+      <PlusEntry from="coach" bottomOffset={dockH + 2} hidden={kbVisible || dockH === 0} />
       <StatusBarMask />
       {/* 左上: 相談履歴（⚙とミラー配置） */}
       <Pressable style={[s.histBtn, { top: insets.top + 8 }]} onPress={() => { Keyboard.dismiss(); setHistOpen(true); }} hitSlop={10}>

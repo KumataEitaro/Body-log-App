@@ -30,11 +30,12 @@ import { GuideProvider } from '../components/GuideTour';
 
 // 遷移先とURLパラメータをテストから差し替える（jest.setup.js の既定モックを上書き）
 const mockNavigate = jest.fn();
+const mockPush = jest.fn();
 let mockParams: Record<string, string> = {};
 let mockKb = false;
 jest.mock('expo-router', () => ({
   useNavigation: () => ({ addListener: () => () => {}, isFocused: () => true }),
-  useRouter: () => ({ push: jest.fn(), navigate: mockNavigate, replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, navigate: mockNavigate, replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockParams,
   useFocusEffect: (cb: () => void) => { const React = require('react'); React.useEffect(() => cb(), []); },
   Redirect: () => null,
@@ -156,7 +157,7 @@ describe('＋シートの行動の振り分け', () => {
       ['食事を記録', '/log', { open: 'text' }],
       ['あとのカロリーで何を食べる？', '/log', { open: 'whattoeat' }],
       ['先の予定を入れる', '/log', { open: 'plan' }],
-      ['運動', '/training', { open: 'activity' }],
+      ['運動（歩く・走る・泳ぐ）', '/training', { open: 'activity' }],
       ['体の写真', '/changes', { open: 'photos', shoot: '1' }],
     ];
     for (const [label, pathname, params] of cases) {
@@ -172,12 +173,30 @@ describe('＋シートの行動の振り分け', () => {
     }
   });
 
-  it('運動タブの「運動」は遷移せずその場で「運動を記録する」シートを開く', async () => {
+  it('運動タブの「運動（歩く・走る・泳ぐ）」は遷移せずその場で「運動を記録する」シートを開く', async () => {
     const tree = await mount(<TrainingScreen />);
-    await pickFromPlus(tree, '運動');
+    await pickFromPlus(tree, '運動（歩く・走る・泳ぐ）');
     expect(tree.root.findByType(ActivityLogSheet).props.visible).toBe(true);
     expect(mockNavigate).not.toHaveBeenCalled();
     await act(async () => { tree.unmount(); });
+  });
+
+  // 2026-09-17 熊田さん「プラスメニューから運動の記録をするときに、急に『運動の記録』に飛ぶので、
+  // 『筋トレを記録』と選ばせてほしい」。有酸素（時間ダイアル）と筋トレ（重量×回数×セット）は
+  // 入力がまったく違うので、＋シートの時点で行き先を割る
+  it('「筋トレ」は有酸素とは別に、筋トレ記録画面へ直行する（戻るラベルと日付つき）', async () => {
+    for (const [Screen, from] of [[TrainingScreen, 'training'], [LogScreen, 'log']] as const) {
+      mockPush.mockClear(); mockNavigate.mockClear();
+      const tree = await mount(<Screen />);
+      await pickFromPlus(tree, '筋トレ');
+      expect(mockNavigate).not.toHaveBeenCalled();        // 運動タブの有酸素シートへは行かない
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const arg = mockPush.mock.calls[0][0] as { pathname: string; params: Record<string, string> };
+      expect(arg.pathname).toBe('/lift-session');
+      expect(arg.params.from).toBe(from);                 // 戻るボタンが「‹ 運動」「‹ 食事」と名乗る
+      expect(arg.params.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      await act(async () => { tree.unmount(); });
+    }
   });
 
   it('概要タブの「体の写真」は遷移せずその場で体写真ページ＋撮影へ', async () => {
@@ -196,12 +215,12 @@ describe('＋シートの行動の振り分け', () => {
     const handled: Record<string, boolean> = {};
     await act(async () => {
       for (const a of ['meal:text', 'meal:myfood', 'meal:library', 'meal:camera', 'meal:whattoeat', 'plan',
-        // 運動・体の写真・マイ食品の登録は共通処理（他タブへ／その場でAddFoodSheet）に任せる
-        'exercise', 'bodyphoto', 'myfood:add']) handled[a] = onLocal(a);
+        // 運動・筋トレ・体の写真・マイ食品の登録は共通処理（他タブへ／筋トレ記録画面へ／その場でAddFoodSheet）に任せる
+        'exercise', 'lift', 'bodyphoto', 'myfood:add']) handled[a] = onLocal(a);
     });
     expect(handled).toEqual({
       'meal:text': true, 'meal:myfood': true, 'meal:library': true, 'meal:camera': true, 'meal:whattoeat': true, plan: true,
-      exercise: false, bodyphoto: false, 'myfood:add': false,
+      exercise: false, lift: false, bodyphoto: false, 'myfood:add': false,
     });
     await act(async () => { tree.unmount(); });
   });

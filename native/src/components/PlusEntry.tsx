@@ -36,6 +36,7 @@ import { todayJST } from '@/lib/calc';
 import { saveWeightEntry } from '@/lib/weightLog';
 import { C, RADIUS, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { navFrom, type NavFrom } from '@/lib/navHeader';
 
 /** 食事タブ側で受ける open= の値（PlusAction から 'meal:' を外したもの） */
 export type LogOpenParam = 'text' | 'myfood' | 'library' | 'camera' | 'whattoeat' | 'plan';
@@ -54,6 +55,8 @@ export function logOpenParamOf(a: PlusAction): LogOpenParam | null {
 }
 
 export type PlusEntryProps = {
+  /** この＋がどのタブに置かれているか。開いた先の戻るボタンに出す（lib/navHeader.ts） */
+  from?: NavFrom;
   /** ガイドツアーの照射キー。食事タブだけ 'dock'（複数タブで登録すると照射がずれる） */
   guideKey?: 'dock' | null;
   /** 既定位置からさらに持ち上げる高さ（相談タブ: コンポーザー＋免責行の実測高さ＋余白） */
@@ -77,7 +80,7 @@ export type PlusEntryProps = {
 };
 
 export default function PlusEntry({
-  guideKey = null, bottomOffset = 0, hidden = false, badge = 0,
+  guideKey = null, bottomOffset = 0, hidden = false, badge = 0, from,
   onLocal, onOpen, onMyFoodSaved, onWeightSaved, latestWeight, date,
 }: PlusEntryProps) {
   const router = useRouter();
@@ -126,6 +129,11 @@ export default function PlusEntry({
     switch (a) {
       case 'exercise':
         router.navigate({ pathname: '/training', params: { open: 'activity', ts } } as never);
+        break;
+      // 筋トレは全画面の記録画面へ直行（2026-09-17）。有酸素とは入力がまったく違うので、
+      // ＋シートの時点で行き先を分けておく。日付は親が持っていればそれ、無ければ今日
+      case 'lift':
+        router.push({ pathname: '/lift-session', params: navFrom(from, { date: date ?? todayJST() }) } as never);
         break;
       case 'bodyphoto':
         router.navigate({ pathname: '/changes', params: { open: 'photos', shoot: '1', ts } } as never);

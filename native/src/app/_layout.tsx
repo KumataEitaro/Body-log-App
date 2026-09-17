@@ -30,6 +30,8 @@ import { peekDroppedNotice, clearDroppedNotice, flush as flushOfflineQueue } fro
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { GuideProvider } from '@/components/GuideTour';
 import ReconsentGate from '@/components/ReconsentGate';
+import RestTimerBar from '@/components/RestTimerBar';
+import { hydrateRest } from '@/lib/restTimer';
 import { installCrashReporter } from '@/lib/crash';
 import { loadRemoteContentCache, startRemoteContentSync } from '@/lib/remoteContent';
 import { loadHealthLink, startHealthAutoSync } from '@/lib/health';
@@ -180,6 +182,8 @@ export default function RootLayout() {
   // 未連携・Android・Expo Go では内部で no-op。バックグラウンド起床（HealthKit配信）でも
   // ここを通るので、起こされた回で体重の取り込みまで済む（通知は出さない）
   useEffect(() => { if (ready && authed) safeBoot('startHealthAutoSync', startHealthAutoSync); }, [ready, authed]);
+  // 筋トレのレストは端末に終了時刻で残る。アプリを立ち上げ直しても残り時間と通知を拾い直す（lib/restTimer.ts）
+  useEffect(() => { if (ready && authed) safeBoot('hydrateRest', hydrateRest); }, [ready, authed]);
 
   return (
     // 描画中の例外でアプリごと落ちるのを防ぐ最後の受け皿
@@ -208,6 +212,9 @@ export default function RootLayout() {
         </GuideProvider>
         {/* 規約改定時の再同意ゲート。認証済みのときだけ判定が走る（lib/consent.ts）。
             ルートに置くのは、どの画面からでも必ず表示させるため */}
+        {/* 筋トレのレスト中だけ上端に出る帯。どのタブにいても残り時間が見える（2026-09-17・熊田さん指摘）。
+            Stack の外に置くのは「戻るボタンで筋トレ記録画面を離れても消えない」ようにするため */}
+        {authed && <RestTimerBar />}
         {authed && <ReconsentGate />}
       </LaunchProvider>
     </ErrorBoundary>

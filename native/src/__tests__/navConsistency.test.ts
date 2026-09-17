@@ -39,6 +39,8 @@ const PUSH_SITES = [
   'app/settings.tsx',
   'components/LeanBulkCard.tsx',
   'components/LiftingProgress.tsx',
+  'components/RestTimerBar.tsx',     // レスト中の帯 → 筋トレ記録画面（いまいるタブを from にする）
+  'components/PlusEntry.tsx',      // ＋シートの「筋トレ」→ 筋トレ記録画面（from は親タブが渡す）
   'components/StartChecklist.tsx',
   'components/StreakChip.tsx',
 ];
