@@ -2332,4 +2332,9 @@ export const PT: Record<string, string> = {
   // オンボーディングの案内文（2026-09-16・廃止された⚙への言及を実在する経路名へ）
   "基礎代謝と消費カロリーの計算に使います。あとで「概要」タブの設定からいつでも変更できます。": "Usado para calcular seu metabolismo basal e seu gasto. Você pode mudar quando quiser em Ajustes, na aba Visão geral.",
   "減らしたい人も、増やしたい人もここから。目的に合わせて、たんぱく質・脂質の目安を自動で決めます。あとで「概要」タブの「目標設定」からいつでも変えられます。": "Para perder ou ganhar peso. Definimos suas metas de proteína e gordura conforme seu objetivo. Você pode mudar quando quiser em Metas, na aba Visão geral.",
+  // ＋メニュー: 運動を「有酸素」と「筋トレ」の2行に分けた（2026-09-17）
+  "運動（歩く・走る・泳ぐ）": "Exercício (caminhar, correr, nadar)",
+  // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
+  "レスト中": "Descansando",
+  "レストを止める": "Parar descanso",
 };

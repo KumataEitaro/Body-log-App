@@ -29,7 +29,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus,
+  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus, Footprints,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,9 +48,10 @@ import { t } from '@/lib/i18n';
  *    マイ食品を登録 BookmarkPlus 「あとで1タップで呼び出せるように取っておく」＝ブックマーク＋。
  *                                食事の Utensils（記録）とも、相談タブの SquarePen（新しい相談）や
  *                                NotebookPen（ノート＝記録に見える）とも意味が被らない（2026-09-10） */
-const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
+const ROW_ICON: Record<'meal' | 'exercise' | 'lift' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
   meal: Utensils,
-  exercise: Dumbbell,
+  exercise: Footprints,   // 歩いた・走った・泳いだ（有酸素）
+  lift: Dumbbell,        // 筋トレ（重量×回数×セット）
   bodyphoto: PersonStanding,
   weight: Scale,
   whattoeat: Sparkles,
@@ -60,7 +61,7 @@ const ROW_ICON: Record<'meal' | 'exercise' | 'bodyphoto' | 'weight' | 'whattoeat
 
 /** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート）。
  *  'myfood:add' はマイ食品の登録シート（components/AddFoodSheet.tsx・どのタブでもその場で開く） */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'bodyphoto' | 'plan' | 'myfood:add';
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'lift' | 'bodyphoto' | 'plan' | 'myfood:add';
 export type PlusStep = 'root' | 'meal' | 'weight';
 
 export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
@@ -183,7 +184,11 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
 
                 {/* 残りの記録はリスト行（高さ56・行間6）。運動は「歩いた・泳いだ」も含む一般の運動 */}
                 <View style={s.rows}>
-                  <Row icon="exercise" label={t('運動')} onPress={() => pick('exercise')} testID="plus-exercise" />
+                  {/* 運動は「歩いた・泳いだ」と「筋トレ」で入力がまったく違う（時間ダイアル vs 重量×回数×セット）。
+                      2026-09-17 まで「運動」1行で、押すと**問答無用で有酸素の記録シート**が開いていた。
+                      筋トレをしたい人が毎回そこから引き返すことになるので、ここで選ばせる（熊田さん指摘） */}
+                  <Row icon="exercise" label={t('運動（歩く・走る・泳ぐ）')} onPress={() => pick('exercise')} testID="plus-exercise" />
+                  <Row icon="lift" label={t('筋トレ')} onPress={() => pick('lift')} testID="plus-lift" />
                   <Row icon="bodyphoto" label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
                   <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
                 </View>

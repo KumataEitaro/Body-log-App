@@ -58,7 +58,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     expect(styleOf(meal).flexDirection).toBe('row');
 
     // ② 残りはすべて高さ52のリスト行で、右端にシェブロンが付く
-    for (const l of ['運動', '体の写真', '体重', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '先の予定を入れる']) {
+    for (const l of ['運動（歩く・走る・泳ぐ）', '筋トレ', '体の写真', '体重', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '先の予定を入れる']) {
       const row = item(tree, l);
       expect(row).toBeTruthy();
       expect(styleOf(row).height).toBe(52);
@@ -72,12 +72,12 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
       .map((n) => n.props.testID as string)
       // 同じ testID が Row と中の Pressable の両方に付く（＝連続して2回出る）ので畳む
       .filter((id, i, arr) => id !== arr[i - 1]);
-    expect(order).toEqual(['plus-meal', 'plus-exercise', 'plus-bodyphoto', 'plus-weight', 'plus-myfood-add', 'plus-whattoeat', 'plus-plan']);
+    expect(order).toEqual(['plus-meal', 'plus-exercise', 'plus-lift', 'plus-bodyphoto', 'plus-weight', 'plus-myfood-add', 'plus-whattoeat', 'plus-plan']);
 
     // ③ 2×2グリッド（flexWrap で折り返す枡・幅%指定・正方形に近い高さ）はもう無い
     const wrapped = tree.root.findAll((n) => n.type === View && (styleOf(n) as { flexWrap?: string }).flexWrap === 'wrap');
     expect(wrapped).toHaveLength(0);
-    for (const l of ['食事を記録', '運動', '体の写真', '体重', 'あとのカロリーで何を食べる？']) {
+    for (const l of ['食事を記録', '運動（歩く・走る・泳ぐ）', '筋トレ', '体の写真', '体重', 'あとのカロリーで何を食べる？']) {
       expect(styleOf(item(tree, l)).width).toBeUndefined();   // 旧タイルは width:'47.5%'
     }
 
@@ -119,9 +119,9 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     await act(async () => { tree.unmount(); });
   });
 
-  it('リスト行の行動もそのまま外へ出る（運動・体の写真・マイ食品を登録・何を食べる？・先の予定）', async () => {
+  it('リスト行の行動もそのまま外へ出る（運動・筋トレ・体の写真・マイ食品を登録・何を食べる？・先の予定）', async () => {
     for (const [label, action] of [
-      ['運動', 'exercise'], ['体の写真', 'bodyphoto'],
+      ['運動（歩く・走る・泳ぐ）', 'exercise'], ['筋トレ', 'lift'], ['体の写真', 'bodyphoto'],
       // マイ食品の登録シート（AddFoodSheet）も、＋シートが閉じ切ってから開く（iOSのModal兄弟問題）
       ['マイ食品を登録', 'myfood:add'],
       ['あとのカロリーで何を食べる？', 'meal:whattoeat'], ['先の予定を入れる', 'plan'],

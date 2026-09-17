@@ -2156,7 +2156,7 @@ export default function LogScreen() {
         {/* ＋とそのシート（記録の種類→食事は入力シート直行・体重はシート内保存・マイ食品の登録）。
             4タブ共通の components/PlusEntry.tsx。食事タブだけガイド照射 'dock' を登録し、
             meal:*／whattoeat／plan は onPlusLocal でこのタブの中で開く */}
-        <PlusEntry
+        <PlusEntry from="log"
           guideKey="dock"
           badge={parsed?.items.length ?? 0}
           onOpen={() => setMsg(null)}
