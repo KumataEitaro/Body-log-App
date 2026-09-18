@@ -29,10 +29,9 @@ export async function buildTodos(): Promise<TodoResult> {
 
   const weekAgo = new Date(Date.parse(today) - 7 * 86400000).toISOString().slice(0, 10);
 
-  const [entRes, goalRes, photoRes, logRes] = await Promise.all([
+  const [entRes, goalRes, logRes] = await Promise.all([
     supabase.from('entries').select('date,intake,weight,mood').gte('date', weekAgo).order('date', { ascending: false }),
     supabase.from('goals').select('*').maybeSingle(),
-    supabase.from('body_photos').select('date').order('date', { ascending: false }).limit(1),
     supabase.from('logs').select('date,text,adj').gte('date', weekAgo),
   ]);
 
@@ -89,21 +88,7 @@ export async function buildTodos(): Promise<TodoResult> {
     }
   }
 
-  // --- 体の写真: 週1回のペース（前回から7日以上） ---
-  const lastPhoto = (photoRes.data as { date: string }[] | null)?.[0]?.date ?? null;
-  if (!photoRes.error) {
-    const d = lastPhoto ? daysBetween(lastPhoto, today) : 99;
-    if (d >= 7) {
-      todos.push({
-        key: 'photo',
-        icon: '📸',
-        title: lastPhoto ? t('体の写真が{n}日ぶりです', { n: d }) : t('体の写真をまだ撮っていません'),
-        detail: t('同じ場所・同じポーズで週1枚。数字に出ない変化が見えます。'),
-        route: '/changes',
-        urgency: 'soon',
-      });
-    }
-  }
+  // 「体の写真」のやること（週1回の撮影）は 2026-09-18 に廃止（写真の保存機能ごと取り下げた）
 
   // --- 気分: 過食の引き金を掴むための材料 ---
   if (!todayEntry?.mood) {

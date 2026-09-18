@@ -2337,4 +2337,23 @@ export const DE: Record<string, string> = {
   // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
   "レスト中": "Pause läuft",
   "レストを止める": "Pause beenden",
+  // 体の数値を＋に統一・体の写真の廃止・筋トレ保存後の導線（2026-09-18）
+  "体脂肪率（AIで推定）": "Körperfett (KI-Schätzung)",
+  "ウエストを記録": "Taille speichern",
+  "体脂肪率を記録": "Körperfett speichern",
+  "おへその高さで、息を吐いたところで測ります。": "Auf Bauchnabelhöhe messen, nach dem Ausatmen.",
+  "ウエストの値を確認してください。": "Bitte den Taillenwert prüfen.",
+  "体脂肪率の値を確認してください。": "Bitte den Körperfettwert prüfen.",
+  "ウエスト {n} を記録しました。": "Taille {n} gespeichert.",
+  "体脂肪率 {n}% を記録しました。": "Körperfett {n}% gespeichert.",
+  "写真は保存されません。AIが体脂肪率を推定するために一度使うだけで、記録に残るのは数値だけです。": "Das Foto wird nicht gespeichert. Es wird einmal für die KI-Schätzung genutzt; gespeichert wird nur die Zahl.",
+  "全身が入るように、同じ場所・同じ明るさで。推定は±3%程度の目安です。": "Ganzkörper, gleicher Ort, gleiches Licht. Die Schätzung ist ein Richtwert (±3 %).",
+  "AIが推定しています…": "KI schätzt…",
+  "記録する体脂肪率（%）": "Zu speicherndes Körperfett (%)",
+  "{min}〜{max}%の範囲で。推定と違うと感じたら直してから保存できます。": "Zwischen {min} und {max} %. Wenn die Schätzung nicht passt, vor dem Speichern anpassen.",
+  "もう一度推定する": "Erneut schätzen",
+  "写真からAIが推定すると記録できます。": "Zuerst per Foto von der KI schätzen lassen.",
+  "AI推定に失敗しました。もう一度お試しください。": "KI-Schätzung fehlgeschlagen. Bitte erneut versuchen.",
+  "次の種目を入力する": "Nächste Übung eingeben",
+  "{name}へ戻る": "Zurück zu {name}",
 };

@@ -14,7 +14,7 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
-import { Plus, Camera, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
+import { Plus, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
@@ -36,7 +36,6 @@ import { Settings as SettingsIcon, Target, Award, BellRing } from 'lucide-react-
 import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
-import BodyPhotosCard from '@/components/BodyPhotosCard';
 import PlusEntry from '@/components/PlusEntry';
 import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
@@ -108,7 +107,9 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // cycle（生理周期モード）は設定「生理周期を記録する」をONにした人にだけ現れる（既定OFF）。
 // 既存のcycles（増量/減量サイクル比較）とは別物なので、キー名を混同しないこと
 // nutrients は食材ナビの栄養ランキング図鑑（/nutrient-rank）への外部遷移行（laws と同じ扱い・2026-09-03）
-const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'nutrients', 'volume', 'strength', 'health'];
+// 2026-09-18: 'photos'（体の写真）を廃止。写真の保存はやめ、体脂肪率は右下の＋から AI 推定の数値だけを記録する。
+// 保存済みの並び・非表示に 'photos' が残っていても useCardLayout/useCardOrder が既知キーだけに揃える
+const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'nutrients', 'volume', 'strength', 'health'];
 // 統合行→詳細で縦に積む旧カードの並び
 const DETAIL_STACKS: Record<string, string[]> = {
   body: ['goal', 'kpi', 'chart', 'table'],
@@ -125,7 +126,7 @@ const DETAIL_STACKS: Record<string, string[]> = {
 // 非表示にされると（右上の⚙を廃止したので）設定へ二度と辿り着けなくなる。
 // 設定ブロックは headerJSX に固定で描く（見た目は同じ sectionH ＋ menuRow）
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
-  { title: () => t('からだの変化'), keys: ['body', 'vitals', 'cycle', 'photos', 'laws', 'bulkguard', 'cycles'] },
+  { title: () => t('からだの変化'), keys: ['body', 'vitals', 'cycle', 'laws', 'bulkguard', 'cycles'] },
   { title: () => t('食事の傾向'), keys: ['eating', 'week', 'nutrients'] },
   { title: () => t('運動の傾向'), keys: ['volume', 'strength', 'health'] },
 ];
@@ -139,7 +140,7 @@ function normalizeOrder(order: string[]): string[] {
 const CARD_LABELS = (): Record<string, string> => ({
   // 統合行（メニュー・詳細タイトル・⊕シートで使う）
   body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
-  laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), photos: t('体の写真'), health: t('歩数・睡眠'),
+  laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), health: t('歩数・睡眠'),
   vitals: t('バイタル'), cycle: t('生理周期'), nutrients: t('栄養ランキング'),
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
@@ -797,8 +798,6 @@ export default function ChangesScreen() {
       case 'kpi': return kpiCard;
       case 'calendar': return calendarCard;
       case 'chart': return chartCard;
-      // 食事タブの＋シート「体の写真」から来たときは、開いた瞬間に「撮影する／写真から選ぶ」を出す（autoCaptureKey=ノンス）
-      case 'photos': return <BodyPhotosCard autoCaptureKey={photoShootTs} />;
       // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
       case 'vitals': return <VitalsCard width={winW - 60} />;
       // 生理周期（migration-28未適用でも空状態で成立する）。保存・削除のたびに帯を貼り直す
@@ -907,7 +906,6 @@ export default function ChangesScreen() {
         const wk = t('{n}週目', { n: Math.floor(days / 7) + 1 });
         return `${cycleLabel(open.purpose)} ${wk}${d != null ? `・${d > 0 ? '+' : ''}${d.toFixed(1)}kg` : ''}`;
       }
-      case 'photos': return t('見た目の変化を並べて見る');
       // 「周期14日目・これまでの平均29日」式（未記録なら記録への誘い）。予測は含まない
       case 'cycle': return cycleSummary(cycleStarts, today);
       // 最新の血圧（無ければ誘い文）。取得は画面ロードのベストエフォート
@@ -934,7 +932,6 @@ export default function ChangesScreen() {
       case 'nutrients': return <Trophy {...p} />;
       case 'bulkguard': return <Gauge {...p} />;
       case 'cycles': return <Repeat {...p} />;
-      case 'photos': return <Camera {...p} />;
       case 'vitals': return <HeartPulse {...p} />;
       case 'cycle': return <Droplet {...p} />;
       case 'health': return <Footprints {...p} />;
@@ -970,18 +967,15 @@ export default function ChangesScreen() {
     // 遷移を確定させたあとに広告の判定（未ロード・条件未達なら何も起きない）
     interstitial.maybeShow(key);
   }
-  // 食事タブの＋シート「体の写真」から（/changes?open=photos&shoot=1&ts=…）:
-  // 体写真の詳細ページを開き、BodyPhotosCard に「すぐ撮影」を伝える（既存のカメラ→体脂肪率→保存の流れに乗せる）
-  // 週次レビュー画面の「くわしく見る」から（/changes?open=week）: 週の数字の一覧を直接開く
-  const { open: openParam, shoot: shootParam, ts: openTs } = useLocalSearchParams<{ open?: string; shoot?: string; ts?: string }>();
-  const [photoShootTs, setPhotoShootTs] = useState<string | undefined>(undefined);
+  // 週次レビュー画面の「くわしく見る」から（/changes?open=week）: 週の数字の一覧を直接開く。
+  // 旧 ?open=photos（体の写真ページ＋撮影）は 2026-09-18 に廃止。古いディープリンクが来ても無視する（壊さない）
+  const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
   useEffect(() => {
-    if (openParam !== 'photos' && openParam !== 'week') return;
+    if (openParam !== 'week') return;
     detailTx.value = 0;
     setDetailKey(openParam);
-    if (openParam === 'photos' && shootParam === '1') setPhotoShootTs(openTs ?? String(Date.now()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openParam, shootParam, openTs]);
+  }, [openParam, openTs]);
 
   // ===== 詳細ページのヘルスケア式ヘッダー（A-8残） =====
   // 数値系の主要ページ（body=体重・health=歩数）だけ、タイトル直下に
@@ -1283,16 +1277,11 @@ export default function ChangesScreen() {
           広告が出ない状態＝RCキー未設定の現運用では常に何も描かれない */}
       {adPitch.element}
       {/* 右下の＋（2026-09-10・食事タブと同じ components/PlusEntry.tsx）。
-          「体の写真」はこのタブにいるので遷移せず、その場で体写真の詳細ページを開いて撮影へ（onLocal で横取り）。
-          食事系・先の予定は食事タブへ、運動は運動タブへ、マイ食品の登録はその場で（PlusEntry の共通処理）。
-          ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない） */}
-      <PlusEntry from="changes" onLocal={(a) => {
-        if (a !== 'bodyphoto') return false;
-        detailTx.value = 0;                        // 前回スワイプ途中の位置が残らないようにする
-        setDetailKey('photos');
-        setPhotoShootTs(String(Date.now()));       // BodyPhotosCard に「すぐ撮影」を伝えるノンス
-        return true;
-      }} />
+          このタブで自前処理する行動は無い（食事系・先の予定は食事タブへ、運動は運動タブへ、
+          体重・ウエスト・体脂肪率・マイ食品の登録はその場で＝PlusEntry の共通処理）。
+          ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない）。
+          体の数値を保存したら一覧を読み直す（体の記録の要約行・グラフが新しい値を見る） */}
+      <PlusEntry from="changes" onWeightSaved={() => { void load(); }} onWaistSaved={() => { void load(); }} onBodyfatSaved={() => { void load(); }} />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />

@@ -58,7 +58,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     expect(styleOf(meal).flexDirection).toBe('row');
 
     // ② 残りはすべて高さ52のリスト行で、右端にシェブロンが付く
-    for (const l of ['運動（歩く・走る・泳ぐ）', '筋トレ', '体の写真', '体重', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '先の予定を入れる']) {
+    for (const l of ['運動（歩く・走る・泳ぐ）', '筋トレ', '体重', 'ウエスト', '体脂肪率（AIで推定）', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '先の予定を入れる']) {
       const row = item(tree, l);
       expect(row).toBeTruthy();
       expect(styleOf(row).height).toBe(52);
@@ -72,12 +72,13 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
       .map((n) => n.props.testID as string)
       // 同じ testID が Row と中の Pressable の両方に付く（＝連続して2回出る）ので畳む
       .filter((id, i, arr) => id !== arr[i - 1]);
-    expect(order).toEqual(['plus-meal', 'plus-exercise', 'plus-lift', 'plus-bodyphoto', 'plus-weight', 'plus-myfood-add', 'plus-whattoeat', 'plus-plan']);
+    // 2026-09-18: 体の写真（plus-bodyphoto）を廃止し、体重の隣にウエストと体脂肪率（AI推定）を置いた
+    expect(order).toEqual(['plus-meal', 'plus-exercise', 'plus-lift', 'plus-weight', 'plus-waist', 'plus-bodyfat', 'plus-myfood-add', 'plus-whattoeat', 'plus-plan']);
 
     // ③ 2×2グリッド（flexWrap で折り返す枡・幅%指定・正方形に近い高さ）はもう無い
     const wrapped = tree.root.findAll((n) => n.type === View && (styleOf(n) as { flexWrap?: string }).flexWrap === 'wrap');
     expect(wrapped).toHaveLength(0);
-    for (const l of ['食事を記録', '運動（歩く・走る・泳ぐ）', '筋トレ', '体の写真', '体重', 'あとのカロリーで何を食べる？']) {
+    for (const l of ['食事を記録', '運動（歩く・走る・泳ぐ）', '筋トレ', 'ウエスト', '体重', 'あとのカロリーで何を食べる？']) {
       expect(styleOf(item(tree, l)).width).toBeUndefined();   // 旧タイルは width:'47.5%'
     }
 
@@ -119,9 +120,9 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     await act(async () => { tree.unmount(); });
   });
 
-  it('リスト行の行動もそのまま外へ出る（運動・筋トレ・体の写真・マイ食品を登録・何を食べる？・先の予定）', async () => {
+  it('リスト行の行動もそのまま外へ出る（運動・筋トレ・体脂肪率・マイ食品を登録・何を食べる？・先の予定）', async () => {
     for (const [label, action] of [
-      ['運動（歩く・走る・泳ぐ）', 'exercise'], ['筋トレ', 'lift'], ['体の写真', 'bodyphoto'],
+      ['運動（歩く・走る・泳ぐ）', 'exercise'], ['筋トレ', 'lift'], ['体脂肪率（AIで推定）', 'bodyfat'],
       // マイ食品の登録シート（AddFoodSheet）も、＋シートが閉じ切ってから開く（iOSのModal兄弟問題）
       ['マイ食品を登録', 'myfood:add'],
       ['あとのカロリーで何を食べる？', 'meal:whattoeat'], ['先の予定を入れる', 'plan'],
@@ -158,6 +159,40 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     await act(async () => { input.props.onChangeText('70.5'); });
     await act(async () => { save.props.onPress(); });
     expect(onClose).toHaveBeenCalledTimes(1);
+    await act(async () => { tree.unmount(); });
+  });
+
+  // 2026-09-18 熊田さん「ウエストの入力も体重などと同じように入力できるようにして」
+  it('ウエスト → 体重と同じ2段目（数字＋単位＋保存）。成功で閉じる／エラー文はシート内', async () => {
+    const onClose = jest.fn();
+    const onSaveWaist = jest.fn(async (v: string) => (v === '999' ? 'ウエストの値を確認してください。' : null));
+    const tree = await mount(
+      <PlusSheet visible onClose={onClose} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="70.0"
+                 onSaveWaist={onSaveWaist} waistUnit="cm" waistPlaceholder="80.0" />,
+    );
+    await act(async () => { item(tree, 'ウエスト').props.onPress(); });
+    const input = tree.root.findAll((n) => n.props?.keyboardType === 'decimal-pad')[0];
+    expect(input).toBeTruthy();
+    expect(hasText(tree, 'cm')).toBe(true);                 // 単位は cm（体重の kg ではない）
+    await act(async () => { input.props.onChangeText('999'); });
+    const save = tree.root.findAll((n) => n.props?.label === 'ウエストを記録' && typeof n.props?.onPress === 'function')[0];
+    expect(save).toBeTruthy();
+    await act(async () => { save.props.onPress(); });
+    expect(onSaveWaist).toHaveBeenCalledWith('999');
+    expect(hasText(tree, 'ウエストの値を確認してください。')).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => { input.props.onChangeText('80.5'); });
+    await act(async () => { save.props.onPress(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await act(async () => { tree.unmount(); });
+  });
+
+  it('initialStep=weight で開くと、いきなり体重の段（スタートチェックリストからの直行）', async () => {
+    const tree = await mount(
+      <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="70.0" initialStep="weight" />,
+    );
+    expect(tree.root.findAll((n) => n.props?.keyboardType === 'decimal-pad').length).toBeGreaterThan(0);
+    expect(item(tree, '食事を記録')).toBeUndefined();   // 1段目は出ていない
     await act(async () => { tree.unmount(); });
   });
 

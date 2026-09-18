@@ -2337,4 +2337,23 @@ export const VI: Record<string, string> = {
   // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
   "レスト中": "Đang nghỉ",
   "レストを止める": "Dừng nghỉ",
+  // 体の数値を＋に統一・体の写真の廃止・筋トレ保存後の導線（2026-09-18）
+  "体脂肪率（AIで推定）": "Tỷ lệ mỡ (AI ước tính)",
+  "ウエストを記録": "Ghi vòng eo",
+  "体脂肪率を記録": "Ghi tỷ lệ mỡ",
+  "おへその高さで、息を吐いたところで測ります。": "Đo ngang rốn, sau khi thở ra.",
+  "ウエストの値を確認してください。": "Hãy kiểm tra giá trị vòng eo.",
+  "体脂肪率の値を確認してください。": "Hãy kiểm tra giá trị tỷ lệ mỡ.",
+  "ウエスト {n} を記録しました。": "Đã ghi vòng eo {n}.",
+  "体脂肪率 {n}% を記録しました。": "Đã ghi tỷ lệ mỡ {n}%.",
+  "写真は保存されません。AIが体脂肪率を推定するために一度使うだけで、記録に残るのは数値だけです。": "Ảnh không được lưu. Chỉ dùng một lần để AI ước tính; chỉ con số được ghi lại.",
+  "全身が入るように、同じ場所・同じ明るさで。推定は±3%程度の目安です。": "Toàn thân trong khung, cùng chỗ và ánh sáng. Ước tính chỉ mang tính tham khảo (±3%).",
+  "AIが推定しています…": "AI đang ước tính…",
+  "記録する体脂肪率（%）": "Tỷ lệ mỡ sẽ ghi (%)",
+  "{min}〜{max}%の範囲で。推定と違うと感じたら直してから保存できます。": "Trong khoảng {min}–{max}%. Nếu ước tính chưa đúng, sửa lại trước khi lưu.",
+  "もう一度推定する": "Ước tính lại",
+  "写真からAIが推定すると記録できます。": "Hãy để AI ước tính từ ảnh trước.",
+  "AI推定に失敗しました。もう一度お試しください。": "Ước tính thất bại. Vui lòng thử lại.",
+  "次の種目を入力する": "Nhập bài tiếp theo",
+  "{name}へ戻る": "Về {name}",
 };

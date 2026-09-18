@@ -19,7 +19,7 @@ import PlusFab from '../components/PlusFab';
 import PlusSheet from '../components/PlusSheet';
 import AddFoodSheet from '../components/AddFoodSheet';
 import ActivityLogSheet from '../components/ActivityLogSheet';
-import BodyPhotosCard from '../components/BodyPhotosCard';
+import BodyFatSheet from '../components/BodyFatSheet';
 import WhatToEatSheet from '../components/WhatToEatSheet';
 import EventPlanSheet from '../components/EventPlanSheet';
 import LogScreen from '../app/(tabs)/log';
@@ -158,7 +158,7 @@ describe('＋シートの行動の振り分け', () => {
       ['あとのカロリーで何を食べる？', '/log', { open: 'whattoeat' }],
       ['先の予定を入れる', '/log', { open: 'plan' }],
       ['運動（歩く・走る・泳ぐ）', '/training', { open: 'activity' }],
-      ['体の写真', '/changes', { open: 'photos', shoot: '1' }],
+      // 「体の写真」（/changes?open=photos）は 2026-09-18 に廃止。体脂肪率はその場のシートで AI 推定する（下のテスト）
     ];
     for (const [label, pathname, params] of cases) {
       mockNavigate.mockClear();
@@ -199,13 +199,26 @@ describe('＋シートの行動の振り分け', () => {
     }
   });
 
-  it('概要タブの「体の写真」は遷移せずその場で体写真ページ＋撮影へ', async () => {
-    const tree = await mount(<ChangesScreen />);
-    expect(tree.root.findAllByType(BodyPhotosCard)).toHaveLength(0);
-    await pickFromPlus(tree, '体の写真');
-    const card = tree.root.findByType(BodyPhotosCard);
-    expect(card.props.autoCaptureKey).toBeTruthy();   // カメラを即起動するノンス
-    expect(mockNavigate).not.toHaveBeenCalled();
+  // 2026-09-18 熊田さん「体の写真保存はエラーが出るのであきらめる。機能として消して。
+  // 代わりに AI で測定した体脂肪率の保存のみ出来るようにして（画像の保存はできませんと明示して）」
+  it('「体脂肪率（AIで推定）」はどのタブでも遷移せず、その場で BodyFatSheet が開く（写真は保存しないと明示）', async () => {
+    for (const Screen of [ChangesScreen, LogScreen]) {
+      mockNavigate.mockClear();
+      const tree = await mount(<Screen />);
+      expect(tree.root.findByType(BodyFatSheet).props.visible).toBe(false);
+      await pickFromPlus(tree, '体脂肪率（AIで推定）');
+      expect(tree.root.findByType(BodyFatSheet).props.visible).toBe(true);
+      expect(mockNavigate).not.toHaveBeenCalled();
+      // 「写真は保存されません」の明示がシートにある
+      expect(tree.root.findAll((n) => n.props?.testID === 'bodyfat-no-photo-notice').length).toBeGreaterThan(0);
+      await act(async () => { tree.unmount(); });
+    }
+  });
+
+  it('「体の写真」の行は無い（写真の保存機能は 2026-09-18 に廃止）', async () => {
+    const tree = await mount(<PlusEntry />);
+    await act(async () => { item(tree, '記録を追加').props.onPress(); });
+    expect(item(tree, '体の写真')).toBeUndefined();
     await act(async () => { tree.unmount(); });
   });
 
@@ -215,12 +228,12 @@ describe('＋シートの行動の振り分け', () => {
     const handled: Record<string, boolean> = {};
     await act(async () => {
       for (const a of ['meal:text', 'meal:myfood', 'meal:library', 'meal:camera', 'meal:whattoeat', 'plan',
-        // 運動・筋トレ・体の写真・マイ食品の登録は共通処理（他タブへ／筋トレ記録画面へ／その場でAddFoodSheet）に任せる
-        'exercise', 'lift', 'bodyphoto', 'myfood:add']) handled[a] = onLocal(a);
+        // 運動・筋トレ・体脂肪率・マイ食品の登録は共通処理（他タブへ／筋トレ記録画面へ／その場で BodyFatSheet・AddFoodSheet）に任せる
+        'exercise', 'lift', 'bodyfat', 'myfood:add']) handled[a] = onLocal(a);
     });
     expect(handled).toEqual({
       'meal:text': true, 'meal:myfood': true, 'meal:library': true, 'meal:camera': true, 'meal:whattoeat': true, plan: true,
-      exercise: false, lift: false, bodyphoto: false, 'myfood:add': false,
+      exercise: false, lift: false, bodyfat: false, 'myfood:add': false,
     });
     await act(async () => { tree.unmount(); });
   });

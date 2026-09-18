@@ -1,12 +1,12 @@
 // ＋ボタンのボトムシート（2026-09-04・「食事だけ大きいカード＋残りはリスト行」へ再設計）
 //
-// 構成: 食事＝高さ84の大カード（使用頻度が圧倒的に高い主導線）／運動・体の写真・体重＝高さ56のリスト行／
+// 構成: 食事＝高さ84の大カード（使用頻度が圧倒的に高い主導線）／運動・筋トレ・体重・ウエスト・体脂肪率＝高さ56のリスト行／
 //       区切り線を挟んで「マイ食品を登録」「何を食べる？」「先の予定」（記録ではなく準備・相談なので性質で分ける）
 // 2026-09-10: このシートは食事タブ専用ではなくなった。4タブ全部の右下＋（components/PlusEntry.tsx）から開き、
 //       行動の振り分け（その場で処理／食事タブへ遷移して同じシートを開く）は PlusEntry が持つ。
 //       シートの高さ: 428pt → **486pt**（＋insets.bottom。行1本＝52＋行間6）
 // 体重だけシート内でもう1段（数値を入れて保存。画面を移らずに済ませる）。
-// 運動・体の写真はシートを閉じて既存の画面へ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
+// 運動・筋トレ・体脂肪率はシートを閉じて既存の画面／別シートへ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
 //
 // 【なぜ2×2グリッドをやめたか（熊田さん判断 2026-09-04）】
 // 大きなカードを2×2に並べる形は「アプリランチャー風グリッド」で、2つの構造的な弱点がある。
@@ -29,7 +29,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  Utensils, Dumbbell, PersonStanding, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus, Footprints,
+  Utensils, Dumbbell, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus, Footprints, Ruler, Percent,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,18 +43,20 @@ import { useThemeRefresh } from '@/lib/theme';
  *  シートは Lucide で Android と同一の絵にしつつ**概念をタブに合わせる**:
  *    食事         Utensils       交差(UtensilsCrossed)ではなく平行＝タブの fork.knife に近い
  *    運動         Dumbbell       タブは「筋トレする人」。旧 Activity（心拍の波線）は運動に見えなかった
- *    体の写真     PersonStanding カメラは食事撮影で既に使っており、同じ絵に別の意味を持たせない
  *    体重         Scale          体重計として読みやすい（旧 Weight は分銅で伝わらない）
+ *    ウエスト     Ruler          巻き尺。体重と並べたときに「測る」が伝わる（2026-09-18）
+ *    体脂肪率     Percent        AI 推定の結果は % の数値だけを残す（写真は保存しない・2026-09-18）
  *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持）
  *    マイ食品を登録 BookmarkPlus 「あとで1タップで呼び出せるように取っておく」＝ブックマーク＋。
  *                                食事の Utensils（記録）とも、相談タブの SquarePen（新しい相談）や
  *                                NotebookPen（ノート＝記録に見える）とも意味が被らない（2026-09-10） */
-const ROW_ICON: Record<'meal' | 'exercise' | 'lift' | 'bodyphoto' | 'weight' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
+const ROW_ICON: Record<'meal' | 'exercise' | 'lift' | 'weight' | 'waist' | 'bodyfat' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
   meal: Utensils,
   exercise: Footprints,   // 歩いた・走った・泳いだ（有酸素）
   lift: Dumbbell,        // 筋トレ（重量×回数×セット）
-  bodyphoto: PersonStanding,
   weight: Scale,
+  waist: Ruler,
+  bodyfat: Percent,
   whattoeat: Sparkles,
   plan: CalendarPlus,
   myfoodAdd: BookmarkPlus,
@@ -62,10 +64,15 @@ const ROW_ICON: Record<'meal' | 'exercise' | 'lift' | 'bodyphoto' | 'weight' | '
 
 /** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート）。
  *  'myfood:add' はマイ食品の登録シート（components/AddFoodSheet.tsx・どのタブでもその場で開く） */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'lift' | 'bodyphoto' | 'plan' | 'myfood:add';
-export type PlusStep = 'root' | 'meal' | 'weight';
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'lift' | 'bodyfat' | 'plan' | 'myfood:add';
+/** シート内で完結する数値入力の段。'weight' と 'waist' は同じ見た目（数字＋単位＋保存） */
+export type PlusStep = 'root' | 'meal' | 'weight' | 'waist';
+/** シート内で保存する体の数値の種類 */
+export type MeasureKind = 'weight' | 'waist';
 
-export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder }: {
+export default function PlusSheet({
+  visible, onClose, onAction, onSaveWeight, weightUnit, weightPlaceholder, onSaveWaist, waistUnit = 'cm', waistPlaceholder = '—', initialStep,
+}: {
   visible: boolean;
   onClose: () => void;
   /** 行を選んだとき。シートが閉じ切ってから呼ばれる */
@@ -74,6 +81,12 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
   onSaveWeight: (text: string) => Promise<string | null>;
   weightUnit: string;
   weightPlaceholder: string;
+  /** ウエスト（表示単位の文字列）を保存する。契約は onSaveWeight と同じ（2026-09-18） */
+  onSaveWaist?: (text: string) => Promise<string | null>;
+  waistUnit?: string;
+  waistPlaceholder?: string;
+  /** 開いた瞬間に出す段（スタートチェックリストの「体重を1回記録する」→ 体重の段へ直行） */
+  initialStep?: MeasureKind;
 }) {
   useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
@@ -86,7 +99,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
   // 開くたびに1段目から（前回の途中状態を引き継がない）
   useEffect(() => {
     if (visible) {
-      setStep('root'); setWeight(''); setBusy(false); setErr(null); ty.value = 0;
+      setStep(initialStep ?? 'root'); setWeight(''); setBusy(false); setErr(null); ty.value = 0;
       // 前回の「閉じ切ってから渡す予定の行動」を捨てる（2026-09-15・Android 監査）。
       // Android には Modal の onDismiss が無いので 350ms のタイマーが唯一の経路。
       // 閉じてすぐ（350ms以内）に開き直すと cleanup でタイマーだけ消えて pending が残り、
@@ -119,11 +132,15 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setStep(next);
   }
-  async function saveWeight() {
-    if (!weight.trim() || busy) return;
+  // 数値の段（体重／ウエスト）の保存。どちらも「数字を入れて保存」で、違うのは保存先と単位だけ
+  const measure: MeasureKind | null = step === 'weight' || step === 'waist' ? step : null;
+  async function saveMeasure() {
+    if (!weight.trim() || busy || !measure) return;
+    const save = measure === 'waist' ? onSaveWaist : onSaveWeight;
+    if (!save) return;
     setBusy(true); setErr(null);
     try {
-      const r = await onSaveWeight(weight.trim());
+      const r = await save(weight.trim());
       if (r === null) onClose();       // 成功
       else if (r) setErr(r);           // エラー文はシートの中に出す（画面の裏に出しても見えない）
     } finally { setBusy(false); }
@@ -140,8 +157,8 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
     });
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
 
-  const crumb = step === 'weight' ? t('体重') : t('記録する');
-  // 「記録する」の下に段があるのは体重だけ（食事は直行になった）。1段のときは段表示を出さない
+  const crumb = step === 'weight' ? t('体重') : step === 'waist' ? t('ウエスト') : t('記録する');
+  // 「記録する」の下に段があるのは体重とウエストだけ（食事は直行になった）。1段のときは段表示を出さない
   const stepLabel = step === 'root' ? null : '2/2';
 
   return (
@@ -150,7 +167,7 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
           根の段まで包むと、キーボードが無いのにシート下へ見えない余白が残り、
           「記録方法を選ぶだけ」のシートが不必要に背高くなる（βフィードバック 2026-09-03） */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' && step === 'weight' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' && measure ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -191,8 +208,11 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
                       筋トレをしたい人が毎回そこから引き返すことになるので、ここで選ばせる（熊田さん指摘） */}
                   <Row icon="exercise" label={t('運動（歩く・走る・泳ぐ）')} onPress={() => pick('exercise')} testID="plus-exercise" />
                   <Row icon="lift" label={t('筋トレ')} onPress={() => pick('lift')} testID="plus-lift" />
-                  <Row icon="bodyphoto" label={t('体の写真')} onPress={() => pick('bodyphoto')} testID="plus-bodyphoto" />
+                  {/* 体の数値（体重・ウエスト）はシート内の2段目で保存。体脂肪率は写真から AI が推定するので
+                      別シート（BodyFatSheet）へ。旧「体の写真」行は 2026-09-18 に廃止（写真の保存はやめた） */}
                   <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
+                  <Row icon="waist" label={t('ウエスト')} onPress={() => go('waist')} testID="plus-waist" />
+                  <Row icon="bodyfat" label={t('体脂肪率（AIで推定）')} onPress={() => pick('bodyfat')} testID="plus-bodyfat" />
                 </View>
 
                 {/* 区切り線: 上（起きたことを記録する）と下（これからのことを決める）を性質で分ける。
@@ -213,20 +233,23 @@ export default function PlusSheet({ visible, onClose, onAction, onSaveWeight, we
               </View>
             )}
 
-            {step === 'weight' && (
+            {measure && (
               <View style={s.weightBox}>
                 <View style={s.wRow}>
                   <TextInput
-                    style={s.wInput} placeholder={weightPlaceholder} placeholderTextColor={C.faint}
+                    style={s.wInput} placeholder={measure === 'waist' ? waistPlaceholder : weightPlaceholder} placeholderTextColor={C.faint}
                     keyboardType="decimal-pad" value={weight} onChangeText={setWeight} autoFocus
-                    returnKeyType="done" onSubmitEditing={saveWeight} maxFontSizeMultiplier={1.3}
+                    returnKeyType="done" onSubmitEditing={saveMeasure} maxFontSizeMultiplier={1.3}
+                    accessibilityLabel={measure === 'waist' ? t('ウエスト') : t('体重')}
                   />
-                  <Text style={s.wUnit}>{weightUnit}</Text>
+                  <Text style={s.wUnit}>{measure === 'waist' ? waistUnit : weightUnit}</Text>
                 </View>
-                <OptionButton variant="teal" label={t('体重を記録')} onPress={saveWeight} busy={busy} disabled={!weight.trim()} />
+                <OptionButton variant="teal" label={measure === 'waist' ? t('ウエストを記録') : t('体重を記録')} onPress={saveMeasure} busy={busy} disabled={!weight.trim()} />
                 {err
                   ? <Text style={s.wErr}>{err}</Text>
-                  : <Text style={s.wHint}>{t('前回から大きく違う値は、保存の前に確認します。')}</Text>}
+                  : <Text style={s.wHint}>{measure === 'waist'
+                      ? t('おへその高さで、息を吐いたところで測ります。')
+                      : t('前回から大きく違う値は、保存の前に確認します。')}</Text>}
               </View>
             )}
           </Animated.View>
