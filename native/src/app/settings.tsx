@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { setWeeklyPhotoReminder, setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, cancelInsightNotification, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
+import { setDailyReminderPrefs, getDailyReminderPrefs, ensureNotifPermission, cancelMealGapReminder, cancelInsightNotification, getInsightNotifyEnabled, setInsightNotifyEnabled, type DailyReminderMode } from '@/lib/notify';
 // 起床時刻（「朝に出るもの」の窓の起点・lib/wakeTime.ts）
 import { WAKE_STEP_MIN, setWakeTime, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
 import { usePurpose } from '@/lib/purpose';
@@ -336,14 +336,12 @@ export default function SettingsScreen() {
   // 通知（設定はAsyncStorageに永続化。OFF→ONで権限リクエスト）
   const [remMode, setRemMode] = useState<DailyReminderMode>('off');
   const [remHour, setRemHour] = useState(21);
-  const [notifWeekly, setNotifWeekly] = useState(false);
   const [notifGap, setNotifGap] = useState(false);
   // 気づきの通知（§8）: 既定ON。記録リマインダーが smart のときだけ実際に届く（それ以外はトグルを薄く見せる）
   const [notifInsight, setNotifInsight] = useState(true);
   const purpose = usePurpose(); // 食間リマインド行はbulk（増量）の人にだけ見せる
   useEffect(() => {
     getDailyReminderPrefs().then((p) => { setRemMode(p.mode); setRemHour(p.hour); }).catch(() => {});
-    AsyncStorage.getItem('bl-notif-weekly').then((v) => setNotifWeekly(v === '1')).catch(() => {});
     AsyncStorage.getItem('bl-notif-gap').then((v) => setNotifGap(v === '1')).catch(() => {});
     getInsightNotifyEnabled().then(setNotifInsight).catch(() => {});
   }, []);
@@ -380,12 +378,6 @@ export default function SettingsScreen() {
       setRemMode('off');
       Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。'));
     }
-  }
-  async function toggleWeekly(on: boolean) {
-    setNotifWeekly(on);
-    const ok = await setWeeklyPhotoReminder(on);
-    if (!ok && on) { setNotifWeekly(false); Alert.alert(t('通知を許可してください'), t('iOSの設定 > BodyLog > 通知 から許可できます（Expo Goでは動作しません）。')); return; }
-    AsyncStorage.setItem('bl-notif-weekly', on ? '1' : '0').catch(() => {});
   }
   // 食間リマインド（増量向け）: 予約自体は食事保存のたびにlib/syncが行う。
   // ここでは設定の永続化と、ONにする瞬間の権限確認だけを担う
@@ -817,14 +809,7 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
-        <View style={s.sep} />
-        <View style={s.notifRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.notifLabel}>{t('週1回の体写真')}</Text>
-            <Text style={s.notifSub}>{t('日曜19:00に撮影リマインド')}</Text>
-          </View>
-          <Switch value={notifWeekly} onValueChange={toggleWeekly} trackColor={{ true: C.teal }} />
-        </View>
+        {/* 「週1回の体写真」のリマインドは 2026-09-18 に廃止（体の写真の保存機能ごと取り下げた） */}
         <Text style={s.notifNote}>{t('チートデイの前日20:00にも自動でお知らせします（登録時に設定・通知許可が必要）。Expo Goでは動作せず、TestFlight版で有効です。')}</Text>
       </View>
 

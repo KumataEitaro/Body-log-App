@@ -198,19 +198,11 @@ export async function setDailyLogReminder(on: boolean): Promise<boolean> {
   return setDailyReminderPrefs(on ? 'smart' : 'off', (await getDailyReminderPrefs()).hour);
 }
 
-// 毎週日曜19:00「今週の体写真を撮りましょう」
-export async function setWeeklyPhotoReminder(on: boolean): Promise<boolean> {
+// 「週1回の体写真」リマインド（日曜19:00）は 2026-09-18 に廃止した（体の写真の保存機能ごと取り下げ）。
+// 旧ビルドで予約済みの通知が鳴り続けないよう、起動時に取り消すだけを残す（reregisterAll）
+export async function cancelWeeklyPhotoReminder(): Promise<void> {
   await cancel('weekly');
-  if (!on) return true;
-  if (!(await ensureNotifPermission())) return false;
-  try {
-    const id = await Notifications.scheduleNotificationAsync({
-      content: { title: t('週1回の体チェック📸'), body: t('同じ場所・同じポーズで1枚。「概要」タブの体の写真から記録できます。') },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: 1, hour: 19, minute: 0 }, // weekday 1=日曜
-    });
-    const ids = await getIds(); ids.weekly = id; await setIds(ids);
-    return true;
-  } catch { return false; }
+  await AsyncStorage.removeItem('bl-notif-weekly').catch(() => {});
 }
 
 // チートデイ前日20:00（単発。イベント登録時に呼ぶ・許可が無ければ静かにスキップ）
@@ -476,8 +468,7 @@ export async function reregisterAll(): Promise<void> {
     await registerReminderCategory();
     const { mode } = await getDailyReminderPrefs();
     if (mode !== 'off') await applyDailyReminder();
-    const kv = await AsyncStorage.multiGet(['bl-notif-weekly']);
-    if (kv[0]?.[1] === '1') await setWeeklyPhotoReminder(true);
+    await cancelWeeklyPhotoReminder();   // 廃止した週1体写真の予約が残っていれば消す（2026-09-18）
     // 週次レビュー（日曜21:00・1週1回）。起動ごとに次の日曜ぶんを補充する
     await scheduleWeeklyReviewNotification().catch(() => {});
   } catch { /* 失敗しても既存の通知が残るだけ */ }

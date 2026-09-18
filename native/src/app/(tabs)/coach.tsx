@@ -487,7 +487,7 @@ export default function CoachScreen() {
           ＋の下端 = insets.bottom + 12 + bottomOffset／コンポーザーの上端 = insets.bottom + 6 + dockH
           → bottomOffset = dockH + 2 で 8pt の隙間になる。
           キーボード表示中（kbVisible）は書く手を邪魔しないので出さない。
-          このタブで自前処理する行動は無い（食事・先の予定は食事タブ、運動は運動タブ、体の写真は概要タブへ。
+          このタブで自前処理する行動は無い（食事・先の予定は食事タブ、運動は運動タブ、体重・ウエスト・体脂肪率・マイ食品はその場で。
           マイ食品の登録と体重はどのタブでも PlusEntry がその場で処理する） */}
       <PlusEntry from="coach" bottomOffset={dockH + 2} hidden={kbVisible || dockH === 0} />
       <StatusBarMask />

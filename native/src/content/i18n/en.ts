@@ -2415,4 +2415,23 @@ export const EN: Record<string, string> = {
   // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
   "レスト中": "Resting",
   "レストを止める": "Stop rest",
+  // 体の数値を＋に統一・体の写真の廃止・筋トレ保存後の導線（2026-09-18）
+  "体脂肪率（AIで推定）": "Body fat (AI estimate)",
+  "ウエストを記録": "Log waist",
+  "体脂肪率を記録": "Log body fat",
+  "おへその高さで、息を吐いたところで測ります。": "Measure at navel height, after exhaling.",
+  "ウエストの値を確認してください。": "Please check the waist value.",
+  "体脂肪率の値を確認してください。": "Please check the body fat value.",
+  "ウエスト {n} を記録しました。": "Logged waist {n}.",
+  "体脂肪率 {n}% を記録しました。": "Logged body fat {n}%.",
+  "写真は保存されません。AIが体脂肪率を推定するために一度使うだけで、記録に残るのは数値だけです。": "Your photo is not saved. It is used once for the AI estimate; only the number is recorded.",
+  "全身が入るように、同じ場所・同じ明るさで。推定は±3%程度の目安です。": "Full body in frame, same spot and lighting each time. The estimate is a guide within about ±3%.",
+  "AIが推定しています…": "AI is estimating…",
+  "記録する体脂肪率（%）": "Body fat to record (%)",
+  "{min}〜{max}%の範囲で。推定と違うと感じたら直してから保存できます。": "Between {min} and {max}%. If the estimate feels off, adjust it before saving.",
+  "もう一度推定する": "Estimate again",
+  "写真からAIが推定すると記録できます。": "Take or choose a photo and let the AI estimate first.",
+  "AI推定に失敗しました。もう一度お試しください。": "AI estimate failed. Please try again.",
+  "次の種目を入力する": "Log the next exercise",
+  "{name}へ戻る": "Back to {name}",
 };

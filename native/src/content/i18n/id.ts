@@ -2337,4 +2337,23 @@ export const ID: Record<string, string> = {
   // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
   "レスト中": "Istirahat",
   "レストを止める": "Hentikan istirahat",
+  // 体の数値を＋に統一・体の写真の廃止・筋トレ保存後の導線（2026-09-18）
+  "体脂肪率（AIで推定）": "Lemak tubuh (estimasi AI)",
+  "ウエストを記録": "Catat lingkar pinggang",
+  "体脂肪率を記録": "Catat lemak tubuh",
+  "おへその高さで、息を吐いたところで測ります。": "Ukur setinggi pusar, setelah menghembuskan napas.",
+  "ウエストの値を確認してください。": "Periksa nilai lingkar pinggang.",
+  "体脂肪率の値を確認してください。": "Periksa nilai lemak tubuh.",
+  "ウエスト {n} を記録しました。": "Lingkar pinggang {n} dicatat.",
+  "体脂肪率 {n}% を記録しました。": "Lemak tubuh {n}% dicatat.",
+  "写真は保存されません。AIが体脂肪率を推定するために一度使うだけで、記録に残るのは数値だけです。": "Foto tidak disimpan. Hanya dipakai sekali untuk estimasi AI; yang dicatat hanya angkanya.",
+  "全身が入るように、同じ場所・同じ明るさで。推定は±3%程度の目安です。": "Seluruh tubuh terlihat, tempat dan cahaya sama. Estimasi hanya panduan (±3%).",
+  "AIが推定しています…": "AI sedang memperkirakan…",
+  "記録する体脂肪率（%）": "Lemak tubuh yang dicatat (%)",
+  "{min}〜{max}%の範囲で。推定と違うと感じたら直してから保存できます。": "Antara {min}–{max}%. Jika estimasi terasa meleset, ubah dulu sebelum menyimpan.",
+  "もう一度推定する": "Perkirakan lagi",
+  "写真からAIが推定すると記録できます。": "Biarkan AI memperkirakan dari foto dulu.",
+  "AI推定に失敗しました。もう一度お試しください。": "Estimasi AI gagal. Coba lagi.",
+  "次の種目を入力する": "Catat gerakan berikutnya",
+  "{name}へ戻る": "Kembali ke {name}",
 };

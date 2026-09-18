@@ -745,7 +745,7 @@ export default function TrainingScreen() {
 
     {/* 右下の＋（2026-09-10・食事タブと同じ components/PlusEntry.tsx）。
         「運動」はこのタブにいるので遷移せず、その場で「運動を記録する」シートを開く（onLocal で横取り）。
-        食事系・先の予定は食事タブへ、体の写真は概要タブへ、マイ食品の登録はその場で（PlusEntry の共通処理） */}
+        食事系・先の予定は食事タブへ、体脂肪率・マイ食品の登録はその場で（PlusEntry の共通処理） */}
     <PlusEntry from="training" onLocal={(a) => { if (a === 'exercise') { setActSheet(true); return true; } return false; }} />
 
     {/* 運動を記録するシート（種目を毎回選ぶ → 時間ダイアル → 保存） */}

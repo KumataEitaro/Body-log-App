@@ -31,6 +31,9 @@ export async function syncEntriesForDate(userId: string, d: string): Promise<(Lo
       intake: s.intake, p: s.p, f: s.f, c: s.c,
       weight: s.weight, waist: s.waist, mood: s.mood, note: '',
       food_text: s.food_text.slice(0, 2000), photo_urls: s.photo_urls,
+      // 体脂肪率は「その日に記録があるときだけ」書く。null で上書きすると、旧「体の写真」カードが
+      // entries に直接入れていた過去の値（logs に行が無い）が同期のたびに消える（2026-09-18）
+      ...(s.bodyfat != null ? { bodyfat: s.bodyfat } : {}),
     }, { onConflict: 'user_id,date' });
   }
   // ホームウィジェットへ今日サマリーを書き出す（投げっぱなし・失敗無視。

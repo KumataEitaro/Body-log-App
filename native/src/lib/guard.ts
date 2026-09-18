@@ -30,6 +30,17 @@ export function inBodyfatRange(pct: number | null | undefined): boolean {
 }
 
 /**
+ * ウエストとして受け付ける範囲(cm)。両端は含めない。
+ * 2026-09-18 に＋シートから体重と同じ手順で入れられるようにしたので、体重と同じく正本をここに置く。
+ * 40cm 未満は成人ではありえず、200cm 超は測り間違い（インチと混同した 30〜40 は 40cm 未満で弾ける）。
+ */
+export const WAIST_RANGE = { min: 40, max: 200 } as const;
+
+export function inWaistRange(cm: number | null | undefined): boolean {
+  return cm != null && Number.isFinite(cm) && cm > WAIST_RANGE.min && cm < WAIST_RANGE.max;
+}
+
+/**
  * プロフィールの身長cm・年齢の範囲（両端を含む）。基礎代謝(Mifflin)の入力なので、
  * ここが別人の値だと「あと食べられる量」まで全部ズレる。
  * 100〜250cm はギネス級の身長も収まる幅、10〜120歳は利用規約の年齢下限より広い幅。

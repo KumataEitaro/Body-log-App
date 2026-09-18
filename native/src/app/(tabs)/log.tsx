@@ -4,7 +4,7 @@
 // 【入力の構成（2026-09-02 再設計）】
 // 以前は画面下に固定の入力ドック（テキスト・カメラ・ライブラリ・送信）が常駐していたが、
 // 「テキストボックスを下に固定する意味がなくなってきた」（熊田さん）ため廃止。
-// Appleヘルスケアと同じく、右下の＋ボタン → 何を記録するか（食事／運動／体の写真／体重）→
+// Appleヘルスケアと同じく、右下の＋ボタン → 何を記録するか（食事／運動／体重・ウエスト・体脂肪率）→
 // 食事なら入力方法（マイ食品／テキスト／写真を選ぶ／撮影）を選び、pageSheet の入力シートで
 // 解析→トレイ→✓保存まで済ませる。ドックにあった機能（テキスト・写真・食べた時間チップ・トレイ・
 // 残量ストリップ・マイ食品チップ・音声ヒント・外食おすすめ）はすべて入力シートの中に移した。
@@ -21,10 +21,9 @@ import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
-import PlusEntry, { type LogOpenParam } from '@/components/PlusEntry';
+import PlusEntry, { type LogOpenParam, type PlusEntryHandle } from '@/components/PlusEntry';
 import ThemeRemount from '@/components/ThemeRemount';
 import { type PlusAction } from '@/components/PlusSheet';
-import { saveWeightEntry } from '@/lib/weightLog';
 import EventPlanSheet, { type EventDraft } from '@/components/EventPlanSheet';
 import { nextEvent, eventBandText } from '@/lib/eventPlan';
 import { scheduleCheatDayEve } from '@/lib/notify';
@@ -52,7 +51,7 @@ import { Plus } from 'lucide-react-native';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
 import { pfcAdvice, PFC_LABEL } from '@/lib/pfcAdvice';
 import { pfcColors, useThemeRefresh } from '@/lib/theme';
-import { useUnits, kgToDisplay, fmtWeight } from '@/lib/units';   // 表示単位→kgの換算は lib/weightLog.ts が持つ
+import { useUnits, fmtWeight } from '@/lib/units';   // 表示単位→kgの換算は lib/weightLog.ts が持つ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -129,10 +128,11 @@ type Profile = { sex: 'male' | 'female'; height_cm: number; age: number; init_we
 type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
-const LOG_CARDS = ['hero', 'balance', 'checklist', 'mood', 'feed', 'recent', 'weight'];
+// 2026-09-18: 'weight'（体重クイック入力カード）を廃止。体重・ウエスト・体脂肪率は右下の＋から入れる（入口を1つにする）
+const LOG_CARDS = ['hero', 'balance', 'checklist', 'mood', 'feed', 'recent'];
 const LOG_LABELS = (): Record<string, string> => ({
   hero: t('あと食べられる量'), balance: t('週と月の収支'), checklist: t('スタートチェックリスト'), mood: t('いまの気分は？'),
-  feed: t('今日の記録'), recent: t('前の食事をもう一度'), weight: t('体重を記録'),
+  feed: t('今日の記録'), recent: t('前の食事をもう一度'),
 });
 
 type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
@@ -248,7 +248,6 @@ export default function LogScreen() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string; upgrade?: boolean; kind?: 'text' | 'photo' | 'coach' } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [wWeight, setWWeight] = useState('');
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -305,7 +304,8 @@ export default function LogScreen() {
   }
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
-  const wInputRef = useRef<TextInput>(null);   // 体重クイック入力（スタートチェックリストからの誘導先）
+  // 右下の＋を命令的に開く口（スタートチェックリスト「体重を1回記録する」→ ＋シートの体重の段へ直行）
+  const plusRef = useRef<PlusEntryHandle>(null);
   // iOS HIG標準「タブ再選択で先頭へ」: 食事タブ表示中にもう一度「食事」をタップ→最上部へ
   const navigation = useNavigation();
   useEffect(() => {
@@ -364,7 +364,7 @@ export default function LogScreen() {
     }
   }
   // ＋シートで選んだ行動のうち、このタブで自前処理できるもの（true を返して PlusEntry の共通処理を横取り）。
-  // 運動・体の写真・マイ食品の登録は PlusEntry の共通処理（運動タブ／概要タブへ遷移・AddFoodSheet）に任せる
+  // 運動・体脂肪率・マイ食品の登録は PlusEntry の共通処理（運動タブへ遷移・BodyFatSheet・AddFoodSheet）に任せる
   function onPlusLocal(a: PlusAction): boolean {
     switch (a) {
       case 'meal:text': openFromParam('text'); return true;
@@ -1074,31 +1074,20 @@ export default function LogScreen() {
     }
   }
 
-  // 体重の保存本体（体重カードから呼ぶ。＋シートの「体重」は PlusEntry が同じ lib/weightLog.ts で保存し、
-  // 成功を onWeightSaved で受けて同じ再読込・メッセージを出す）。
-  // 戻り値: null=成功／文字列=エラー文（カードは画面のメッセージ欄へ）。判定・書き込みの規則は lib/weightLog.ts
-  async function saveWeightValue(text: string): Promise<string | null> {
-    setSaving(true);
-    try {
-      const r = await saveWeightEntry(text, { uid, date: today, unit: units.weight, latestWeight });
-      if (!r.ok) return r.msg;
-      await onWeightSaved(r.kg);
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  }
+  // 体の数値（体重・ウエスト・体脂肪率）は右下の＋（PlusEntry）が lib/weightLog.ts / lib/bodyLog.ts で保存する。
+  // ここは成功を受けて再読込とメッセージを出すだけ。旧「体重クイック入力カード」は 2026-09-18 に廃止
+  // （入口が2つあると、どちらで入れたか分からなくなる。熊田さん「プラスボタンから追加するフローに統一」）
   async function onWeightSaved(kg: number) {
     await load();
     setMsg({ ok: true, text: t('体重 {w} を記録しました。', { w: fmtWeight(kg) }) });
   }
-  // 体重カードのエラーはカードの中に出す（画面上部のメッセージ欄はカードから遠く、気づけない）
-  const [wErr, setWErr] = useState<string | null>(null);
-  async function saveWeight() {
-    setWErr(null);
-    const err = await saveWeightValue(wWeight);
-    if (err !== null) { if (err) setWErr(err); return; }
-    setWWeight('');
+  async function onWaistSaved(cm: number) {
+    await load();
+    setMsg({ ok: true, text: t('ウエスト {n} を記録しました。', { n: `${cm.toFixed(1)}cm` }) });
+  }
+  async function onBodyfatSaved(pct: number) {
+    await load();
+    setMsg({ ok: true, text: t('体脂肪率 {n}% を記録しました。', { n: pct.toFixed(1) }) });
   }
 
   // ===== 週間・月間の収支（ヒーロー直下のカード） =====
@@ -1882,7 +1871,7 @@ export default function LogScreen() {
             onHide={() => cards.hide('checklist')}
             onFocusInput={() => openInput('text')}
             onTakePhoto={() => openInput('camera')}
-            onFocusWeight={() => wInputRef.current?.focus()}
+            onFocusWeight={() => plusRef.current?.open('weight')}
             refreshKey={dayLogs.length}
             onVisible={setChecklistLive}
             suppressed={attention.checklist === 0}
@@ -2130,22 +2119,6 @@ export default function LogScreen() {
           </View>
         )}
 
-        {/* 体重クイック入力。入力ミスの文言はカードの中に出す（画面上部のメッセージ欄は遠くて気づけない） */}
-        {vis('weight') && (
-        <Animated.View style={[s.card, enter[2]]}>
-          <MinusBadge editing={editing} onPress={() => cards.hide('weight')} />
-          <View style={[s.wRow, { marginTop: 0 }]}>
-            <TextInput ref={wInputRef} style={s.wInput} placeholder={latestWeight != null ? kgToDisplay(latestWeight, units.weight).toFixed(1) : '—'}
-                       placeholderTextColor={C.faint} keyboardType="decimal-pad" value={wWeight} onChangeText={setWWeight}
-                       accessibilityLabel={t('体重を記録')} />
-            <Text style={s.wUnit}>{units.weight}</Text>
-            <OptionButton variant="tonal" label={t('体重を記録')} leading={<Weight size={15} color={C.ink} />}
-                          onPress={saveWeight} busy={saving} disabled={!wWeight} />
-          </View>
-          {wErr && <Text style={[s.mutedT, { color: C.coral, fontSize: 13, marginTop: 8 }]}>{wErr}</Text>}
-        </Animated.View>
-        )}
-
         <View style={{ height: 16 }} />
       </ScrollView>
       </ThemeRemount>
@@ -2156,13 +2129,15 @@ export default function LogScreen() {
         {/* ＋とそのシート（記録の種類→食事は入力シート直行・体重はシート内保存・マイ食品の登録）。
             4タブ共通の components/PlusEntry.tsx。食事タブだけガイド照射 'dock' を登録し、
             meal:*／whattoeat／plan は onPlusLocal でこのタブの中で開く */}
-        <PlusEntry from="log"
+        <PlusEntry ref={plusRef} from="log"
           guideKey="dock"
           badge={parsed?.items.length ?? 0}
           onOpen={() => setMsg(null)}
           onLocal={onPlusLocal}
           latestWeight={latestWeight} date={today}
           onWeightSaved={onWeightSaved}
+          onWaistSaved={onWaistSaved}
+          onBodyfatSaved={onBodyfatSaved}
           onMyFoodSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に登録しました。下のチップから1タップで足せます。') }); }}
         />
       </Animated.View>

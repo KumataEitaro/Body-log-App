@@ -13,6 +13,7 @@ export type LogRow = {
   c?: number | null;
   weight?: number | null;
   waist?: number | null;
+  bodyfat?: number | null;   // 体脂肪率(%)。＋シートの「体脂肪率（AIで推定）」が数値だけの行として入れる（2026-09-18）
   ex?: ExLevel | null;
   adj?: number | null;
   mood?: string | null;
@@ -27,6 +28,7 @@ export type DaySummary = {
   c: number | null;
   weight: number | null;
   waist: number | null;
+  bodyfat: number | null;   // その日の最後の体脂肪率(%)。無ければ null（entries の既存値は上書きしない・lib/sync.ts）
   ex: ExLevel;      // 表示用: その日の最高強度
   adj: number;      // 目安計算用: (Σ運動追加kcal + Σ補正) − EX_ADD[最高強度] を折り込む
   exKcalTotal: number; // その日の運動追加kcalの合計（表示用）
@@ -61,6 +63,7 @@ export function summarizeDay(logs: LogRow[]): DaySummary {
 
   const weights = logs.filter((l) => l.weight != null);
   const waists = logs.filter((l) => l.waist != null);
+  const bodyfats = logs.filter((l) => l.bodyfat != null);
   const moods = logs.filter((l) => l.mood && String(l.mood).trim() !== '');
   const ex = maxExLevel(logs);
   const exTotal = dayExerciseKcal(logs);
@@ -72,6 +75,7 @@ export function summarizeDay(logs: LogRow[]): DaySummary {
     c: sum('c'),
     weight: weights.length ? Number(weights[weights.length - 1].weight) : null,
     waist: waists.length ? Number(waists[waists.length - 1].waist) : null,
+    bodyfat: bodyfats.length ? Number(bodyfats[bodyfats.length - 1].bodyfat) : null,
     ex,
     adj: round1(exTotal - (EX_ADD[ex] ?? 0)),
     exKcalTotal: exTotal,

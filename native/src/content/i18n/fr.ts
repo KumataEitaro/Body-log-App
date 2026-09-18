@@ -2337,4 +2337,23 @@ export const FR: Record<string, string> = {
   // レスト中の帯（どのタブにいても残り時間が見える・2026-09-17）
   "レスト中": "Repos en cours",
   "レストを止める": "Arrêter le repos",
+  // 体の数値を＋に統一・体の写真の廃止・筋トレ保存後の導線（2026-09-18）
+  "体脂肪率（AIで推定）": "Masse grasse (estimation IA)",
+  "ウエストを記録": "Enregistrer le tour de taille",
+  "体脂肪率を記録": "Enregistrer la masse grasse",
+  "おへその高さで、息を吐いたところで測ります。": "Mesurez à hauteur du nombril, après avoir expiré.",
+  "ウエストの値を確認してください。": "Vérifiez la valeur du tour de taille.",
+  "体脂肪率の値を確認してください。": "Vérifiez la valeur de masse grasse.",
+  "ウエスト {n} を記録しました。": "Tour de taille {n} enregistré.",
+  "体脂肪率 {n}% を記録しました。": "Masse grasse {n}% enregistrée.",
+  "写真は保存されません。AIが体脂肪率を推定するために一度使うだけで、記録に残るのは数値だけです。": "La photo n’est pas enregistrée. Elle sert une fois à l’estimation par l’IA ; seul le chiffre est conservé.",
+  "全身が入るように、同じ場所・同じ明るさで。推定は±3%程度の目安です。": "Corps entier, même endroit et même lumière. L’estimation est indicative (±3 %).",
+  "AIが推定しています…": "L’IA estime…",
+  "記録する体脂肪率（%）": "Masse grasse à enregistrer (%)",
+  "{min}〜{max}%の範囲で。推定と違うと感じたら直してから保存できます。": "Entre {min} et {max} %. Si l’estimation semble fausse, corrigez-la avant d’enregistrer.",
+  "もう一度推定する": "Réestimer",
+  "写真からAIが推定すると記録できます。": "Laissez d’abord l’IA estimer à partir d’une photo.",
+  "AI推定に失敗しました。もう一度お試しください。": "L’estimation a échoué. Réessayez.",
+  "次の種目を入力する": "Saisir l’exercice suivant",
+  "{name}へ戻る": "Retour à {name}",
 };
