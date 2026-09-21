@@ -97,7 +97,6 @@ import { checkFirstLawUnlock, consumeFirstLawBanner } from '@/lib/laws';
 import { BookOpen } from 'lucide-react-native';
 import { useGuide, useGuideTarget, useGuideScroller } from '@/components/GuideTour';
 import { useLaunch } from '@/components/LaunchIntro';
-import ReorderableChips from '@/components/ReorderableChips';
 import StreakChip from '@/components/StreakChip';
 import BadgeIcon from '@/components/BadgeIcon';
 // 食事の制約（B-18・docs/DIET-MODES.md）。警告は情報提供だけで、保存は絶対にブロックしない
@@ -284,7 +283,6 @@ export default function LogScreen() {
   // 聞き返しに「1/4玉」とだけ返しても文脈が繋がるように、直前のやりとりを覚えておく
   const parseHistory = useRef<{ role: 'user' | 'ai'; text: string }[]>([]);
   const [stagedNote, setStagedNote] = useState(''); // トレイ確定時にlogs.textへ書く元テキストの蓄積
-  const [foodsView, setFoodsView] = useState<'row' | 'grid'>('row');
   const [foodsOrder, setFoodsOrder] = useState<string[]>([]);
 
   // マイ食品の並び順（保存済み順とサーバーの食品一覧をマージ・新規は末尾）
@@ -314,13 +312,9 @@ export default function LogScreen() {
     return sub;
   }, [navigation]);
 
-  useEffect(() => { AsyncStorage.getItem('bl-foods-view').then((v) => { if (v === 'grid') setFoodsView('grid'); }).catch(() => {}); }, []);
-
-  function toggleFoodsView() {
-    const v = foodsView === 'row' ? 'grid' : 'row';
-    setFoodsView(v);
-    AsyncStorage.setItem('bl-foods-view', v).catch(() => {});
-  }
+  // 2026-09-18（TODO B2）: マイ食品は**常に全表示**。以前は ▦/▬ で「1行スクロール ⇄ 全展開」を切り替えていたが、
+  // 1行モードでは探せず、切替ボタンの意味も伝わっていなかった。1行モードにあったドラッグ並び替えは廃止し、
+  // 並びは「よく使う順」（bl-foods-order・保存の実績）に任せる。切替の保存キー bl-foods-view は読まない
 
   // ===== 入力シートの開閉 =====
   // ＋シート（PlusSheet）は透過のボトムシート、入力シートは pageSheet。iOSは表示中のModalの
@@ -382,7 +376,9 @@ export default function LogScreen() {
   // ts は同じ行動を続けて選んでも毎回開き直すためのノンス。400ms はタブ切替のアニメが落ち着くまでの間
   const { quick, open: openParam, ts: openTs } = useLocalSearchParams<{ quick?: string; open?: string; ts?: string }>();
   useEffect(() => {
-    if (quick) setTimeout(() => openInput('text'), 400);
+    if (!quick) return;
+    const h = setTimeout(() => openInput('text'), 400);
+    return () => clearTimeout(h);   // 400ms 以内に画面を離れたら開かない（QA R-3）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quick]);
   useEffect(() => {
@@ -405,10 +401,13 @@ export default function LogScreen() {
   const { introDone } = useLaunch();
   useEffect(() => {
     if (!introDone) return; // 起動イントロが終わってから案内を始める
+    let alive = true;
     // ユーザー単位フラグ（同じ端末の別アカウントでもチュートリアルが正しく始まる）
+    let h: ReturnType<typeof setTimeout> | null = null;
     getFirstRunFlag('bl-guide-done').then((v: string | null) => {
-      if (!v) setTimeout(() => guide.start('auto'), 900); // 初回は「入力のきほん」だけ自動再生
+      if (!v && alive) h = setTimeout(() => guide.start('auto'), 900); // 初回は「入力のきほん」だけ自動再生
     }).catch(() => {});
+    return () => { alive = false; if (h) clearTimeout(h); };   // 別画面でガイドが始まらないように（QA R-3）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [introDone]);
 
@@ -526,7 +525,9 @@ export default function LogScreen() {
   const activeBonus = activeToGoal && activeEquivalent != null
     ? activeKcalGoalBonus(activeEquivalent, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
   const [kcalAdjust] = useKcalAdjust();
-  const target = profile ? Math.round(bmr * Number(profile.life_factor)) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
+  // life_factor が null の旧プロフィールは Number(null)=0 で目標が運動ぶんだけになっていた（QA B-5）。既定の生活係数に落とす
+  const lifeFactor = Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT) || LIFE_FACTOR_DEFAULT;
+  const target = profile ? Math.round(bmr * lifeFactor) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
   const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
   // 7日以内のいちばん近い予定（帯に1件だけ出す）。常設にすると読まれなくなるので窓で絞る
   const upcomingEvent = nextEvent(events, today);
@@ -1094,6 +1095,8 @@ export default function LogScreen() {
   // 過去29日の日次サマリー（entries）＋今日はlogsの生値。維持kcalは当日の運動を含め、
   // 目標kcalは目標画面と同じ dailyAllowance（維持 − 赤字 + 調整）で日ごとに出す
   const [pastRows, setPastRows] = useState<{ date: string; intake: number | null; ex: string | null; adj: number | null }[]>([]);
+  // 当日ログの「変わったか」の署名（件数＋kcal合計）。配列そのものを依存に入れると毎回走る
+  const dayLogsSig = `${dayLogs.length}:${Math.round(dayLogs.reduce((a, l) => a + (Number(l.kcal) || 0), 0))}`;
   useEffect(() => {
     if (!profile) return;
     let alive = true;
@@ -1106,11 +1109,12 @@ export default function LogScreen() {
       } catch { /* ベストエフォート（カードは記録なし表示のまま） */ }
     })();
     return () => { alive = false; };
+    // 依存は件数ではなく「件数＋kcal合計」の署名（QA R-4）: 品目を書き換えて件数が同じでも読み直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, today, dayLogs.length]);
+  }, [profile, today, dayLogsSig]);
   const balanceDays: BalanceDay[] = useMemo(() => {
     if (!profile) return [];
-    const base = Math.round(bmr * Number(profile.life_factor));
+    const base = Math.round(bmr * lifeFactor);
     const req = plan ? plan.requiredDaily : 0;
     const byDate = new Map(pastRows.map((r) => [r.date, r]));
     const out: BalanceDay[] = [];
@@ -1124,7 +1128,7 @@ export default function LogScreen() {
     out.push({ date: today, intake: summary.intake == null ? null : Math.round(summary.intake), maintenance: target, allowance: goalKcal });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, pastRows, bmr, plan?.requiredDaily, kcalAdjust, today, summary.intake, target, goalKcal]);
+  }, [profile, pastRows, bmr, plan, kcalAdjust, today, summary.intake, target, goalKcal]);
 
   // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
   const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
@@ -1141,7 +1145,7 @@ export default function LogScreen() {
           .gte('date', shiftDate(t, -28)).lt('date', t)
           .order('date', { ascending: true });
         if (!data || data.length < 5) return; // データが薄いうちは主張しない
-        const base = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * Number(profile.life_factor));
+        const base = Math.round(mifflinBMR(profile.sex, weightForBmr, Number(profile.height_cm), Number(profile.age)) * lifeFactor);
         const days: InsightDay[] = data.map((r) => {
           const dayTarget = base + (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0);
           const intake = r.intake == null ? null : Number(r.intake);
@@ -1174,8 +1178,9 @@ export default function LogScreen() {
         }
       } catch { /* ベストエフォート */ }
     })();
+    // weightForBmr を依存に入れる（QA R-4）: 体重を記録し直したら BMR の基準も新しい体重で判定し直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, todayKey]);
+  }, [profile, todayKey, weightForBmr]);
 
   // ===== B-7: Day12「最初の法則」の帯 =====
   // 記録12日到達＋法則1件以上を初検出したら、21:05の通知予約＋この帯を一度きり出す。
@@ -1251,16 +1256,25 @@ export default function LogScreen() {
     if (cautionAlert) await closeAlert(cautionAlert);
   }
 
-  // 1タップ予防: 今日だけ目標を+200kcal緩める（チートデイ吸収の仕組みに乗せる）
+  // 1タップ予防: 今日だけ目標を+200kcal緩める（チートデイ吸収の仕組みに乗せる）。
+  // QA S-5（2026-09-18）: 素早く2回押すと +400kcal になっていた（アプリ内で唯一ガードの無いDB書き込み）。
+  //   ・useRef の同期フラグで再入を弾く（useState は同一フレームの2連打を両方通す）
+  //   ・saveEventPlan と同じく「同日の枠を消してから入れる」＝何度押しても1日1枠（冪等）
+  const recoveryBusy = useRef(false);
   async function addRecoveryEvent() {
-    if (!uid) return;
-    const { data: ev, error } = await supabase.from('events')
-      .insert({ user_id: uid, date: today, title: t('🕊 リカバリー枠'), extra_kcal: 200 })
-      .select('id,date,title,extra_kcal').single();
-    if (error) { setMsg({ ok: false, text: t('設定に失敗しました。もう一度お試しください。') }); return; }
-    setEvents((prev) => [...prev, ev as PlanEvent & { id: string }]);
-    await snoozeRisk();
-    setMsg({ ok: true, text: t('🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。') });
+    if (!uid || recoveryBusy.current) return;
+    recoveryBusy.current = true;
+    try {
+      const title = t('🕊 リカバリー枠');
+      await supabase.from('events').delete().eq('user_id', uid).eq('date', today).eq('title', title);
+      const { data: ev, error } = await supabase.from('events')
+        .insert({ user_id: uid, date: today, title, extra_kcal: 200 })
+        .select('id,date,title,extra_kcal').single();
+      if (error) { setMsg({ ok: false, text: t('設定に失敗しました。もう一度お試しください。') }); return; }
+      setEvents((prev) => [...prev.filter((e) => !(e.date === today && e.title === title)), ev as PlanEvent & { id: string }]);
+      await snoozeRisk();
+      setMsg({ ok: true, text: t('🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。') });
+    } finally { recoveryBusy.current = false; }
   }
 
   // 先の予定を登録する。保存するのは events の1行だけで、計画への織り込みは
@@ -1496,11 +1510,9 @@ export default function LogScreen() {
   }, [stagedP, stagedF, stagedC]);
 
   // ===== マイ食品チップ（入力シートの中） =====
-  // タップ=トレイへ・−で減・長押しドラッグで並び替え。▦/▬で1行スクロール⇄全展開。
+  // タップ=トレイへ・−で減・長押しで即記録。常に全展開（TODO B2・2026-09-18。1行スクロールと切替は廃止）。
   // 先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
-  // 長押しで削除→Undoスナックバー）。セットは常に先頭固定＝並び替えの保存対象は単品だけ。
-  // 「マイ食品」から開いたときは選ぶのが目的なので常に全展開にする（1行スクロールで探させない）
-  const chipsGrid = foodsView === 'grid' || inputMode === 'myfood';
+  // 長押しで削除→Undoスナックバー）。セットは常に先頭固定
   const myFoodsSection = (myFoods.length > 0 || myMeals.length > 0) ? (() => {
     const mealChipEl = (m: MyMeal) => (
       <Pressable key={m.id} style={s.mealChip}
@@ -1534,29 +1546,8 @@ export default function LogScreen() {
         <View style={s.sheetSectionHead}>
           <Text style={s.sheetSectionT}>{t('マイ食品')}</Text>
           <Text style={s.sheetSectionSub} numberOfLines={1}>{t('タップでトレイへ・長押しで即記録')}</Text>
-          {inputMode !== 'myfood' && (
-            <Pressable onPress={toggleFoodsView} hitSlop={8} style={s.viewToggle}>
-              <Text style={s.viewToggleT}>{foodsView === 'row' ? '▦' : '▬'}</Text>
-            </Pressable>
-          )}
         </View>
-        {!chipsGrid ? (
-          <ReorderableChips
-            order={[...myMeals.map((m) => `meal:${m.id}`), ...foodsOrder]}
-            // 並び替えの永続化はマイ食品のidだけ（セットは次の描画で先頭に戻る）
-            onOrderChange={(next) => persistFoodsOrder(next.filter((id) => !id.startsWith('meal:')))}
-            renderChip={(id) => {
-              if (id.startsWith('meal:')) {
-                const m = myMeals.find((x) => `meal:${x.id}` === id);
-                return m ? mealChipEl(m) : null;
-              }
-              const fd = myFoods.find((f) => f.id === id);
-              return fd ? chipEl(fd) : null;
-            }}
-          />
-        ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
-        )}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
       </View>
     );
   })() : null;
@@ -2472,8 +2463,8 @@ export default function LogScreen() {
               {/* 音声入力（1500人監査Later群「入力が遅い層への救済」）: キーボードのマイクへの道しるべ */}
               <VoiceHintButton onFocusInput={() => inputRef.current?.focus()} />
               {/* カメラ1本で料理も成分表示も（AIが読み分ける）。ライブラリは複数選択 */}
-              <DockIconButton Icon={Camera} onPress={takePhoto} disabled={photos.length >= 4} />
-              <DockIconButton Icon={Images} onPress={pickPhotos} disabled={photos.length >= 4} />
+              <DockIconButton Icon={Camera} label={t('撮影する')} onPress={takePhoto} disabled={photos.length >= 4} />
+              <DockIconButton Icon={Images} label={t('写真から選ぶ')} onPress={pickPhotos} disabled={photos.length >= 4} />
               {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
                   「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
               {profile != null && (

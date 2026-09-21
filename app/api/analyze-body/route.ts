@@ -4,6 +4,7 @@ import { AI_DAILY_LIMIT, isUnlimited, todayJST } from '@/lib/calc';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
+import { bumpAiUsage } from '@/lib/aiUsage';
 
 const MAX_IMAGE_BYTES = 1_500_000;
 
@@ -76,7 +77,8 @@ export async function POST(req: Request) {
     try { parsed = parseJsonLoose(r.text); } catch {
       return NextResponse.json({ ok: false, error: 'AIの応答を解釈できませんでした。もう一度お試しください。' }, { status: 502 });
     }
-    await supabase.from('ai_usage').upsert({ user_id: user.id, date: today, count: used + 1 });
+    // 加算は service role（lib/aiUsage.ts）。本人権限では書けない（migration-34）
+    await bumpAiUsage(user.id, today, 'photo', usage, supabase);
     return NextResponse.json({ ok: true, result: parsed, remaining: unlimited ? null : AI_DAILY_LIMIT - used - 1 });
   } catch (e) {
     return NextResponse.json({ ok: false, error: '解析に失敗しました: ' + (e instanceof Error ? e.message : String(e)) }, { status: 500 });

@@ -613,7 +613,8 @@ export default function SettingsScreen() {
       headerLargeTitleStyle: { color: C.ink },
     }} />
     <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }} contentContainerStyle={s.scroll}>
-      <Text style={s.h}>{t('マイページ')}</Text>
+      {/* 入口（概要タブの「設定」行）と同じ語を名乗る。以前は「マイページ」で、押した語と着いた語が違った（NAV-AUDIT D-09） */}
+      <Text style={s.h}>{t('設定')}</Text>
 
       {/* ヘッダーサマリーカード */}
       <View style={s.summary}>
@@ -655,8 +656,7 @@ export default function SettingsScreen() {
         {/* クーポン: プラン行の隣に置く（コード配布キャンペーンの入口。適用はサーバー直付与） */}
         <Row icon={<Ticket color={C.teal} size={ICON.xl} />} label={t('クーポンコード')} sub={t('コードを入力して機能を解放')} onPress={() => setCouponOpen(true)} />
         <View style={s.sep} />
-        <Row icon={<Award color={C.teal} size={ICON.xl} />} label={t('実績')} sub={t('ストリーク・バッジ・ストーリー共有')} badge={unseenBadges} onPress={() => router2.push({ pathname: '/achievements', params: navFrom('settings') } as never)} />
-        <View style={s.sep} />
+        {/* 「実績」の行は概要タブの設定ブロックに1本だけ残す（3つの階層から生えていた・NAV-AUDIT D-10） */}
         <Row icon={<UserRound color={C.teal} size={ICON.xl} />} label={t('プロフィール編集')} sub={t('表示名・性別・身長・年齢・活動量')} onPress={() => openSheet('profile')} />
         <View style={s.sep} />
         <Row icon={<Salad color={C.teal} size={ICON.xl} />} label={t('マイ食品の管理')} sub={t('{n}件 登録済み', { n: foods.length + meals.length })} onPress={() => openSheet('foods')} />

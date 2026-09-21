@@ -101,7 +101,7 @@ export default function BadgeIcon({ id, size = 44, earned = false, cat }: {
       width: size, height: size, alignItems: 'center', justifyContent: 'center',
       // 獲得済みだけ浮かせる（未獲得は面に沈んでいてよい）
       ...(earned ? {
-        shadowColor: 'rgba(0,0,0,1)', shadowOpacity: 0.20,
+        shadowColor: C.shadow, shadowOpacity: 0.20,
         shadowRadius: size * 0.10, shadowOffset: { width: 0, height: size * 0.045 }, elevation: 3,
       } : null),
     }}>

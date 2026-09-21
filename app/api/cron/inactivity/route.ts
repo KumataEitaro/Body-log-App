@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { todayJST } from '@/lib/calc';
 import { daysBetween } from '@/lib/goal';
+import { bearerMatches } from '@/lib/secretEq';
 
 const APP_URL = 'https://bodylog-orcin.vercel.app';
 const IDLE_DAYS = 3;      // この日数記録がなければアラート
@@ -11,7 +12,7 @@ const REMIND_EVERY = 3;   // 同じ人への再送は最短この日数おき
 // 3日以上記録がないユーザーへ「記録をつけましょう」メールを送る。
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization');
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!bearerMatches(auth, process.env.CRON_SECRET)) {   // timing-safe（QA C-4）
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
   const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,7 +32,8 @@ export async function GET(req: Request) {
   const entries = entriesRes.data || [];
   const profiles = profilesRes.data || [];
 
-  const results: Array<{ email: string; idle: number; sent: boolean; reason?: string }> = [];
+  // レスポンスにメールアドレスは載せない（QA C-6）。件数と理由の内訳だけ
+  const results: Array<{ idle: number; sent: boolean; reason?: string }> = [];
   for (const u of usersRes.data.users) {
     if (!u.email) continue;
     const prof = profiles.find((p) => p.id === u.id);
@@ -46,15 +48,19 @@ export async function GET(req: Request) {
 
     const lastMail = prof.last_inactivity_mail as string | null;
     if (lastMail && daysBetween(lastMail, today) < REMIND_EVERY) {
-      results.push({ email: u.email, idle, sent: false, reason: 'recently notified' });
+      results.push({ idle, sent: false, reason: 'recently notified' });
       continue;
     }
 
     const sent = await sendMail(u.email, prof.display_name || '', idle);
     if (sent) await svc.from('profiles').update({ last_inactivity_mail: today }).eq('id', u.id);
-    results.push({ email: u.email, idle, sent, reason: sent ? undefined : 'mail not configured or failed' });
+    results.push({ idle, sent, reason: sent ? undefined : 'mail not configured or failed' });
   }
-  return NextResponse.json({ ok: true, checked: usersRes.data.users.length, results });
+  return NextResponse.json({
+    ok: true, checked: usersRes.data.users.length,
+    sent: results.filter((r) => r.sent).length,
+    skipped: results.filter((r) => !r.sent).length,
+  });
 }
 
 // Brevo（無料枠300通/日）でメール送信。BREVO_API_KEY / ALERT_FROM_EMAIL が未設定なら送らない

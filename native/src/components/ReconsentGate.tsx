@@ -76,7 +76,8 @@ export default function ReconsentGate() {
 
           {/* 「読みました」のチェックを必須にする（同意の質＝執行力に効く）。
               緑✓ではなく四角のチェックにする（安全そうに見える表現を作らない方針） */}
-          <Pressable style={s.checkRow} onPress={() => setRead((v) => !v)} hitSlop={8}>
+          <Pressable style={s.checkRow} onPress={() => setRead((v) => !v)} hitSlop={8}
+                     accessibilityRole="checkbox" accessibilityState={{ checked: read }} accessibilityLabel={t('内容を読んで理解しました')}>
             <View style={[s.box, read && s.boxOn]}>{read && <Text style={s.boxMark}>✓</Text>}</View>
             <Text style={s.checkT}>{t('内容を読んで理解しました')}</Text>
           </Pressable>

@@ -43,7 +43,7 @@ export default function SimpleChart({ points, unit, decimals = 1, planValue }: {
           <SvgLine key={i} x1={PL} y1={y(t)} x2={W - PR + 4} y2={y(t)} stroke={C.line} strokeWidth={1} />
         ))}
         {yTicks.map((t, i) => (
-          <SvgText key={`l${i}`} x={W - PR + 8} y={y(t) + 3.5} fontSize={10} fill={C.faint}>{fmt(t)}</SvgText>
+          <SvgText key={`l${i}`} x={W - PR + 8} y={y(t) + 3.5} fontSize={11} fill={C.faint}>{fmt(t)}</SvgText>
         ))}
         {planValue != null && (
           <SvgLine x1={PL} y1={y(planValue)} x2={W - PR} y2={y(planValue)}
@@ -51,8 +51,8 @@ export default function SimpleChart({ points, unit, decimals = 1, planValue }: {
         )}
         <Polyline points={pts} fill="none" stroke={C.teal} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
         <Circle cx={x(last.date)} cy={y(last.value)} r={3.5} fill={C.teal} />
-        <SvgText x={PL} y={H - 6} fontSize={10} fill={C.faint}>{fmtX(points[0].date)}</SvgText>
-        <SvgText x={W - PR} y={H - 6} fontSize={10} fill={C.faint} textAnchor="end">{fmtX(last.date)}</SvgText>
+        <SvgText x={PL} y={H - 6} fontSize={11} fill={C.faint}>{fmtX(points[0].date)}</SvgText>
+        <SvgText x={W - PR} y={H - 6} fontSize={11} fill={C.faint} textAnchor="end">{fmtX(last.date)}</SvgText>
       </Svg>
       <Text style={s.latest}>{t('最新')} {fmt(last.value)}{unit}</Text>
     </View>

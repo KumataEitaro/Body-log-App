@@ -5,8 +5,10 @@ import type { LucideIcon } from 'lucide-react-native';
 import { C, themed } from '@/lib/ui';
 import { useGuideTarget } from '@/components/GuideTour';
 
-export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18, guideKey }: {
+export default function DockIconButton({ Icon, onPress, onLongPress, disabled, tint, size = 18, guideKey, label }: {
   Icon: LucideIcon;
+  /** VoiceOver の読み上げ名（必須。アイコンだけのボタンは無名になる・QA X-1） */
+  label: string;
   onPress: () => void;
   onLongPress?: () => void;   // 隠し操作用（例: 成分表示ボタンの長押し=バーコード）
   disabled?: boolean;
@@ -20,6 +22,7 @@ export default function DockIconButton({ Icon, onPress, onLongPress, disabled, t
     <Pressable
       ref={target} collapsable={false}
       onPress={onPress} onLongPress={onLongPress} delayLongPress={450} disabled={disabled} hitSlop={6}
+      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [s.btn, pressed && s.pressed, disabled && { opacity: 0.35 }]}
     >
       <Icon size={size} color={tint ?? C.sub} strokeWidth={2} />

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
+import { bearerMatches } from '@/lib/secretEq';
 
 // 辞書翻訳の作業用エンドポイント（ループエンジニアリング）。
 // QA_SECRET を知る場合のみ動く。日本語キー＋英語参考訳のバッチを受け取り、
@@ -9,7 +10,7 @@ export const preferredRegion = 'hnd1';
 export async function POST(req: Request) {
   const secret = process.env.QA_SECRET;
   const auth = req.headers.get('authorization') ?? '';
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!bearerMatches(auth, secret)) {   // timing-safe（QA C-4）
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 });
   }
   const key = process.env.GEMINI_API_KEY;

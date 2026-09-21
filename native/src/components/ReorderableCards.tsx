@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Minus } from 'lucide-react-native';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
+import { useReduceMotion } from '@/lib/motion';
 
 const SPRING = { damping: 18, stiffness: 180, mass: 0.6 };
 const EDGE = 130;       // 自動スクロール発火ゾーン(px)
@@ -202,12 +203,13 @@ function DraggableCard({
   const rot = useSharedValue(0);
   const { dragKey, dropKey, kSV, slotsSV, packSV, activeSV, scroll0, autoDir, scrollY, framesSV } = sv;
 
+  const reduceMotion = useReduceMotion();   // 視差効果を減らす設定では無限ループのジグルを張らない（QA X-10）
   // Jiggle（編集中のみ。ドラッグ中の自分はstyle側で回転を止める）
   useEffect(() => {
-    rot.value = editing
+    rot.value = editing && !reduceMotion
       ? withRepeat(withSequence(withTiming(-0.35, { duration: 140 }), withTiming(0.35, { duration: 140 })), -1, true)
       : withTiming(0, { duration: 100 });
-  }, [editing, rot]);
+  }, [editing, rot, reduceMotion]);
 
   // 並び確定後の無アニメリセット（レイアウトが新順序になった瞬間にtransformを消す）
   useEffect(() => {
@@ -323,7 +325,7 @@ function DraggableCard({
         { rotate: `${dragKey.value === id ? 0 : rot.value}deg` },
       ],
       zIndex: isActive ? 20 : 0,
-      shadowColor: '#000',
+      shadowColor: '#000',   // 固定色: worklet（UIスレッド）の中では C を読めない。ドラッグ中の落ち影は明暗どちらでも黒でよい
       shadowOpacity: dragKey.value === id ? 0.3 : 0,
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 10 },
@@ -362,7 +364,7 @@ const s = themed(() => ({
   hideBtn: {
     position: 'absolute', top: -4, left: -4, width: 27, height: 27, borderRadius: 14,
     backgroundColor: C.coral, alignItems: 'center', justifyContent: 'center', zIndex: 30,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 6,
+    shadowColor: C.shadow, shadowOpacity: 0.25, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 6,
   },
   ghostCard: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, borderStyle: 'dashed',

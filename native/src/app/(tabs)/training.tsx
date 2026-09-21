@@ -656,7 +656,11 @@ export default function TrainingScreen() {
           いずれの場合も運動タブの枠は1つだけ */}
       {!editing && !visibleOrder.includes('move') && <AdSlot placement="training" />}
       {history.length > 0 && (
-        <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「挙上重量の推移」で見られます')}</Text>
+        // タップで概要タブの「筋トレの成長」詳細（挙上重量の推移グラフを含む）へ直接（NAV-AUDIT D-11）
+        <Pressable style={s.moveNoteRow} hitSlop={6} accessibilityRole="button"
+                   onPress={() => router.navigate({ pathname: '/changes', params: { open: 'strength', ts: String(Date.now()) } } as never)}>
+          <Text style={s.moveNote}>{t('挙上重量の推移グラフは「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
+        </Pressable>
       )}
       <Pressable style={s.goalRow} onPress={() => setGoalOpen(true)}>
         <View style={s.goalIcon}><Target size={ICON.md} color={C.teal} /></View>
@@ -667,7 +671,9 @@ export default function TrainingScreen() {
         <Text style={s.goalRowGo}>›</Text>
       </Pressable>
       {history.length > 0 && (
-        <Pressable style={s.moveNoteRow} onPress={() => router.navigate('/changes' as never)} hitSlop={6}>
+        <Pressable style={s.moveNoteRow} hitSlop={6} accessibilityRole="button"
+                   // 概要のトップではなく「筋トレの成長」の詳細まで連れて行く（NAV-AUDIT D-11）
+                   onPress={() => router.navigate({ pathname: '/changes', params: { open: 'strength', ts: String(Date.now()) } } as never)}>
           <Text style={s.moveNote}>{t('筋トレ履歴は「概要」タブ →「筋トレの成長」で見られます（タップで移動）')}</Text>
         </Pressable>
       )}

@@ -39,7 +39,11 @@ export function daysBetween(fromISO: string, toISO: string): number {
 }
 
 export function addDays(iso: string, n: number): string {
-  return new Date(new Date(iso + 'T00:00:00Z').getTime() + n * MS_DAY).toISOString().slice(0, 10);
+  const base = new Date(String(iso) + 'T00:00:00Z').getTime();
+  // goals.target_date が null／空の行で NaN → toISOString が RangeError を投げてルートまで落ちていた（QA R-2）。
+  // timeSlots.ts と同じく、壊れた入力はそのまま返す（呼び出し側は文字列を受け取れる）
+  if (!Number.isFinite(base)) return String(iso ?? '');
+  return new Date(base + n * MS_DAY).toISOString().slice(0, 10);
 }
 
 // グラフ横軸用の日付目盛り（x0〜x1を最大n分割）

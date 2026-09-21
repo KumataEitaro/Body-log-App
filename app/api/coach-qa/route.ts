@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
+import { bearerMatches } from '@/lib/secretEq';
 
 // コーチAIの品質検証（ループエンジニアリング）用エンドポイント。
 //
@@ -15,7 +16,7 @@ export const preferredRegion = 'hnd1';
 export async function POST(req: Request) {
   const secret = process.env.QA_SECRET;
   const auth = req.headers.get('authorization') ?? '';
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!bearerMatches(auth, secret)) {   // timing-safe（QA C-4）
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 });
   }
   const key = process.env.GEMINI_API_KEY;

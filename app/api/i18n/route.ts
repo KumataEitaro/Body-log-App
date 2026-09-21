@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { globalCapReached } from '@/lib/globalUsage';
+import { todayJST } from '@/lib/calc';
 
 // UI文字列の翻訳（AIで一度だけ翻訳→DBキャッシュ→以後は即返す）
 export async function POST(req: Request) {
@@ -39,6 +40,23 @@ export async function POST(req: Request) {
   // コスト保護: 全体のAI上限に達している場合、新規翻訳は行わない（キャッシュ分のみ返す）
   if (await globalCapReached()) {
     return NextResponse.json({ ok: Object.keys(map).length > 0, map, error: '本日のAI利用上限に達しています' });
+  }
+
+  // 1人1日あたりの新規翻訳の上限（QA C-8・2026-09-18）。プラン上限とは独立。
+  // ログイン済みなら毎回新しい80文字列でループできる上限なしの LLM プロキシになっていた
+  const DAILY_NEW_STRINGS = 400;
+  const svcKeyForCap = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (svcKeyForCap) {
+    try {
+      const svc = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, svcKeyForCap, { auth: { persistSession: false, autoRefreshToken: false } });
+      const today = todayJST();
+      const { data: cur } = await svc.from('i18n_requests').select('count').eq('user_id', user.id).eq('date', today).maybeSingle();
+      const usedToday = Number(cur?.count ?? 0);
+      if (usedToday + missing.length > DAILY_NEW_STRINGS) {
+        return NextResponse.json({ ok: Object.keys(map).length > 0, map, error: '本日の翻訳の上限に達しました' });
+      }
+      await svc.from('i18n_requests').upsert({ user_id: user.id, date: today, count: usedToday + missing.length });
+    } catch { /* 数えられないときは止めない（テーブル未作成など） */ }
   }
 
   // 未翻訳分をAIでまとめて翻訳

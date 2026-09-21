@@ -70,8 +70,9 @@ export async function buildTodos(): Promise<TodoResult> {
   // --- 運動: 週の回数目標を立てている人にだけ、残り回数を知らせる ---
   const perWeek = goal?.ex_per_week != null ? Number(goal.ex_per_week) : null;
   if (perWeek && perWeek > 0) {
-    const monday = new Date(Date.parse(today));
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    // 'YYYY-MM-DD' を UTC の暦として扱い、曜日も UTC で取る（端末のタイムゾーンに依らない・QA A-4）
+    const monday = new Date(today + 'T00:00:00Z');
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
     const ws = monday.toISOString().slice(0, 10);
     const exDays = new Set(
       logs.filter((l) => l.date >= ws && (l.text?.startsWith('🏃') || l.text?.startsWith('🏋️'))).map((l) => l.date),

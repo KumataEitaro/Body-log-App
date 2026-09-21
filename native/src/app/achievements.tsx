@@ -136,6 +136,8 @@ export default function AchievementsScreen() {
   const [celebrate, setCelebrate] = useState<BadgeState[]>([]);
   const [retroCount, setRetroCount] = useState(0);
   const [detail, setDetail] = useState<BadgeState | null>(null);
+  // ★レビュー依頼のタイマー。画面を離れたら依頼しない（QA R-3）
+  const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     evaluateAchievements().then((r) => {
@@ -149,7 +151,7 @@ export default function AchievementsScreen() {
       // ★レビューの依頼は「うまくいっている人の、うまくいった直後」にだけ出す。
       // 条件（14日以上の記録＋成功体験＋未依頼＋不具合報告から30日）は lib/reviewPrompt.ts 側。
       // 祝祭のオーバーレイと重ならないよう、少し置いてから声をかける
-      setTimeout(() => {
+      reviewTimer.current = setTimeout(() => {
         maybeAskReview({
           recordedDays: r.recordedDays,
           streak: r.streak,
@@ -158,6 +160,7 @@ export default function AchievementsScreen() {
         }).catch(() => {});
       }, 2500);
     }).catch(() => setReport(null));
+    return () => { if (reviewTimer.current) clearTimeout(reviewTimer.current); };
   }, []);
 
   const earned = report?.badges.filter((b) => b.earnedOn != null) ?? [];

@@ -466,7 +466,8 @@ export default function CoachScreen() {
             )}
             <Pressable
               style={[s.sendInline, (busy || !input.trim()) && { opacity: 0.35 }]}
-              onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}>
+              onPress={() => send(input)} disabled={busy || !input.trim()} hitSlop={6}
+              accessibilityRole="button" accessibilityLabel={t('送信')} accessibilityState={{ disabled: busy || !input.trim() }}>
               <ArrowUp color="#fff" size={ICON.md} strokeWidth={ICON.strokeBold} />
             </Pressable>
           </View>
@@ -567,7 +568,7 @@ const s = themed(() => ({
   bubble: { borderRadius: RADIUS.panel, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, maxWidth: '88%' },
   bUser: { backgroundColor: C.ink, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
   bAi: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
-  bubbleT: { fontSize: 17, lineHeight: 22, color: C.ink },
+  bubbleT: { fontSize: 17, lineHeight: 24, color: C.ink },   // ×1.4（QA X-6）
   actionCard: {
     alignSelf: 'flex-start', maxWidth: '88%', backgroundColor: C.accentBadge,
     borderWidth: 1, borderColor: C.teal, borderRadius: RADIUS.tile, padding: 12, marginBottom: 8, marginTop: -2,

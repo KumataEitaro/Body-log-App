@@ -10,7 +10,7 @@
 //    返信が要る人には /support（App Store申請にも使っているサポートページ）へ逃がす。
 //  ・種別が「不具合」だった送信は端末に記録し、以後30日は★レビューを依頼しない
 //    （lib/reviewPrompt.ts）。不満のある人に星を求めない。
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
@@ -37,6 +37,9 @@ export default function FeedbackSheet({ visible, onClose }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(false);
+  // お礼のあとに自動で閉じるタイマー。アンマウント時に消す（QA R-3）
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
 
   // 開き直すたびに前回の状態を持ち越さない
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function FeedbackSheet({ visible, onClose }: {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setDone(true);
       // お礼を読める時間だけ置いて自動で閉じる（閉じるボタンを押させない）
-      setTimeout(() => { onClose(); }, 1400);
+      closeTimer.current = setTimeout(() => { onClose(); }, 1400);
     } finally {
       setBusy(false);
     }

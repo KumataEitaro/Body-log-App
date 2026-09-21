@@ -29,6 +29,7 @@ import { PROTEIN_PER_KG_DEFAULT } from './goal';
 import { getPurpose } from './purpose';
 import { getNutrientDb, foodName } from '@/content/nutrientDb';
 import { tierShareOf } from '@/content/proteinTiers';
+import { jstHour } from './jst';
 
 // ===== 型 =====
 
@@ -702,7 +703,7 @@ function hourJST(at: string | null | undefined): number | null {
   if (!at) return null;
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) return null;
-  return new Date(ms + 9 * 3600_000).getUTCHours();
+  return jstHour(ms);   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 type ProfileRow = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };

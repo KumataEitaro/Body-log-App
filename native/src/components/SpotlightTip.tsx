@@ -112,7 +112,7 @@ const s = themed(() => ({
   },
   bubble: {
     position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: RADIUS.card, padding: SPACE.card,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
+    shadowColor: C.shadow, shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   title: { fontSize: 17, fontWeight: '800', color: C.ink },
   text: { fontSize: 15, color: C.sub, lineHeight: 21, marginTop: 7 },

@@ -1,5 +1,5 @@
 // 通知センター: 「いま入力すべきこと」を一覧で見て、その場で該当画面へ飛べる
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -36,9 +36,12 @@ export default function NotificationCenter({ visible, onClose }: { visible: bool
     buildTodos().then((r) => setTodos(r.todos)).catch(() => setTodos([]));
   }, [visible]);
 
+  // 閉じアニメのあとに遷移する。アンマウント後に走らせない（QA R-3）
+  const goTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (goTimer.current) clearTimeout(goTimer.current); }, []);
   function go(todo: Todo) {
     onClose();
-    setTimeout(() => router.navigate(todo.route as never), 250);
+    goTimer.current = setTimeout(() => router.navigate(todo.route as never), 250);
   }
 
   const urgencyStyle = (u: Todo['urgency']) =>

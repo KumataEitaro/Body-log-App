@@ -5,7 +5,7 @@
 //         undo.show(t('削除しました'), onUndo) を呼び、undo.element を画面末尾に描く。
 // 連続削除は最後の1件だけを表示する（前の件のonExpireを先に確定させる＝取り消しの取りこぼしなし）。
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
 import Reanimated, {
   Easing, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
@@ -67,13 +67,24 @@ function SnackBar({ item, onDone }: { item: Item; onDone: (key: number) => void 
   useEffect(() => {
     // 表示時に軽い触覚を1回（「消えたが、まだ戻せる」の合図）
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    progress.value = withTiming(0, { duration: DURATION_MS, easing: Easing.linear });
-    const id = setTimeout(() => {
-      expired.current = true;
-      item.onExpire?.();
-      onDone(item.key);
-    }, DURATION_MS);
-    return () => clearTimeout(id);
+    // スクリーンリーダーには読み上げで届ける（QA X-3）。猶予も 5秒 → 15秒に延ばす
+    // （読み上げを聞いて「元に戻す」まで辿る時間が要る。Material 3 の推奨と同じ）
+    let id: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const arm = (ms: number) => {
+      progress.value = withTiming(0, { duration: ms, easing: Easing.linear });
+      id = setTimeout(() => {
+        expired.current = true;
+        item.onExpire?.();
+        onDone(item.key);
+      }, ms);
+    };
+    AccessibilityInfo.isScreenReaderEnabled().then((on) => {
+      if (cancelled) return;
+      if (on) AccessibilityInfo.announceForAccessibility(item.label + ' ' + t('元に戻す'));
+      arm(on ? DURATION_MS * 3 : DURATION_MS);
+    }).catch(() => { if (!cancelled) arm(DURATION_MS); });
+    return () => { cancelled = true; if (id) clearTimeout(id); };
     // itemはkey付きで作り直される（マウント中に差し替わらない）ため初回だけでよい
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -86,10 +97,11 @@ function SnackBar({ item, onDone }: { item: Item; onDone: (key: number) => void 
       entering={reduce ? undefined : SlideInDown.springify().damping(18)}
       exiting={reduce ? undefined : SlideOutDown.duration(180)}
       style={sw.bar}
+      accessibilityLiveRegion="polite"
     >
       <View style={sw.row}>
         <Text style={sw.label} numberOfLines={1}>{item.label}</Text>
-        <Pressable hitSlop={10}
+        <Pressable hitSlop={10} accessibilityRole="button" accessibilityLabel={t('元に戻す')}
                    onPress={() => {
                      if (expired.current) return;   // 期限切れの直後の連打を弾く
                      Haptics.selectionAsync().catch(() => {});

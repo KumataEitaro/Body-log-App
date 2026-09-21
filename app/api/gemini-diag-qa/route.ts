@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { bearerMatches } from '@/lib/secretEq';
 
 // Gemini各モデルの生死・応答時間の診断（ループエンジニアリング用）。
 // 本番の callGemini と同じ発見ロジック・同じ試行順で、1モデルずつ軽いJSONタスクを
@@ -31,7 +32,7 @@ function rank(nameRaw: string): number {
 export async function POST(req: Request) {
   const secret = process.env.QA_SECRET;
   const auth = req.headers.get('authorization') ?? '';
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!bearerMatches(auth, secret)) {   // timing-safe（QA C-4）
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 });
   }
   const key = process.env.GEMINI_API_KEY;

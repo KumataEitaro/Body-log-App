@@ -11,6 +11,8 @@
 // 既存の朝/昼/夜（lib/itemLog.ts slotOf・4区分）は「食べる時間帯」カードと法則が使っているので
 // そのまま残し、こちらは特徴量用の細かい区分として別に置く（名前は同じ slotOf だがモジュールが違う）。
 
+import { jstParts } from './jst';
+
 /** 8区分の時間帯。配列の順＝1日の流れ（深夜だけ日付をまたぐ） */
 export type TimeSlot8 =
   | 'earlyMorning'   // 早朝 4–7
@@ -108,8 +110,8 @@ export function hmJST(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return null;
-  const d = new Date(ms + 9 * 3600_000);
-  return fmtHm(d.getUTCHours(), d.getUTCMinutes());
+  const p = jstParts(ms);   // JST の算術は lib/jst.ts に1本化（QA T-4）
+  return p ? fmtHm(p.h, p.mi) : null;
 }
 
 /** 分を step 刻みに丸める（ピッカーの初期値用。59分→60分は繰り上げて次の時へ） */

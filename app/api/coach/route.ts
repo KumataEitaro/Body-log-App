@@ -9,6 +9,7 @@ import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
 import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { PURPOSE_PRESETS } from '@/lib/purpose';
+import { bumpAiUsage } from '@/lib/aiUsage';
 
 // AIコーチ相談: 本人の実データ（摂取推移・栄養素・気分・メモ・体重）を根拠に質問へ答える。
 // 「気分がすぐれない」→ 直近のカロリー不足・栄養素・昨日のメモ（酒等）から仮説を提示する。
@@ -241,12 +242,8 @@ export async function POST(req: Request) {
   const bumpUsage = async () => {
     if (!isNewSession) return;
     try {
-      await supabase.from('ai_usage').upsert({
-        user_id: user.id, date: today, count: used + 1,
-        text_count: usageRes.data?.text_count ?? 0,
-        photo_count: usageRes.data?.photo_count ?? 0,
-        coach_count: (usageRes.data?.coach_count ?? 0) + 1,
-      });
+      // 加算は service role（lib/aiUsage.ts）。本人権限では書けない（migration-34）
+      await bumpAiUsage(user.id, today, 'coach', usageRes.data, supabase);
       // セッション台帳に記録（次の往復から「継続」と判定される）。
       // テーブルが無い（migration-22未適用）と失敗するが、その場合は毎往復1消費のままでよい
       if (sessionId) {

@@ -8,6 +8,7 @@
 // 時刻と栄養量を捨てていたため、時間帯の分析や量の比較ができなかった。
 import { foodKey, foodBaseName } from './foodName';
 import type { FoodItem } from './items';
+import { jstHour } from './jst';
 
 /** 分析に使う1品目の記録。1回の食事に3品あれば3件になる */
 export type ItemEntry = {
@@ -34,7 +35,7 @@ function hourJST(at: string | null | undefined): number | null {
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) return null;
   // JSTはUTC+9固定（日本のみ対象のため夏時間の考慮は不要）
-  return new Date(ms + 9 * 3600_000).getUTCHours();
+  return jstHour(ms);   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 /** 食事レコードの配列を、品目1件ずつの列に開く */

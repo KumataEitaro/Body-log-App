@@ -27,7 +27,8 @@ describe('文字サイズの下限', () => {
     for (const f of FILES) {
       if (ALLOW.has(rel(f))) continue;
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)\b/g)) {
+      // オブジェクト形（fontSize: 9）と JSX 属性形（fontSize={9}・SVG）の両方を見る（QA X-11）
+      for (const m of src.matchAll(/fontSize[:=]\s*\{?\s*(\d+(?:\.\d+)?)\b/g)) {
         if (Number(m[1]) < 11) offenders.push(`${rel(f)}: fontSize ${m[1]}`);
       }
     }

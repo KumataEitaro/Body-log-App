@@ -539,7 +539,7 @@ const s = themed(() => ({
   skipT: { color: '#fff', fontSize: 13, fontWeight: '800' },
   bubble: {
     position: 'absolute', left: 18, right: 18, backgroundColor: C.panel, borderRadius: 18, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
+    shadowColor: C.shadow, shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   bubbleTitle: { fontSize: 17, fontWeight: '800', color: C.ink, marginBottom: 5 },
   bubbleText: { fontSize: 15, color: C.sub, lineHeight: 21 },
@@ -560,7 +560,7 @@ const s = themed(() => ({
   demoLead: { fontSize: 13, color: 'rgba(255,255,255,0.82)', textAlign: 'center', lineHeight: 19, marginTop: 6, marginBottom: 14 },
   demoPhone: {
     backgroundColor: C.panel, borderRadius: 20, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+    shadowColor: C.shadow, shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
   demoBar: { paddingVertical: 9, alignItems: 'center', backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.line },  // 生HEX淡色はダークで浮くためトークン化
   demoBarT: { fontSize: 13, fontWeight: '800', color: C.sub },
@@ -576,7 +576,7 @@ const s = themed(() => ({
   cardWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   card: {
     width: '100%', maxWidth: 380, backgroundColor: C.panel, borderRadius: 22, padding: 22, alignItems: 'stretch',
-    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
+    shadowColor: C.shadow, shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12,
   },
   cardTitle: { fontSize: 21, fontWeight: '900', color: C.ink, textAlign: 'center', marginBottom: 8 },
   cardText: { fontSize: 15, color: C.sub, lineHeight: 21, textAlign: 'center' },

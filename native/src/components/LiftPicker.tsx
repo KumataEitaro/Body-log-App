@@ -70,7 +70,8 @@ export default function LiftPicker({ visible, onClose, onPick, history }: {
               <Text style={s.addT}>{t('「{name}」を追加して使う', { name: query })}</Text>
             </Pressable>
             {/* 懸垂タイプ: kg欄が「加重」になり、実負荷=体重＋加重で計算される */}
-            <Pressable style={s.bwToggle} onPress={() => setBwNew((v) => !v)} hitSlop={6}>
+            <Pressable style={s.bwToggle} onPress={() => setBwNew((v) => !v)} hitSlop={6}
+                       accessibilityRole="checkbox" accessibilityState={{ checked: bwNew }} accessibilityLabel={t('体重が負荷になる種目（懸垂・ディップス系）')}>
               <View style={[s.bwBox, bwNew && s.bwBoxOn]}>{bwNew && <Text style={s.bwCheck}>✓</Text>}</View>
               <Text style={s.bwToggleT}>{t('体重が負荷になる種目（懸垂・ディップス系）')}</Text>
             </Pressable>

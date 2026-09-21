@@ -60,11 +60,15 @@ export default function LiftSessionScreen() {
   const [st, setSt] = useState<LiftSessionState | null>(null);
   const loaded = useRef(false);
   useEffect(() => {
+    // 遅れて返った読み取りは捨てる（QA S-6）: 開いた直後に date の違う遷移が入ると、先の読み取りが
+    // あとから解決して古い内容を setSt → 下の永続化 effect がそれを書き戻し、記録済みのセットが消えていた
+    let alive = true;
     (async () => {
       const [raw, restRaw] = await Promise.all([
         AsyncStorage.getItem(LIFT_SESSION_KEY).catch(() => null),
         AsyncStorage.getItem('bl-rest-sec').catch(() => null),
       ]);
+      if (!alive) return;
       const restSec = REST_CHOICES.includes(Number(restRaw)) ? Number(restRaw) : REST_DEFAULT_SEC;
       const prev = parseSessionState(raw);
       // 途中のセッション（セットが1つ以上）があれば再開。無ければ運動タブで見ていた日付で新規
@@ -73,6 +77,7 @@ export default function LiftSessionScreen() {
       loaded.current = true;
       loadCustomLifts();
     })();
+    return () => { alive = false; };
   }, [paramDate]);
   useEffect(() => {
     if (!loaded.current || !st) return;
@@ -378,7 +383,8 @@ export default function LiftSessionScreen() {
                         <View style={s.cell}>
                           <Text style={s.cellT}>{x.reps}<Text style={s.cellUnit}> {t('回')}</Text></Text>
                         </View>
-                        <Pressable onPress={() => removeSet(x.id)} hitSlop={10} style={{ padding: 4 }}>
+                        <Pressable onPress={() => removeSet(x.id)} hitSlop={10} style={{ padding: 4 }}
+                                   accessibilityRole="button" accessibilityLabel={t('{n}セット目を削除', { n: setNo })}>
                           <X size={ICON.sm} color={C.faint} />
                         </Pressable>
                       </Pressable>

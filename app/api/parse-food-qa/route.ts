@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { buildParseFoodPrompt, buildParseHistoryBlock } from '@/lib/parseFoodPrompt';
+import { bearerMatches } from '@/lib/secretEq';
 
 // 食事解析の品質検証（ループエンジニアリング）用エンドポイント。
 // 本番の /api/parse-food と同じ buildParseFoodPrompt・同じモデル呼び出しを、
@@ -10,7 +11,7 @@ export const preferredRegion = 'hnd1';
 export async function POST(req: Request) {
   const secret = process.env.QA_SECRET;
   const auth = req.headers.get('authorization') ?? '';
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!bearerMatches(auth, secret)) {   // timing-safe（QA C-4）
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 });
   }
   const key = process.env.GEMINI_API_KEY;

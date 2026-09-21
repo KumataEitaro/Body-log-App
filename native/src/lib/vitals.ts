@@ -9,6 +9,7 @@
 // 一言を出すかどうかだけに使い、病名・重症度・治療の示唆は一切持たせない。
 import { supabase } from './supabase';
 import { t } from './i18n';
+import { jstYmd } from './jst';
 
 export type Vital = {
   date: string;                 // YYYY-MM-DD（JST）
@@ -113,7 +114,7 @@ export function vitalsSummary(list: Vital[]): string {
 
 // ---- 日付ユーティリティ（lib/calcのtodayJSTと同値。循環importを避けてここに置く） ----
 export function todayJSTLocal(): string {
-  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  return jstYmd(Date.now());   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 export function addDays(d: string, n: number): string {

@@ -297,7 +297,10 @@ export async function callGemini(
 
   if (result) return result;
   if (sawStale) cachedModels = null; // 全滅時は次回再発見
-  const detail = errs.slice(-3).join(' / ');
+  // 上流のエラー本文はリクエストURL（?key=…）を含みうる。本番では返さずログだけに残す（QA C-7）
+  const rawDetail = errs.slice(-3).join(' / ');
+  const detail = process.env.NODE_ENV === 'production' ? undefined : rawDetail;
+  if (process.env.NODE_ENV === 'production') console.error(`[gemini] all candidates failed: ${rawDetail}`);
   // ユーザー向けは日本語のみ（選択言語へはDOM翻訳が担当）。技術詳細はdetailに分離してログ用に返す
   //
   // 「待てば直る」と「待っても直らない」を区別する（2026-09-15）。
@@ -306,7 +309,7 @@ export async function callGemini(
   // 「少し待って再試行してください」と出ていたため、利用者は何度も押し続け、
   // 熊田さんにも「AIが使えない」としか伝わらず、原因に辿り着くまで時間がかかった。
   if (isBillingExhausted(errs)) {
-    console.error(`[gemini] 課金枠の枯渇でAIが全断: ${detail}`);
+    console.error(`[gemini] 課金枠の枯渇でAIが全断: ${rawDetail}`);
     return {
       ok: false, status: 502, detail,
       error: 'AIの利用枠が上限に達しているため、いまは解析できません。再試行しても直りません。復旧までお待ちください（開発者に通知が届いています）。',
