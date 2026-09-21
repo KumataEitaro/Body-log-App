@@ -78,7 +78,6 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-guide-done', 'bl-guide-chapters', 'bl-onboard-done',
   'bl-comeback-shown', 'bl-start-checklist-done',
   'bl-day12-banner', 'bl-day12-done',
-  'bl-voice-hint-seen',
   // --- 画面の状態・並び順・表示の出し分け ---
   'bl-cards-log', 'bl-cards-exercise',
   'bl-order-all2', 'bl-order-exercise', 'bl-hidden-all2',
