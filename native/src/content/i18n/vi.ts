@@ -2435,4 +2435,11 @@ export const VI: Record<string, string> = {
   "少なすぎ −{n}kcal": "Ăn thiếu −{n}kcal",
   "1日 {k}kcal・あと{d}日": "{k}kcal/ngày · còn {d} ngày",
   "この調整を取り消す": "Hủy điều chỉnh này",
+  // ログイン失敗の理由別の文言（lib/authErrors.ts・2026-09-21）
+  "このビルドにはサーバーの接続先が入っていません。開発者向け: EXPO_PUBLIC_SUPABASE_URL の埋め込みを確認してください。": "Bản build này không có địa chỉ máy chủ. Dành cho nhà phát triển: kiểm tra EXPO_PUBLIC_SUPABASE_URL đã được nhúng.",
+  "メールアドレスの確認が済んでいません。届いた確認メールのリンクを開いてから、もう一度ログインしてください。": "Email chưa được xác nhận. Hãy mở liên kết trong email xác nhận rồi đăng nhập lại.",
+  "試行が多すぎます。しばらく待ってからもう一度お試しください。": "Quá nhiều lần thử. Vui lòng đợi một lát rồi thử lại.",
+  "ログインに失敗しました: {reason}": "Đăng nhập thất bại: {reason}",
+  "登録に失敗しました: {reason}": "Đăng ký thất bại: {reason}",
+  "不明なエラー": "Lỗi không xác định",
 };

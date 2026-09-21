@@ -7,6 +7,10 @@
 #
 # jest の変換は jest.config.js が app.json（experiments.reactCompiler）から決めるので、
 # ここで走るのは**実機に載るのと同じプログラム**。
+#
+# 2026-09-21: 「追跡ファイルに .env が無い」検査は取り消した。native/.env は EXPO_PUBLIC_* の
+# 公開クライアント設定で**意図して git 管理**（Codemagic / android-smoke が接続先をそこから得る）。
+# 外した結果 TestFlight 1.1.13 がログイン不能になった（docs/FEATURES.md「ログイン不能ビルドの復旧」）。
 name: native-check
 
 on:
@@ -28,34 +32,6 @@ jobs:
         working-directory: native
     steps:
       - uses: actions/checkout@v4
-      - name: No tracked .env files
-        # 実値の env が追跡されていたら落とす（QA C-1・2026-09-21）。.env.example は雛形なので許す
-        working-directory: .
-        run: |
-          if git ls-files | grep -E '(^|/).env(.[^/]+)?      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: native/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Type check
-        run: npx tsc --noEmit
-      - name: Test
-        run: npm test
- | grep -v '.env.example      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: native/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Type check
-        run: npx tsc --noEmit
-      - name: Test
-        run: npm test
-; then
-            echo "::error::.env が git 管理下にあります（git rm --cached してください）"; exit 1; fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22

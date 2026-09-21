@@ -6,7 +6,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { SegmentedControl, OptionButton } from '@/components/ui/Selectable';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_CONFIGURED } from '@/lib/supabase';
+import { authErrorMessage, configMissingMessage } from '@/lib/authErrors';
 import { parseAuthCallback } from '@/lib/authCallback';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
@@ -98,6 +99,8 @@ export default function LoginScreen() {
   // 「保存済みのアカウントから選ぶ」を押したときだけ操作ヒントを出す（常時出すと画面が説明文だらけになる）
   const [autofillHint, setAutofillHint] = useState(false);
   const emailRef = useRef<TextInput>(null);
+  // 接続先の無いビルド（TestFlight 1.1.13 で実際に起きた）: 何を押しても失敗するので、押す前に理由を見せる
+  useEffect(() => { if (!SUPABASE_CONFIGURED) setMsg(configMissingMessage()); }, []);
 
   // 複数アカウントの切替。アプリ側でパスワードを保存・一覧表示することは意図的にしない
   // （キーチェーンに任せるのが正道。アプリが平文/独自暗号で持つと漏洩面が増えるだけ）。
@@ -118,18 +121,16 @@ export default function LoginScreen() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) {
-        if (/invalid login/i.test(error.message)) {
-          // セキュリティ上「未登録」と「パスワード違い」は区別されない（列挙攻撃対策の業界標準）。
-          // かわりに新規登録への救済導線を出す（βフィードバック: 未登録の人が行き止まりになる）
-          setMsg(t('メールまたはパスワードが違います。'));
-          setShowSignupHint(true);
-        } else {
-          setMsg(t('ログインに失敗しました。通信環境を確認してください。'));
-        }
+        // 理由ごとの文言は lib/authErrors.ts（「通信環境を確認」は本当に通信の失敗のときだけ・2026-09-21）。
+        // 「未登録」と「パスワード違い」は区別されない（列挙攻撃対策の業界標準）ので、
+        // かわりに新規登録への救済導線を出す（βフィードバック: 未登録の人が行き止まりになる）
+        const r = authErrorMessage(error, 'login', SUPABASE_CONFIGURED);
+        setMsg(r.text);
+        if (r.signupHint) setShowSignupHint(true);
       }
       // 成功時は_layoutの認証ゲートが自動でタブへ遷移させる
-    } catch {
-      setMsg(t('ログインに失敗しました。通信環境を確認してください。'));
+    } catch (e) {
+      setMsg(authErrorMessage(e as Error, 'login', SUPABASE_CONFIGURED).text);
     } finally {
       setBusy(false);   // 例外でもボタンを必ず戻す（回り続けると操作不能になる）
     }
@@ -170,9 +171,7 @@ export default function LoginScreen() {
     try {
     const { data, error } = await supabase.auth.signUp({ email: mail, password });
     if (error) {
-      setMsg(/already registered/i.test(error.message) ? t('このメールアドレスは登録済みです。ログインしてください。')
-        : /invalid/i.test(error.message) ? t('メールアドレスの形式を確認してください。')
-        : t('登録に失敗しました。通信環境を確認してください。'));
+      setMsg(authErrorMessage(error, 'signup', SUPABASE_CONFIGURED).text);
       return;
     }
     // メール確認が有効な場合はセッションが返らない → 確認メール案内
@@ -181,8 +180,8 @@ export default function LoginScreen() {
       setMode('login');
     }
     // セッションが返った場合は_layoutの認証ゲートが自動遷移
-    } catch {
-      setMsg(t('登録に失敗しました。通信環境を確認してください。'));
+    } catch (e) {
+      setMsg(authErrorMessage(e as Error, 'signup', SUPABASE_CONFIGURED).text);
     } finally {
       setBusy(false);   // 例外でもボタンを必ず戻す
     }
@@ -192,6 +191,8 @@ export default function LoginScreen() {
   // bodylog://auth-callback に返ってきたコードをセッションに交換する（PKCE）
   const [gBusy, setGBusy] = useState(false);
   async function googleLogin() {
+    // 接続先の無いビルドは https://invalid.invalid をブラウザで開いてしまう（TestFlight 1.1.13）。開く前に止める
+    if (!SUPABASE_CONFIGURED) { setMsg(configMissingMessage()); return; }
     setGBusy(true); setMsg(''); setInfo('');
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -236,6 +237,7 @@ export default function LoginScreen() {
     }
   }, []);
   async function appleLogin() {
+    if (!SUPABASE_CONFIGURED) { setMsg(configMissingMessage()); return; }
     setABusy(true); setMsg(''); setInfo('');
     try {
       const rawNonce = Array.from(await Crypto.getRandomBytesAsync(16))

@@ -2350,7 +2350,7 @@ docs/QA-2026-09-10.md の P2 26件・P3 20件と docs/NAV-AUDIT-2026-09-16.md �
 - QA ルート・RevenueCat Webhook・cron の共有シークレット比較を timing-safe に（`lib/secretEq.ts`・C-4）
 - `/api/crash` の user_id は body を信用せず Bearer トークンから（C-5）／cron の応答からメールアドレスを除去（C-6）
 - Gemini の上流エラー本文は本番では返さない（C-7）／`/api/i18n` に1人1日400文字列の上限（C-8）
-- `native/.env` を git 管理から外し、`.env.example` に置き換え。CI で追跡を禁止（C-1）
+- ~~`native/.env` を git 管理から外し、`.env.example` に置き換え。CI で追跡を禁止（C-1）~~ → **2026-09-21 に取り消し**。値は空ではなく実値（公開クライアント設定）で、Codemagic / CI がそれに依存していた（下記「ログイン不能ビルドの復旧」）
 
 ### アプリ側（QA P2）
 - S-5 「今日は+200kcal緩める」を冪等に（同日の枠を消してから入れる＋再入ガード）
@@ -2426,3 +2426,30 @@ docs/QA-2026-09-10.md の P2 26件・P3 20件と docs/NAV-AUDIT-2026-09-16.md �
   併せて 🍽外食メニューの相談（B-11・`components/MenuAdvisor.tsx`）と「これを食べたら？」ピル（N2 入口②）もコンポーザーから外した。
   MenuAdvisor の部品は残してあるが**入口が無い**（必要なら＋メニュー等へ移す）。「これを食べたら？」は「何を食べる？」シート側の入口①（候補カードから）が残る
 - 10辞書から音声ヒントの5キーを削除
+
+## ログイン不能ビルド（TestFlight 1.1.13）の復旧と再発防止（2026-09-21・v1.1.15）
+
+### 何が起きたか
+- 2026-09-18 の QA 一括対応で、QA レポート C-1「`native/.env` が git 管理下にある（値は3つとも空なので実害無し）」に従い `git rm --cached native/.env` した。
+  **「空」は誤りで、3つとも実値**（`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` / `EXPO_PUBLIC_API_BASE`）だった
+- Codemagic（rn-testflight / rn-android）も GitHub Actions（android-smoke）も、この tracked ファイルからしか接続先を得ていなかったため、
+  以後のビルドは接続先の無いバンドルになった。android-smoke #29/#30 の起動ログには
+  「EXPO_PUBLIC_SUPABASE_URL がビルドに埋め込まれていません」が出ていたが、判定は「起動したか」だけだったので通っていた
+- TestFlight 1.1.13: メール＋パスワードは「ログインに失敗しました。通信環境を確認してください。」（電波はある）、
+  Google ログインはブラウザで `https://invalid.invalid`（createClient を throw させないためのプレースホルダ）を開いた
+
+### 復旧
+- `native/.env` を git 管理に戻した（値は EXPO_PUBLIC_* ＝アプリのバンドルに埋め込まれる**公開クライアント設定**。秘密ではない）。
+  `.gitignore` の無視ルールと CI の「追跡 .env 禁止」検査を取り消し。QA レポートに訂正を追記
+
+### 再発防止（3層）
+1. **ビルドの入口で止める**: `native/app.config.js` の `assertBuildEnv` が、CI（GitHub Actions / Codemagic）で接続先が無ければ
+   `expo prebuild` の時点で throw する（手元では警告だけ）
+2. **スモークで止める**: android-smoke の Verdict が起動ログの「ビルドに埋め込まれていません」で落ちる
+3. **画面で嘘をつかない**: `lib/authErrors.ts`（純関数・テスト付き）。「通信環境を確認」は本当に通信の失敗のときだけ。
+   接続先の無いビルドはログイン画面を開いた時点で「このビルドにはサーバーの接続先が入っていません」と出し、Google / Apple もブラウザを開く前に止める。
+   パスワード違い・メール未確認・回数制限・その他（理由を120文字まで添える）を出し分ける
+
+### 併せて直したスモークの誤検知
+- Verdict の致命例外チェックが**他プロセス**（Google 検索ボックスの SIGILL）を拾って #29 が赤くなっていた → 自分のプロセスの行だけ見る
+- エミュレータ側ランチャーの ANR ダイアログが前面を奪って描画チェックが落ちていた（#23 / #28）→ 閉じて再前面化してやり直す

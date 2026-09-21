@@ -2475,4 +2475,11 @@ export const ES: Record<string, string> = {
   "少なすぎ −{n}kcal": "Defecto −{n}kcal",
   "1日 {k}kcal・あと{d}日": "{k}kcal/día · quedan {d} días",
   "この調整を取り消す": "Deshacer este ajuste",
+  // ログイン失敗の理由別の文言（lib/authErrors.ts・2026-09-21）
+  "このビルドにはサーバーの接続先が入っていません。開発者向け: EXPO_PUBLIC_SUPABASE_URL の埋め込みを確認してください。": "Esta compilación no incluye la dirección del servidor. Para desarrolladores: comprueba que EXPO_PUBLIC_SUPABASE_URL esté incluido.",
+  "メールアドレスの確認が済んでいません。届いた確認メールのリンクを開いてから、もう一度ログインしてください。": "Tu correo aún no está confirmado. Abre el enlace del correo de confirmación y vuelve a iniciar sesión.",
+  "試行が多すぎます。しばらく待ってからもう一度お試しください。": "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+  "ログインに失敗しました: {reason}": "No se pudo iniciar sesión: {reason}",
+  "登録に失敗しました: {reason}": "No se pudo registrar: {reason}",
+  "不明なエラー": "Error desconocido",
 };
