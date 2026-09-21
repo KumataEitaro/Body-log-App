@@ -7,7 +7,7 @@
 // Appleヘルスケアと同じく、右下の＋ボタン → 何を記録するか（食事／運動／体重・ウエスト・体脂肪率）→
 // 食事なら入力方法（マイ食品／テキスト／写真を選ぶ／撮影）を選び、pageSheet の入力シートで
 // 解析→トレイ→✓保存まで済ませる。ドックにあった機能（テキスト・写真・食べた時間チップ・トレイ・
-// 残量ストリップ・マイ食品チップ・音声ヒント・外食おすすめ）はすべて入力シートの中に移した。
+// 残量ストリップ・マイ食品チップ）はすべて入力シートの中に移した。
 // バーコード読み取りは食品DBを持たないため置かない（AddFoodSheet の補助経路だけ残る）
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,7 +17,6 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, UtensilsCrossed, X , CalendarClock } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
-import VoiceHintButton from '@/components/VoiceHintButton';
 import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
 import TabHeader, { STICKY_FIRST } from '@/components/TabHeader';
@@ -31,7 +30,6 @@ import { FoodName, ItemsTitle, PfcInline, KcalCell } from '@/components/FoodRowT
 import { LiveBar, GhostPair, usePulse } from '@/components/LivePreviewBar';
 import SpotlightTip from '@/components/SpotlightTip';
 import AddFoodSheet, { type MyFoodDraft } from '@/components/AddFoodSheet';
-import MenuAdvisor from '@/components/MenuAdvisor';
 import WhatToEatSheet, { type WhatIfSeedFromPick } from '@/components/WhatToEatSheet';
 // N1 今日の予定ヒアリング（朝の1問）＋N2 未来シミュレーション＋N3 司令塔（docs/STRATEGY.md §7）
 import TodayPlanCard from '@/components/TodayPlanCard';
@@ -2616,33 +2614,12 @@ export default function LogScreen() {
               value={chat} onChangeText={setChat}
             />
             <View style={s.composerBar}>
-              {/* 音声入力（1500人監査Later群「入力が遅い層への救済」）: キーボードのマイクへの道しるべ */}
-              <VoiceHintButton onFocusInput={() => inputRef.current?.focus()} />
-              {/* カメラ1本で料理も成分表示も（AIが読み分ける）。ライブラリは複数選択 */}
+              {/* 2026-09-21: 補助ボタンは「撮影する」「写真から選ぶ」の2つだけ（熊田さんの指示）。
+                  🎤音声ヒント（端末の音声認識が使えなかった・components/VoiceHintButton.tsx を削除）、
+                  🍽外食メニューの相談（components/MenuAdvisor.tsx は残置・入口なし）、「これを食べたら？」ピル（N2 入口②）を外した。
+                  カメラ1本で料理も成分表示も（AIが読み分ける）。ライブラリは複数選択 */}
               <DockIconButton Icon={Camera} label={t('撮影する')} onPress={takePhoto} disabled={photos.length >= 4} />
               <DockIconButton Icon={Images} label={t('写真から選ぶ')} onPress={pickPhotos} disabled={photos.length >= 4} />
-              {/* B-11 外食メニューおすすめ: ヒーローと同じ残量計算値を渡す。
-                  「これにする」は入力欄への充填まで（送信＝AI解析→トレイ→✓保存は本人の操作） */}
-              {profile != null && (
-                <MenuAdvisor
-                  remainingKcal={left}
-                  pRemain={macros ? Math.round(macros.p) - eatenP : null}
-                  onPick={(name) => { setChat(name); setTimeout(() => inputRef.current?.focus(), 500); }}
-                />
-              )}
-              {/* N2 入口②: テキストに食べ物を書いた状態で「これを食べたら？」（docs/STRATEGY.md §7 N2）。
-                  入力シート（pageSheet）の中から別のModalは開けないので、閉じ切ってから開く（queueTip と同じ流儀） */}
-              {chat.trim().length > 0 && parsed == null && (
-                <Pressable hitSlop={8} style={({ pressed }) => [s.dockWhatIf, pressed && { opacity: 0.7 }]}
-                           accessibilityRole="button" accessibilityLabel={t('これを食べたら？')}
-                           onPress={() => {
-                             const name = chat.trim();
-                             closeInput();
-                             queueTip(() => { setWhatIfSeed({ name }); setWhatIfOpen(true); });
-                           }}>
-                  <Text style={s.dockWhatIfT}>{t('これを食べたら？')}</Text>
-                </Pressable>
-              )}
               <View style={{ flex: 1 }} />
               <Pressable style={[s.dockSend, !canSend && { opacity: 0.35 }]} onPress={sendQuick} disabled={!canSend}
                          accessibilityRole="button" accessibilityLabel={t('送信')}>
@@ -2945,11 +2922,6 @@ const s = themed(() => ({
   timeBtnT: { fontSize: 15, fontWeight: '800', color: '#fff' },
   dockSend: { backgroundColor: C.teal, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   // N2「これを食べたら？」（コンポーザーの補助・送信より控えめ）
-  dockWhatIf: {
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.chip,
-    backgroundColor: C.accentSoft, borderWidth: 1, borderColor: C.accentBorder,
-  },
-  dockWhatIfT: { fontSize: 12, fontWeight: '800', color: C.accentInk },
   viewToggle: { marginLeft: 6, width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', backgroundColor: C.panel },
   viewToggleT: { fontSize: 13, color: C.sub, fontWeight: '700' },
   // 残量ストリップ（シート上部・常設）
