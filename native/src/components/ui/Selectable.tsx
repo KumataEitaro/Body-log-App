@@ -42,6 +42,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
       )}
       {options.map((o) => (
         <Pressable key={o.key} style={s.segBtn} android_ripple={ripple()}
+                   accessibilityRole="tab" accessibilityState={{ selected: o.key === value }} accessibilityLabel={o.label}
                    onPress={() => { if (o.key !== value) { hapt(); onChange(o.key); } }}>
           {o.icon}
           <Text numberOfLines={1} maxFontSizeMultiplier={FONT_CAP} style={[s.segT, o.key === value && s.segTOn]}>{o.label}</Text>
@@ -75,6 +76,7 @@ export function Chip({ label, selected, onPress, onLongPress, tone = 'teal', lea
   return (
     <Pressable onPressIn={() => press(0.96)} onPressOut={() => press(1)} disabled={disabled}
                style={{ borderRadius: 999 }} android_ripple={ripple()}
+               accessibilityRole="button" accessibilityState={{ selected: !!selected, disabled: !!disabled }} accessibilityLabel={label}
                onPress={() => { if (haptics) hapt(); onPress(); }} onLongPress={onLongPress}>
       <Animated.View style={[s.chip, onStyle, disabled && { opacity: 0.4 }, { transform: [{ scale: sc }] }]}>
         {leading}
@@ -103,6 +105,7 @@ export function OptionButton({ label, onPress, onLongPress, variant = 'filled', 
   const txt = variant === 'tonal' ? { color: C.ink } : variant === 'filled' ? { color: C.panel } : { color: '#fff' };
   return (
     <Pressable onPressIn={() => press(0.95)} onPressOut={() => press(1)}
+               accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
                onPress={() => { hapt(); onPress(); }} disabled={disabled || busy}
                onLongPress={onLongPress ? () => { hapt(); onLongPress(); } : undefined} delayLongPress={350}
                style={[{ borderRadius: 999 }, style]} android_ripple={ripple()}>
@@ -123,16 +126,17 @@ const s = themed(() => ({
   track: { position: 'relative', flexDirection: 'row', backgroundColor: C.segTrack, borderRadius: 999, padding: 3 },
   plate: {
     position: 'absolute', top: 3, bottom: 3, left: 3, backgroundColor: C.panel, borderRadius: 999,
-    shadowColor: '#141815', shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2,
+    shadowColor: C.shadow, shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },
-  segBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999 },
+  // minHeight 44 = タップ領域の下限（docs/ux-principles.md・QA X-2）
+  segBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, minHeight: 44, borderRadius: 999 },
   segT: { fontSize: 15, fontWeight: '600', color: C.sub },
   segTOn: { color: C.ink, fontWeight: '700' },
   // Chip
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: C.chipBg, borderWidth: 1, borderColor: C.line, borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 9,
+    paddingHorizontal: 14, paddingVertical: 9, minHeight: 44,   // タップ領域の下限（QA X-2）
   },
   chipT: { fontSize: 13, fontWeight: '600', color: C.sub },
   chipOnTeal: {
@@ -141,7 +145,7 @@ const s = themed(() => ({
   },
   chipOnInk: {
     backgroundColor: C.ink, borderColor: C.ink,
-    shadowColor: '#141815', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    shadowColor: C.shadow, shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   chipOnOutline: { borderWidth: 1.5, borderColor: C.teal, backgroundColor: C.accentSoft },
   // OptionButton
@@ -151,7 +155,7 @@ const s = themed(() => ({
   },
   optFilled: {
     backgroundColor: C.ink,
-    shadowColor: '#141815', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    shadowColor: C.shadow, shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
   optTeal: {
     backgroundColor: C.teal,

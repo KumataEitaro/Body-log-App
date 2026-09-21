@@ -9,6 +9,7 @@ import Animated, {
   withSpring, withRepeat, withSequence, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useReduceMotion } from '@/lib/motion';
 
 const SPRING = { damping: 18, stiffness: 200, mass: 0.5 };
 const EDGE = 56;
@@ -40,7 +41,8 @@ export default function ReorderableChips({ order, onOrderChange, renderChip }: P
   const autoScroll = useRef<ReturnType<typeof setInterval> | null>(null);
   const winW = Dimensions.get('window').width;
 
-  useEffect(() => () => { if (autoScroll.current) clearInterval(autoScroll.current); }, []);
+  const dropTimer = useRef<ReturnType<typeof setTimeout> | null>(null);   // ドロップ後の setState 6連発（QA R-3）
+  useEffect(() => () => { if (autoScroll.current) clearInterval(autoScroll.current); if (dropTimer.current) clearTimeout(dropTimer.current); }, []);
   const stopAuto = () => { if (autoScroll.current) { clearInterval(autoScroll.current); autoScroll.current = null; } };
 
   function onDragStart(id: string) {
@@ -108,7 +110,7 @@ export default function ReorderableChips({ order, onOrderChange, renderChip }: P
     setDrop({ id, offset: sn.slots[k] - sn.active.x });
     const others = order.filter((o) => o !== id);
     const nextOrder = [...others.slice(0, k), id, ...others.slice(k)];
-    setTimeout(() => {
+    dropTimer.current = setTimeout(() => {
       onOrderChange(nextOrder);
       setShifts({});
       setDrop(null);
@@ -175,12 +177,13 @@ function DraggableChip({
   const rot = useSharedValue(0);
   const scroll0 = useSharedValue(0);
   const isActive = useSharedValue(false);
+  const reduceMotion = useReduceMotion();   // 視差効果を減らす設定では無限ループのジグルを張らない（QA X-10）
 
   useEffect(() => {
-    rot.value = sessionActive && !active
+    rot.value = sessionActive && !active && !reduceMotion
       ? withRepeat(withSequence(withTiming(-1.2, { duration: 130 }), withTiming(1.2, { duration: 130 })), -1, true)
       : withTiming(0, { duration: 100 });
-  }, [sessionActive, active, rot]);
+  }, [sessionActive, active, rot, reduceMotion]);
 
   useEffect(() => { shiftX.value = withSpring(shift, SPRING); }, [shift, shiftX]);
   useEffect(() => {
@@ -218,7 +221,7 @@ function DraggableChip({
       { rotate: `${rot.value}deg` },
     ],
     zIndex: isActive.value || drop != null ? 20 : 0,
-    shadowColor: '#000',
+    shadowColor: '#000',   // 固定色: worklet（UIスレッド）の中では C を読めない。ドラッグ中の落ち影は明暗どちらでも黒でよい
     shadowOpacity: isActive.value ? 0.25 : 0,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },

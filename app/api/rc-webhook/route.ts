@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { bearerMatches } from '@/lib/secretEq';
 
 // RevenueCat Webhook: 課金状態の正本をprofiles.plan / plan_untilへ反映する。
 // 設定: RevenueCat > Integrations > Webhooks で
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   const secret = process.env.RC_WEBHOOK_SECRET;
   const auth = req.headers.get('authorization') ?? '';
   // RevenueCatはAuthorizationヘッダーに設定値をそのまま送る（Bearer付きでも設定次第なので両対応）
-  if (!secret || (auth !== secret && auth !== `Bearer ${secret}`)) {
+  if (!bearerMatches(auth, secret, true)) {   // timing-safe・素の値も許容（QA C-4）
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 

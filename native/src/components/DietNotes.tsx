@@ -100,7 +100,8 @@ export function DietDisclaimerPanel() {
  */
 export function DietConsentCheck({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
   return (
-    <Pressable style={s.consentRow} onPress={onToggle} hitSlop={6}>
+    <Pressable style={s.consentRow} onPress={onToggle} hitSlop={6}
+               accessibilityRole="checkbox" accessibilityState={{ checked }} accessibilityLabel={t('上記を理解しました（この機能を安全確認には使いません）')}>
       <View style={[s.box, checked && s.boxOn]}>
         {checked && <Text style={s.boxMark}>✓</Text>}
       </View>
@@ -118,7 +119,7 @@ export function DietEstimateNote({ onDetail }: { onDetail?: () => void }) {
   return (
     <View style={s.noteRow}>
       <Text style={s.noteT}>{t('これは推定です。原材料表示と、店舗・製造者への確認を優先してください。')}</Text>
-      <Pressable hitSlop={8} onPress={onDetail ?? (() => router.push('/settings?open=diet' as never))}>
+      <Pressable hitSlop={8} accessibilityRole="button" onPress={onDetail ?? (() => router.push(`/settings?open=diet&ts=${Date.now()}` as never))}>   {/* ts で2回目も開く（NAV-AUDIT D-15） */}
         <Text style={s.noteLink}>{t('詳しく')}</Text>
       </Pressable>
     </View>

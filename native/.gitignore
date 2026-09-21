@@ -41,3 +41,8 @@ example
 # generated native folders
 /ios
 /android
+
+# 実値の env はコミットしない（QA C-1）。雛形の .env.example だけ追跡する
+.env
+.env.*
+!.env.example

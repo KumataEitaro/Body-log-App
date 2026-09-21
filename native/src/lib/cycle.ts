@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from './supabase';
 import { t } from './i18n';
+import { jstYmd } from './jst';
 
 /** 「生理周期を記録する」設定（既定OFF＝キーが無ければ機能ごと非表示） */
 export const CYCLE_ENABLED_KEY = 'bl-cycle-enabled';
@@ -43,7 +44,7 @@ export type CycleLog = { start_date: string; note: string | null };
 
 // ---- 日付ユーティリティ（lib/calcと同値。循環importを避けてここに置く。vitals.tsと同じ流儀） ----
 export function todayJSTLocal(): string {
-  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  return jstYmd(Date.now());   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 export function addDays(d: string, n: number): string {

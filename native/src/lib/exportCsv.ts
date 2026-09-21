@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import { supabase } from './supabase';
 import { t } from './i18n';
 import type { FoodItem } from './items';
+import { jstHm, jstYmd } from './jst';
 
 function esc(v: unknown): string {
   const s = v == null ? '' : String(v);
@@ -18,8 +19,7 @@ function timeJST(at: string | null | undefined): string {
   if (!at) return '';
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) return '';
-  const d = new Date(ms + 9 * 3600_000);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  return jstHm(ms);   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 export async function exportAllCsv(): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -59,7 +59,7 @@ export async function exportAllCsv(): Promise<{ ok: true } | { ok: false; error:
         esc([e.weight != null ? `weight=${e.weight}` : '', e.waist != null ? `waist=${e.waist}` : '', e.bodyfat != null ? `bodyfat=${e.bodyfat}` : ''].filter(Boolean).join(' '))].join(','));
     }
 
-    const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+    const today = jstYmd(Date.now());
     const uri = `${FileSystem.cacheDirectory}bodylog-export-${today}.csv`;
     await FileSystem.writeAsStringAsync(uri, '﻿' + rows.join('\n'), { encoding: FileSystem.EncodingType.UTF8 });
 

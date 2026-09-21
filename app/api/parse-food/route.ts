@@ -7,6 +7,7 @@ import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { buildParseFoodPrompt, buildParseHistoryBlock } from '@/lib/parseFoodPrompt';
 import { buildDietBlock, dietAiPlan } from '@/lib/dietPrompt';
+import { bumpAiUsage } from '@/lib/aiUsage';
 
 // 日本のユーザーが主のため東京リージョンで実行（画像アップロードとSupabase往復を短縮）
 export const preferredRegion = 'hnd1';
@@ -140,12 +141,7 @@ export async function POST(req: Request) {
     // 使用回数のカウントアップは応答を返した後に実行（ユーザーを待たせない）。種類別にも数える
     const bumpUsage = async () => {
       try {
-        await supabase.from('ai_usage').upsert({
-          user_id: user.id, date: today, count: used + 1,
-          text_count: (usageRes.data?.text_count ?? 0) + (kind === 'text' ? 1 : 0),
-          photo_count: (usageRes.data?.photo_count ?? 0) + (kind === 'photo' ? 1 : 0),
-          coach_count: usageRes.data?.coach_count ?? 0,
-        });
+        await bumpAiUsage(user.id, today, kind === 'photo' ? 'photo' : 'text', usageRes.data, supabase);   // service role（migration-34）
         // 無料・ライトの写真はお試し累計を消費（standard以上は日次枠なので数えない）
         if (kind === 'photo' && (plan === 'free' || plan === 'lite')) {
           await supabase.from('profiles').update({ photo_trial_used: photoTrialUsed + 1 }).eq('id', user.id);

@@ -22,6 +22,7 @@ import { epley1RM } from './rm';
 import { healthAvailable, readActivitySummary, readSleepStages } from './health';
 import { isCycleEnabled, listCycleStarts, cycleDay, isWaterRetentionWindow } from './cycle';
 import { sumTagGrams, FOOD_TAGS, type FoodTag } from '@/content/foodTags';
+import { jstHour } from './jst';
 
 // ===== 型 =====
 
@@ -109,7 +110,7 @@ function hourJST(at: string | null | undefined): number | null {
   if (!at) return null;
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) return null;
-  return new Date(ms + 9 * 3600_000).getUTCHours();
+  return jstHour(ms);   // JST の算術は lib/jst.ts に1本化（QA T-4）
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;

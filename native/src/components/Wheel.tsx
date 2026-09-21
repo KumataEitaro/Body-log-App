@@ -55,8 +55,20 @@ export function Wheel({ values, index, onChange, width }: {
     }
   };
 
+  // スクリーンリーダー: 上下スワイプ（increment/decrement）で1刻み動かす（QA X-9）。
+  // 触れる要素は外側の View 1つにまとめ、値は accessibilityValue で読み上げる
+  const step = (d: number) => {
+    const i = Math.min(values.length - 1, Math.max(0, last.current + d));
+    if (i === last.current) return;
+    last.current = i; setSel(i); onChange(i);
+    ref.current?.scrollTo({ y: i * ITEM_H, animated: true });
+  };
   return (
-    <View style={{ width, height: WHEEL_H }}>
+    <View style={{ width, height: WHEEL_H }}
+          accessible accessibilityRole="adjustable"
+          accessibilityValue={{ text: values[sel] ?? '' }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) => { if (e.nativeEvent.actionName === 'increment') step(1); else if (e.nativeEvent.actionName === 'decrement') step(-1); }}>
       <ScrollView
         ref={ref}
         showsVerticalScrollIndicator={false}

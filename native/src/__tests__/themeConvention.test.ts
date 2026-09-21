@@ -53,7 +53,14 @@ describe('スタイル定義の規約', () => {
       if (rel(f) === 'lib/theme.ts' || rel(f) === 'lib/ui.ts') continue; // パレット定義そのものは除く
       const src = readFileSync(f, 'utf8');
       if (/rgba\(14,17,22,0\.08\)/.test(src)) offenders.push(`${rel(f)}: rgba(14,17,22,0.08) → C.hairline`);
-      if (/shadowColor:\s*'#0e1116'/.test(src)) offenders.push(`${rel(f)}: shadowColor '#0e1116' → C.shadow`);
+      // 影の色は生リテラル全般を禁止する（QA T-2・2026-09-18）。以前は '#0e1116' の1つしか見ておらず、
+      // '#000' / '#141815' / 'rgba(0,0,0,1)' が13か所に残ってダークで輪郭が消えていた。
+      // 意図して固定する行（Reanimated の worklet の中では C を読めない等）は `固定色:` と理由を書く
+      for (const line of src.split(/\r?\n/)) {
+        if (/shadowColor:\s*['"](#|rgba?\()/.test(line) && !/固定色/.test(line)) {
+          offenders.push(`${rel(f)}: ${line.trim().slice(0, 60)} → C.shadow（意図的なら「// 固定色: 理由」を添える）`);
+        }
+      }
     }
     expect(offenders).toEqual([]);
   });

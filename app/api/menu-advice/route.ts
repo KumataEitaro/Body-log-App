@@ -7,6 +7,7 @@ import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { buildMenuAdvicePrompt } from '@/lib/menuAdvicePrompt';
 import { buildDietBlock, dietAiPlan } from '@/lib/dietPrompt';
+import { bumpAiUsage } from '@/lib/aiUsage';
 
 // 外食メニューおすすめ（B-11）: メニュー表の写真＋今日の残量＋目的から
 // 「この中ならどれを選ぶべきか」を注文前に答える事前意思決定支援。
@@ -128,12 +129,7 @@ export async function POST(req: Request) {
     // 使用回数は応答を返した後に計上（写真解析として数える。parse-foodと同じ流儀）
     const bumpUsage = async () => {
       try {
-        await supabase.from('ai_usage').upsert({
-          user_id: user.id, date: today, count: used + 1,
-          text_count: usageRes.data?.text_count ?? 0,
-          photo_count: (usageRes.data?.photo_count ?? 0) + 1,
-          coach_count: usageRes.data?.coach_count ?? 0,
-        });
+        await bumpAiUsage(user.id, today, 'photo', usageRes.data, supabase);   // service role（migration-34）
         if (plan === 'free' || plan === 'lite') {
           await supabase.from('profiles').update({ photo_trial_used: photoTrialUsed + 1 }).eq('id', user.id);
         }

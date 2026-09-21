@@ -10,6 +10,7 @@ import { supabase } from './supabase';
 import { todayJST } from './calc';
 import { parseLiftText, effectiveKg, weightLookup } from './liftLog';
 import { t } from './i18n';
+import { jstHour } from './jst';
 import {
   evaluateDeclarativeBadge, getRemoteContent, mergeById, onRemoteContentChange, pickL10n,
   type BadgeCondition, type BadgeMetrics, type RemoteBadge,
@@ -427,13 +428,14 @@ async function runEvaluate(): Promise<AchievementReport> {
     if (!recorded.has(sat) || !recorded.has(sun)) { weekend4 = false; break; }
   }
   // 朝型（10時までの記録がある日 累計14日）
-  const morningDays = new Set(logs.filter((r) => r.at && new Date(r.at).getHours() < 10).map((r) => r.date)).size;
+  // 端末のローカル時ではなく JST（特徴量・法則と同じ物差し・QA A-7）
+  const morningDays = new Set(logs.filter((r) => r.at && jstHour(Date.parse(r.at)) < 10).map((r) => r.date)).size;
   // 全部入りの一日
   const exDays = new Set(logs.filter((r) => r.text.startsWith('🏋️') || r.text.startsWith('🏃')).map((r) => r.date));
   const fullday = entries.some((e) => e.intake != null && e.weight != null && exDays.has(e.date));
   // 深夜ゼロ週間: 直近7日すべて記録があり、21時以降の食事記録がない
   const last7 = Array.from({ length: 7 }, (_, i) => shiftDate(today, -i - 1));
-  const lateDays = new Set(logs.filter((r) => r.at && new Date(r.at).getHours() >= 21 && !r.text.startsWith('🏋️') && !r.text.startsWith('🏃')).map((r) => r.date));
+  const lateDays = new Set(logs.filter((r) => r.at && jstHour(Date.parse(r.at)) >= 21 && !r.text.startsWith('🏋️') && !r.text.startsWith('🏃')).map((r) => r.date));
   const nolate7 = last7.every((d) => recorded.has(d) && !lateDays.has(d));
 
   // 体重系

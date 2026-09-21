@@ -153,10 +153,11 @@ export function HideableCard({ editing, onHide, label, children }: {
 }
 
 /** カード内に置く⊖バッジ（カードのJSXを包まずに済むので既存レイアウトを壊さない） */
-export function MinusBadge({ editing, onPress }: { editing: boolean; onPress: () => void }) {
+export function MinusBadge({ editing, onPress, label }: { editing: boolean; onPress: () => void; label?: string }) {
   if (!editing) return null;
   return (
-    <Pressable style={s.minusBtn} onPress={onPress} hitSlop={10}>
+    <Pressable style={s.minusBtn} onPress={onPress} hitSlop={10}
+               accessibilityRole="button" accessibilityLabel={label ? t('{label}を非表示', { label }) : t('このカードを非表示')}>
       <Minus size={16} color="#fff" strokeWidth={3.5} />
     </Pressable>
   );
@@ -228,7 +229,7 @@ const s = themed(() => ({
   minusBtn: {
     position: 'absolute', top: -6, left: -6, width: 26, height: 26, borderRadius: 13,
     backgroundColor: C.coral, alignItems: 'center', justifyContent: 'center', zIndex: 20,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 4,
+    shadowColor: C.shadow, shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 4,
   },
   sheet: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 18 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },

@@ -48,7 +48,8 @@ export default function MoodFace({ level, size = 30, color }: { level: 1 | 2 | 3
 // 表情とドットの埋まり具合で段階を見せる。数字は出さない。
 export function MoodInline({ level, size = 18 }: { level: 1 | 2 | 3 | 4 | 5; size?: number }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+          accessible accessibilityLabel={t('気分 {n}段階中{lv}', { n: 5, lv: level })}>
       <MoodFace level={level} size={size} color={C.teal} />
       <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.ink }}>{t('気分')}</Text>
       <Text style={{ fontSize: 11, letterSpacing: 2.5, color: C.accentInk }}>

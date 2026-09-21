@@ -242,7 +242,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                   <Line key={`h${t}`} x1={PAD_L} y1={y(t)} x2={PAD_L + plotW} y2={y(t)} stroke={C.line} strokeWidth={0.5} />
                 ))}
                 {ticks.map((t) => (
-                  <SvgText key={`hl${t}`} x={width - PAD_R + 6} y={y(t) + 3.5} fontSize={9.5} fill={C.faint}>
+                  <SvgText key={`hl${t}`} x={width - PAD_R + 6} y={y(t) + 3.5} fontSize={11} fill={C.faint}>
                     {t.toFixed(decimals > 0 && hi - lo < 10 ? decimals : 0)}
                   </SvgText>
                 ))}
@@ -252,7 +252,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                         stroke={C.sub} strokeOpacity={t.label ? 0.30 : 0.14} strokeWidth={0.5} strokeDasharray={t.label ? undefined : '2,3'} />
                 ))}
                 {xtks.filter((t) => t.label !== '').map((t) => (
-                  <SvgText key={`vl${t.idx}`} x={x(t.idx)} y={height - 7} fontSize={9} fill={C.sub} textAnchor="middle">{t.label}</SvgText>
+                  <SvgText key={`vl${t.idx}`} x={x(t.idx)} y={height - 7} fontSize={11} fill={C.sub} textAnchor="middle">{t.label}</SvgText>
                 ))}
                 {/* 目標線 */}
                 {planValue != null && planValue >= lo && planValue <= hi && (
@@ -263,7 +263,7 @@ function Inner({ points, unit = '', decimals = 1, planValue = null, presetDays =
                   <G key={`mk${m.idx}-${i}`}>
                     <Line x1={x(m.idx)} y1={PAD_T} x2={x(m.idx)} y2={PAD_T + plotH}
                           stroke={C.sub} strokeOpacity={0.35} strokeWidth={1} strokeDasharray="3,3" />
-                    <SvgText x={x(m.idx) + 3} y={PAD_T + 8} fontSize={9} fill={C.sub} fillOpacity={0.85}>{m.label}</SvgText>
+                    <SvgText x={x(m.idx) + 3} y={PAD_T + 8} fontSize={11} fill={C.sub} fillOpacity={0.85}>{m.label}</SvgText>
                   </G>
                 ))}
                 {/* トレンド下のグラデーション面（うっすら。曲線を主役に立てる） */}

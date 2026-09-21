@@ -137,7 +137,7 @@ export default function MenuAdvisor({ remainingKcal, pRemain, onPick }: {
 
   return (
     <>
-      <DockIconButton Icon={UtensilsCrossed} onPress={start} />
+      <DockIconButton Icon={UtensilsCrossed} label={t('外食メニューの相談')} onPress={start} />
       {/* 結果シート。RNのModalは描画ツリー上の位置に関係なく最前面に出るが、
           iOSのpageSheetは他のModalの内側（入れ子）では正しく出せない。
           このコンポーネントごと通常View（食事タブのドック）に置き、

@@ -41,5 +41,5 @@ export default function VoiceHintButton({ onFocusInput, mode = 'log' }: {
     );
   }, [onFocusInput, mode]);
 
-  return <DockIconButton Icon={Mic} onPress={() => { press().catch(() => {}); }} />;
+  return <DockIconButton Icon={Mic} label={t('音声で入力')} onPress={() => { press().catch(() => {}); }} />;
 }

@@ -94,7 +94,9 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
             const on = d === value;
             const isT = d === today;
             return (
-              <Pressable key={d} style={s.chip} onPress={() => pick(d)} hitSlop={{ top: 6, bottom: 6 }}>
+              <Pressable key={d} style={s.chip} onPress={() => pick(d)} hitSlop={{ top: 6, bottom: 6, left: 1, right: 1 }}
+                         accessibilityRole="button" accessibilityState={{ selected: on }}
+                         accessibilityLabel={`${cdt.getMonth() + 1}/${cdt.getDate()} ${WD()[cdt.getDay()]}${isT ? ` ${t('今日')}` : ''}`}>
                 {/* チップは幅26px固定のため、文字サイズ拡大は上限1.3で頭打ちにする */}
                 <Text style={[s.chipW, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{WD()[cdt.getDay()]}</Text>
                 <Text style={[s.chipD, on && s.chipTOn]} maxFontSizeMultiplier={1.3}>{cdt.getDate()}</Text>
@@ -122,7 +124,7 @@ export default function DateStrip({ value, onChange }: { value: string; onChange
             <Text style={s.pickerTitle}>{t('記録する日付')}</Text>
             <DateTimePicker
               locale={apiLang()}
-              value={dt} mode="date" display="inline" maximumDate={new Date()}
+              value={dt} mode="date" display="inline" maximumDate={new Date(today + 'T23:59:59')}   // JST の今日まで（QA A-9）
               onChange={(_ev, d) => {
                 if (d) {
                   onChange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
@@ -165,8 +167,9 @@ const s = themed(() => ({
     position: 'absolute', left: 0, top: 0, width: CHIP_W, height: CHIP_H,
     borderRadius: 10, backgroundColor: C.ink,
   },
-  chipW: { fontSize: 11, lineHeight: 13, fontWeight: '700', color: C.faint },
-  chipD: { fontSize: 12, lineHeight: 15, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
+  // lineHeight は fontSize×1.3 以上（文字サイズ拡大でグリフが切れる・QA X-6）
+  chipW: { fontSize: 11, lineHeight: 15, fontWeight: '700', color: C.faint },
+  chipD: { fontSize: 12, lineHeight: 16, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
   // ink地の上の文字。ダークではC.inkが明色に反転するため、白固定ではなく背景トークンで吸収する
   // （ライト=ink地に白文字 / ダーク=明色地に暗文字。βフィードバック 2026-09-02「選択チップが白く浮く」対応）
   chipTOn: { color: C.panel },

@@ -89,8 +89,8 @@ export type PlusEntryProps = {
 
 /** 親が命令的に開くための口。食事タブの「体重を1回記録する」（スタートチェックリスト）が使う（2026-09-18） */
 export type PlusEntryHandle = {
-  /** ＋シートを開く。step を渡すとその数値の段から始まる（体重／ウエスト） */
-  open: (step?: MeasureKind) => void;
+  /** ＋シートを開く。step を渡すとその数値の段から始まる（体重／ウエスト）。'bodyfat' は AI 推定のシートを直接開く */
+  open: (step?: MeasureKind | 'bodyfat') => void;
 };
 
 const PlusEntry = forwardRef<PlusEntryHandle, PlusEntryProps>(function PlusEntry({
@@ -105,7 +105,11 @@ const PlusEntry = forwardRef<PlusEntryHandle, PlusEntryProps>(function PlusEntry
   const [addOpen, setAddOpen] = useState(false);
   const [bfOpen, setBfOpen] = useState(false);
   useImperativeHandle(ref, () => ({
-    open: (step) => { onOpen?.(); setPlusStep(step); setPlusOpen(true); },
+    open: (step) => {
+      onOpen?.();
+      if (step === 'bodyfat') { setBfOpen(true); return; }   // 概要「体の記録」の体脂肪率タイルから
+      setPlusStep(step); setPlusOpen(true);
+    },
   }), [onOpen]);
   // 直近の体重: 親が持っていれば親の値、無ければシートを開くたびに読む（古い値で外れ値判定しない）
   const [fetchedWeight, setFetchedWeight] = useState<number | null>(null);

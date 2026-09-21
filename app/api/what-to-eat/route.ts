@@ -6,6 +6,7 @@ import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { findLang } from '@/lib/langs';
 import { buildDietBlock, dietAiPlan } from '@/lib/dietPrompt';
+import { bumpAiUsage } from '@/lib/aiUsage';
 import {
   buildWhatToEatPrompt, sanitizeEatPicks, slotOfHour,
   EAT_CONTEXTS, EAT_SLOTS, type EatContext, type EatSlot, type EatPick,
@@ -151,12 +152,7 @@ export async function POST(req: Request) {
     // 使用回数は応答を返した後に計上（AI相談として数える）
     const bumpUsage = async () => {
       try {
-        await supabase.from('ai_usage').upsert({
-          user_id: user.id, date: today, count: used + 1,
-          text_count: usageRes.data?.text_count ?? 0,
-          photo_count: usageRes.data?.photo_count ?? 0,
-          coach_count: (usageRes.data?.coach_count ?? 0) + 1,
-        });
+        await bumpAiUsage(user.id, today, 'coach', usageRes.data, supabase);   // service role（migration-34）
       } catch { /* 計上失敗は無視 */ }
     };
     try { after(bumpUsage); } catch { void bumpUsage(); } // after非対応環境（テスト等）は即時実行

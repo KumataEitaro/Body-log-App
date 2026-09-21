@@ -14,7 +14,11 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
-import { Plus, Salad, Trophy, ChevronLeft } from 'lucide-react-native';
+import { Plus, Salad, Trophy, ChevronLeft, ArrowUpRight } from 'lucide-react-native';
+
+// タブの外（スタック画面）へ出る行。見た目が同じ13行のうちこの3行だけ戻り方が違うので、
+// 押す前に分かる印（↗）を付ける（NAV-AUDIT D-05 案A・2026-09-18）
+const EXTERNAL_ROWS = new Set(['laws', 'week', 'nutrients']);
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
@@ -36,7 +40,7 @@ import { Settings as SettingsIcon, Target, Award, BellRing } from 'lucide-react-
 import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
-import PlusEntry from '@/components/PlusEntry';
+import PlusEntry, { type PlusEntryHandle } from '@/components/PlusEntry';
 import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
@@ -412,6 +416,12 @@ export default function ChangesScreen() {
     try { setVitals(await listVitals(30)); } catch { /* 要約は飾り */ }
   };
   useEffect(() => { load(); }, [load]);
+  // 他のタブ（食事タブの＋など）で体重・ウエスト・体脂肪率を入れて戻ってきたときに、
+  // 「体の記録」が古い値のままにならないよう、タブがフォーカスされるたびに読み直す（2026-09-18）。
+  // 初回はマウント時の load() と二重になるが軽い読み取りなので許容する
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  // 右下の＋を命令的に開く（体の記録の KPI タイルをタップ → その数値の入力へ直行）
+  const plusRef = useRef<PlusEntryHandle>(null);
 
   // 月経開始日の読み込み。ONにした瞬間・設定から戻った瞬間に反映する。
   // OFFのときは問い合わせもせず、持っていた値も捨てる（画面に残骸を残さない）
@@ -464,7 +474,8 @@ export default function ChangesScreen() {
       case 'burn': return rows.map((r) => ({ date: r.date, value: r.target }));
     }
   })();
-  const conf = series().find((x) => x.key === serie)!;
+  // 保存済みの系列キーが series() から消えていても落とさない（QA R-2・非nullアサーションをやめる）
+  const conf = series().find((x) => x.key === serie) ?? series()[0];
 
   // カレンダーのマーク（記録あり=緑 / 目標超過=赤 / 未記録=?）— Web版と同じ判定
   //
@@ -494,6 +505,15 @@ export default function ChangesScreen() {
   // 増減は直近30日の起点と比較（全期間比は取込データ起点になり実感と合わない）
   const w30 = weights.filter((r) => r.date >= addDays(today, -30));
   const firstW = w30.length ? w30[0].weight! : null;
+  // ウエスト・体脂肪率も体重と同じ物差し（直近値と直近30日の起点）で見せる（2026-09-18・＋から入るようになった）
+  const waists = rows.filter((r) => r.waist != null);
+  const latestWaist = waists.length ? waists[waists.length - 1].waist! : null;
+  const waist30 = waists.filter((r) => r.date >= addDays(today, -30));
+  const firstWaist = waist30.length ? waist30[0].waist! : null;
+  const bfs = rows.filter((r) => r.bodyfat != null);
+  const latestBf = bfs.length ? bfs[bfs.length - 1].bodyfat! : null;
+  const bf30 = bfs.filter((r) => r.date >= addDays(today, -30));
+  const firstBf = bf30.length ? bf30[0].bodyfat! : null;
   const sumAll = Math.round(rows.reduce((a, r) => a + (r.diff ?? 0), 0));
   // 未記録は「直近30日」に限定して数える（全期間だと取込データ起点で数千日になり意味を失う）
   let unrecorded = 0;
@@ -599,17 +619,37 @@ export default function ChangesScreen() {
     );
   })();
 
+  // 体の数値タイル（体重・ウエスト・体脂肪率）。値が無いタイルは「タップして記録」の入口になる。
+  // ＋シートと同じ保存経路（PlusEntry）へ直行するので、入口が増えても保存の規則は1つのまま（2026-09-18）
+  function bodyTile(key: 'weight' | 'waist' | 'bodyfat', label: string, unit: string, latest: number | null, first: number | null, testID: string) {
+    const delta = latest != null && first != null ? Math.round((latest - first) * 10) / 10 : null;
+    return (
+      <Pressable
+        style={s.kpi} testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={latest != null ? `${label} ${latest.toFixed(1)}${unit}` : t('{label}を記録する', { label })}
+        onPress={() => plusRef.current?.open(key)}
+      >
+        <Text style={s.kpiL}>{label}</Text>
+        <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{latest != null ? latest.toFixed(1) : '—'}<Text style={s.kpiU}>{unit}</Text></Text>
+        {delta != null ? (
+          <Text style={[s.kpiD, { color: delta <= 0 ? C.successInk : C.coral }]}>
+            {t('30日で')}{delta <= 0 ? '▼' : '▲'}{Math.abs(delta).toFixed(1)}{unit}
+          </Text>
+        ) : (
+          <Text style={s.kpiD}>{latest != null ? t('30日の変化はまだ出ません') : t('タップして記録')}</Text>
+        )}
+      </Pressable>
+    );
+  }
   const kpiCard = (
+    <>
       <View style={s.kpiRow}>
-        <View style={s.kpi}>
-          <Text style={s.kpiL}>{t('体重')}</Text>
-          <Text style={s.kpiV} maxFontSizeMultiplier={1.3}>{latestW != null ? latestW.toFixed(1) : '—'}<Text style={s.kpiU}>kg</Text></Text>
-          {latestW != null && firstW != null && (
-            <Text style={[s.kpiD, { color: latestW - firstW <= 0 ? C.successInk : C.coral }]}>
-              {t('30日で')}{latestW - firstW <= 0 ? '▼' : '▲'}{Math.abs(latestW - firstW).toFixed(1)}kg
-            </Text>
-          )}
-        </View>
+        {bodyTile('weight', t('体重'), 'kg', latestW, firstW, 'kpi-weight')}
+        {bodyTile('waist', t('ウエスト'), 'cm', latestWaist, firstWaist, 'kpi-waist')}
+        {bodyTile('bodyfat', t('体脂肪率'), '%', latestBf, firstBf, 'kpi-bodyfat')}
+      </View>
+      <View style={s.kpiRow}>
         <View style={s.kpi}>
           <Text style={s.kpiL}>{t('累計収支')}</Text>
           <Text style={[s.kpiV, { color: sumAll <= 0 ? C.successInk : C.coral }]} maxFontSizeMultiplier={1.3}>{bigKcalParts(sumAll).num}<Text style={s.kpiU}>{bigKcalParts(sumAll).unit}</Text></Text>
@@ -621,6 +661,7 @@ export default function ChangesScreen() {
           <Text style={s.kpiD}>{t('±0扱い')}</Text>
         </View>
       </View>
+    </>
   );
 
   const calendarCard = (
@@ -854,9 +895,15 @@ export default function ChangesScreen() {
     switch (key) {
       case 'body': {
         // 旧kpi行の要約: 現在体重＋1週間の変化（30日の流れは詳細のヘッダー・グラフで見せる）
-        if (latestW2 == null) return t('体重を記録するとここに変化が出ます');
-        const d = weekW != null ? `・${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg` : '';
-        return `${latestW2.toFixed(1)}kg${d}`;
+        if (latestW2 == null && latestWaist == null && latestBf == null) return t('体重を記録するとここに変化が出ます');
+        const parts: string[] = [];
+        if (latestW2 != null) {
+          const d = weekW != null ? `（${t('1週間で')}${weekW <= 0 ? '▼' : '▲'}${Math.abs(weekW).toFixed(1)}kg）` : '';
+          parts.push(`${latestW2.toFixed(1)}kg${d}`);
+        }
+        if (latestWaist != null) parts.push(`${t('ウエスト')} ${latestWaist.toFixed(1)}cm`);
+        if (latestBf != null) parts.push(`${t('体脂肪')} ${latestBf.toFixed(1)}%`);
+        return parts.join('・');
       }
       case 'eating': {
         // 旧slotsの要約（最多時間帯）を優先。データが無いうちは旧bingeの誘い文
@@ -967,11 +1014,14 @@ export default function ChangesScreen() {
     // 遷移を確定させたあとに広告の判定（未ロード・条件未達なら何も起きない）
     interstitial.maybeShow(key);
   }
-  // 週次レビュー画面の「くわしく見る」から（/changes?open=week）: 週の数字の一覧を直接開く。
-  // 旧 ?open=photos（体の写真ページ＋撮影）は 2026-09-18 に廃止。古いディープリンクが来ても無視する（壊さない）
+  // /changes?open=<キー>&ts=… で、そのキーの詳細ページを直接開く（NAV-AUDIT D-11・2026-09-18）。
+  //   week: 週次レビュー画面の「くわしく見る」から（週の数字の一覧）
+  //   strength / volume / body …: 運動タブの「概要タブ →◯◯で見られます」から
+  // 旧 ?open=photos（体の写真）は廃止。知らないキーは無視する（古いディープリンクで壊さない）。
+  // ts は「同じ行き先を2回続けて開く」ためのノンス（expo-router は同一パスを無視する・D-15）
   const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
   useEffect(() => {
-    if (openParam !== 'week') return;
+    if (!openParam || !ALL_ORDER_DEFAULT.includes(openParam) || EXTERNAL_ROWS.has(openParam) && openParam !== 'week') return;
     detailTx.value = 0;
     setDetailKey(openParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -987,8 +1037,8 @@ export default function ChangesScreen() {
     let unit = '';
     let src: { date: string; value: number }[] = [];
     if (key === 'body') {
-      if (latestW2 == null) return null;
-      val = latestW2.toFixed(1); unit = 'kg';
+      if (latestW2 == null && latestWaist == null && latestBf == null) return null;
+      val = latestW2 != null ? latestW2.toFixed(1) : '—'; unit = 'kg';
       src = wRows.map((r) => ({ date: r.date, value: Number(r.weight) }));
     } else if (key === 'health') {
       const st = activity?.find((d) => d.date === today)?.steps;
@@ -1016,6 +1066,14 @@ export default function ChangesScreen() {
           <Text style={s.detailUnit}> {unit}</Text>
         </Text>
         <Text style={s.detailTrend}>{trendPhrase(src)}</Text>
+        {key === 'body' && (latestWaist != null || latestBf != null) && (
+          <Text style={s.detailSub} testID="body-sub-metrics">
+            {[
+              latestWaist != null ? `${t('ウエスト')} ${latestWaist.toFixed(1)}cm` : null,
+              latestBf != null ? `${t('体脂肪率')} ${latestBf.toFixed(1)}%` : null,
+            ].filter(Boolean).join('　')}
+          </Text>
+        )}
         {waterDay != null && (
           <Text style={s.detailWater}>{t('この時期の増加は水分の可能性があります（周期{n}日目）', { n: waterDay })}</Text>
         )}
@@ -1051,8 +1109,11 @@ export default function ChangesScreen() {
     const crowned = g.crowned;
     const crownBlocks = g.blocked;
     const secTitle = sectionHeadOf.get(key);
+    const external = EXTERNAL_ROWS.has(key);
     const row = (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+                 accessibilityRole="button" accessibilityLabel={CARD_LABELS()[key] ?? key}
+                 accessibilityHint={external ? t('別のページを開きます') : undefined}
                  // Androidリップル（Material 3の作法）。menuRow自身のborderRadius 16内にクリップされる
                  android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
                  // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
@@ -1096,7 +1157,7 @@ export default function ChangesScreen() {
         </View>
         {crowned && <CrownBadge size={14} />}
         {withSpark && <MiniSpark vals={sparkVals} color={C.teal} />}
-        <Text style={s.menuGo}>›</Text>
+        {external ? <ArrowUpRight size={16} color={C.faint} testID={`external-${key}`} /> : <Text style={s.menuGo}>›</Text>}
       </Pressable>
     );
     // セクション先頭ならヘルスケア風の小見出し＋余白を上に足す（見出しは行と一体で描くため、
@@ -1185,6 +1246,9 @@ export default function ChangesScreen() {
         rows={rows} today={today} ready={menuLoaded}
         onOpen={(target: HighlightTarget) => {
           if (target === 'laws') { router.push({ pathname: '/laws', params: navFrom('changes') } as never); return; }
+          // 「週のふりかえり」はメニュー行と同じ行き先（週次レビュー画面）へ（NAV-AUDIT D-06）。
+          // 以前はここだけタブ内詳細（数字の一覧）を開いていて、隣り合う2つの入口が別の場所を指していた
+          if (target === 'week') { router.push({ pathname: '/weekly-review', params: navFrom('changes') } as never); return; }
           // メニュー行と**同じ王冠判定**を通す（2026-09-16・NAV-AUDIT D-07）。
           // ここに判定が無かったため、無料のまま有料の「食べ方の分析」が開けていた。
           // 行き先が同じなら、入口が違っても結果は同じでなければならない
@@ -1281,7 +1345,7 @@ export default function ChangesScreen() {
           体重・ウエスト・体脂肪率・マイ食品の登録はその場で＝PlusEntry の共通処理）。
           ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない）。
           体の数値を保存したら一覧を読み直す（体の記録の要約行・グラフが新しい値を見る） */}
-      <PlusEntry from="changes" onWeightSaved={() => { void load(); }} onWaistSaved={() => { void load(); }} onBodyfatSaved={() => { void load(); }} />
+      <PlusEntry ref={plusRef} from="changes" onWeightSaved={() => { void load(); }} onWaistSaved={() => { void load(); }} onBodyfatSaved={() => { void load(); }} />
       <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
@@ -1318,7 +1382,7 @@ const s = themed(() => ({
   doneBtnT: { fontSize: 13, fontWeight: '800', color: '#fff' },
   editHint: { fontSize: 13, color: C.sub, marginBottom: 10, textAlign: 'center' },
   lifted: {
-    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 },
+    shadowColor: C.shadow, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 10 },
     elevation: 12, borderRadius: RADIUS.card, backgroundColor: C.bg,
   },
   ghostCard: {
@@ -1407,6 +1471,7 @@ const s = themed(() => ({
   detailVal: { fontSize: 36, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
   detailUnit: { fontSize: 16, fontWeight: '700', color: C.sub },
   detailTrend: { fontSize: 13.5, fontWeight: '700', color: C.sub, marginTop: 2 },
+  detailSub: { fontSize: 13.5, fontWeight: '700', color: C.accentInk, marginTop: 4, fontVariant: ['tabular-nums'] },
   detailWater: { fontSize: 13, fontWeight: '700', color: C.accentInk, lineHeight: 19, marginTop: 4 },
   // トレンドの2期間平均線（B-17）
   bandBox: { marginTop: 10 },
