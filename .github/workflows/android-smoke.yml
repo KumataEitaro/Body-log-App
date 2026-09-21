@@ -178,9 +178,17 @@ jobs:
             echo "❌ 通らなかった操作: ${STEPS_FAILED}" >&2
             exit 1
           fi
-          # 生きていても致命例外が出ていたら落とす（ErrorBoundary が拾って画面だけ出ている可能性）
-          if grep -q "FATAL EXCEPTION\|Fatal signal" logcat-full.txt; then
-            echo "❌ プロセスは生きているが致命例外のログがある" >&2
+          # 生きていても致命例外が出ていたら落とす（ErrorBoundary が拾って画面だけ出ている可能性）。
+          # **自分のプロセスの行だけ**見る（#29 は Google 検索ボックスの SIGILL を拾って赤くなった・2026-09-21）。
+          # Fatal signal の行は "(tcha.bodylog.rn)"、Java の FATAL EXCEPTION は次行に "Process: com.gotcha.bodylog.rn"
+          if grep -E -A2 "FATAL EXCEPTION|Fatal signal" logcat-full.txt | grep -q "bodylog"; then
+            echo "❌ プロセスは生きているが自分の致命例外のログがある" >&2
             exit 1
           fi
-          echo "✅ 起動・画面の描画・ダークモード切替・画面の回転・前景復帰をすべて通過"
+          # 接続先（EXPO_PUBLIC_SUPABASE_URL）がバンドルに無いビルドを通さない（2026-09-21・TestFlight 1.1.13 の教訓。
+          # #29/#30 は起動はしていたが、誰もログインできないビルドだった。native/.env は git 管理・公開クライアント設定）
+          if grep -q "ビルドに埋め込まれていません" logcat-app.txt; then
+            echo "❌ Supabase の接続先がバンドルに埋め込まれていません（native/.env が git 管理下にあるか確認）" >&2
+            exit 1
+          fi
+          echo "✅ 起動・画面の描画・ダークモード切替・画面の回転・前景復帰・接続先の埋め込みをすべて通過"

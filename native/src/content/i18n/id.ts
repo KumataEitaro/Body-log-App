@@ -2435,4 +2435,11 @@ export const ID: Record<string, string> = {
   "少なすぎ −{n}kcal": "Kurang −{n}kcal",
   "1日 {k}kcal・あと{d}日": "{k}kcal/hari · {d} hari lagi",
   "この調整を取り消す": "Batalkan penyesuaian ini",
+  // ログイン失敗の理由別の文言（lib/authErrors.ts・2026-09-21）
+  "このビルドにはサーバーの接続先が入っていません。開発者向け: EXPO_PUBLIC_SUPABASE_URL の埋め込みを確認してください。": "Build ini tidak berisi alamat server. Untuk pengembang: pastikan EXPO_PUBLIC_SUPABASE_URL sudah disematkan.",
+  "メールアドレスの確認が済んでいません。届いた確認メールのリンクを開いてから、もう一度ログインしてください。": "Alamat email belum dikonfirmasi. Buka tautan di email konfirmasi, lalu masuk lagi.",
+  "試行が多すぎます。しばらく待ってからもう一度お試しください。": "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+  "ログインに失敗しました: {reason}": "Gagal masuk: {reason}",
+  "登録に失敗しました: {reason}": "Gagal mendaftar: {reason}",
+  "不明なエラー": "Kesalahan tidak diketahui",
 };

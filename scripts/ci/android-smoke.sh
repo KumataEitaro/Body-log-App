@@ -93,7 +93,8 @@ check() {
     echo "❌ $label のあとプロセスが居ません"
     return 1
   fi
-  if adb logcat -d | grep -q "FATAL EXCEPTION"; then
+  # 自分のプロセスの致命例外だけ（他アプリの例外・ANR を拾わない。Java の FATAL EXCEPTION は次行に Process: が出る）
+  if adb logcat -d | grep -A2 "FATAL EXCEPTION" | grep -q "bodylog"; then
     STEPS_FAILED="$STEPS_FAILED [$label:致命例外]"
     echo "❌ $label のあと FATAL EXCEPTION がログにあります"
     return 1
@@ -126,7 +127,18 @@ check "起動" || exit 0
 #   ・画面ダンプに**自分のパッケージのノード**があり、**空でないテキストが1つ以上**ある
 # 起動直後はまだ描けていないことがあるので、10秒ぶん数回やり直す。
 DRAWN=0
-for i in 1 2 3 4 5; do
+for i in 1 2 3 4 5 6 7 8; do
+  # エミュレータ側のランチャー等の ANR ダイアログ（"Pixel Launcher isn't responding"）が前面を奪うと、
+  # 自分は生きているのに描画チェックが落ちる（#23 / #28）。閉じて自分を前面に戻してからやり直す
+  FOCUS=$(adb shell dumpsys window 2>/dev/null | grep -i "mCurrentFocus" | head -1)
+  if echo "$FOCUS" | grep -q "Application Not Responding"; then
+    echo "⚠️ 他アプリの ANR ダイアログが前面: $FOCUS → 閉じて再前面化"
+    adb shell input keyevent 4 >/dev/null 2>&1 || true
+    sleep 1
+    adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
+    sleep 3
+    continue
+  fi
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   adb pull /sdcard/ui.xml ui-dump.xml >/dev/null 2>&1
   if [ -f ui-dump.xml ] && grep -q "package=\"$PKG\"" ui-dump.xml && grep -qE 'text="[^"]+"' ui-dump.xml; then

@@ -2435,4 +2435,11 @@ export const FR: Record<string, string> = {
   "少なすぎ −{n}kcal": "Manque −{n}kcal",
   "1日 {k}kcal・あと{d}日": "{k}kcal/jour · {d} jours restants",
   "この調整を取り消す": "Annuler cet ajustement",
+  // ログイン失敗の理由別の文言（lib/authErrors.ts・2026-09-21）
+  "このビルドにはサーバーの接続先が入っていません。開発者向け: EXPO_PUBLIC_SUPABASE_URL の埋め込みを確認してください。": "Cette version ne contient pas l’adresse du serveur. Pour les développeurs : vérifiez que EXPO_PUBLIC_SUPABASE_URL est intégré.",
+  "メールアドレスの確認が済んでいません。届いた確認メールのリンクを開いてから、もう一度ログインしてください。": "Votre adresse e-mail n’est pas encore confirmée. Ouvrez le lien de l’e-mail de confirmation, puis reconnectez-vous.",
+  "試行が多すぎます。しばらく待ってからもう一度お試しください。": "Trop de tentatives. Patientez un moment puis réessayez.",
+  "ログインに失敗しました: {reason}": "Échec de la connexion : {reason}",
+  "登録に失敗しました: {reason}": "Échec de l’inscription : {reason}",
+  "不明なエラー": "Erreur inconnue",
 };

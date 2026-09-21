@@ -12,7 +12,13 @@ import { recordBootError } from './boot';
 // 通信は全部失敗するが、画面は出るので「設定画面の起動時エラー記録」から原因が読める。
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+/**
+ * 接続先がビルドに入っているか。false のビルドは通信が全部失敗する。
+ * ログイン画面はこれを見て「通信環境を確認」ではなく設定不備の文を出す（2026-09-21・TestFlight 1.1.13 の教訓。
+ * 原因は native/.env を git から外したこと。app.config.js が CI ではビルド自体を止める）
+ */
+export const SUPABASE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+if (!SUPABASE_CONFIGURED) {
   // boot.ts は AsyncStorage だけに依存しており、supabase.ts を import しないので循環しない
   recordBootError(
     'supabase.env',

@@ -2484,4 +2484,11 @@ export const EN: Record<string, string> = {
   "少なすぎ −{n}kcal": "Under by −{n}kcal",
   "1日 {k}kcal・あと{d}日": "{k}kcal/day · {d} days left",
   "この調整を取り消す": "Undo this adjustment",
+  // ログイン失敗の理由別の文言（lib/authErrors.ts・2026-09-21）
+  "このビルドにはサーバーの接続先が入っていません。開発者向け: EXPO_PUBLIC_SUPABASE_URL の埋め込みを確認してください。": "This build has no server address. For developers: check that EXPO_PUBLIC_SUPABASE_URL is embedded.",
+  "メールアドレスの確認が済んでいません。届いた確認メールのリンクを開いてから、もう一度ログインしてください。": "Your email address is not confirmed yet. Open the link in the confirmation email, then log in again.",
+  "試行が多すぎます。しばらく待ってからもう一度お試しください。": "Too many attempts. Please wait a while and try again.",
+  "ログインに失敗しました: {reason}": "Login failed: {reason}",
+  "登録に失敗しました: {reason}": "Sign-up failed: {reason}",
+  "不明なエラー": "Unknown error",
 };
