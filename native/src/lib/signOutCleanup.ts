@@ -66,6 +66,7 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-day-plan:',          // 日ごとの予定（プレフィックス）
   'bl-day-plan-ask-off',
   'bl-kcal-adjust',
+  'bl-carry-mode', 'bl-carry-days', 'bl-carry-dismiss',   // 繰り越し調整の聞き方・日数・流した日（本人の計画の一部）
   'bl-week-goal', 'bl-week-steps-goal',
   'bl-active-kcal-to-goal', 'bl-act-last-min',
   'bl-food-freq-v2', 'bl-food-seen',

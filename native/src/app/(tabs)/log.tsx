@@ -109,7 +109,7 @@ import MoodFace, { MoodInline } from '@/components/MoodFace';
 import ComebackSheet from '@/components/ComebackSheet';
 import StartChecklist from '@/components/StartChecklist';
 import { invalidateStreak, maybeEvaluateBadges, peekBadgeBanner, consumeBadgeBanner, badgeById } from '@/lib/achievements';
-import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
+import { computePlan, macroTargets, type Goal } from '@/lib/goal';
 import { dailyAllowance, overLevel, balanceOf, balanceFill, type BalanceDay, type Balance } from '@/lib/deficit';
 import { useKcalAdjust } from '@/lib/kcalAdjust';
 import { t, apiLang } from '@/lib/i18n';
@@ -120,6 +120,8 @@ import { setDayStatus } from '@/lib/dayStatus';
 import { confirmOutlierWeight } from '@/lib/guard';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { arbitrateAttention } from '@/lib/logCards';
+import { splitEvents, carryToday, detectCarry, isCarry, signedKcal, CARRY_TITLE, CARRY_DAYS_OPTIONS, type EventRow } from '@/lib/carryover';
+import { useCarryPrefs, readCarryDismissed, dismissCarry } from '@/lib/carryPrefs';
 import { useTodayRollover } from '@/lib/rollover';
 import { navFrom } from '@/lib/navHeader';
 
@@ -234,7 +236,8 @@ export default function LogScreen() {
   // 起動のたびに一瞬「プロフィールを設定してください」が閃く（QA P0-3 修正案4）
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [events, setEvents] = useState<(PlanEvent & { id: string })[]>([]);
+  // 先の予定（plan）と繰り越し調整（carry）の両方（lib/carryover.ts）。使う側で splitEvents する
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [myFoods, setMyFoods] = useState<MyFood[]>([]);
   // マイ食品（セット・複数品目）。migration-24未適用のDBでは常に空＝チップが出ないだけ
@@ -467,7 +470,8 @@ export default function LogScreen() {
     const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes, mealsRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('goals').select('*').maybeSingle(),
-      supabase.from('events').select('id,date,title,extra_kcal').order('date', { ascending: true }),
+      // kind / absorb_days（migration-35）も読む。列を名指しすると旧DBで select ごと落ちるので '*'
+      supabase.from('events').select('*').order('date', { ascending: true }),
       supabase.from('entries').select('weight,date').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
       supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio').order('created_at', { ascending: true }).limit(30),
       supabase.from('logs').select('*').eq('date', viewDate).order('at', { ascending: true }),
@@ -479,7 +483,7 @@ export default function LogScreen() {
     if (profRes.data) setProfile(profRes.data as Profile);
     if (!profRes.error) setProfileLoaded(true);   // 通信できた＝「行が無い」も確定した情報として扱える
     if (goalRes.data) setGoal(goalRes.data as Goal);
-    setEvents((evRes.data as (PlanEvent & { id: string })[]) || []);
+    setEvents((evRes.data as EventRow[]) || []);
     if (wRes.data?.length) setLatestWeight(Number(wRes.data[0].weight));
     setMyFoods((foodRes.data as MyFood[]) || []);
     setMyMeals(mealsRes);
@@ -528,17 +532,23 @@ export default function LogScreen() {
   // life_factor が null の旧プロフィールは Number(null)=0 で目標が運動ぶんだけになっていた（QA B-5）。既定の生活係数に落とす
   const lifeFactor = Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT) || LIFE_FACTOR_DEFAULT;
   const target = profile ? Math.round(bmr * lifeFactor) + Math.round(dayExerciseKcal(dayLogs)) + activeBonus : 0;
-  const plan = goal && profile ? computePlan(goal, today, weightForBmr, events, goal.absorb_days) : null;
+  // events は「先の予定（plan）」と「繰り越し調整（carry）」の2種（lib/carryover.ts）。
+  // 計画（チートデイの吸収）に渡すのは plan だけ。carry を混ぜると当日の目標を+側に緩めてしまう
+  const { plans: planEvents, carries } = useMemo(() => splitEvents(events), [events]);
+  const plan = goal && profile ? computePlan(goal, today, weightForBmr, planEvents, goal.absorb_days) : null;
+  // 繰り越し調整の今日ぶん（正=食べる量を減らす・負=増やす）。「使わない」なら台帳があっても足さない
+  const carryPrefs = useCarryPrefs();
+  const carryNow = carryPrefs.mode === 'off' ? 0 : carryToday(carries, today, carryPrefs.days);
   // 7日以内のいちばん近い予定（帯に1件だけ出す）。常設にすると読まれなくなるので窓で絞る
-  const upcomingEvent = nextEvent(events, today);
-  const todayEvent = events.find((e) => e.date === today) ?? null;
+  const upcomingEvent = nextEvent(planEvents, today);
+  const todayEvent = planEvents.find((e) => e.date === today) ?? null;
   // 1日に食べられる量 = max(維持 − 必要赤字/日 + 手動調整, BMR)。目標画面の「結論」と同じ関数（lib/deficit.ts）。
   // 手動調整（目標画面「きつければ自分で調整」・端末保存）が0なら従来の計算と完全に一致する。
   // 第5引数＝target に含まれている運動ぶん（アプリ記録の EX_ADD＋adj と、アクティブ反映の上乗せ）。
   // BMR下限は運動抜きの土台にだけ掛かり、運動ぶんは必ずその上に乗る（lib/deficit.ts の説明のとおり。
   // これが無いと赤字が大きい日に運動を記録しても目標が1kcalも動かなかった）
   const planIntakeBase = profile
-    ? dailyAllowance(target, plan ? plan.requiredDailyWithEvents : 0, Math.round(bmr), kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)
+    ? dailyAllowance(target, (plan ? plan.requiredDailyWithEvents : 0) + carryNow, Math.round(bmr), kcalAdjust, Math.round(dayExerciseKcal(dayLogs)) + activeBonus)
     : 0;
   const goalKcal = plan && todayEvent ? planIntakeBase + Math.round(Number(todayEvent.extra_kcal)) : planIntakeBase;
   const eaten = Math.round(summary.intake ?? 0);
@@ -1123,12 +1133,16 @@ export default function LogScreen() {
       const r = byDate.get(d);
       const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) : 0);
       // 第5引数＝その日の運動ぶん（maintenance − 土台）。ヒーローの目標と同じく、運動ぶんはBMR下限の上に乗せる
-      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req, Math.round(bmr), kcalAdjust, maintenance - base) });
+      // その日の実効目標: 繰り越し調整（carry）と、その日のチートデイ（plan）も織り込む。
+      // 収支の点と「ずれ」の判定はこの数字に対して行う（調整込みの目標を守った日を「少なすぎ」と誤読しない）
+      const carryD = carryPrefs.mode === 'off' ? 0 : carryToday(carries, d, carryPrefs.days);
+      const planExtra = Math.round(Number(planEvents.find((e) => e.date === d)?.extra_kcal ?? 0));
+      out.push({ date: d, intake: r?.intake == null ? null : Number(r.intake), maintenance, allowance: dailyAllowance(maintenance, req + carryD, Math.round(bmr), kcalAdjust, maintenance - base) + planExtra });
     }
     out.push({ date: today, intake: summary.intake == null ? null : Math.round(summary.intake), maintenance: target, allowance: goalKcal });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, pastRows, bmr, plan, kcalAdjust, today, summary.intake, target, goalKcal]);
+  }, [profile, pastRows, bmr, plan, kcalAdjust, today, summary.intake, target, goalKcal, carries, planEvents, carryPrefs.mode, carryPrefs.days]);
 
   // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
   const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
@@ -1271,7 +1285,7 @@ export default function LogScreen() {
         .insert({ user_id: uid, date: today, title, extra_kcal: 200 })
         .select('id,date,title,extra_kcal').single();
       if (error) { setMsg({ ok: false, text: t('設定に失敗しました。もう一度お試しください。') }); return; }
-      setEvents((prev) => [...prev.filter((e) => !(e.date === today && e.title === title)), ev as PlanEvent & { id: string }]);
+      setEvents((prev) => [...prev.filter((e) => !(e.date === today && e.title === title)), ev as EventRow]);
       await snoozeRisk();
       setMsg({ ok: true, text: t('🕊 今日の目標を+200kcal緩めました。我慢しすぎないことが、結局いちばん速いです。') });
     } finally { recoveryBusy.current = false; }
@@ -1285,7 +1299,7 @@ export default function LogScreen() {
     if (!uid) return;
     setEventPlanBusy(true);
     try {
-      const dup = events.filter((e) => e.date === d.date);
+      const dup = planEvents.filter((e) => e.date === d.date);   // 調整行（carry）は別物なので消さない
       if (dup.length > 0) {
         await supabase.from('events').delete().in('id', dup.map((e) => e.id));
       }
@@ -1296,7 +1310,7 @@ export default function LogScreen() {
         setMsg({ ok: false, text: t('予定の登録に失敗しました。もう一度お試しください。') });
         return;
       }
-      setEvents((prev) => [...prev.filter((e) => e.date !== d.date), ev as PlanEvent & { id: string }]
+      setEvents((prev) => [...prev.filter((e) => e.date !== d.date || isCarry(e)), ev as EventRow]
         .sort((a, b) => (a.date < b.date ? -1 : 1)));
       // 前日20時のリマインド（通知許可がなければ静かにスキップ）
       scheduleCheatDayEve(d.date);
@@ -1372,6 +1386,73 @@ export default function LogScreen() {
     } finally {
       setBackfillBusy(false);
     }
+  }
+
+  // ===== 食べすぎ・少なすぎの繰り越し調整（lib/carryover.ts・2026-09-21） =====
+  // 候補は2つ: (a) きのうの超過／不足（1日が終わってから） (b) 今日の超過（当日に確定できる。「毎回聞く」のときだけ）。
+  // どちらも「まだ台帳（kind='carry' の行）が無く、×で流していない」ときだけカードを出す。判定は純関数 detectCarry。
+  // 「自動で調整」は (a) を起床後に自動で積む（下の effect）。当日ぶんは1日が終わっていないので自動では積まない
+  const [carryDismissed, setCarryDismissed] = useState<string[]>([]);
+  const [yEntries, setYEntries] = useState<number | null>(null);   // きのうの食事記録の件数（1品だけの日を「少なすぎ」と誤読しない）
+  useEffect(() => {
+    let alive = true;
+    readCarryDismissed().then((v) => { if (alive) setCarryDismissed(v); }).catch(() => {});
+    (async () => {
+      try {
+        const { count, error } = await supabase.from('logs').select('id', { count: 'exact', head: true })
+          .eq('date', shiftDate(today, -1)).not('kcal', 'is', null);
+        if (alive && !error) setYEntries(count ?? 0);
+      } catch { /* 件数が取れなければ不足は聞かない（null のまま） */ }
+    })();
+    return () => { alive = false; };
+  }, [todayKey]);
+  const yesterdayISO = shiftDate(today, -1);
+  const yRow = balanceDays.find((b) => b.date === yesterdayISO) ?? null;
+  const foodCountToday = dayLogs.filter((l) => l.kcal != null).length;
+  const carryCandidate = useMemo(() => {
+    if (!profile || !carryPrefs.loaded || carryPrefs.mode === 'off') return null;
+    const handled = (d: string) => carries.some((c) => c.date === d) || carryDismissed.includes(d);
+    // (a) きのう。件数が未取得（null）のあいだは不足を判定しない（超過は件数に依らない）
+    if (yRow && !handled(yesterdayISO)) {
+      const det = detectCarry({ date: yesterdayISO, intake: yRow.intake, allowance: yRow.allowance, entries: yEntries ?? 0, days: carryPrefs.days });
+      if (det && (det.kind === 'over' || yEntries != null)) return det;
+    }
+    // (b) 今日の超過（表示中の日が今日のときだけ。eaten / goalKcal は表示日の数字）
+    if (carryPrefs.mode === 'ask' && viewDate === today && !handled(today) && summary.intake != null) {
+      const det = detectCarry({ date: today, intake: eaten, allowance: goalKcal, entries: foodCountToday, days: carryPrefs.days, sameDay: true });
+      if (det) return det;
+    }
+    return null;
+  }, [profile, carryPrefs.loaded, carryPrefs.mode, carryPrefs.days, carries, carryDismissed, yRow, yesterdayISO, yEntries, viewDate, today, summary.intake, eaten, goalKcal, foodCountToday]);
+  const carryBusy = useRef(false);
+  const [carrySaving, setCarrySaving] = useState(false);
+  // 承認: その日の調整行を1本だけ（delete→insert で冪等）。額と日数は承認した時点で固定する
+  async function acceptCarry(det: NonNullable<typeof carryCandidate>, auto = false) {
+    if (!uid || carryBusy.current) return;
+    carryBusy.current = true; setCarrySaving(true);
+    try {
+      await supabase.from('events').delete().eq('user_id', uid).eq('date', det.date).eq('kind', 'carry');
+      const { data: ev, error } = await supabase.from('events')
+        .insert({ user_id: uid, date: det.date, title: CARRY_TITLE, extra_kcal: det.delta, kind: 'carry', absorb_days: det.days })
+        .select('*').single();
+      if (error) { if (!auto) setMsg({ ok: false, text: t('設定に失敗しました。もう一度お試しください。') }); return; }
+      setEvents((prev) => [...prev.filter((e) => !(e.date === det.date && isCarry(e))), ev as EventRow]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const k = Math.abs(det.perDay).toLocaleString();
+      const from = det.date === today ? t('明日から') : t('今日から');
+      setMsg({
+        ok: true,
+        text: auto
+          ? t('きのうの {delta}kcal を{days}日でならします（1日 {k}kcal）。目標画面から取り消せます。', { delta: signedKcal(det.delta), days: det.days, k: signedKcal(-det.perDay) })
+          : det.kind === 'over'
+            ? t('{from}{days}日間、目標を1日 −{k}kcal にして取り戻します。', { from, days: det.days, k })
+            : t('{from}{days}日間、目標を1日 +{k}kcal にして戻します。', { from, days: det.days, k }),
+      });
+    } finally { carryBusy.current = false; setCarrySaving(false); }
+  }
+  async function dismissCarryFor(date: string) {
+    setCarryDismissed((prev) => (prev.includes(date) ? prev : [...prev, date]));
+    await dismissCarry(date, today);
   }
 
   // 朝の気分カード: その日まだ気分が無ければ1タップで聞く（スキップはその日限り）。
@@ -1570,6 +1651,7 @@ export default function LogScreen() {
     candidates: {
       caution: bingeRisk || cautionAlert ? 1 : 0,
       dayPlan: askDayPlan ? 1 : 0,
+      carry: carryCandidate ? 1 : 0,
       backfill: backfill ? 1 : 0,
       checklist: vis('checklist') && checklistLive ? 1 : 0,
       mood: vis('mood') && showMood ? 1 : 0,
@@ -1580,6 +1662,36 @@ export default function LogScreen() {
     },
   });
   const shownPositive = positiveAlerts.slice(0, attention.positive);
+
+  // 「自動で調整」: きのうのずれは起床後に自動で台帳へ（1日1回・失敗しても同じ日を繰り返さない）
+  const autoCarried = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (carryPrefs.mode !== 'auto' || !carryCandidate || carryCandidate.date === today || isBeforeWake) return;
+    if (autoCarried.current.has(carryCandidate.date)) return;
+    autoCarried.current.add(carryCandidate.date);
+    void acceptCarry(carryCandidate, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carryPrefs.mode, carryCandidate, today, isBeforeWake]);
+
+  // 今日の調整行を承認したあとに、さらに食べた／消した → 行の額を「今日の最終的なずれ」に合わせる（1日1本の約束を保つ）。
+  // 超過が無くなったら（消して 0 以下）行そのものを取り下げる
+  const todayCarry = useMemo(() => carries.find((c) => c.date === today) ?? null, [carries, today]);
+  const lastReconciled = useRef<number | null>(null);
+  useEffect(() => {
+    if (!uid || !todayCarry || !isViewToday) return;
+    const delta = Math.round(eaten - goalKcal);
+    if (delta === Math.round(Number(todayCarry.extra_kcal)) || lastReconciled.current === delta) return;
+    lastReconciled.current = delta;
+    (async () => {
+      if (delta <= 0) {
+        const { error } = await supabase.from('events').delete().eq('id', todayCarry.id);
+        if (!error) setEvents((prev) => prev.filter((e) => e.id !== todayCarry.id));
+      } else {
+        const { error } = await supabase.from('events').update({ extra_kcal: delta }).eq('id', todayCarry.id);
+        if (!error) setEvents((prev) => prev.map((e) => (e.id === todayCarry.id ? { ...e, extra_kcal: delta } : e)));
+      }
+    })().catch(() => {});
+  }, [uid, todayCarry, isViewToday, eaten, goalKcal]);
 
   // マイ食品（セット）の登録シート（記録行の長押しメニュー／✓保存の長押しから。
   // alsoSave=✓保存長押し経由: セット登録に続けてトレイの通常保存も行う）。
@@ -1688,6 +1800,12 @@ export default function LogScreen() {
               {/* 目標の数字から統合目標画面へ直行（P/F/Cバーのタップと同じ導線）。小さく「目標を調整 ›」で発見性を担保 */}
               <Pressable onPress={openGoalHub} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={s.metaT}>{t('目標')} <Text style={s.metaGoalN}>{goalKcal.toLocaleString()}</Text></Text>
+                {/* 繰り越し調整が効いている日は理由を隠さない（activeBonus の内訳と同じ考え方） */}
+                {carryNow !== 0 && (
+                  <View style={s.carryBadge} accessibilityLabel={t('繰り越し調整で目標を {n}kcal 動かしています', { n: signedKcal(-carryNow) })}>
+                    <Text style={s.carryBadgeT}>{t('調整')} {signedKcal(-carryNow)}</Text>
+                  </View>
+                )}
                 <Text style={s.metaAdjust}>{t('目標を調整')} ›</Text>
               </Pressable>
             </View>
@@ -1870,6 +1988,44 @@ export default function LogScreen() {
         )}
 
         {/* 昨日の穴埋めカード（責めないトーン） */}
+        {/* 繰り越し調整の確認（lib/carryover.ts）。Alert ではなくカード＝答えなくても記録は進む（Apple HIG: 日常の情報にアラートを使わない）。
+            文面は責めない: 「取り返す」は罰ではなく、週の収支で帳尻を合わせる算数の話。日数のチップは次回からの既定にもなる */}
+        {carryCandidate && attention.carry > 0 && (
+          <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]} testID="carry-card">
+            <View style={s.alertHead}>
+              <Text style={[s.h2, { flex: 1, marginBottom: 0 }]}>
+                {carryCandidate.date === today
+                  ? t('⚖️ 今日はここまで、目標より +{n}kcal', { n: carryCandidate.delta.toLocaleString() })
+                  : carryCandidate.kind === 'over'
+                    ? t('⚖️ {date}は目標より +{n}kcal でした', { date: dateLabelOf(carryCandidate.date), n: carryCandidate.delta.toLocaleString() })
+                    : t('⚖️ {date}は目標より −{n}kcal でした', { date: dateLabelOf(carryCandidate.date), n: Math.abs(carryCandidate.delta).toLocaleString() })}
+              </Text>
+              <Pressable hitSlop={10} onPress={() => dismissCarryFor(carryCandidate.date)} accessibilityRole="button" accessibilityLabel={t('今回は調整しない')}>
+                <Text style={s.alertX}>×</Text>
+              </Pressable>
+            </View>
+            <Text style={s.mutedT}>
+              {carryCandidate.kind === 'over'
+                ? t('1日で取り返す必要はありません。{days}日に分けると 1日 −{k}kcal で吸収できます。体重は週の合計で決まります。', { days: carryCandidate.days, k: Math.abs(carryCandidate.perDay).toLocaleString() })
+                : t('少なすぎる日が続くと代謝と筋肉が落ちます。{days}日に分けると 1日 +{k}kcal ずつ戻せます。', { days: carryCandidate.days, k: Math.abs(carryCandidate.perDay).toLocaleString() })}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }} accessibilityLabel={t('何日に分けるか')}>
+              {CARRY_DAYS_OPTIONS.map((d) => (
+                <Chip key={d} label={t('{n}日', { n: d })} tone="ink" selected={d === carryPrefs.days} onPress={() => carryPrefs.setDays(d)} disabled={carrySaving} />
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <OptionButton style={{ flex: 1 }}
+                            label={carryCandidate.date === today ? t('明日から{days}日でならす', { days: carryCandidate.days }) : t('今日から{days}日でならす', { days: carryCandidate.days })}
+                            onPress={() => acceptCarry(carryCandidate)} busy={carrySaving} />
+              <OptionButton style={{ flex: 1 }} variant="tonal" label={t('調整しない')} onPress={() => dismissCarryFor(carryCandidate.date)} disabled={carrySaving} />
+            </View>
+            <Pressable onPress={openGoalHub} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 10 }} accessibilityRole="link">
+              <Text style={s.alertLink}>{t('自動で調整する設定 →')}</Text>
+            </Pressable>
+          </View>
+        )}
+
         {backfill && attention.backfill > 0 && (
           <View style={[s.card, { borderColor: C.amber, borderWidth: 1.5 }]}>
             <Text style={s.h2}>{backfill.binge
@@ -2648,6 +2804,9 @@ const s = themed(() => ({
   // 目標の数字はタップできることが分かるよう濃く・下線。「目標を調整 ›」はアクセント色の小さな導線
   metaGoalN: { fontWeight: '800', color: C.ink, textDecorationLine: 'underline' },
   metaAdjust: { fontSize: 12, fontWeight: '800', color: C.accentInk },
+  // ヒーロー「目標」横の繰り越し調整バッジ（小さく・責め色にしない）
+  carryBadge: { backgroundColor: C.chipBg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  carryBadgeT: { fontSize: 11, lineHeight: 15, fontWeight: '800', color: C.sub, fontVariant: ['tabular-nums'] },
   card: { backgroundColor: C.panel, borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline, borderRadius: RADIUS.card, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2, padding: SPACE.card, marginBottom: 12 },
   h2: { ...HEAD.card, color: C.ink, marginBottom: 8 },
   // 気づきアラート（§8）: 統合カードの見出し行・×・解説リンク・ポジティブ側の控えめな面
