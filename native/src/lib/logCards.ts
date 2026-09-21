@@ -13,6 +13,9 @@
 //            > dayPlan（N1 朝の1問「今日は外食の予定ありますか？」。答えると今日の配分そのものが変わる
 //                      ＝この後に見る全部の数字の前提。だから backfill より上。ただし caution は
 //                      「今日が崩れやすい」という今日の準備の話で、予定の再配分より先に読まれるべきなので下に置く）
+//            > carry（食べすぎ／少なすぎの繰り越し調整「ならしますか？」lib/carryover.ts・2026-09-21。
+//                      答えると今日以降の目標そのものが変わる＝dayPlan と同じ「前提」の話なので backfill より上。
+//                      dayPlan より下なのは、朝の1問が「今日の配分」で、こちらは「今日以降の水準」だから）
 //            > backfill（昨日の未記録。放置すると収支の数字がズレる）
 //            > checklist（新規ユーザー14日間の道しるべ。日々の入力より先に「次に何をするか」）
 //            > mood（1タップの気分入力）
@@ -28,7 +31,7 @@
 // ヒーロー・収支・今日の記録・前の食事・体重入力・広告枠は「構造カード」（ユーザーが⊖/⊕で自分で
 // 管理する、または位置が固定）なのでこの調停の対象外。スポットライト（マイ食品の案内・食事の制約の案内）は
 // Modal であり、保存直後に1枚だけ・互いに排他で出るのでここには載せない。
-export type AttentionCard = 'caution' | 'dayPlan' | 'backfill' | 'checklist' | 'mood' | 'positive';
+export type AttentionCard = 'caution' | 'dayPlan' | 'carry' | 'backfill' | 'checklist' | 'mood' | 'positive';
 export type AttentionBand = 'badge' | 'firstLaw' | 'brief';
 export type AttentionKey = AttentionCard | AttentionBand;
 
@@ -36,11 +39,11 @@ export const MAX_CARDS = 2;
 export const MAX_BANDS = 2;
 
 /** 枠を取る順（先頭ほど優先） */
-export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'dayPlan', 'backfill', 'checklist', 'mood', 'positive'];
+export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'dayPlan', 'carry', 'backfill', 'checklist', 'mood', 'positive'];
 export const BAND_PRIORITY: readonly AttentionBand[] = ['badge', 'firstLaw', 'brief'];
 
 /** 今日を表示しているときだけ意味を持つもの（過去日では候補から外す） */
-export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'backfill', 'mood', 'positive', 'brief']);
+export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'carry', 'backfill', 'mood', 'positive', 'brief']);
 
 /**
  * 「朝に出すもの」＝起床時刻より前（`beforeWake`）は候補から外すもの。
@@ -50,6 +53,8 @@ export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['cau
  *                        まだ寝る前の深夜に出しても行動に変えられない（しかも1日1回で消費される）
  *   dayPlan            … 今日の予定ヒアリング。深夜に「今日は外食の予定ありますか？」は答えられない
  *   mood               … 朝の気分。起きた直後の気分を聞きたいので、寝る前に聞いてしまうと意味がない
+ *   carry              … 繰り越し調整。「きのうは +1,000kcal でした」は**きのうが終わってから**の話。
+ *                        0:30 の本人はまだ「きのうの続き」を食べているかもしれない（額が確定していない）
  *
  * **入っていないもの（＝深夜こそ出したい）**:
  *   backfill（昨日の穴埋め）… 0:30 の本人の体感は「今日の続き」で、直前まで食べていた記憶が
@@ -58,7 +63,7 @@ export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['cau
  *   checklist / badge / firstLaw … 日付にも時刻にも依存しない（過去日でも出るのと同じ理由）
  *   brief（今日のひとこと帯）… 帯1行で、答えを求めない読み物なので深夜に出ても消費されない
  */
-export const MORNING_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'mood', 'positive']);
+export const MORNING_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'carry', 'mood', 'positive']);
 
 export type AttentionInput = {
   /** 表示中の日付が今日か */

@@ -4,14 +4,14 @@
 import { arbitrateAttention, attentionCount, MAX_BANDS, MAX_CARDS, MORNING_ONLY, TODAY_ONLY, CARD_PRIORITY, BAND_PRIORITY } from '../logCards';
 
 const ALL_ON = {
-  caution: 1, dayPlan: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
+  caution: 1, dayPlan: 1, carry: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
   badge: 1, firstLaw: 1, brief: 1,
 };
 
 describe('arbitrateAttention（ヒーロー直下の調停）', () => {
   it('全候補がそろっても カード最大2枚＋帯最大2本 を超えない', () => {
     const r = arbitrateAttention({ isToday: true, candidates: ALL_ON });
-    const cards = r.caution + r.dayPlan + r.backfill + r.checklist + r.mood + r.positive;
+    const cards = r.caution + r.dayPlan + r.carry + r.backfill + r.checklist + r.mood + r.positive;
     const bands = r.badge + r.firstLaw + r.brief;
     expect(cards).toBe(MAX_CARDS);
     expect(bands).toBe(MAX_BANDS);
@@ -22,6 +22,7 @@ describe('arbitrateAttention（ヒーロー直下の調停）', () => {
     const r = arbitrateAttention({ isToday: true, candidates: ALL_ON });
     expect(r.caution).toBe(1);
     expect(r.dayPlan).toBe(1);
+    expect(r.carry).toBe(0);
     expect(r.backfill).toBe(0);
     expect(r.checklist).toBe(0);
     expect(r.mood).toBe(0);
@@ -37,6 +38,25 @@ describe('arbitrateAttention（ヒーロー直下の調停）', () => {
     const tight = arbitrateAttention({ isToday: true, candidates: { dayPlan: 1, backfill: 1 } }, 1);
     expect(tight.dayPlan).toBe(1);
     expect(tight.backfill).toBe(0);
+  });
+
+  // 繰り越し調整（lib/carryover.ts・2026-09-21）: 答えると今日以降の目標の水準が変わる＝前提の話。
+  // 朝の1問（今日の配分）の次、昨日の穴埋めより先
+  it('繰り越し調整は朝の1問の次・昨日の穴埋めより先に枠を取る', () => {
+    const r = arbitrateAttention({ isToday: true, candidates: { carry: 1, backfill: 1 } }, 1);
+    expect(r.carry).toBe(1);
+    expect(r.backfill).toBe(0);
+    const r2 = arbitrateAttention({ isToday: true, candidates: { dayPlan: 1, carry: 1 } }, 1);
+    expect(r2.dayPlan).toBe(1);
+    expect(r2.carry).toBe(0);
+  });
+
+  it('繰り越し調整は今日だけ・起床前は出さない（「きのう」が終わってから聞く）', () => {
+    expect(TODAY_ONLY.has('carry')).toBe(true);
+    expect(MORNING_ONLY.has('carry')).toBe(true);
+    expect(arbitrateAttention({ isToday: false, candidates: { carry: 1 } }).carry).toBe(0);
+    expect(arbitrateAttention({ isToday: true, beforeWake: true, candidates: { carry: 1 } }).carry).toBe(0);
+    expect(arbitrateAttention({ isToday: true, beforeWake: false, candidates: { carry: 1 } }).carry).toBe(1);
   });
 
   it('朝の1問は「今日」を見ているときだけ（過去日の予定を聞かない）', () => {
@@ -111,7 +131,7 @@ describe('arbitrateAttention（起床前は「朝に出るもの」を出さな�
 
   it('深夜は上位の朝カードが枠を取らないので、下位（backfill/checklist）が繰り上がる＝枠を余らせない', () => {
     const r = arbitrateAttention({ isToday: true, beforeWake: true, candidates: ALL_ON });
-    const cards = r.caution + r.dayPlan + r.backfill + r.checklist + r.mood + r.positive;
+    const cards = r.caution + r.dayPlan + r.carry + r.backfill + r.checklist + r.mood + r.positive;
     expect(cards).toBe(MAX_CARDS);
     expect(r.backfill).toBe(1);
     expect(r.checklist).toBe(1);

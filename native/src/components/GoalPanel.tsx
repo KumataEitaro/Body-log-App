@@ -8,16 +8,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Target, Beef, Dumbbell, Footprints, Flame, CalendarCheck, Utensils, Scale } from 'lucide-react-native';
+import { Target, Beef, Dumbbell, Footprints, Flame, CalendarCheck, Utensils, Scale, Repeat } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { C, rgba, themed } from '@/lib/ui';
 import { todayJST, mifflinBMR, LIFE_FACTOR_DEFAULT } from '@/lib/calc';
-import { progressStatus, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
+import { progressStatus, addDays, PROTEIN_PER_KG_DEFAULT, FAT_PER_KG_DEFAULT, type Goal } from '@/lib/goal';
+import { activeCarries, splitEvents, CARRY_DAYS_OPTIONS, CARRY_THRESHOLD, signedKcal, type EventRow, type CarryMode } from '@/lib/carryover';
+import { useCarryPrefs } from '@/lib/carryPrefs';
 import { deficitPlan, dailyAllowance, projectedTargetDate, clampAdjust, MAX_WEEKLY_LOSS_KG } from '@/lib/deficit';
 import { useKcalAdjust } from '@/lib/kcalAdjust';
 import { trainingSeries } from '@/lib/training';
 import { scheduleCheatDayEve } from '@/lib/notify';
-import { OptionButton, Chip } from '@/components/ui/Selectable';
+import { OptionButton, Chip, SegmentedControl } from '@/components/ui/Selectable';
 import HabitGoals from '@/components/HabitGoals';
 import { epley1RM } from '@/lib/rm';
 import { isBodyweightLift, loadCustomLifts } from '@/lib/lifts';
@@ -28,7 +30,7 @@ import { bmiFloorKg, assessWeightGoal } from '@/lib/guard';
 import { t, apiLang } from '@/lib/i18n';
 
 type TGoal = { id: string; name: string; target_kg: number; target_date: string | null };
-type Ev = { id: string; date: string; title: string; extra_kcal: number };
+type Ev = EventRow;   // 先の予定（plan）と繰り越し調整（carry）の両方が入る（lib/carryover.ts）
 type Prof = { sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number };
 
 function fmt(d: Date): string {
@@ -66,6 +68,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
   // 1日に食べられる量の手動調整（端末保存・0=自動）
   const [kcalAdjust, setKcalAdjust] = useKcalAdjust();
   const [adjustText, setAdjustText] = useState('');
+  // 繰り越し調整の聞き方と日数（端末保存・lib/carryPrefs.ts）
+  const carry = useCarryPrefs();
   const [events, setEvents] = useState<Ev[]>([]);
   const [evDate, setEvDate] = useState('');
   const [evKcal, setEvKcal] = useState('800');
@@ -99,7 +103,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
       supabase.from('logs').select('date,text').like('text', '🏋️%').order('at', { ascending: false }).limit(200),
       // select('*')なら maternity 列が無い旧DBでもクエリ自体は失敗しない（列指定だとselectごと落ちる）
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
-      supabase.from('events').select('id,date,title,extra_kcal').gte('date', todayJST()).order('date', { ascending: true }),
+      // 先の予定（今日以降）＋直近14日の繰り越し調整（kind='carry'）。列は '*'（旧DBに kind が無くても落ちない）
+      supabase.from('events').select('*').gte('date', addDays(todayJST(), -14)).order('date', { ascending: true }),
     ]);
     if (profRes.data) {
       const pr = profRes.data as { init_weight?: number | null; height_cm?: number | null; maternity?: boolean | null; sex?: 'male' | 'female' | null; age?: number | null; life_factor?: number | null };
@@ -605,11 +610,58 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
     </>
   );
 
+  // events は先の予定（plan）と繰り越し調整（carry）の2種。チートデイの一覧には plan の今日以降だけ
+  const { plans: planEvents, carries } = splitEvents(events);
+  const futurePlans = planEvents.filter((e) => e.date >= today);
+  const carryActive = activeCarries(carries, today, carry.days);
+
+  // ===== 食べすぎ・少なすぎの繰り越し調整（lib/carryover.ts）=====
+  // 「1日で取り返さない」を仕組みにする。聞き方（毎回聞く／自動／使わない）と日数は端末に保存、
+  // 承認済みの調整は events（kind='carry'）にあり、ここで一覧と取り消しができる
+  const carrySection = (
+    <>
+      <View style={s.h2Row}><Repeat size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食べすぎ・少なすぎの繰り越し')}</Text></View>
+      <Text style={s.note}>{t('目標との差が{th}kcalを超えた日は、そのぶんを翌日から数日に分けて目標に織り込みます。1日で取り返す必要はありません。', { th: CARRY_THRESHOLD.toLocaleString() })}</Text>
+      <Text style={s.label}>{t('聞き方')}</Text>
+      <SegmentedControl<CarryMode>
+        options={[{ key: 'ask', label: t('毎回聞く') }, { key: 'auto', label: t('自動で調整') }, { key: 'off', label: t('使わない') }]}
+        value={carry.mode} onChange={carry.setMode} />
+      {carry.mode !== 'off' && (
+        <>
+          <Text style={s.label}>{t('何日に分けるか')}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {CARRY_DAYS_OPTIONS.map((d) => (
+              <Chip key={d} label={t('{n}日', { n: d })} tone="ink" selected={d === carry.days} onPress={() => carry.setDays(d)} />
+            ))}
+          </View>
+          <Text style={s.tiny}>{carry.mode === 'auto'
+            ? t('ずれは翌朝、起床後に自動で織り込みます（食事タブに1行お知らせします）。')
+            : t('ずれが出た日に、食事タブで「ならしますか？」と聞きます。')}</Text>
+          <Text style={[s.label, { marginTop: 12 }]}>{t('いま調整中')}</Text>
+          {carryActive.length === 0 ? (
+            <Text style={s.note}>{t('ありません')}</Text>
+          ) : carryActive.map((a) => (
+            <View key={a.id} style={s.evRow}>
+              <Text style={s.evDate}>{a.date.slice(5).replace('-', '/')}</Text>
+              <Text style={s.evTitle}>{a.extra_kcal > 0
+                ? t('食べすぎ +{n}kcal', { n: a.extra_kcal.toLocaleString() })
+                : t('少なすぎ −{n}kcal', { n: Math.abs(a.extra_kcal).toLocaleString() })}</Text>
+              <Text style={s.evKcal}>{t('1日 {k}kcal・あと{d}日', { k: signedKcal(-a.perDay), d: a.daysLeft })}</Text>
+              <Pressable onPress={() => removeEvent(a.id)} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('この調整を取り消す')}>
+                <Text style={{ color: C.coral, fontWeight: '800', fontSize: 17 }}>×</Text>
+              </Pressable>
+            </View>
+          ))}
+        </>
+      )}
+    </>
+  );
+
   const cheatSection = (
     <>
       <View style={s.h2Row}><Beef size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('チートデイ')}</Text></View>
       <Text style={s.note}>{t('登録した日は目標が+設定kcalに緩み、超過分は前後の日で計画が自動吸収します。')}</Text>
-      {events.map((e) => (
+      {futurePlans.map((e) => (
         <View key={e.id} style={s.evRow}>
           <Text style={s.evDate}>{e.date.slice(5).replace('-', '/')}</Text>
           <Text style={s.evTitle}>{e.title}</Text>
@@ -669,6 +721,8 @@ export default function GoalPanel({ mode, weightSections = 'all' }: { mode: 'wei
           <View style={[s.card, s.cardAccent]}>
             {allowanceSection}
           </View>
+
+          <View style={s.card}>{carrySection}</View>
 
           <View style={s.card}>
             <View style={s.h2Row}>
