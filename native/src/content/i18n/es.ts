@@ -2092,7 +2092,6 @@ export const ES: Record<string, string> = {
   "ゆで卵2個＋バナナ": "2 huevos cocidos + plátano",
   "買ってそのまま食べられて、たんぱく質も確保できます。": "Listo para comprar y comer, asegurando tu aporte de proteína.",
   "栄養ランキング": "Ranking nutricional",
-  "◯◯が多い食材・かしこい置き換え・たんぱく源ティア": "Alimentos ricos en..., sustituciones inteligentes y niveles de proteínas",
   "置き換え候補を見る": "Ver alternativas",
   "かしこい置き換え": "Sustituciones inteligentes",
   "たんぱく源のうちAティア以上の割合（たんぱく質g加重）": "Porcentaje de fuentes de proteína en nivel A o superior (ponderado por g de proteína)",
@@ -2499,4 +2498,8 @@ export const ES: Record<string, string> = {
   "例: 150": "ej. 150",
   "入れると、チップで足したときの量が g で出て、倍率や g で調整できます。": "Si lo indicas, la cantidad aparece en gramos al añadir desde el chip y puedes ajustar por multiplicador o gramos.",
   "1回分 = {g}g として登録します（チップで足すときの量になります）": "Se guardará como 1 ración = {g}g (la cantidad al añadir desde el chip)",
+  // 概要: 摂取・消費kcal の表・収支カードからの直行（2026-09-24）
+  "グラフと表で見る": "Ver gráfico y tabla",
+  "摂取カロリーのグラフと表を見る": "Ver gráfico y tabla de calorías ingeridas",
+  "自分の摂取ランキング・不足栄養素・食材図鑑": "Tu ranking de ingesta · nutrientes bajos · guía de alimentos",
 };

@@ -186,12 +186,18 @@ function BalanceRow({ label, b, isBulk }: { label: string; b: Balance; isBulk: b
     </View>
   );
 }
-function BalanceCard({ days, perDayDeficit, isBulk }: { days: BalanceDay[]; perDayDeficit: number; isBulk: boolean }) {
+function BalanceCard({ days, perDayDeficit, isBulk, onOpen }: { days: BalanceDay[]; perDayDeficit: number; isBulk: boolean; onOpen?: () => void }) {
   const week = balanceOf(days.slice(-7), perDayDeficit);
   const month = balanceOf(days.slice(-30), perDayDeficit);
   return (
-    <View>
-      <Text style={bs.h2}>{t('週と月の収支')}</Text>
+    // タップで概要「体の記録」の摂取kcal グラフ・表へ（2026-09-24 熊田さん）。並び替え中（onOpen 無し）は押せない。
+    // 行き先は概要のメニュー行と同じ（/changes?open=body&serie=intake）＝王冠判定も広告も同じ道を通る
+    <Pressable onPress={onOpen} disabled={!onOpen} accessibilityRole={onOpen ? 'button' : undefined}
+               accessibilityLabel={onOpen ? t('摂取カロリーのグラフと表を見る') : undefined}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <Text style={bs.h2}>{t('週と月の収支')}</Text>
+        {onOpen && <Text style={bs.link}>{t('グラフと表で見る')} ›</Text>}
+      </View>
       <BalanceRow label={t('この1週間')} b={week} isBulk={isBulk} />
       {/* 日別ドット（左=6日前 … 右=今日）。増量ではドットの意味が反転するため色を入れ替える */}
       <View style={bs.dots}>
@@ -207,11 +213,12 @@ function BalanceCard({ days, perDayDeficit, isBulk }: { days: BalanceDay[]; perD
       </View>
       <BalanceRow label={t('この1か月')} b={month} isBulk={isBulk} />
       <Text style={bs.principle}>{t('体重は1日ではなく、週と月の合計で決まります。今日多めでも、週で戻せば大丈夫です。')}</Text>
-    </View>
+    </Pressable>
   );
 }
 const bs = themed(() => ({
   h2: { ...HEAD.card, color: C.ink },
+  link: { fontSize: 13, fontWeight: '700', color: C.accentInk },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
   label: { fontSize: 13, fontWeight: '700', color: C.sub },
   num: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
@@ -2041,7 +2048,8 @@ export default function LogScreen() {
         {vis('balance') && profile && (
           <Animated.View style={[s.card, enter[1]]}>
             <MinusBadge editing={editing} onPress={() => cards.hide('balance')} />
-            <BalanceCard days={balanceDays} perDayDeficit={plan ? plan.requiredDaily : 0} isBulk={isBulk} />
+            <BalanceCard days={balanceDays} perDayDeficit={plan ? plan.requiredDaily : 0} isBulk={isBulk}
+                         onOpen={editing ? undefined : () => router.navigate({ pathname: '/changes', params: { open: 'body', serie: 'intake', ts: String(Date.now()) } } as never)} />
           </Animated.View>
         )}
 

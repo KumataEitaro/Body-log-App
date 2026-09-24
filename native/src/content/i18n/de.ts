@@ -2023,7 +2023,6 @@ export const DE: Record<string, string> = {
   "ゆで卵2個＋バナナ": "2 gekochte Eier + Banane",
   "買ってそのまま食べられて、たんぱく質も確保できます。": "Direkt verzehrfertig gekauft und sichert deine Proteinzufuhr.",
   "栄養ランキング": "Nährstoff-Rankings",
-  "◯◯が多い食材・かしこい置き換え・たんぱく源ティア": "Reich an ..., smarte Alternativen & Protein-Tier-List",
   "置き換え候補を見る": "Alternativen ansehen",
   "かしこい置き換え": "Smarte Alternativen",
   "たんぱく源のうちAティア以上の割合（たんぱく質g加重）": "Anteil von Tier A oder höher an Proteinquellen (gewichtet nach Protein g)",
@@ -2459,4 +2458,8 @@ export const DE: Record<string, string> = {
   "例: 150": "z. B. 150",
   "入れると、チップで足したときの量が g で出て、倍率や g で調整できます。": "Wenn gesetzt, wird die Menge beim Hinzufügen per Chip in Gramm angezeigt und lässt sich per Faktor oder Gramm anpassen.",
   "1回分 = {g}g として登録します（チップで足すときの量になります）": "Wird als 1 Portion = {g}g gespeichert (Menge beim Hinzufügen per Chip)",
+  // 概要: 摂取・消費kcal の表・収支カードからの直行（2026-09-24）
+  "グラフと表で見る": "Diagramm und Tabelle ansehen",
+  "摂取カロリーのグラフと表を見る": "Diagramm und Tabelle der aufgenommenen Kalorien ansehen",
+  "自分の摂取ランキング・不足栄養素・食材図鑑": "Deine Aufnahme-Rangliste · knappe Nährstoffe · Lebensmittelführer",
 };

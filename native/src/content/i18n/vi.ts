@@ -2023,7 +2023,6 @@ export const VI: Record<string, string> = {
   "ゆで卵2個＋バナナ": "2 quả trứng luộc + Chuối",
   "買ってそのまま食べられて、たんぱく質も確保できます。": "Mua ăn được ngay mà vẫn đảm bảo lượng protein cần thiết.",
   "栄養ランキング": "Bảng xếp hạng dinh dưỡng",
-  "◯◯が多い食材・かしこい置き換え・たんぱく源ティア": "Thực phẩm giàu chất dinh dưỡng • Đổi món thông minh • Xếp hạng nguồn đạm",
   "置き換え候補を見る": "Xem gợi ý thay thế",
   "かしこい置き換え": "Đổi món thông minh",
   "たんぱく源のうちAティア以上の割合（たんぱく質g加重）": "Tỷ lệ nguồn đạm từ hạng A trở lên (tính theo g đạm)",
@@ -2459,4 +2458,8 @@ export const VI: Record<string, string> = {
   "例: 150": "vd: 150",
   "入れると、チップで足したときの量が g で出て、倍率や g で調整できます。": "Khi nhập, lượng sẽ hiện theo gram khi thêm từ chip và có thể chỉnh theo hệ số hoặc gram.",
   "1回分 = {g}g として登録します（チップで足すときの量になります）": "Sẽ lưu là 1 phần = {g}g (lượng khi thêm từ chip)",
+  // 概要: 摂取・消費kcal の表・収支カードからの直行（2026-09-24）
+  "グラフと表で見る": "Xem biểu đồ và bảng",
+  "摂取カロリーのグラフと表を見る": "Xem biểu đồ và bảng calo nạp vào",
+  "自分の摂取ランキング・不足栄養素・食材図鑑": "Xếp hạng nạp vào của bạn · dưỡng chất thiếu · cẩm nang thực phẩm",
 };

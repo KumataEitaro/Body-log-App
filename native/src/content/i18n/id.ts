@@ -2023,7 +2023,6 @@ export const ID: Record<string, string> = {
   "ゆで卵2個＋バナナ": "2 Telur Rebus + Pisang",
   "買ってそのまま食べられて、たんぱく質も確保できます。": "Bisa langsung dibeli dan dimakan, sekaligus mengamankan asupan protein.",
   "栄養ランキング": "Peringkat Nutrisi",
-  "◯◯が多い食材・かしこい置き換え・たんぱく源ティア": "Bahan kaya nutrisi, pengganti pintar & tier sumber protein",
   "置き換え候補を見る": "Lihat opsi pengganti",
   "かしこい置き換え": "Pengganti Pintar",
   "たんぱく源のうちAティア以上の割合（たんぱく質g加重）": "Porsi sumber protein Tier A ke atas (bobot g protein)",
@@ -2459,4 +2458,8 @@ export const ID: Record<string, string> = {
   "例: 150": "mis. 150",
   "入れると、チップで足したときの量が g で出て、倍率や g で調整できます。": "Jika diisi, jumlah tampil dalam gram saat ditambahkan dari chip dan bisa diatur dengan pengali atau gram.",
   "1回分 = {g}g として登録します（チップで足すときの量になります）": "Akan disimpan sebagai 1 porsi = {g}g (jumlah saat ditambahkan dari chip)",
+  // 概要: 摂取・消費kcal の表・収支カードからの直行（2026-09-24）
+  "グラフと表で見る": "Lihat grafik dan tabel",
+  "摂取カロリーのグラフと表を見る": "Lihat grafik dan tabel kalori masuk",
+  "自分の摂取ランキング・不足栄養素・食材図鑑": "Peringkat asupanmu · nutrisi kurang · panduan bahan",
 };

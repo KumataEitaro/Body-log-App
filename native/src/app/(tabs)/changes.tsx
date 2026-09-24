@@ -45,7 +45,7 @@ import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
-import { BodyTable, LiftTable, TableEntryCard } from '@/components/DataTableCard';
+import { BodyTable, LiftTable, TableEntryCard, type BodyMetric } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2, Share2 } from 'lucide-react-native';
 import ShareStickerModal, { type StickerData } from '@/components/ShareSticker';
@@ -332,12 +332,12 @@ export default function ChangesScreen() {
   // 保存済みの bl-order-all2 / bl-hidden-all2 は読まない＝全員がセクション順の固定表示
   const [bodyTableOpen, setBodyTableOpen] = useState(false);
   const [liftTableOpen, setLiftTableOpen] = useState(false);
-  const [tableMetric, setTableMetric] = useState<'weight' | 'waist' | 'bodyfat'>('weight');
+  const [tableMetric, setTableMetric] = useState<BodyMetric>('weight');
   // 体重変化グラフの共有ステッカー（体の記録の詳細ページ右上の共有アイコンから）
   const [sticker, setSticker] = useState<StickerData | null>(null);
 
   // グラフやKPIから「数字の一覧」へ飛ぶ
-  function openBodyTable(metric: 'weight' | 'waist' | 'bodyfat' = 'weight') {
+  function openBodyTable(metric: BodyMetric = 'weight') {
     setTableMetric(metric);
     setBodyTableOpen(true);
   }
@@ -477,6 +477,8 @@ export default function ChangesScreen() {
   })();
   // 保存済みの系列キーが series() から消えていても落とさない（QA R-2・非nullアサーションをやめる）
   const conf = series().find((x) => x.key === serie) ?? series()[0];
+  // 表（BodyTable）に渡す摂取・消費kcal の日別値。消費＝その日の目標kcal（維持＋運動ぶん）＝グラフの burn 系列と同じ
+  const kcalRows = useMemo(() => rows.map((r) => ({ date: r.date, intake: r.intake, burn: r.target })), [rows]);
 
   // カレンダーのマーク（記録あり=緑 / 目標超過=赤 / 未記録=?）— Web版と同じ判定
   //
@@ -705,7 +707,7 @@ export default function ChangesScreen() {
             ))}
           </View>
           <Pressable style={s.toTable}
-                     onPress={() => openBodyTable(serie === 'waist' ? 'waist' : serie === 'bodyfat' ? 'bodyfat' : 'weight')}
+                     onPress={() => openBodyTable(serie)}
                      hitSlop={8}>
             <Table2 size={13} color={C.teal} />
             <Text style={s.toTableT}>{t('表で見る')}</Text>
@@ -942,7 +944,7 @@ export default function ChangesScreen() {
           : t('今週{n}日記録', { n: rec });
       }
       case 'laws': return lawLine ?? t('記録が貯まると、あなたの法則が見つかります');
-      case 'nutrients': return t('◯◯が多い食材・かしこい置き換え・たんぱく源ティア');
+      case 'nutrients': return t('自分の摂取ランキング・不足栄養素・食材図鑑');
       case 'bulkguard': return t('週あたりの増量ペースを見張る');
       case 'cycles': {
         // 現在のサイクル「増量 5週目・+1.2kg」（進行中の期間＋期間内の体重変化）
@@ -1020,11 +1022,17 @@ export default function ChangesScreen() {
   //   strength / volume / body …: 運動タブの「概要タブ →◯◯で見られます」から
   // 旧 ?open=photos（体の写真）は廃止。知らないキーは無視する（古いディープリンクで壊さない）。
   // ts は「同じ行き先を2回続けて開く」ためのノンス（expo-router は同一パスを無視する・D-15）
-  const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
+  //   body&serie=intake: 食事タブ「週と月の収支」カードから（摂取kcal のグラフが選ばれた状態で開く・2026-09-24）
+  // 王冠判定（detailGate）と全画面広告（openDetail → interstitial）はメニュー行と**同じ**ものを通す。
+  // 入口が違っても行き先が同じなら結果は同じ（NAV-AUDIT D-07）。広告の導線を2本作らない（熊田さん）
+  const { open: openParam, ts: openTs, serie: serieParam } = useLocalSearchParams<{ open?: string; ts?: string; serie?: string }>();
   useEffect(() => {
     if (!openParam || !ALL_ORDER_DEFAULT.includes(openParam) || EXTERNAL_ROWS.has(openParam) && openParam !== 'week') return;
-    detailTx.value = 0;
-    setDetailKey(openParam);
+    const sk = series().find((x) => x.key === serieParam)?.key;
+    if (sk) setSerie(sk);
+    const g = detailGate(openParam, gate.gated);
+    if (g.blocked) { router.push(paywallPath(g.src) as never); return; }
+    openDetail(openParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openParam, openTs]);
 
@@ -1204,19 +1212,21 @@ export default function ChangesScreen() {
   );
   // 概要タブ最上部のブロック（2026-09-04・右上の⚙を廃止してここへ集約）。
   //
-  // 2026-09-16 に見出しと並びを直した（熊田さん指摘）。それまでは:
-  //   ・見出しが「設定」なのに、中身は 目標設定／実績／通知センター／設定 の4つ。
-  //     **設定は4つのうち1つだけ**で、日本語として見出しが中身を言い表していなかった
-  //   ・その「設定」が**いちばん下**にあった。見出しと同じ名前の行が最後に出てくるのは座りが悪い
-  // 見出しを「あなたの記録と設定」に変え、並びを **よく押す順**（実績 → 通知 → 目標 → 設定）にする。
-  // 設定はいちばん奥＝最後で正しいので、位置はそのまま。見出しが変わったことで違和感が消える。
+  // 2026-09-24 熊田さん: 並びは **設定 → 通知センター → 目標設定**。実績は概要の**いちばん下**へ（achievementsRow）。
+  // （2026-09-16 の「よく押す順（実績→通知→目標→設定）」は見出し「あなたの記録と設定」と中身のずれを直す暫定案だった。
+  //   設定が先頭に来ることで、このブロックが見出しどおり「設定の入口」として読める）
+  const achievementsRow = settingsRow({
+    key: 'achievements', icon: <Award size={17} color={C.teal} />, label: t('実績'),
+    sub: t('ストリーク・バッジ・ストーリー共有'), badge: unseenBadges,
+    onPress: () => router.push({ pathname: '/achievements', params: navFrom('changes') } as never),
+  });
   const settingsBlock = (
     <View>
       <Text style={s.sectionH}>{t('あなたの記録と設定')}</Text>
       {settingsRow({
-        key: 'achievements', icon: <Award size={17} color={C.teal} />, label: t('実績'),
-        sub: t('ストリーク・バッジ・ストーリー共有'), badge: unseenBadges,
-        onPress: () => router.push({ pathname: '/achievements', params: navFrom('changes') } as never),
+        key: 'settings', icon: <SettingsIcon size={17} color={C.teal} />, label: t('設定'),
+        sub: t('プロフィール・マイ食品・食べないもの・テーマ・言語・通知・ヘルスケア連携'),
+        onPress: () => openSettings(), guideRef: gearTarget,
       })}
       {settingsRow({
         key: 'notice', icon: <BellRing size={17} color={C.teal} />, label: t('通知センター'),
@@ -1230,11 +1240,6 @@ export default function ChangesScreen() {
         key: 'goal', icon: <Target size={17} color={C.teal} />, label: t('目標設定'),
         sub: t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC'),
         onPress: () => openSettings('goal'),
-      })}
-      {settingsRow({
-        key: 'settings', icon: <SettingsIcon size={17} color={C.teal} />, label: t('設定'),
-        sub: t('プロフィール・マイ食品・食べないもの・テーマ・言語・通知・ヘルスケア連携'),
-        onPress: () => openSettings(), guideRef: gearTarget,
       })}
     </View>
   );
@@ -1302,6 +1307,8 @@ export default function ChangesScreen() {
           {stickyHeaderJSX}
           {headerJSX}
           {visibleOrder.map((k) => <View key={k}>{menuRow(k)}</View>)}
+          {/* 実績は概要のいちばん下（2026-09-24 熊田さん）。バッジ・ストリークは「振り返ったあとに見るもの」 */}
+          <View style={{ marginTop: 18 }}>{achievementsRow}</View>
         </ScrollView>
       ) : (
         // ===== 詳細ページ（メニュー行タップで展開。既存カードをそのまま全画面で見せる） =====
@@ -1347,7 +1354,7 @@ export default function ChangesScreen() {
           ガイド照射キー 'dock' は食事タブの＋だけが登録する（ここでは guideKey を渡さない）。
           体の数値を保存したら一覧を読み直す（体の記録の要約行・グラフが新しい値を見る） */}
       <PlusEntry ref={plusRef} from="changes" onWeightSaved={() => { void load(); }} onWaistSaved={() => { void load(); }} onBodyfatSaved={() => { void load(); }} />
-      <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} />
+      <BodyTable visible={bodyTableOpen} onClose={() => setBodyTableOpen(false)} initialMetric={tableMetric} kcalRows={kcalRows} />
       <LiftTable visible={liftTableOpen} onClose={() => setLiftTableOpen(false)} />
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
       {/* 一覧はスティッキーヘッダーがステータスバー領域を覆う。詳細ページ（戻る行の構成）だけ従来の下敷きを使う */}

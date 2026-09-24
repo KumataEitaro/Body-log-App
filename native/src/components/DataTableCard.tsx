@@ -14,13 +14,19 @@ import { weightLookup } from '@/lib/liftLog';
 import { useThemeRefresh } from '@/lib/theme';
 
 type Row = { date: string; weight: number | null; waist: number | null; bodyfat: number | null };
-type Metric = 'weight' | 'waist' | 'bodyfat';
+/** 表で見られる指標。intake / burn（摂取・消費kcal）は 2026-09-24 に追加（熊田さん「体重と同じように表で見たい」） */
+export type BodyMetric = 'weight' | 'waist' | 'bodyfat' | 'intake' | 'burn';
+type Metric = BodyMetric;
+/** 摂取・消費kcal の日別値。集計は概要タブ（changes.tsx の rows・消費＝その日の目標kcal）が持つので、表は受け取るだけ */
+export type KcalRow = { date: string; intake: number | null; burn: number | null };
 
-const UNIT: Record<Metric, string> = { weight: '', waist: 'cm', bodyfat: '%' };
+const UNIT: Record<Metric, string> = { weight: '', waist: 'cm', bodyfat: '%', intake: 'kcal', burn: 'kcal' };
 
 /** 体重などの推移を表で見る（日付・値・前日比・7日平均） */
-export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
+export function BodyTable({ visible, onClose, initialMetric = 'weight', kcalRows = [] }: {
   visible: boolean; onClose: () => void; initialMetric?: Metric;
+  /** 摂取・消費kcal（概要タブが集計した日別値）。無ければその2指標の表は空になる */
+  kcalRows?: KcalRow[];
 }) {
   useThemeRefresh();   // 壁（ThemeRemount）の外に出る Modal を持つので、自分でテーマを購読する（2026-09-17）
   const insets = useSafeAreaInsets();
@@ -46,19 +52,23 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
   useEffect(() => { if (visible) load(); }, [visible, load]);
 
   // 選んだ指標の記録だけを新しい順に並べ、前日比と7日平均を添える
+  const isKcal = metric === 'intake' || metric === 'burn';
   const table = useMemo(() => {
-    const withVal = rows
-      .filter((r) => r[metric] != null)
-      .map((r) => ({ date: r.date, value: Number(r[metric]) }));
+    // 摂取・消費kcal は概要タブが集計した日別値（新しい順に並べ直す）。体の3指標は entries から
+    const withVal = (metric === 'intake' || metric === 'burn')
+      ? [...kcalRows].filter((r) => r[metric] != null).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+          .map((r) => ({ date: r.date, value: Number(r[metric]) }))
+      : rows.filter((r) => r[metric] != null).map((r) => ({ date: r.date, value: Number(r[metric]) }));
     return withVal.map((r, i) => {
       const prev = withVal[i + 1]; // 1つ後ろ＝1つ前の記録（降順のため）
       const window = withVal.slice(i, i + 7);
       const avg = window.reduce((a, b) => a + b.value, 0) / window.length;
       return { ...r, delta: prev ? r.value - prev.value : null, avg7: avg };
     });
-  }, [rows, metric]);
+  }, [rows, metric, kcalRows]);
 
-  const fmt = (v: number) => (metric === 'weight' ? kgToDisplay(v, units.weight) : v).toFixed(1);
+  // kcal は整数、体の指標は小数1桁（体重は表示単位に換算）
+  const fmt = (v: number) => (isKcal ? Math.round(v).toLocaleString() : (metric === 'weight' ? kgToDisplay(v, units.weight) : v).toFixed(1));
   const unitLabel = metric === 'weight' ? units.weight : UNIT[metric];
 
   return (
@@ -70,7 +80,7 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
         </View>
 
         <View style={s.chips}>
-          {([['weight', t('体重')], ['waist', t('ウエスト')], ['bodyfat', t('体脂肪率')]] as const).map(([k, label]) => (
+          {([['weight', t('体重')], ['waist', t('ウエスト')], ['bodyfat', t('体脂肪率')], ['intake', t('摂取kcal')], ['burn', t('消費kcal')]] as const).map(([k, label]) => (
             <Chip key={k} label={label} tone="ink" selected={metric === k} onPress={() => setMetric(k)} />
           ))}
         </View>
@@ -92,7 +102,8 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight' }: {
                 <View key={r.date} style={s.tr}>
                   <Text style={[s.td, { flex: 1.2, color: C.sub }]}>{r.date.slice(5).replace('-', '/')}</Text>
                   <Text style={[s.td, s.num, s.strong]}>{fmt(r.value)}</Text>
-                  <Text style={[s.td, s.num, r.delta != null && r.delta > 0 ? { color: C.coral } : r.delta != null && r.delta < 0 ? { color: C.successInk } : null]}>
+                  {/* kcal の増減は良し悪しではないので色を付けない（体の指標は増=coral・減=success） */}
+                  <Text style={[s.td, s.num, !isKcal && r.delta != null && r.delta > 0 ? { color: C.coral } : !isKcal && r.delta != null && r.delta < 0 ? { color: C.successInk } : null]}>
                     {r.delta == null ? '—' : `${r.delta > 0 ? '+' : ''}${fmt(Math.abs(r.delta)).replace(/^/, r.delta < 0 ? '-' : '')}`}
                   </Text>
                   <Text style={[s.td, s.num, { color: C.faint }]}>{fmt(r.avg7)}</Text>

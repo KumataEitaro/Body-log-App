@@ -2101,7 +2101,6 @@ export const EN: Record<string, string> = {
   "ゆで卵2個＋バナナ": "2 boiled eggs + Banana",
   "買ってそのまま食べられて、たんぱく質も確保できます。": "Ready to eat right away and packed with protein.",
   "栄養ランキング": "Nutrient Rankings",
-  "◯◯が多い食材・かしこい置き換え・たんぱく源ティア": "Rich in nutrients, smart swaps & protein tier list",
   "置き換え候補を見る": "View Swap Options",
   "かしこい置き換え": "Smart Swaps",
   "たんぱく源のうちAティア以上の割合（たんぱく質g加重）": "Share of Tier A+ protein sources (weighted by protein g)",
@@ -2508,4 +2507,8 @@ export const EN: Record<string, string> = {
   "例: 150": "e.g. 150",
   "入れると、チップで足したときの量が g で出て、倍率や g で調整できます。": "With this set, the amount shows in grams when you add it from a chip, and you can adjust by multiplier or grams.",
   "1回分 = {g}g として登録します（チップで足すときの量になります）": "Will be saved as 1 serving = {g}g (the amount used when added from a chip)",
+  // 概要: 摂取・消費kcal の表・収支カードからの直行（2026-09-24）
+  "グラフと表で見る": "See chart and table",
+  "摂取カロリーのグラフと表を見る": "See the intake calorie chart and table",
+  "自分の摂取ランキング・不足栄養素・食材図鑑": "Your intake ranking · low nutrients · food guide",
 };
