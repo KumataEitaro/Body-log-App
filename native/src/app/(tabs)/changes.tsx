@@ -376,11 +376,11 @@ export default function ChangesScreen() {
     if (!session?.user) return;
     const [profRes, entResRaw, goalRes, itemRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
-      supabase.from('entries').select('date,intake,weight,waist,bodyfat,ex,adj').order('date', { ascending: true }),
+      supabase.from('entries').select('date,intake,weight,waist,bodyfat,ex,adj,active_kcal').order('date', { ascending: true }),
       supabase.from('goals').select('*').maybeSingle(),
       supabase.from('logs').select('id,date,at,items').order('date', { ascending: true }).limit(2000),
     ]);
-    // bodyfat列が無い旧DB（v16未適用）でも画面が壊れないようフォールバック
+    // bodyfat（v16）／active_kcal（migration-36）の列が無い旧DBでも画面が壊れないようフォールバック
     const entRes = entResRaw.error
       ? await supabase.from('entries').select('date,intake,weight,waist,ex,adj').order('date', { ascending: true })
       : entResRaw;
@@ -389,10 +389,11 @@ export default function ChangesScreen() {
     if (goalRes.data) setGoal(goalRes.data as Goal);
     if (!prof || !entRes.data) return;
     let w: number = Number(prof.init_weight) || 70;
-    setRows((entRes.data as { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; ex: string | null; adj: number | null }[]).map((e) => {
+    setRows((entRes.data as { date: string; intake: number | null; weight: number | null; waist: number | null; bodyfat: number | null; ex: string | null; adj: number | null; active_kcal?: number | null }[]).map((e) => {
       if (e.weight != null) w = Number(e.weight);
       const bmr = mifflinBMR(prof.sex, w, Number(prof.height_cm), Number(prof.age));
-      const target = targetKcal(bmr, Number(prof.life_factor), (e.ex as ExLevel) || 'オフ', Number(e.adj) || 0);
+      // その日に「目標に反映する」で足した運動ぶん（active_kcal）も目標に入れる＝食事タブのヒーローと同じ式
+      const target = targetKcal(bmr, Number(prof.life_factor), (e.ex as ExLevel) || 'オフ', Number(e.adj) || 0) + (Number(e.active_kcal) || 0);
       const intake = e.intake == null ? null : Number(e.intake);
       return {
         date: e.date, intake,

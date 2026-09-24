@@ -65,8 +65,9 @@ import { C, rgba, RADIUS, SPACE, ICON, HEAD, themed, sheetTopPad } from '@/lib/u
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mifflinBMR, EX_ADD, todayJST, LIFE_FACTOR_DEFAULT, type ExLevel } from '@/lib/calc';
 import { jstHmFromIso } from '@/lib/jst';
-import { activeKcalGoalBonus, useActiveKcal, useActiveKcalToGoal, useStepsOfDay } from '@/lib/activeKcal';
-import { resolveBurnKcal } from '@/lib/stepsKcal';
+import { useActiveKcal, useStepsOfDay } from '@/lib/activeKcal';
+import { activeApplyCandidate, writeAppliedActive } from '@/lib/activeApply';
+
 import {
   MEAL_TIME_PRESETS, MEAL_TIME_NOW, MEAL_TIME_STEP_MIN,
   resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm, slotOf,
@@ -82,8 +83,8 @@ import DailyBrief from '@/components/DailyBrief';
 import { getColumns } from '@/content/columns';
 import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
-import { sumItems, type FoodItem } from '@/lib/items';
-import { addServing, removeServing, servingCount, type MyFoodRow } from '@/lib/foods';
+import { sumItems, type FoodItem, qtyNumber } from '@/lib/items';
+import { addServing, removeServing, servingCount, type MyFoodRow, gramsOf, gramsFromQty, fmtGrams, rescaleToGrams, servingOf } from '@/lib/foods';
 import { listMyMeals, deleteMyMeal, saveMyMeal, type MyMeal } from '@/lib/meals';
 import { applyMult, currentMult, MULT_STEPS } from '@/lib/mealAdjust';
 import { swapsFor, swapLine, emojiText, swapKcalDelta } from '@/lib/smartSwap';
@@ -128,10 +129,12 @@ type MyFood = MyFoodRow & { id: string };
 type DayLog = LogRow & { id: string; at: string };
 type Parsed = { items: FoodItem[]; weight: number | null; waist: number | null; ex: ExLevel | null; adj: number; mood: string | null };
 // 2026-09-18: 'weight'（体重クイック入力カード）を廃止。体重・ウエスト・体脂肪率は右下の＋から入れる（入口を1つにする）
-const LOG_CARDS = ['hero', 'balance', 'checklist', 'mood', 'feed', 'recent'];
+// 2026-09-24: 'recent'（前の食事をもう一度）はタブ本体のカードから**入力シートの中**へ移した（recentSection）。
+// 「もう一度食べる」は入力の場面で使うもので、タブを眺めているときに要る情報ではない（熊田さんの指示）
+const LOG_CARDS = ['hero', 'balance', 'checklist', 'mood', 'feed'];
 const LOG_LABELS = (): Record<string, string> => ({
   hero: t('あと食べられる量'), balance: t('週と月の収支'), checklist: t('スタートチェックリスト'), mood: t('いまの気分は？'),
-  feed: t('今日の記録'), recent: t('前の食事をもう一度'),
+  feed: t('今日の記録'),
 });
 
 type RecentMeal = { id: string; date: string; items: FoodItem[]; kcal: number };
@@ -458,25 +461,36 @@ export default function LogScreen() {
   // 読み取りはlib/health.ts側でキャッシュ済み＝毎レンダーでHealthKitを叩かない
   const activeKcalToday = useActiveKcal(viewDate);
   const stepsOfView = useStepsOfDay(viewDate);
-  const activeToGoal = useActiveKcalToGoal();
+  // その日に「目標に反映する」で足した運動ぶん（entries.active_kcal・lib/activeApply.ts）。load() で読む
+  const [appliedActive, setAppliedActive] = useState(0);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const applyBusyRef = useRef(false);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     if (!userId) return;
     setUid(userId);
-    const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes, mealsRes] = await Promise.all([
+    const [profRes, goalRes, evRes, wRes, foodRes, logRes, recentRes, mealsRes, actRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('goals').select('*').maybeSingle(),
       // kind / absorb_days（migration-35）も読む。列を名指しすると旧DBで select ごと落ちるので '*'
       supabase.from('events').select('*').order('date', { ascending: true }),
       supabase.from('entries').select('weight,date').not('weight', 'is', null).order('date', { ascending: false }).limit(1),
-      supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio').order('created_at', { ascending: true }).limit(30),
+      // grams / nutrients（migration-36）も読む。列が無い旧DBでは無しで読み直す
+      (async () => {
+        const full = await supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio,grams,nutrients').order('created_at', { ascending: true }).limit(30);
+        return full.error
+          ? supabase.from('my_foods').select('id,name,kind,unit,kcal,p,f,c,serving_label,serving_ratio').order('created_at', { ascending: true }).limit(30)
+          : full;
+      })(),
       supabase.from('logs').select('*').eq('date', viewDate).order('at', { ascending: true }),
       supabase.from('logs').select('id,date,items,kcal')
         .lt('date', viewDate).not('kcal', 'is', null)
         .order('at', { ascending: false }).limit(40),
       listMyMeals(),   // テーブル未作成なら空（セットのチップが出ないだけ）
+      // 表示日に反映済みの運動ぶん（列が無い旧DBでは error → 0 のまま）
+      supabase.from('entries').select('active_kcal').eq('date', viewDate).maybeSingle(),
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
     if (!profRes.error) setProfileLoaded(true);   // 通信できた＝「行が無い」も確定した情報として扱える
@@ -486,6 +500,7 @@ export default function LogScreen() {
     setMyFoods((foodRes.data as MyFood[]) || []);
     setMyMeals(mealsRes);
     setDayLogs((logRes.data as DayLog[]) || []);
+    setAppliedActive(actRes.error ? 0 : Math.max(0, Math.round(Number((actRes.data as { active_kcal?: number | null } | null)?.active_kcal ?? 0)) || 0));
     // 「もう一度食べる」候補: 品目内訳のある過去の食事を、同じ品目構成は最新1件に重複排除
     const seen = new Set<string>();
     const meals: RecentMeal[] = [];
@@ -522,10 +537,14 @@ export default function LogScreen() {
   //   ① 実測>0 → 実測 ／ ② 実測0で歩数>0 → 歩数からの推定（「（推定）」を添える）／ ③ どちらも無し → 上乗せなし
   // ③の「アプリ記録ぶん（adj）」は target の dayExerciseKcal にすでに入っているので recorded=0 で渡し、
   // source が 'recorded' のときは上乗せしない（二重計上しない）
-  const heroBurn = resolveBurnKcal({ measured: activeKcalToday, steps: stepsOfView, weightKg: weightForBmr, recorded: 0 });
-  const activeEquivalent = heroBurn.source !== 'recorded' ? heroBurn.kcal : null;
-  const activeBonus = activeToGoal && activeEquivalent != null
-    ? activeKcalGoalBonus(activeEquivalent, bmr, Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT)) : 0;
+  // 運動ぶんの目標反映は**手動**（lib/activeApply.ts・2026-09-24）。目標に入るのは押して固定した額（appliedActive）だけ。
+  // 候補（いま押せば足せる額）は表示だけ。式は「実測 − 日常の想定 − 手記録の運動」＝二重に数えない
+  const activeBonus = appliedActive;
+  const activeCandidate = profile ? activeApplyCandidate({
+    measured: activeKcalToday, steps: stepsOfView, weightKg: weightForBmr, bmr,
+    lifeFactor: Number(profile.life_factor ?? LIFE_FACTOR_DEFAULT) || LIFE_FACTOR_DEFAULT,
+    manualKcal: Math.round(dayExerciseKcal(dayLogs)),
+  }) : null;
   const [kcalAdjust] = useKcalAdjust();
   // life_factor が null の旧プロフィールは Number(null)=0 で目標が運動ぶんだけになっていた（QA B-5）。既定の生活係数に落とす
   const lifeFactor = Number(profile?.life_factor ?? LIFE_FACTOR_DEFAULT) || LIFE_FACTOR_DEFAULT;
@@ -588,6 +607,18 @@ export default function LogScreen() {
   const overColor = overLv === 'none' ? null : overLv === 'high' ? C.coral : C.amber;
   const overBar = overLv === 'high' ? C.coral : overLv === 'mild' ? rgba(C.amber, 0.7) : C.amber;
   const openGoalHub = () => router.push({ pathname: '/settings', params: navFrom('log', { open: 'goal' }) });
+  // 「運動ぶんを目標に反映する」（手動・lib/activeApply.ts）。押した時点の額で固定して entries.active_kcal に保存
+  async function applyActiveNow() {
+    if (!uid || !activeCandidate || activeCandidate.kcal <= 0 || applyBusyRef.current) return;
+    applyBusyRef.current = true; setApplyBusy(true);
+    try {
+      const r = await writeAppliedActive(uid, today, activeCandidate.kcal);
+      if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+      setAppliedActive(activeCandidate.kcal);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setMsg({ ok: true, text: t('運動ぶん +{n}kcal を今日の目標に足しました。', { n: activeCandidate.kcal.toLocaleString() }) });
+    } finally { applyBusyRef.current = false; setApplyBusy(false); }
+  }
   const macros = profile ? macroTargets(
     weightForBmr, goalKcal,
     goal?.protein_per_kg ?? purposePreset?.p,
@@ -890,10 +921,43 @@ export default function LogScreen() {
 
   // 量調整ポップ: 注目中の1品に倍率を適用してkcal/PFCを再計算する
   // （「半分だけ食べた」の1タップ補正。保存前のトレイ内だけで完結し、保存後は既存の書き換え機能）
+  // 量調整ポップで注目中の品目（トレイ行のタップで開く・もう一度押すと閉じる）
+  const [focusItem, setFocusItem] = useState<number | null>(null);
+  // 注目中の品目がマイ食品でグラム登録があれば、その登録（倍率の基準＝1回分の g）。2026-09-24
+  const focusFood = parsed && focusItem != null && parsed.items[focusItem]
+    ? (myFoods.find((f) => f.name === parsed.items[focusItem].name && gramsOf(f) != null) ?? null)
+    : null;
+  const [adjText, setAdjText] = useState('');
   function adjustFocused(mult: number) {
     if (!parsed || focusItem == null || !parsed.items[focusItem]) return;
     Haptics.selectionAsync().catch(() => {});
-    setParsed({ ...parsed, items: parsed.items.map((it, i) => (i === focusItem ? applyMult(it, mult) : it)) });
+    const it = parsed.items[focusItem];
+    const baseG = focusFood ? gramsOf(focusFood) : null;
+    // グラム登録がある品目は「1回分の g × 倍率」に直す（qty は 120g のようにグラムで出る）。無ければ従来の倍率付記
+    const next = baseG != null && gramsFromQty(it.qty) != null ? rescaleToGrams(it, baseG * mult) : applyMult(it, mult);
+    setParsed({ ...parsed, items: parsed.items.map((x, i) => (i === focusItem ? next : x)) });
+  }
+  // 任意入力: 「1.5」→ ×1.5（グラム登録があれば 1回分×1.5 の g）／「120g」→ そのグラム（分量に g が読めるときだけ）
+  function applyAdjText() {
+    const raw = adjText.trim().replace(/^[×x]/i, '');
+    if (!raw || !parsed || focusItem == null || !parsed.items[focusItem]) return;
+    const it = parsed.items[focusItem];
+    const gm = raw.match(/^(\d+(?:\.\d+)?)\s*g$/i);
+    if (gm) {
+      const g = parseFloat(gm[1]);
+      if (!(g > 0)) return;
+      if (gramsFromQty(it.qty) == null) {
+        setMsg({ ok: false, text: t('この品目はグラムで指定できません（量に g が含まれていません）。倍率で指定してください。') });
+        return;
+      }
+      setParsed({ ...parsed, items: parsed.items.map((x, i) => (i === focusItem ? rescaleToGrams(it, g) : x)) });
+    } else {
+      const m = parseFloat(raw);
+      if (!(m > 0) || !Number.isFinite(m)) return;
+      adjustFocused(m);
+    }
+    setAdjText('');
+    Haptics.selectionAsync().catch(() => {});
   }
 
   // 記録の長押しメニュー: 書き換え（トレイへ戻す）と削除。
@@ -1102,7 +1166,7 @@ export default function LogScreen() {
   // ===== 週間・月間の収支（ヒーロー直下のカード） =====
   // 過去29日の日次サマリー（entries）＋今日はlogsの生値。維持kcalは当日の運動を含め、
   // 目標kcalは目標画面と同じ dailyAllowance（維持 − 赤字 + 調整）で日ごとに出す
-  const [pastRows, setPastRows] = useState<{ date: string; intake: number | null; ex: string | null; adj: number | null }[]>([]);
+  const [pastRows, setPastRows] = useState<{ date: string; intake: number | null; ex: string | null; adj: number | null; active_kcal?: number | null }[]>([]);
   // 当日ログの「変わったか」の署名（件数＋kcal合計）。配列そのものを依存に入れると毎回走る
   const dayLogsSig = `${dayLogs.length}:${Math.round(dayLogs.reduce((a, l) => a + (Number(l.kcal) || 0), 0))}`;
   useEffect(() => {
@@ -1110,10 +1174,13 @@ export default function LogScreen() {
     let alive = true;
     (async () => {
       try {
-        const { data } = await supabase.from('entries').select('date,intake,ex,adj')
+        // active_kcal（反映済みの運動ぶん）も読む。列が無い旧DB（migration-36 未適用）では無しで読み直す
+        const q = (cols: string) => supabase.from('entries').select(cols)
           .gte('date', shiftDate(today, -29)).lt('date', today)
           .order('date', { ascending: true });
-        if (alive && data) setPastRows(data as typeof pastRows);
+        let { data, error } = await q('date,intake,ex,adj,active_kcal');
+        if (error) ({ data } = await q('date,intake,ex,adj'));
+        if (alive && data) setPastRows(data as unknown as typeof pastRows);
       } catch { /* ベストエフォート（カードは記録なし表示のまま） */ }
     })();
     return () => { alive = false; };
@@ -1129,7 +1196,8 @@ export default function LogScreen() {
     for (let i = 29; i >= 1; i--) {
       const d = shiftDate(today, -i);
       const r = byDate.get(d);
-      const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) : 0);
+      // その日の維持 = 土台 ＋ 手記録の運動（ex/adj）＋ 反映済みの運動ぶん（active_kcal）。ヒーローの目標と同じ式
+      const maintenance = base + (r ? (EX_ADD[(r.ex as ExLevel) || 'オフ'] ?? 0) + (Number(r.adj) || 0) + (Number(r.active_kcal) || 0) : 0);
       // 第5引数＝その日の運動ぶん（maintenance − 土台）。ヒーローの目標と同じく、運動ぶんはBMR下限の上に乗せる
       // その日の実効目標: 繰り越し調整（carry）と、その日のチートデイ（plan）も織り込む。
       // 収支の点と「ずれ」の判定はこの数字に対して行う（調整込みの目標を守った日を「少なすぎ」と誤読しない）
@@ -1512,7 +1580,6 @@ export default function LogScreen() {
   // 保存前ライブプレビュー: トレイ（未保存）の合計。バーのゴースト表示に使う
   const pulse = usePulse(parsed != null);
   // トレイで注目している食品（バー上でその寄与だけを光らせる）
-  const [focusItem, setFocusItem] = useState<number | null>(null);
   // 編集中の記録ID: セットされている間、✓保存はこの記録を置き換える（新規追加ではない）
   const [editingId, setEditingId] = useState<string | null>(null);
   // 「食べた時間」チップ（§4）。null=未操作（今日なら「いま」・過去日なら12:00に解決）／'now'／'H:mm'。
@@ -1607,7 +1674,7 @@ export default function LogScreen() {
         <View key={fd.id} style={[s.chip, cnt != null && s.chipOn]}>
           <Pressable onPress={() => tapFood(fd)} onLongPress={() => quickSaveFood(fd)} delayLongPress={450} style={s.chipMain}>
             <Text style={[s.chipT, cnt != null && { color: C.ink }]}>
-              {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : ''}
+              {cnt == null ? '＋ ' : ''}{fd.name}{cnt != null ? ` ×${cnt % 1 === 0 ? cnt : cnt.toFixed(1)}` : gramsOf(fd) != null ? ` ${servingOf(fd).qty}` : ''}
             </Text>
           </Pressable>
           {cnt != null && (
@@ -1630,6 +1697,38 @@ export default function LogScreen() {
       </View>
     );
   })() : null;
+
+  // ===== 前の食事をもう一度（入力シートの中・2026-09-24） =====
+  // 以前は食事タブ本体の構造カード（'recent'）だったが、「もう一度食べる」は入力の場面で使うもの。
+  // 熊田さん「食事の登録画面（＋ボタンの後、食事の記録）の中でこの機能を追加したい」→ ここへ移した。
+  // ↺ は品目をトレイへ積む（AI解析なし・保存済みの栄養値をそのまま使う）。書き換え中は出さない（別の記録が混ざる）
+  const recentSection = recentMeals.length > 0 && editingId == null ? (
+    <View style={s.sheetSection}>
+      <Pressable style={s.sheetSectionHead} onPress={() => setRecentOpen((v) => !v)} hitSlop={6}
+                 accessibilityRole="button" accessibilityState={{ expanded: recentOpen }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+          <History size={14} color={C.teal} />
+          <Text style={s.sheetSectionT}>{t('前の食事をもう一度')}</Text>
+          <Text style={s.sheetSectionSub} numberOfLines={1}>{t('{n}件', { n: recentMeals.length })}</Text>
+        </View>
+        <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? t('▴ とじる') : t('▾ ひらく')}</Text>
+      </Pressable>
+      {recentOpen && recentMeals.map((m) => (
+        <View key={m.id} style={[s.feedRow, { alignItems: 'center' }]}>
+          <Text style={s.feedTime}>{m.date.slice(5).replace('-', '/')}</Text>
+          <View style={{ flex: 1 }}><ItemsTitle items={m.items} /></View>
+          <KcalCell kcal={Number(m.kcal)} />
+          <Pressable style={s.reuseBtn} hitSlop={6} onPress={() => reuseMeal(m)}
+                     accessibilityRole="button" accessibilityLabel={t('この食事をもう一度トレイに入れる')}>
+            <Text style={s.reuseBtnT}>↺</Text>
+          </Pressable>
+        </View>
+      ))}
+      {recentOpen && (
+        <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺でトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
+      )}
+    </View>
+  ) : null;
 
   // ===== ヒーロー直下の調停（lib/logCards.ts）: 何を何枚出すかは1か所で決める =====
   // カード最大2枚（caution > backfill > checklist > mood > positive）・帯最大2本（badge > firstLaw > brief）。
@@ -1809,13 +1908,19 @@ export default function LogScreen() {
             </View>
             {/* 目標を黙って増やさない: アクティブ反映ONで上乗せが起きた日だけ内訳を1行出す。
                 「なぜ今日は多いのか」が分からない増加はアプリへの信頼を削る */}
-            {activeBonus > 0 && (
-              <Text style={s.heroActive}>
-                {heroBurn.source === 'steps'
-                  ? t('歩いたぶん（推定） +{n}kcal', { n: activeBonus.toLocaleString() })   // 歩数からの推定＝実測と同じ顔をさせない
-                  : t('歩いたぶん +{n}kcal', { n: activeBonus.toLocaleString() })}
-              </Text>
-            )}
+            {activeBonus > 0 ? (
+              <Text style={s.heroActive}>{t('運動ぶん +{n}kcal を目標に反映中', { n: activeBonus.toLocaleString() })}</Text>
+            ) : activeCandidate && activeCandidate.kcal > 0 && isViewToday ? (
+              // 反映は手動（lib/activeApply.ts）。押すまで目標は動かない。歩数からの推定は実測と同じ顔をさせない
+              <Pressable onPress={applyActiveNow} hitSlop={8} disabled={applyBusy} accessibilityRole="button"
+                         accessibilityLabel={t('運動ぶん +{n}kcal を目標に反映する', { n: activeCandidate.kcal.toLocaleString() })}>
+                <Text style={[s.heroActive, { color: C.accentInk, textDecorationLine: 'underline' }, applyBusy && { opacity: 0.5 }]}>
+                  {activeCandidate.source === 'steps'
+                    ? t('歩いたぶん（推定） +{n}kcal を目標に反映する', { n: activeCandidate.kcal.toLocaleString() })
+                    : t('運動ぶん +{n}kcal を目標に反映する', { n: activeCandidate.kcal.toLocaleString() })}
+                </Text>
+              </Pressable>
+            ) : null}
             {/* 残りPFCプログレスバー（英字P/F/Cは初心者に伝わらないため日本語を主・英字は補助） */}
             {macros && (
               <View style={{ marginTop: 10, gap: 5 }}>
@@ -2233,37 +2338,6 @@ export default function LogScreen() {
         </Animated.View>
         )}
 
-        {/* 前の食事をもう一度（過去記録のitemsを再利用・AI解析不要） */}
-        {vis('recent') && recentMeals.length > 0 && (
-          <View style={s.card}>
-            <MinusBadge editing={editing} onPress={() => cards.hide('recent')} />
-            <Pressable style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                       onPress={() => setRecentOpen((v) => !v)} hitSlop={6}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <History size={16} color={C.teal} />
-                <Text style={[s.h2, { marginBottom: 0 }]}>{t('前の食事をもう一度')}</Text>
-                <Text style={s.h2sub}>{t('{n}件', { n: recentMeals.length })}</Text>
-              </View>
-              <Text style={{ color: C.sub, fontSize: 15, fontWeight: '800' }}>{recentOpen ? t('▴ とじる') : t('▾ ひらく')}</Text>
-            </Pressable>
-            {recentOpen && (
-              <>
-                {recentMeals.map((m) => (
-                  <View key={m.id} style={[s.feedRow, { alignItems: 'center' }]}>
-                    <Text style={s.feedTime}>{m.date.slice(5).replace('-', '/')}</Text>
-                    <View style={{ flex: 1 }}><ItemsTitle items={m.items} /></View>
-                    <KcalCell kcal={Number(m.kcal)} />
-                    <Pressable style={s.reuseBtn} hitSlop={6} onPress={() => reuseMeal(m)}>
-                      <Text style={s.reuseBtnT}>↺</Text>
-                    </Pressable>
-                  </View>
-                ))}
-                <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺でトレイに入り、入力シートが開きます。品目を×で外して量を調整してから✓保存してください。')}</Text>
-              </>
-            )}
-          </View>
-        )}
-
         <View style={{ height: 16 }} />
       </ScrollView>
       </ThemeRemount>
@@ -2554,16 +2628,38 @@ export default function LogScreen() {
                   {t('「{name}」の量を補正', { name: parsed.items[focusItem].name })}
                   <Text style={s.adjustHint}>  {t('半分だけ食べたら ×0.5')}</Text>
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 7 }}>
-                  {MULT_STEPS.map((mv) => {
-                    const on = Math.abs(currentMult(parsed.items[focusItem]) - mv) < 0.001;
-                    return (
-                      <Pressable key={mv} style={[s.multChip, on && s.multChipOn]} onPress={() => adjustFocused(mv)}>
-                        <Text style={[s.multChipT, on && s.multChipTOn]}>×{mv}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {(() => {
+                  const it = parsed.items[focusItem];
+                  // マイ食品でグラム登録がある品目: 倍率は「1回分の g」基準で、チップに g を添える（2026-09-24）
+                  const baseG = focusFood ? gramsOf(focusFood) : null;
+                  const curG = baseG != null ? gramsFromQty(it.qty) : null;
+                  return (
+                    <>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+                        {MULT_STEPS.map((mv) => {
+                          const on = baseG != null && curG != null
+                            ? Math.abs(curG / baseG - mv) < 0.01
+                            : Math.abs(currentMult(it) - mv) < 0.001;
+                          return (
+                            <Pressable key={mv} style={[s.multChip, on && s.multChipOn]} onPress={() => adjustFocused(mv)}
+                                       accessibilityRole="button" accessibilityState={{ selected: on }}>
+                              <Text style={[s.multChipT, on && s.multChipTOn]}>×{mv}{baseG != null ? ` ${fmtGrams(baseG * mv)}g` : ''}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {/* 任意の倍率／グラム（熊田さん: 推奨グラムより倍率で選んで PFC・kcal も自動計算） */}
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                        <TextInput style={s.adjustInput} value={adjText} onChangeText={setAdjText}
+                                   placeholder={baseG != null ? t('倍率か g（例: 1.5 / 120g）') : t('倍率（例: 1.5）')} placeholderTextColor={C.faint}
+                                   keyboardType="numbers-and-punctuation" returnKeyType="done" onSubmitEditing={applyAdjText}
+                                   accessibilityLabel={t('量の補正を入力')} />
+                        <OptionButton variant="tonal" label={t('反映')} onPress={applyAdjText} />
+                      </View>
+                      {baseG != null && <Text style={s.adjustHint}>{t('1回分 = {g}g（マイ食品の登録）', { g: fmtGrams(baseG) })}</Text>}
+                    </>
+                  );
+                })()}
                 {/* 食材ナビ「かしこい置き換え」（2026-09-03）: この品目の得意な栄養素を、より少ない（増量なら多い）kcalで
                     取れる食材があるときだけ1行。「🍊×4 ≒ 🫑×1」の対比＋栄養素を限定した文（lib/smartSwap の規約）。
                     タップで栄養ランキング図鑑のその品目の置き換え候補へ。ヒーロー直下の調停（logCards）対象外＝トレイ内の行 */}
@@ -2586,6 +2682,7 @@ export default function LogScreen() {
             )}
 
             {inputMode !== 'myfood' && myFoodsSection}
+            {recentSection}
 
             {/* 何も無いときの一言（テキスト/写真経路の初回）。トレイもマイ食品も無い空白を放置しない */}
             {parsed == null && jobs.length === 0 && aiNote == null && myFoods.length === 0 && myMeals.length === 0 && (
@@ -2683,6 +2780,7 @@ export default function LogScreen() {
             setFoodDraft({
               name: suggest.name, unit: suggest.portion || undefined,
               kcal: suggest.kcal, p: suggest.p, f: suggest.f, c: suggest.c,
+              grams: gramsFromQty(suggest.portion),   // 「1杯（約150g）」→ 150。推奨グラムとして登録フォームに入る
             });
           }
           setSuggest(null);
@@ -2841,6 +2939,7 @@ const s = themed(() => ({
   },
   adjustName: { fontSize: 13, fontWeight: '800', color: C.ink },
   adjustHint: { fontSize: 11, fontWeight: '600', color: C.sub },
+  adjustInput: { flex: 1, height: 40, borderRadius: RADIUS.input, borderWidth: 1, borderColor: C.line, backgroundColor: C.panel, paddingHorizontal: 10, fontSize: 15, color: C.ink },
   // 食材ナビ「かしこい置き換え」（量調整ポップの下の1行）
   swapRow: { marginTop: 8, backgroundColor: C.chipBg, borderRadius: RADIUS.input, paddingHorizontal: 10, paddingVertical: 7 },
   swapLabel: { fontSize: 11, fontWeight: '800', color: C.accentInk, letterSpacing: 0.4 },

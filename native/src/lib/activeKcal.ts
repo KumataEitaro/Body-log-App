@@ -32,14 +32,12 @@
 //
 // 精度そのものは追わない（アクティブの実測とMETs換算の手記録は重複しうるが、
 // 差分の厳密計算はしない＝過剰に賢くしない）。UIで重複の可能性を1行断っている。
-import { useCallback, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { readActiveEnergyCached, healthAvailable, readActivitySummary, type HealthDaySummary } from './health';
 import { healthStoreState, useHealthVersion } from './healthStore';
 
-/** 「アクティブカロリーを目標に反映する」の保存キー（設定画面と各タブで共有・未設定=OFF） */
-export const ACTIVE_KCAL_TO_GOAL_KEY = 'bl-active-kcal-to-goal';
+// 2026-09-24: 自動反映の設定（bl-active-kcal-to-goal）は廃止。目標への反映は運動タブのボタンで日ごとに手動
+// （lib/activeApply.ts）。この式（activeKcalGoalBonus）はその「足せる額」の計算にそのまま使う。
 
 /**
  * 目標kcalへ上乗せするアクティブぶん（kcal・整数・0以上）。
@@ -62,17 +60,6 @@ export function activeKcalGoalBonus(activeKcal: number, bmr: number, lifeFactor:
   // 係数が1未満（あり得ないが手入力DBの事故）なら想定日常活動0として扱う
   const assumedDaily = Number.isFinite(lf) && lf > 1 ? b * (lf - 1) : 0;
   return Math.max(0, Math.round(active - assumedDaily));
-}
-
-/** 「アクティブカロリーを目標に反映する」設定（既定OFF）。設定画面から戻ったら追従するようフォーカスごとに読み直す */
-export function useActiveKcalToGoal(): boolean {
-  const [on, setOn] = useState(false);
-  const read = useCallback(() => {
-    AsyncStorage.getItem(ACTIVE_KCAL_TO_GOAL_KEY).then((v) => setOn(v === '1')).catch(() => {});
-  }, []);
-  useEffect(() => { read(); }, [read]);
-  useFocusEffect(read);
-  return on;
 }
 
 /**

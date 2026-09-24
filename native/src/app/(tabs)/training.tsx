@@ -16,7 +16,8 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import TabHeader from '@/components/TabHeader';
 import { healthAvailable, requestHealthAuth, linkHealth, ensureHealthAuth, activeEnergyAuthState, listWorkouts, importWorkouts, readActivitySummary, readHourlySteps, jstHourNow, invalidateActiveEnergyCache, type HKWorkout, type HealthDaySummary } from '@/lib/health';
 import { useHealthLinkState, useHealthVersion } from '@/lib/healthStore';
-import { activeKcalGoalBonus, useActiveKcalToGoal } from '@/lib/activeKcal';
+import { activeApplyCandidate, writeAppliedActive } from '@/lib/activeApply';
+import { isImportedExercise } from '@/lib/day';
 import { resolveBurnKcal, stepsForKcal } from '@/lib/stepsKcal';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { usePurpose } from '@/lib/purpose';
@@ -128,25 +129,49 @@ export default function TrainingScreen() {
   const [burnToday, setBurnToday] = useState(0);
   const [entryToday, setEntryToday] = useState<{ intake: number | null; target: number | null }>({ intake: null, target: null });
   const [healthDays, setHealthDays] = useState<HealthDaySummary[] | null>(null);
-  // 「アクティブカロリーを目標に反映する」（設定・既定OFF）。ONのときだけ逆算の目標に上乗せする
-  const activeToGoal = useActiveKcalToGoal();
+  // 運動ぶんの目標反映は**手動**（lib/activeApply.ts・2026-09-24）。表示日に反映済みの額（entries.active_kcal）と、
+  // 手記録の運動kcal（取込⌚は含まない＝二重に数えないための差し引きに使う）
+  const [appliedActive, setAppliedActive] = useState(0);
+  const [manualToday, setManualToday] = useState(0);
+  const [applyBusy, setApplyBusy] = useState(false);
   // 上乗せ額の計算にはBMRと生活係数が必要（食事タブと同じ考え方＝二重計上を避ける式）
   const [prof, setProf] = useState<{ sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number } | null>(null);
   const loadMove = useCallback(async (date: string) => {
-    const [ls, en, pr] = await Promise.all([
-      supabase.from('logs').select('adj').eq('date', date),
-      supabase.from('entries').select('intake,target').eq('date', date).maybeSingle(),
+    const [ls, enRaw, pr] = await Promise.all([
+      supabase.from('logs').select('adj,text,source_id').eq('date', date),
+      supabase.from('entries').select('intake,target,active_kcal').eq('date', date).maybeSingle(),
       supabase.from('profiles').select('sex,height_cm,age,life_factor').maybeSingle(),
     ]);
-    setBurnToday(((ls.data as { adj: number | null }[]) || []).reduce((sum, l) => sum + Math.max(0, Number(l.adj) || 0), 0));
-    const e = en.data as { intake: number | null; target: number | null } | null;
+    // active_kcal 列が無い旧DB（migration-36 未適用）では無しで読み直す
+    const en = enRaw.error ? await supabase.from('entries').select('intake,target').eq('date', date).maybeSingle() : enRaw;
+    const logRows = (ls.data as { adj: number | null; text?: string | null; source_id?: string | null }[]) || [];
+    setBurnToday(logRows.reduce((sum, l) => sum + Math.max(0, Number(l.adj) || 0), 0));
+    setManualToday(logRows.filter((l) => !isImportedExercise(l)).reduce((sum, l) => sum + Math.max(0, Number(l.adj) || 0), 0));
+    const e = en.data as { intake: number | null; target: number | null; active_kcal?: number | null } | null;
     setEntryToday({
       intake: e?.intake != null ? Number(e.intake) : null,
       target: e?.target != null ? Number(e.target) : null,
     });
+    setAppliedActive(Math.max(0, Math.round(Number(e?.active_kcal ?? 0)) || 0));
     setProf((pr.data as { sex: 'male' | 'female'; height_cm: number; age: number; life_factor: number } | null) ?? null);
   }, []);
   useEffect(() => { loadMove(viewDate); }, [viewDate, loadMove]);
+  // 「目標に反映する」（手動）。押した時点の額で固定して entries.active_kcal に保存。null で取り消し
+  async function applyActive(kcal: number | null) {
+    if (applyBusy) return;
+    setApplyBusy(true); setMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const r = await writeAppliedActive(uid, viewDate, kcal);
+      if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+      setAppliedActive(kcal != null && kcal > 0 ? Math.round(kcal) : 0);
+      setMsg({ ok: true, text: kcal != null && kcal > 0
+        ? t('運動ぶん +{n}kcal を今日の目標に足しました。', { n: Math.round(kcal).toLocaleString() })
+        : t('運動ぶんの反映を取り消しました。') });
+    } finally { setApplyBusy(false); }
+  }
   const loadHealth = useCallback(async (): Promise<HealthDaySummary[] | null> => {
     if (!healthAvailable()) return null;
     const r = await readActivitySummary(7);
@@ -280,7 +305,8 @@ export default function TrainingScreen() {
       if ('error' in r) { setHkMsg(r.error); return; }
       setHkOpen(false);
       loadMove(viewDate);
-      setMsg({ ok: true, text: t('⌚ {n}件を取り込みました{skip}。消費kcalが目標カロリーに反映されます。', { n: r.imported, skip: r.skipped > 0 ? t('（{n}件は取込済みでスキップ）', { n: r.skipped }) : '' }) });
+      // 取り込んでも目標は動かない（lib/activeApply.ts）。反映は「きょうの動き」のボタンで本人が決める
+      setMsg({ ok: true, text: t('⌚ {n}件を取り込みました{skip}。目標カロリーへの反映は「きょうの動き」の反映ボタンから行います（自動では変わりません）。', { n: r.imported, skip: r.skipped > 0 ? t('（{n}件は取込済みでスキップ）', { n: r.skipped }) : '' }) });
     } finally { setHkBusy(false); }
   }
 
@@ -468,8 +494,11 @@ export default function TrainingScreen() {
         const walkKcalMin = 0.0613 * myWeight;                 // はや歩き3.5METs相当
         const bmrOfMe = prof ? mifflinBMR(prof.sex, myWeight, Number(prof.height_cm), Number(prof.age)) : 0;
         const lifeFactor = prof?.life_factor != null ? Number(prof.life_factor) : LIFE_FACTOR_DEFAULT;
-        const activeBonus = activeToGoal && activeOfView != null
-          ? activeKcalGoalBonus(activeOfView, bmrOfMe, lifeFactor) : 0;
+        // 目標に入っているのは「反映する」で固定した額だけ。候補は表示とボタンに使う（lib/activeApply.ts）
+        const activeBonus = appliedActive;
+        const cand = activeOfView != null
+          ? activeApplyCandidate({ measured: burn.source === 'measured' ? burn.kcal : null, steps: burn.source === 'steps' ? stepsOfView : null, weightKg: myWeight, bmr: bmrOfMe, lifeFactor, manualKcal: manualToday })
+          : null;
         const target = entryToday.target != null ? entryToday.target + activeBonus : null;
         const over = target != null ? Math.round((entryToday.intake ?? 0) - target) : null;
         let line: { text: string; color: string } | null = null;
@@ -552,12 +581,24 @@ export default function TrainingScreen() {
               </Pressable>
             )}
             {line && <Text style={[s.mvLine, { color: line.color }]}>{line.text}</Text>}
-            {activeBonus > 0 && (
-              <Text style={s.mvNote}>
-                {burn.source === 'steps'
-                  ? t('歩いたぶん（推定）+{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })
-                  : t('歩いたぶん +{n}kcal を目標に上乗せしています', { n: activeBonus.toLocaleString() })}
-              </Text>
+            {/* 目標への反映は手動（lib/activeApply.ts）。取り込んでも、歩いても、押すまで目標は動かない */}
+            {(activeBonus > 0 || (cand != null && cand.kcal > 0)) && (
+              <View style={s.mvApply}>
+                {activeBonus > 0 && (
+                  <Text style={[s.mvNote, { color: C.successInk, fontWeight: '700' }]}>{t('運動ぶん +{n}kcal を目標に反映中', { n: activeBonus.toLocaleString() })}</Text>
+                )}
+                {cand != null && cand.kcal > 0 && cand.kcal !== activeBonus && (
+                  <OptionButton variant="tonal" busy={applyBusy}
+                                label={activeBonus > 0 ? t('+{n}kcal に更新する', { n: cand.kcal.toLocaleString() }) : t('目標に反映する（+{n}kcal）', { n: cand.kcal.toLocaleString() })}
+                                onPress={() => applyActive(cand.kcal)} />
+                )}
+                {activeBonus > 0 && (
+                  <Pressable onPress={() => applyActive(null)} hitSlop={8} disabled={applyBusy} accessibilityRole="button">
+                    <Text style={s.mvAuthLink}>{t('反映を取り消す')}</Text>
+                  </Pressable>
+                )}
+                <Text style={s.mvNote}>{t('反映するのは「いつもより多く動いたぶん」だけです。日常の動きは生活係数に、アプリで記録した運動はその記録に既に入っているので差し引きます。自動では足しません。')}</Text>
+              </View>
             )}
             </View>
             {(weekStepsGoal != null || last7.length > 1 || (hourlySteps != null && hourlySteps.some((v) => v > 0))) && (
@@ -813,6 +854,7 @@ const s = themed(() => ({
   mvLink: { fontSize: 13, fontWeight: '800', color: C.accentInk, textDecorationLine: 'underline', paddingVertical: 5 },
   mvStatSub: { fontSize: 11, fontWeight: '700', color: C.sub, marginTop: 2, lineHeight: 15 },
   mvNote: { fontSize: 11.5, color: C.faint, lineHeight: 16, marginTop: 6 },
+  mvApply: { marginTop: 8, gap: 6 },   // 運動ぶんの手動反映（ボタン＋説明）
   mvLine: { fontSize: 13, fontWeight: '700', lineHeight: 19, marginTop: 10 },
   mvBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 12 },
   mvBar: { width: '62%', borderRadius: 4, backgroundColor: C.line },

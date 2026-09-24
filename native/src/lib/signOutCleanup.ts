@@ -68,7 +68,7 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-kcal-adjust',
   'bl-carry-mode', 'bl-carry-days', 'bl-carry-dismiss',   // 繰り越し調整の聞き方・日数・流した日（本人の計画の一部）
   'bl-week-goal', 'bl-week-steps-goal',
-  'bl-active-kcal-to-goal', 'bl-act-last-min',
+  'bl-act-last-min',
   'bl-food-freq-v2', 'bl-food-seen',
   'bl-purpose',            // ダイエットの目的（バルク/カット）
   'bl-wake-time',

@@ -1,11 +1,13 @@
 // マイ食品の登録ロジック: 複数食材→1品への合算（純関数）と、items列が無いDBへの後退保存
 type Row = Record<string, unknown>;
 const mockCalls: { op: 'insert' | 'update'; row: Row }[] = [];
-const mockState = { failWithItems: false };
+const mockState = { failWithItems: false, failWithGrams: false };
 
 // supabase をこのテスト用に差し替える（jest.setup の共通モックより後に登録されるので優先される）
 jest.mock('@/lib/supabase', () => {
   const result = (row: Row) => {
+    // migration-36 未適用のDBを模す: grams / nutrients を含む書き込みだけ PGRST204 を返す
+    if (mockState.failWithGrams && ('grams' in row || 'nutrients' in row)) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'grams' column of 'my_foods'" } };
     // migration-31 未適用のDBを模す: items を含む書き込みだけ PGRST204 を返す
     if (mockState.failWithItems && 'items' in row) return { data: null, error: { code: 'PGRST204', message: "Could not find the 'items' column of 'my_foods'" } };
     return { data: null, error: null };
@@ -28,7 +30,7 @@ const items: FoodItem[] = [
   { name: '白米', qty: '150g', kcal: 252, p: 3.8, f: 0.5, c: 55.7 },
 ];
 
-beforeEach(() => { mockCalls.length = 0; mockState.failWithItems = false; });
+beforeEach(() => { mockCalls.length = 0; mockState.failWithItems = false; mockState.failWithGrams = false; });
 
 describe('composeMyFood（複数食材→1つのマイ食品）', () => {
   it('名前が空なら「先頭の食材＋セット」・合計kcal/PFC・内訳を持つセット（recipe）になる', () => {
@@ -71,10 +73,33 @@ describe('saveMyFood（my_foods への書き込み）', () => {
     mockState.failWithItems = true;
     const r = await saveMyFood('u1', composeMyFood('定食', items));
     expect(r.ok).toBe(true);
-    expect(mockCalls).toHaveLength(2);
+    // 段階的に落とす: [items+grams] → [items] → [合計だけ]（2026-09-24 に grams/nutrients が増えたので3段）
+    expect(mockCalls).toHaveLength(3);
     expect('items' in mockCalls[0].row).toBe(true);
-    expect('items' in mockCalls[1].row).toBe(false);
-    expect(mockCalls[1].row.kcal).toBe(377);
+    expect('grams' in mockCalls[0].row).toBe(true);
+    const last = mockCalls[mockCalls.length - 1].row;
+    expect('items' in last).toBe(false);
+    expect('grams' in last).toBe(false);
+    expect(last.kcal).toBe(377);
+  });
+
+  it('grams/nutrients 列が無いDB（migration-36 未適用）では、その2列だけ落として内訳つきで再登録する', async () => {
+    mockState.failWithGrams = true;
+    const r = await saveMyFood('u1', composeMyFood('定食', items));
+    expect(r.ok).toBe(true);
+    expect(mockCalls).toHaveLength(2);
+    expect(mockCalls[0].row.grams).toBe(300);          // 3品とも g があるので合計 300g
+    expect('grams' in mockCalls[1].row).toBe(false);
+    expect(Array.isArray(mockCalls[1].row.items)).toBe(true);
+  });
+
+  it('列がそろったDBでは grams と nutrients も1回の insert に載る', async () => {
+    const withNut: FoodItem[] = [{ ...items[0], k: 300, fe: 0.4 }];
+    const r = await saveMyFood('u1', composeMyFood('', withNut));
+    expect(r.ok).toBe(true);
+    expect(mockCalls).toHaveLength(1);
+    expect(mockCalls[0].row.grams).toBe(100);
+    expect(mockCalls[0].row.nutrients).toEqual({ k: 300, fe: 0.4 });
   });
 
   it('上書きidを渡すと update になる', async () => {

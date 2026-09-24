@@ -19,7 +19,24 @@ export type LogRow = {
   mood?: string | null;
   text?: string | null;
   photo_urls?: string[] | null;
+  /** 取込元（ヘルスケアのワークアウトは 'hk:<UUID>'・v17 以降）。目標への自動加算を止める判定に使う */
+  source_id?: string | null;
 };
+
+/**
+ * ヘルスケアから取り込んだ運動（⌚）か。
+ * 取り込んだワークアウトのカロリーは、ヘルスケアの「アクティブ」実測に既に含まれている。
+ * だから目標カロリーへは**自動で足さない**（足すかどうかは運動タブの「目標に反映する」で本人が決める・lib/activeApply.ts）。
+ * 2026-09-24: 以前は取り込んだ瞬間に目標が動き、さらにアクティブ反映と二重に数えられていた
+ */
+export function isImportedExercise(l: LogRow): boolean {
+  return String(l.source_id ?? '').startsWith('hk:') || /⌚\s*$/.test(String(l.text ?? ''));
+}
+
+/** ヘルスケアから取り込んだ運動のkcal合計（表示用。目標には入れない） */
+export function importedExerciseKcal(logs: LogRow[]): number {
+  return round1(logs.filter(isImportedExercise).reduce((a, l) => a + (Number(l.adj) || 0), 0));
+}
 
 export type DaySummary = {
   intake: number | null;
@@ -41,7 +58,9 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // その日の運動追加kcal合計 = Σ EX_ADD[レベル] + Σ 補正
 export function dayExerciseKcal(logs: LogRow[]): number {
-  return round1(logs.reduce((a, l) => a + (EX_ADD[(l.ex as ExLevel) || 'オフ'] ?? 0) + (Number(l.adj) || 0), 0));
+  // ヘルスケア取込（⌚）は除く: アクティブ実測に含まれているぶんを目標へ自動加算しない（isImportedExercise 参照）
+  return round1(logs.filter((l) => !isImportedExercise(l))
+    .reduce((a, l) => a + (EX_ADD[(l.ex as ExLevel) || 'オフ'] ?? 0) + (Number(l.adj) || 0), 0));
 }
 
 // 最高強度レベル（表示用）
