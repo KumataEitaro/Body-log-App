@@ -138,9 +138,16 @@ describe('概要タブの最上部ブロックは、見出しと中身が一致�
     expect(block).toMatch(/sectionH}>\{t\('あなたの記録と設定'\)\}/);
   });
 
-  it('「設定」の行はブロックのいちばん最後（いちばん奥の階層）', () => {
+  // 2026-09-24 熊田さん指定: 並びは 設定 → 通知センター → 目標設定。実績はブロックの外（概要のいちばん下）
+  it('並びは 設定 → 通知センター → 目標設定 で、実績はブロックに含まない', () => {
     const block = src.slice(src.indexOf('const settingsBlock'), src.indexOf('const headerJSX'));
     const keys = [...block.matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
-    expect(keys[keys.length - 1]).toBe('settings');
+    expect(keys).toEqual(['settings', 'notice', 'goal']);
+  });
+
+  it('実績の行は概要のいちばん下（メニュー行の並びのあと）に1本だけ出る', () => {
+    const list = src.slice(src.indexOf('{visibleOrder.map((k) => <View key={k}>{menuRow(k)}</View>)}'), src.indexOf('</ScrollView>', src.indexOf('{visibleOrder.map((k) => <View key={k}>{menuRow(k)}</View>)}')));
+    expect(list).toMatch(/\{achievementsRow\}/);
+    expect((src.match(/key: 'achievements'/g) ?? []).length).toBe(1);
   });
 });
