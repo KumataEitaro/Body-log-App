@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { syncEntriesForDate } from '@/lib/sync';
 import { C, themed } from '@/lib/ui';
 import { Chip } from '@/components/ui/Selectable';
-import { liftPartOf, liftPartLabel, LIFT_PARTS } from '@/lib/lifts';
+import { liftPartOf, liftPartLabel, LIFT_PARTS, loadCustomLifts, useCustomLiftDefs } from '@/lib/lifts';
 import {
   groupLiftsByDay, removeLiftAt, liftSetLabel, weightLookup, volumeOf,
   type LiftEntry,
@@ -63,13 +63,18 @@ export default function LiftHistoryCard({ showUndo }: { showUndo?: ShowUndo }) {
       if (data) setHistory(data as HistRow[]);
     } catch { /* 圏外。手元のstateを保つ */ }
   }, []);
+  // ユーザー追加種目の部位（liftPartOf）は端末から読む。読み終わったら描き直す（部位フィルタに入れるため）
+  useCustomLiftDefs();
   useEffect(() => {
     load();
+    loadCustomLifts();
     supabase.from('entries').select('date,weight').not('weight', 'is', null)
       .order('date', { ascending: false }).limit(400)
       .then(({ data }) => setWeightRows((data as { date: string; weight: number | null }[] | null) ?? []));
   }, [load]);
   const weightAt = weightLookup(weightRows);
+  // ダンベル種目の重さは「片側20kg」と見せる（保存は日本語マーカー・表示は訳語）
+  const sideFmt = (w: string) => t('片側{w}', { w });
 
   // 履歴を日ごとにまとめる（食事の「その日の記録」と同じ見せ方にそろえる）
   const days = groupLiftsByDay(history, weightAt);
@@ -196,7 +201,7 @@ export default function LiftHistoryCard({ showUndo }: { showUndo?: ShowUndo }) {
                   <Pressable key={`${rec.id}-${ix}`} style={s.liftRow}
                              onLongPress={() => confirmRecord(rec, d.date)} delayLongPress={450}>
                     <Text style={s.liftName} numberOfLines={1}>{e.name}</Text>
-                    <Text style={s.liftSet}>{liftSetLabel(e, t('自重'))}</Text>
+                    <Text style={s.liftSet}>{liftSetLabel(e, t('自重'), sideFmt)}</Text>
                     <Pressable onPress={() => deleteOneLift(rec, ix, d.date)} hitSlop={10}>
                       <Text style={s.liftX}>×</Text>
                     </Pressable>

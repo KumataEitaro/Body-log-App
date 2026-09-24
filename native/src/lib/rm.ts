@@ -19,6 +19,8 @@ export function repsNeededFor(target1RM: number, kg: number): number | null {
 // 種目ごとの推定1RMを抽出する。
 // 解析は liftLog に寄せている（自重・加重の書き方をここで二重に持たないため）。
 // 自重種目は体重が負荷の大半なので、体重を渡さないと過小評価になる点に注意。
+// 片側入力（`ダンベルプレス 片側20kg×8`）の推定1RMは**片側の重さ**で出す（effectiveKg は片手ぶん）。
+// ダンベルの重さは片側で語るものなので、両側の合計に直すのはボリュームだけ（liftLog.totalKg）。
 export function parse1RMs(text: string, bodyWeight?: number | null): { name: string; kg: number; reps: number; est: number }[] {
   return parseLiftText(text)
     .map((e) => {

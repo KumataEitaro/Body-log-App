@@ -1,8 +1,9 @@
 // 成長グラフ・バランス集計が読む解析。
 // 記録の書き方（自重・加重）を足したとき、ここが読めないと
 // 「保存はできているのにグラフに出ない」という気づきにくい壊れ方をする。
-import { parseTrainingText, trainingSeries } from '../training';
+import { parseTrainingText, trainingSeries, weeklyPartVolumes } from '../training';
 import { weightLookup } from '../liftLog';
+import { addCustomLift, removeCustomLift, getCustomLifts } from '../lifts';
 
 describe('parseTrainingText', () => {
   it('通常の記録を読む', () => {
@@ -103,5 +104,60 @@ describe('weeklyPartVolumes', () => {
     const w = require('../training').weeklyPartVolumes(
       [{ date: '2026-08-18', text: '🏋️ ジャンプスクワット 20kg×10×3' }], undefined, 1, '2026-08-21');
     expect(w[0].byPart.other).toBe(20 * 10 * 3);
+  });
+});
+
+// ダンベル種目（片側入力 `片側20kg`）と、部位つきで追加した種目の集計（2026-09-24）。
+// 最大重量・推定1RMは片側のまま、ボリュームだけ両側ぶん＝この非対称をここで固定する
+describe('片側入力（ダンベル）とユーザー追加種目の部位', () => {
+  afterEach(async () => {
+    for (const n of [...getCustomLifts()]) await removeCustomLift(n);
+  });
+
+  it('parseTrainingText: 片側の重さはそのまま kg・side=true', () => {
+    expect(parseTrainingText('🏋️ ダンベルプレス 片側20kg×8×3')).toEqual([
+      { name: 'ダンベルプレス', kg: 20, reps: 8, sets: 3, side: true },
+    ]);
+  });
+
+  it('trainingSeries: maxKg は片側のまま・volume は両側ぶん・side が立つ', () => {
+    const s = trainingSeries([
+      { date: '2026-09-24', text: '🏋️ ダンベルプレス 片側20kg×8×3' },
+      { date: '2026-09-24', text: '🏋️ ダンベルプレス 片側22.5kg×5' },
+    ]);
+    expect(s.get('ダンベルプレス')).toEqual([
+      { date: '2026-09-24', maxKg: 22.5, volume: 40 * 8 * 3 + 45 * 5, side: true },
+    ]);
+  });
+
+  it('trainingSeries: マーカーの無い旧記録は side を持たず、その重さそのものとして数える', () => {
+    const s = trainingSeries([{ date: '2026-09-24', text: '🏋️ ダンベルプレス 40kg×8×3' }]);
+    expect(s.get('ダンベルプレス')).toEqual([{ date: '2026-09-24', maxKg: 40, volume: 40 * 8 * 3 }]);
+  });
+
+  it('weeklyPartVolumes: 片側入力は両側ぶんで部位に積む', () => {
+    const w = weeklyPartVolumes([{ date: '2026-08-18', text: '🏋️ サイドレイズ 片側8kg×15×3' }], undefined, 1, '2026-08-21');
+    expect(w[0].byPart.shoulder).toBe(16 * 15 * 3);
+    expect(w[0].total).toBe(16 * 15 * 3);
+  });
+
+  it('weeklyPartVolumes: ユーザー追加種目は選んだ部位に入る（その他に落ちない）', async () => {
+    await addCustomLift('ヒップアブダクション', { part: 'legs' });
+    await addCustomLift('ダンベルカール', { part: 'arm', dumbbell: true });
+    const w = weeklyPartVolumes([
+      { date: '2026-08-18', text: '🏋️ ヒップアブダクション 30kg×15×3' },
+      { date: '2026-08-18', text: '🏋️ ダンベルカール 片側12kg×10×3' },
+      { date: '2026-08-18', text: '🏋️ 知らない種目 20kg×10' },
+    ], undefined, 1, '2026-08-21');
+    expect(w[0].byPart.legs).toBe(30 * 15 * 3);
+    expect(w[0].byPart.arm).toBe(24 * 10 * 3);
+    expect(w[0].byPart.other).toBe(20 * 10);
+    expect(w[0].total).toBe(30 * 15 * 3 + 24 * 10 * 3 + 20 * 10);
+  });
+
+  it('weeklyPartVolumes: 追加種目の自重（体重が負荷）もその週の体重で部位に積む', async () => {
+    await addCustomLift('マッスルアップ', { bodyweight: true, part: 'back' });
+    const w = weeklyPartVolumes([{ date: '2026-08-18', text: '🏋️ マッスルアップ 自重×5×3' }], () => 62, 1, '2026-08-21');
+    expect(w[0].byPart.back).toBe(62 * 5 * 3);
   });
 });

@@ -2,10 +2,14 @@
 //
 // 解析は lib/liftLog に一本化している。以前はここでも別の正規表現を持っていたため、
 // 記録の書き方（自重・加重）を足したときに片方だけ読めなくなる事故が起きた。
-import { parseLiftText, effectiveKg } from './liftLog';
+import { parseLiftText, effectiveKg, totalKg, sidesOf } from './liftLog';
 import { liftPartOf } from './lifts';
 
-export type TrainSet = { name: string; kg: number; reps: number; sets: number };
+/**
+ * kg は実負荷（自重種目は体重込み）。**片側入力（ダンベル）の kg は片手ぶん**で、
+ * side が true のときだけ立つ（ボリュームは両側＝×2 で数える。liftLog.ts の方針）
+ */
+export type TrainSet = { name: string; kg: number; reps: number; sets: number; side?: boolean };
 
 /** @param bodyWeight 自重種目の負荷に使う体重。省略すると加重ぶんだけが負荷になる */
 export function parseTrainingText(text: string, bodyWeight?: number | null): TrainSet[] {
@@ -13,10 +17,15 @@ export function parseTrainingText(text: string, bodyWeight?: number | null): Tra
   if (!s.startsWith('🏋️')) return [];
   return parseLiftText(s).map((e) => ({
     name: e.name, kg: effectiveKg(e, bodyWeight), reps: e.reps, sets: e.sets,
+    ...(e.side ? { side: true } : {}),
   }));
 }
 
-export type TrainPoint = { date: string; maxKg: number; volume: number }; // volume = Σ kg×回×set
+/**
+ * volume = Σ 両側の実負荷×回×set。maxKg はその日の最大実負荷（片側入力の種目は片側の重さ）。
+ * side はその日に片側入力の記録が1つでもあれば true（グラフの単位に「片側」と添えるため）
+ */
+export type TrainPoint = { date: string; maxKg: number; volume: number; side?: boolean };
 
 // 履歴（date×text）→ 種目ごとの時系列（同日複数記録は maxKg=最大 / volume=合算）
 // 自重種目の負荷は体重で変わるので、その日の体重を引ける関数を渡せるようにしている
@@ -30,8 +39,10 @@ export function trainingSeries(
       if (!byName.has(s.name)) byName.set(s.name, new Map());
       const days = byName.get(s.name)!;
       const cur = days.get(r.date) ?? { date: r.date, maxKg: 0, volume: 0 };
+      // 最大重量は片側のまま（ダンベルは片側で語る）。ボリュームは両側ぶん
       cur.maxKg = Math.max(cur.maxKg, s.kg);
-      cur.volume += s.kg * s.reps * s.sets;
+      cur.volume += s.kg * sidesOf(s) * s.reps * s.sets;
+      if (s.side) cur.side = true;
       days.set(r.date, cur);
     }
   }
@@ -70,6 +81,8 @@ export type PartWeek = { week: string; total: number; byPart: Record<string, num
 /**
  * 筋トレ記録を「週×部位」の総挙上量に集計する。
  * 「肩のボリュームが週ごとにどう変わっているか」を部位別に遡るための土台。
+ * 部位は liftPartOf（基本種目のカタログ＋ユーザー追加種目の設定。どちらにも無ければ 'other'）。
+ * 片側入力（ダンベル）の記録は両側ぶん（×2）で数える（totalKg）。
  * @param endDate  最新週を決める基準日（通常は今日）。ここを引数にしているのは
  *                 テストと再現性のため（内部で現在時刻を読まない）
  * @param weeks    返す週数。記録が無い週も0で埋める（休んだ週が見えることに意味がある）
@@ -85,7 +98,7 @@ export function weeklyPartVolumes(
     for (const e of parseLiftText(r.text)) {
       const wk = weekStartOf(r.date);
       const part = liftPartOf(e.name);
-      const kg = effectiveKg(e, weightAt ? weightAt(r.date) : null);
+      const kg = totalKg(e, weightAt ? weightAt(r.date) : null);
       const m = byWeek.get(wk) ?? {};
       m[part] = (m[part] ?? 0) + kg * e.reps * e.sets;
       byWeek.set(wk, m);

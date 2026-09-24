@@ -2,14 +2,15 @@
 // 保存文字列が既存の書式（parseLiftText が読める形）から外れると、集計・e1RM・履歴が
 // 「保存はできるのに出てこない」壊れ方をするので、往復で固定する。
 import {
-  sessionEntries, sessionText, sessionVolume, roundTrips, loadLabel, loadKind, clampLoad,
+  sessionEntries, sessionText, sessionVolume, roundTrips, loadLabel, loadKind, clampLoad, setToEntry,
   nextSet, setReady, parseSessionState, serializeSessionState, restLeftSec, fmtRestSec,
   ASSIST_RANGE_KG, REST_CHOICES, type SessionSet,
 } from '../liftSession';
 import { parseLiftText, effectiveKg } from '../liftLog';
-import { isBodyweightLift } from '../lifts';
+import { isBodyweightLift, isPerSideLift } from '../lifts';
 
 const bw = isBodyweightLift;
+const side = isPerSideLift;
 const S = (name: string, kg: number, reps: number, id = 'x'): SessionSet => ({ id, name, kg, reps });
 const WORDS = { bw: '自重', plus: '加重', assist: '補助' };
 const REST_WORDS = { min: (n: number) => `${n}分`, sec: (n: number) => `${n}秒`, minSec: (m: number, s: number) => `${m}分${s}秒` };
@@ -139,5 +140,46 @@ describe('セット行の追加と状態の保存', () => {
     expect(fmtRestSec(45, REST_WORDS)).toBe('45秒');
     expect(fmtRestSec(90, REST_WORDS)).toBe('1分30秒');
     expect(fmtRestSec(120, REST_WORDS)).toBe('2分');
+  });
+});
+
+// ダンベル種目は kg を片側で受け、保存テキストに `片側` を書く（2026-09-24）
+describe('ダンベル種目＝片側入力', () => {
+  it('保存テキストに 片側 マーカーを書く（基本種目の db フラグで判定）。同じ重さ・回数はまとめる', () => {
+    const sets = [S('ダンベルプレス', 20, 8), S('ダンベルプレス', 20, 8), S('ダンベルプレス', 22.5, 5)];
+    expect(sessionText(sets, bw, side)).toBe('🏋️ ダンベルプレス 片側20kg×8×2、ダンベルプレス 片側22.5kg×5');
+    expect(roundTrips(sets, bw, side)).toBe(true);
+    expect(parseLiftText(sessionText(sets, bw, side)).map((e) => e.side)).toEqual([true, true]);
+  });
+
+  it('isSide を渡さなければ従来どおり（マーカー無し）。ダンベルでない種目にも付かない', () => {
+    expect(sessionText([S('ダンベルプレス', 20, 8)], bw)).toBe('🏋️ ダンベルプレス 20kg×8');
+    expect(sessionText([S('ベンチプレス', 80, 8)], bw, side)).toBe('🏋️ ベンチプレス 80kg×8');
+  });
+
+  it('ボリュームは両側ぶん（片側20kg×8 → 320）。他の種目と混ざっても合算できる', () => {
+    expect(sessionVolume([S('ダンベルプレス', 20, 8)], bw, 70, side)).toBe(320);
+    expect(sessionVolume([S('ダンベルプレス', 20, 8)], bw, 70)).toBe(160);   // 片側判定なし＝従来
+    expect(sessionVolume([S('ダンベルプレス', 20, 8), S('懸垂', 0, 6)], bw, 70, side)).toBe(320 + 420);
+  });
+
+  it('ラベル: 片側20kg（訳語の関数で語順を差し替えられる）。加重にも付く・補助には付かない', () => {
+    expect(loadLabel(20, false, WORDS, true)).toBe('片側20kg');
+    expect(loadLabel(22.5, false, WORDS, true)).toBe('片側22.5kg');
+    expect(loadLabel(20, false, { ...WORDS, side: (w) => `${w}/side` }, true)).toBe('20kg/side');
+    expect(loadLabel(20, false, WORDS)).toBe('20kg');
+    expect(loadLabel(10, true, WORDS, true)).toBe('加重 片側+10kg');
+    expect(loadLabel(-20, true, WORDS, true)).toBe('補助 −20kg');
+    expect(loadLabel(0, true, WORDS, true)).toBe('自重');
+  });
+
+  it('setToEntry: 片側は abs/plus にだけ付く（自重のみ・補助には付かない）', () => {
+    const always = () => true;
+    const never = () => false;
+    expect(setToEntry(S('X', 20, 8), never, 1, always)).toEqual({ name: 'X', kg: 20, reps: 8, sets: 1, mode: 'abs', side: true });
+    expect(setToEntry(S('X', 10, 8), always, 1, always)).toMatchObject({ mode: 'plus', side: true });
+    expect('side' in setToEntry(S('X', 0, 8), always, 1, always)).toBe(false);
+    expect('side' in setToEntry(S('X', -10, 8), always, 1, always)).toBe(false);
+    expect('side' in setToEntry(S('X', 20, 8), never)).toBe(false);
   });
 });

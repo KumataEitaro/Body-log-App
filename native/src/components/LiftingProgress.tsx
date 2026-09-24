@@ -13,7 +13,7 @@ import { trainingSeries, volumeVerdict } from '@/lib/training';
 import { parse1RMs } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
 import { weeklyPartVolumes } from '@/lib/training';
-import { LIFT_PARTS, liftPartLabel } from '@/lib/lifts';
+import { LIFT_PARTS, liftPartLabel, loadCustomLifts, useCustomLiftDefs } from '@/lib/lifts';
 import InteractiveChart from '@/components/InteractiveChart';
 import MonthCalendar, { CARDIO_GREEN, type DayMark } from '@/components/MonthCalendar';
 import { Chip, OptionButton } from '@/components/ui/Selectable';
@@ -66,6 +66,8 @@ function useLifting() {
   const [habit, setHabit] = useState<Habit>({ perWeek: null, weeklyKcal: null, minMin: null });
   // 懸垂などの自重種目は体重が負荷の大半なので、日付ごとの体重が必要
   const [weightRows, setWeightRows] = useState<{ date: string; weight: number | null }[]>([]);
+  // ユーザー追加種目の部位（liftPartOf が描画中に読む）。端末から読み終わったら描き直す
+  useCustomLiftDefs();
   const load = useCallback(async () => {
     const [lift, run, tgRes, gRes, wRes] = await Promise.all([
       fetchLogs('🏋️', 120),
@@ -87,7 +89,7 @@ function useLifting() {
       });
     }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadCustomLifts(); }, [load]);
   const weightAt = weightLookup(weightRows);
   const series = trainingSeries(history, weightAt);
   const exercises = [...series.entries()].sort((a, b) => b[1].length - a[1].length).map(([n]) => n);
@@ -306,7 +308,9 @@ export function PartVolumeCard() {
           );
         })}
       </View>
-      <Text style={[s.muted, { marginTop: 8 }]}>{t('自重種目（懸垂など）はその週の体重で実負荷に換算しています。')}</Text>
+      <Text style={[s.muted, { marginTop: 8 }]}>
+        {t('自重種目（懸垂など）はその週の体重で実負荷に換算しています。')}{t('片側で入力したダンベル種目は両側の合計で数えています。')}
+      </Text>
     </View>
   );
 }
@@ -330,6 +334,8 @@ export function LiftChartCard() {
 
   const activeEx = selEx && series.has(selEx) ? selEx : exercises[0] ?? null;
   const exPoints = activeEx ? series.get(activeEx)! : [];
+  // 片側入力（ダンベル）の記録がある種目: 実重量・推定1RMは片側の重さなので単位に添える（ボリュームは両側ぶん）
+  const perSide = exPoints.some((p) => p.side);
   const verdict = volumeVerdict(exPoints);
   // 推定1RM系列: 履歴テキストから種目別に日毎の最大1RMを抽出（10回×100kgと1回×120kgを同じ土俵で比較）
   const rmByDate = new Map<string, number>();
@@ -365,7 +371,7 @@ export function LiftChartCard() {
         points={chartMode === '1rm'
           ? rmPoints
           : exPoints.map((p) => ({ date: p.date, value: chartMode === 'kg' ? p.maxKg : p.volume }))}
-        unit={chartMode === 'volume' ? t('kg·回') : 'kg'} decimals={0}
+        unit={chartMode === 'volume' ? t('kg·回') : perSide ? t('kg（片側）') : 'kg'} decimals={0}
         planValue={chartMode === '1rm' && activeEx ? goalKg.get(activeEx) ?? null : null}
         presetDays={null}
       />
@@ -413,7 +419,8 @@ export function PersonalBestCard() {
   const rows = [...series.entries()].map(([name, pts]) => {
     let best = { kg: 0, date: '' };
     for (const p of pts) if (p.maxKg > best.kg) best = { kg: p.maxKg, date: p.date };
-    return { name, kg: best.kg, date: best.date };
+    // ダンベル種目（片側入力の記録あり）の最高記録は片側の重さ。行に「片側」と添える
+    return { name, kg: best.kg, date: best.date, side: pts.some((p) => p.side) };
   }).filter((r) => r.kg > 0)
     .sort((a, b) => b.kg - a.kg)
     .slice(0, 8);
@@ -436,7 +443,7 @@ export function PersonalBestCard() {
                 {r.kg}<Text style={s.prUnit}>kg</Text>
                 {isNew(r.date) && <Text style={s.prNew}> NEW!</Text>}
               </Text>
-              <Text style={s.prDate}>{r.date.slice(5).replace('-', '/')}{goal ? ` ・ ${t('目標')}${goal}kg` : ''}</Text>
+              <Text style={s.prDate}>{r.date.slice(5).replace('-', '/')}{r.side ? ` ・ ${t('片側')}` : ''}{goal ? ` ・ ${t('目標')}${goal}kg` : ''}</Text>
             </View>
             <Pressable hitSlop={8} onPress={() => setSticker({ kind: 'pr', name: r.name, kg: Math.round(r.kg), date: r.date })}>
               <Share2 size={15} color={C.faint} />
@@ -444,7 +451,10 @@ export function PersonalBestCard() {
           </View>
         );
       })}
-      <Text style={[s.muted, { marginTop: 8 }]}>{t('実重量ベースの最高記録（自重種目は体重込み）。共有アイコンでストーリー用の透過ステッカーを作れます。')}</Text>
+      <Text style={[s.muted, { marginTop: 8 }]}>
+        {t('実重量ベースの最高記録（自重種目は体重込み）。共有アイコンでストーリー用の透過ステッカーを作れます。')}
+        {rows.some((r) => r.side) ? t('「片側」はダンベル種目で、片手ぶんの重さです。') : ''}
+      </Text>
       <ShareStickerModal data={sticker} visible={sticker != null} onClose={() => setSticker(null)} />
     </View>
   );

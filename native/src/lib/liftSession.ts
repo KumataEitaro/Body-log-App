@@ -14,7 +14,11 @@
 //   0 = 自重のみ ／ 正 = 加重（ベルト・ダンベル） ／ 負 = 補助（アシストマシン・バンド）
 // の1つの数直線で持つ。実負荷 = 体重×係数 + kg（liftLog.effectiveKg。負なら引かれる）。
 // 通常種目の kg は負荷そのもの（正のみ）。
-import { effectiveKg, liftTextFrom, parseLiftText, type LiftEntry, type LiftMode } from './liftLog';
+//
+// 【ダンベル種目＝片側入力（2026-09-24）】isSide(name) が true の種目は kg を「片側の重さ」として受け、
+// 保存テキストに `片側20kg×8×3` のマーカーを書く（liftLog.ts）。ボリュームは両側ぶん（totalKg）。
+// isBw と同じく関数で受けるのは、この層を lib/lifts.ts（端末のフラグ）から切り離してテストしやすくするため。
+import { totalKg, liftTextFrom, parseLiftText, type LiftEntry, type LiftMode } from './liftLog';
 
 /** 画面上の1セット。id は行のキー（並び替えはしないが React の key に要る） */
 export type SessionSet = {
@@ -65,21 +69,41 @@ export function loadKind(kg: number, bw: boolean): LoadKind {
   return 'bw';
 }
 
-/** 表示用の短い重量ラベル。「補助 −20kg」「加重 +10kg」「自重」「80kg」（訳語は呼び側から） */
-export function loadLabel(kg: number, bw: boolean, words: { bw: string; plus: string; assist: string }): string {
+/** 重量ラベルの訳語。side は片側入力の見せ方（"20kg" → 「片側20kg」）。省略時は日本語のマーカーを前に付ける */
+export type LoadWords = { bw: string; plus: string; assist: string; side?: (w: string) => string };
+
+/**
+ * 表示用の短い重量ラベル。「補助 −20kg」「加重 +10kg」「自重」「80kg」（訳語は呼び側から）。
+ * side=true（ダンベル種目）なら重さの部分を「片側20kg」「加重 片側+10kg」と見せる。
+ * 補助（−）はダンベルと組み合わさらないので片側を付けない
+ */
+export function loadLabel(kg: number, bw: boolean, words: LoadWords, side = false): string {
   const kind = loadKind(kg, bw);
   const num = (v: number) => (v % 1 === 0 ? String(v) : v.toFixed(1));
-  if (kind === 'abs') return `${num(kg)}kg`;
+  const sideFmt = words.side ?? ((w: string) => `片側${w}`);
+  const wrap = (w: string) => (side ? sideFmt(w) : w);
+  if (kind === 'abs') return wrap(`${num(kg)}kg`);
   if (kind === 'bw') return words.bw;
-  if (kind === 'plus') return `${words.plus} +${num(kg)}kg`;
+  if (kind === 'plus') return `${words.plus} ${wrap(`+${num(kg)}kg`)}`;
   return `${words.assist} −${num(Math.abs(kg))}kg`;   // 表示は全角マイナス（保存は ASCII の -）
 }
 
-/** 1セットを LiftEntry（保存書式の1単位）にする。自重種目の kg の符号で mode を決める */
-export function setToEntry(s: SessionSet, isBw: (name: string) => boolean, sets = 1): LiftEntry {
+/** 種目名から真偽を返す判定（自重種目か・片側入力か）。lib/lifts.ts の関数をそのまま渡す */
+export type LiftPred = (name: string) => boolean;
+
+/**
+ * 1セットを LiftEntry（保存書式の1単位）にする。自重種目の kg の符号で mode を決める。
+ * @param isSide 片側入力（ダンベル）の種目か。true なら side を立てて保存テキストに `片側` を書く。
+ *               自重のみ（mode=bw）や補助（minus）では重さが無い／ダンベルでないので付けない
+ */
+export function setToEntry(s: SessionSet, isBw: LiftPred, sets = 1, isSide?: LiftPred): LiftEntry {
   const bw = isBw(s.name);
   const mode: LiftMode = !bw ? 'abs' : s.kg > 0 ? 'plus' : s.kg < 0 ? 'minus' : 'bw';
-  return { name: s.name.trim(), kg: bw ? s.kg : Math.max(0, s.kg), reps: Math.round(s.reps), sets, mode };
+  const side = !!isSide?.(s.name) && (mode === 'abs' || mode === 'plus');
+  return {
+    name: s.name.trim(), kg: bw ? s.kg : Math.max(0, s.kg), reps: Math.round(s.reps), sets, mode,
+    ...(side ? { side: true } : {}),
+  };
 }
 
 /**
@@ -87,13 +111,13 @@ export function setToEntry(s: SessionSet, isBw: (name: string) => boolean, sets 
  * 連続する同じ種目・同じkg・同じ回数だけ sets にまとめる（「80kg×8×3」）。
  * 回数が変わる（9→7→5）・重量が変わる・別種目を挟む と別の単位になる。
  */
-export function sessionEntries(sets: SessionSet[], isBw: (name: string) => boolean): LiftEntry[] {
+export function sessionEntries(sets: SessionSet[], isBw: LiftPred, isSide?: LiftPred): LiftEntry[] {
   const out: LiftEntry[] = [];
   for (const s of sets) {
     if (!setReady(s, isBw)) continue;
-    const e = setToEntry(s, isBw);
+    const e = setToEntry(s, isBw, 1, isSide);
     const last = out[out.length - 1];
-    if (last && last.name === e.name && last.kg === e.kg && last.reps === e.reps && last.mode === e.mode) {
+    if (last && last.name === e.name && last.kg === e.kg && last.reps === e.reps && last.mode === e.mode && !!last.side === !!e.side) {
       last.sets += 1;
     } else {
       out.push(e);
@@ -103,25 +127,28 @@ export function sessionEntries(sets: SessionSet[], isBw: (name: string) => boole
 }
 
 /** セット配列 → 保存テキスト（`🏋️ …`）。保存できる行が無ければ空文字 */
-export function sessionText(sets: SessionSet[], isBw: (name: string) => boolean): string {
-  return liftTextFrom(sessionEntries(sets, isBw));
+export function sessionText(sets: SessionSet[], isBw: LiftPred, isSide?: LiftPred): string {
+  return liftTextFrom(sessionEntries(sets, isBw, isSide));
 }
 
-/** セッション全体の総挙上量（実負荷×回数の合計・整数）。自重種目は体重が要る（無ければ加重ぶんだけ） */
-export function sessionVolume(sets: SessionSet[], isBw: (name: string) => boolean, bodyWeight?: number | null): number {
+/**
+ * セッション全体の総挙上量（両側の実負荷×回数の合計・整数）。
+ * 自重種目は体重が要る（無ければ加重ぶんだけ）。片側入力の種目は両側ぶん（×2）で数える
+ */
+export function sessionVolume(sets: SessionSet[], isBw: LiftPred, bodyWeight?: number | null, isSide?: LiftPred): number {
   let v = 0;
   for (const s of sets) {
     if (!setReady(s, isBw)) continue;
-    v += effectiveKg(setToEntry(s, isBw), bodyWeight) * Math.round(s.reps);
+    v += totalKg(setToEntry(s, isBw, 1, isSide), bodyWeight) * Math.round(s.reps);
   }
   return Math.round(v);
 }
 
 /** 保存テキストがこの画面のセット配列と同じ内容に戻せるか（テスト用の往復チェック） */
-export function roundTrips(sets: SessionSet[], isBw: (name: string) => boolean): boolean {
-  const text = sessionText(sets, isBw);
+export function roundTrips(sets: SessionSet[], isBw: LiftPred, isSide?: LiftPred): boolean {
+  const text = sessionText(sets, isBw, isSide);
   const back = parseLiftText(text);
-  const fwd = sessionEntries(sets, isBw);
+  const fwd = sessionEntries(sets, isBw, isSide);
   return liftTextFrom(back) === text && back.length === fwd.length;
 }
 

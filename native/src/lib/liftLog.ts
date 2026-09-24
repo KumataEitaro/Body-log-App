@@ -13,6 +13,15 @@
 // 昔の記録（`懸垂 10kg×8×3`）も加重の意味なので、実負荷の計算では同じに扱う。
 // 補助は「体重から引く」負荷（実負荷 = 体重×係数 − 補助）。2026-09-02 の筋トレ記録画面で
 // 加重/補助を1本のダイアル（−60〜+60kg）で選べるようにしたときに追加した。
+//
+// 【ダンベル種目＝片側入力（2026-09-24）】ダンベルは「片手20kg」と言うのが普通なので、
+// 入力も片側の重さで受ける。記録テキストには `ダンベルプレス 片側20kg×8×3` と**マーカーを書く**。
+//   ・マーカーの無い記録（`ダンベルプレス 20kg×8×3`）は従来どおり「その重さそのもの」＝両側の合計とみなす。
+//     過去の記録の意味を、あとから変わり得る端末側のフラグ（lib/lifts.ts の db）で書き換えないため
+//   ・`20kg×2×8×3` のような書き方は「2回×8セット」と区別できないので使わない
+//   ・ボリューム（総挙上量）は両側ぶん（×2）で数える（totalKg / volumeOf）
+//   ・実負荷（effectiveKg）と、そこから出す推定1RM・最大重量は**片側のまま**（ダンベルの重さは片側で語るもの）。
+//     画面では「片側」と添える
 import { bwRatioOf } from './lifts';
 
 /**
@@ -30,46 +39,61 @@ export type LiftEntry = {
   reps: number;
   sets: number;   // 省略時は1
   mode: LiftMode;
+  /**
+   * kg が片側（片手ぶん）の重さ＝ダンベル種目。記録テキストの `片側` マーカーから立つ。
+   * 片側でないときはキー自体を持たない（true のときだけ付ける。等価比較を単純にするため）
+   */
+  side?: boolean;
 };
 
 export type LiftRecord = { id: string; date: string; text: string };
 
 export const LIFT_PREFIX = '🏋️ ';
 const BW_WORD = '自重';
+/** 片側入力のマーカー（保存テキスト用・日本語固定） */
+export const SIDE_WORD = '片側';
 
 /** 記録テキストを種目ごとに分解する。読めない断片は落として、記録全体は捨てない */
 export function parseLiftText(text: string): LiftEntry[] {
   const body = text.replace(/^🏋️\s*/, '');
   const out: LiftEntry[] = [];
   for (const part of body.split('、')) {
-    // 「種目名 80kg×8×3」「種目名 +10kg×8×3」「種目名 -20kg×8×3」「種目名 自重×8×3」
+    // 「種目名 80kg×8×3」「種目名 +10kg×8×3」「種目名 -20kg×8×3」「種目名 自重×8×3」「種目名 片側20kg×8×3」
     // 符号は ASCII の -/+ のほか、全角マイナス（−）で手打ちされたものも読む
-    const m = part.trim().match(/^(.+?)\s+(?:自重|([+\-−])?([\d.]+)kg)(?:×(\d+))?(?:×(\d+))?$/);
+    // 片側マーカーは数字の直前（符号の前）。`片側+10kg` のように加重と組み合わさっても読める
+    const m = part.trim().match(/^(.+?)\s+(?:自重|(片側)?([+\-−])?([\d.]+)kg)(?:×(\d+))?(?:×(\d+))?$/);
     if (!m) continue;
-    const isBw = m[3] === undefined;
-    const isMinus = m[2] === '-' || m[2] === '−';
-    const abs = isBw ? 0 : Number(m[3]);
+    const isBw = m[4] === undefined;
+    const isMinus = m[3] === '-' || m[3] === '−';
+    const abs = isBw ? 0 : Number(m[4]);
     if (!isBw && !(abs > 0)) continue;
     out.push({
       name: m[1].trim(),
       kg: isMinus ? -abs : abs,
-      reps: m[4] ? Number(m[4]) : 1,
-      sets: m[5] ? Number(m[5]) : 1,
-      mode: isBw ? 'bw' : isMinus ? 'minus' : m[2] === '+' ? 'plus' : 'abs',
+      reps: m[5] ? Number(m[5]) : 1,
+      sets: m[6] ? Number(m[6]) : 1,
+      mode: isBw ? 'bw' : isMinus ? 'minus' : m[3] === '+' ? 'plus' : 'abs',
+      ...(m[2] ? { side: true } : {}),
     });
   }
   return out;
 }
 
+/** 片側マーカーの既定の書き方（保存用・日本語固定）。「片側20kg」「片側+10kg」 */
+const sideCanon = (w: string) => `${SIDE_WORD}${w}`;
+
 /**
  * 重量×回数×セットの表示（種目名を除いた部分）。
  * @param bwWord 「自重」の訳語。省略すると日本語のまま返す。
+ * @param sideFmt 片側入力の見せ方。重量文字列（"20kg"・"+10kg"）を受けて「片側20kg」のように返す関数。
+ *   省略すると日本語のマーカーを前に付ける（保存形式）。画面では t('片側{w}') で語順ごと訳す。
  *   DBに書く文字列は日本語固定でなければならない（訳語を保存すると解析が壊れる）ので、
  *   訳すのは画面に出すときだけ。既定値を日本語にしているのはそのため。
  */
-export function liftSetLabel(e: LiftEntry, bwWord: string = BW_WORD): string {
+export function liftSetLabel(e: LiftEntry, bwWord: string = BW_WORD, sideFmt: (w: string) => string = sideCanon): string {
   // minus は kg を負の数で持っているので、そのまま文字列にすると「-20kg」になる
-  const w = e.mode === 'bw' ? bwWord : e.mode === 'plus' ? `+${e.kg}kg` : `${e.kg}kg`;
+  const raw = e.mode === 'plus' ? `+${e.kg}kg` : `${e.kg}kg`;
+  const w = e.mode === 'bw' ? bwWord : e.side ? sideFmt(raw) : raw;
   return `${w}×${e.reps}${e.sets > 1 ? `×${e.sets}` : ''}`;
 }
 
@@ -97,24 +121,43 @@ export function removeLiftAt(entries: LiftEntry[], index: number):
   return text ? { kind: 'update', text } : { kind: 'delete' };
 }
 
+/** 片側入力なら2（両手）、それ以外は1。ボリュームを両側ぶんにする係数 */
+export function sidesOf(e: Pick<LiftEntry, 'side'>): number {
+  return e.side ? 2 : 1;
+}
+
+/** 実負荷の共通計算。mult は kg に掛ける係数（片側入力を両側にするとき2） */
+function loadKg(e: LiftEntry, bodyWeight: number | null | undefined, mult: number): number {
+  const ratio = bwRatioOf(e.name);
+  if (ratio > 0 && bodyWeight && bodyWeight > 0) {
+    return Math.max(0, Math.round((bodyWeight * ratio + e.kg * mult) * 10) / 10);
+  }
+  return Math.max(0, e.kg * mult);
+}
+
 /**
- * 実際にかかった負荷(kg)。
+ * 実際にかかった負荷(kg)。**片側入力の種目は片手ぶん**（推定1RM・最大重量はこれで出す）。
  * 懸垂のような自重種目は「体重×係数 ± kg」（加重は足す・補助は引く。kgの符号がそのまま効く）。
  * 体重が分からないときは加重だけを返す（補助は体重が無いと意味を持たないので0）。
  * 昔の `懸垂 10kg` も加重の意味なので abs/plus の区別なく体重を足す。
  * 補助が体重を上回る入力（あり得ないが）でも負の負荷は返さない。
  */
 export function effectiveKg(e: LiftEntry, bodyWeight?: number | null): number {
-  const ratio = bwRatioOf(e.name);
-  if (ratio > 0 && bodyWeight && bodyWeight > 0) {
-    return Math.max(0, Math.round((bodyWeight * ratio + e.kg) * 10) / 10);
-  }
-  return Math.max(0, e.kg);
+  return loadKg(e, bodyWeight, 1);
 }
 
-/** その種目の総挙上量（実負荷×回×セット）。日ごとの手応えを1つの数字で見せるため */
+/**
+ * 両側を合わせた実負荷(kg)。片側入力（ダンベル）は kg×2、それ以外は effectiveKg と同じ。
+ * 自重種目で片側入力（両手にダンベルを持つランジ等）なら 体重×係数 + 加重×2。
+ * ボリューム（総挙上量）はこちらで数える
+ */
+export function totalKg(e: LiftEntry, bodyWeight?: number | null): number {
+  return loadKg(e, bodyWeight, sidesOf(e));
+}
+
+/** その種目の総挙上量（両側の実負荷×回×セット）。日ごとの手応えを1つの数字で見せるため */
 export function volumeOf(e: LiftEntry, bodyWeight?: number | null): number {
-  return effectiveKg(e, bodyWeight) * e.reps * e.sets;
+  return totalKg(e, bodyWeight) * e.reps * e.sets;
 }
 
 export type LiftDay = {
