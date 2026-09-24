@@ -28,7 +28,7 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import { lookupBarcode, packageNutrition } from '@/lib/foodDb';
 import { analyzeFood, type LimitKind } from '@/lib/quicklog';
 import { rescaleByQty, sumItems, type FoodItem } from '@/lib/items';
-import { composeMyFood, findMyFoodByName, saveMyFood, type MyFoodInput } from '@/lib/foods';
+import { composeMyFood, findMyFoodByName, gramsFromQty, saveMyFood, type MyFoodInput } from '@/lib/foods';
 import { useThemeRefresh } from '@/lib/theme';
 
 /** 食事タブの登録案内から渡されるプリフィル（名前と栄養値。手入力を開いた状態で出す） */
@@ -37,6 +37,8 @@ export type MyFoodDraft = {
   unit?: string;
   kcal?: number;
   p?: number; f?: number; c?: number;
+  /** 1回分のグラム（案内の分量「1杯（約150g）」から拾う・2026-09-24） */
+  grams?: number | null;
 };
 
 type Msg = { ok: boolean; text: string; upgrade?: boolean; kind?: LimitKind };
@@ -57,6 +59,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
   // ---- 手入力（折り畳み） ----
   const [manualOpen, setManualOpen] = useState(false);
   const [unit, setUnit] = useState('');
+  const [grams, setGrams] = useState('');   // 1回分のグラム（任意）。チップで足す量を g で見せる基準
   const [kcal, setKcal] = useState('');
   const [p, setP] = useState('');
   const [f, setF] = useState('');
@@ -76,6 +79,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
     setItems(null);
     setManualOpen(draft != null);
     setUnit(draft?.unit ?? '');
+    { const g = draft?.grams ?? gramsFromQty(draft?.unit); setGrams(g != null ? String(g) : ''); }
     setKcal(draft?.kcal != null ? String(Math.round(draft.kcal)) : '');
     setP(draft?.p != null ? String(Math.round(draft.p)) : '');
     setF(draft?.f != null ? String(Math.round(draft.f)) : '');
@@ -119,6 +123,8 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
   }
 
   const total = items ? sumItems(items) : null;
+  // 登録される形のプレビュー（グラム・微量栄養素は composeMyFood が品目から拾う）
+  const composedPreview = items && items.length > 0 ? composeMyFood(name, items) : null;
 
   // ===== 保存（AI計算の結果／手入力のどちらも同じ経路） =====
   async function persist(input: MyFoodInput) {
@@ -175,7 +181,9 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
       if (v == null || v < 0) { setMsg({ ok: false, text: t('P・F・Cは数字で入力してください。') }); return; }
       macros[k] = v;
     }
-    persist({ name: nm, unit: unit.trim(), kcal: kc, ...macros, kind: 'food' });
+    // 1回分のグラム: 欄が空なら量の文字列（"80g"）から拾う
+    const g = parseDecimal(grams);
+    persist({ name: nm, unit: unit.trim(), kcal: kc, ...macros, kind: 'food', grams: g != null && g > 0 ? g : gramsFromQty(unit) });
   }
 
   // ===== 手入力の補助: 成分表示の写真（表記どおりの数値が入る）／バーコード（公式DB・AI枠を使わない） =====
@@ -192,6 +200,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
     setP(String(sum('p'))); setF(String(sum('f'))); setC(String(sum('c')));
     if (!name.trim() && it.name) setName(String(it.name));
     if (!unit.trim() && it.qty && list.length === 1) setUnit(String(it.qty));
+    { const g = list.length === 1 ? gramsFromQty(it.qty) : null; if (g != null) setGrams(String(g)); }
     setMsg({ ok: true, text: t('数値を入れました。自由に直せます。') });
   }
 
@@ -240,6 +249,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
       // 100gあたりを基準として充填（単位も100gにして量の意味を揃える）
       setName(fd.brand ? `${fd.brand} ${fd.name}` : fd.name);
       setUnit('100g');
+      setGrams('100');
       setKcal(String(Math.round(fd.per100g.kcal)));
       setP(String(fd.per100g.p)); setF(String(fd.per100g.f)); setC(String(fd.per100g.c));
       const pkg = packageNutrition(fd);
@@ -321,6 +331,9 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
                     </Text>
                   </View>
                 )}
+                {composedPreview?.grams != null && (
+                  <Text style={s.hint}>{t('1回分 = {g}g として登録します（チップで足すときの量になります）', { g: composedPreview.grams })}</Text>
+                )}
                 <OptionButton style={{ marginTop: 10 }} label={t('マイ食品として登録')} onPress={saveComposed} busy={busy} disabled={aiBusy} />
               </View>
             )}
@@ -335,6 +348,10 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
                 <Text style={s.label}>{t('1回分の量（任意）')}</Text>
                 <TextInput style={s.input} value={unit} onChangeText={setUnit}
                            placeholder={t('例: 80g')} placeholderTextColor={C.faint} />
+                <Text style={s.label}>{t('1回分のグラム（任意）')}</Text>
+                <TextInput style={s.input} value={grams} onChangeText={setGrams} keyboardType="decimal-pad"
+                           placeholder={t('例: 150')} placeholderTextColor={C.faint} accessibilityLabel={t('1回分のグラム（任意）')} />
+                <Text style={s.hint}>{t('入れると、チップで足したときの量が g で出て、倍率や g で調整できます。')}</Text>
 
                 {/* 補助: 成分表示の写真（最も正確）／バーコード（公式DB・AI枠を使わない）。数値はいつでも手で直せる */}
                 <View style={s.helperRow}>

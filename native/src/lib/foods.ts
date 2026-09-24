@@ -1,15 +1,69 @@
 // マイ食品のロジック: 登録（CRUD）・複数食材→1品への合算・「よく使う量」・チップの並び順
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import { qtyNumber, rescaleByQty, sumItems, type FoodItem } from '@/lib/items';
+import { NUTRIENT_KEYS, qtyNumber, rescaleByQty, sumItems, type FoodItem, type NutrientKey } from '@/lib/items';
 import { t } from '@/lib/i18n';
+
+/** 微量栄養素（キーは items.ts NUTRIENT_KEYS）。登録時に AI が出した値を ×1 ぶんとして持つ */
+export type Nutrients = Partial<Record<NutrientKey, number>>;
 
 export type MyFoodRow = {
   id: string; name: string; unit: string;
   kcal: number; p: number; f: number; c: number;
   serving_label?: string | null;   // よく使う量の名前（例: 丼1杯）
   serving_ratio?: number | null;   // 基準量に対する倍率（例: 1/6 → 0.1667）
+  /**
+   * ×1（登録した1回分）が何グラムか（migration-36・2026-09-24）。
+   * あると、チップで足した品目の量は「×0.5」ではなく「75g」のようにグラムで出て、
+   * 量調整では倍率でも g でも直せる（熊田さん「推奨グラムより倍率で選んで PFC も自動計算」）
+   */
+  grams?: number | null;
+  /** 登録時の微量栄養素（×1 ぶん）。チップで足すときに比例させて品目へ載せる（栄養ランキングの集計に使う） */
+  nutrients?: Nutrients | null;
 };
+
+/** ×1 のグラム数。未登録・0 以下は null */
+export function gramsOf(fd: Pick<MyFoodRow, 'grams'>): number | null {
+  const g = Number(fd.grams);
+  return fd.grams != null && Number.isFinite(g) && g > 0 ? g : null;
+}
+
+/** 分量の文字列からグラム数を拾う（"150g" / "1杯（約150g）" / "80 g"）。無ければ null */
+export function gramsFromQty(qty: string | null | undefined): number | null {
+  const m = String(qty ?? '').match(/(\d+(?:\.\d+)?)\s*g(?![a-zA-Z])/i);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** グラムの表示（小数1桁まで・末尾の .0 は落とす） */
+export function fmtGrams(g: number): string {
+  const v = Math.round(g * 10) / 10;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+/**
+ * 品目をグラム指定で直す（量調整ポップの「120g」入力・倍率チップ）。
+ * 現在の分量にグラムが読めるとき（"150g" / "1杯（約150g）"）だけ比例スケールし、qty を「120g」に置き換える。
+ * 読めなければそのまま返す（呼び出し側が倍率へ切り替える）
+ */
+export function rescaleToGrams(it: FoodItem, newGrams: number): FoodItem {
+  const cur = gramsFromQty(it.qty);
+  if (cur == null || !(newGrams > 0) || !Number.isFinite(newGrams)) return it;
+  return rescaleByQty({ ...it, qty: `${cur}g` }, `${fmtGrams(newGrams)}g`);
+}
+
+/** 品目一覧の微量栄養素を合計する。どの品目にも値が無ければ null */
+export function sumNutrients(items: readonly FoodItem[]): Nutrients | null {
+  const out: Nutrients = {};
+  let any = false;
+  for (const k of NUTRIENT_KEYS) {
+    let sum = 0; let has = false;
+    for (const it of items) { const v = it[k]; if (typeof v === 'number' && Number.isFinite(v)) { sum += v; has = true; } }
+    if (has) { out[k] = Math.round(sum * 10) / 10; any = true; }
+  }
+  return any ? out : null;
+}
 
 // 「1/6」「0.17」「2」などを倍率に変換
 export function parseRatio(s: string): number | null {
@@ -25,7 +79,8 @@ export function parseRatio(s: string): number | null {
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
-export type LocalItem = { name: string; qty: string; kcal: number; p: number; f: number; c: number };
+/** トレイの品目。FoodItem と同じ形（微量栄養素のキーも載る） */
+export type LocalItem = FoodItem;
 
 /**
  * テキストがマイ食品辞書「だけ」で完全に説明できる場合、AIを呼ばずローカルで品目化する（0秒解析）。
@@ -57,13 +112,9 @@ export function matchFoodsLocally(text: string, foods: MyFoodRow[]): LocalItem[]
         consumed += m[0].length;
       }
       if (!(count > 0 && count <= 20)) { count = 1; consumed = n.length; }
-      const sv = servingOf(fd);
-      const baseR = fd.serving_ratio != null && Number(fd.serving_ratio) > 0 ? Number(fd.serving_ratio) : 1;
-      items.push({
-        name: fd.name,
-        qty: `×${Math.round(baseR * count * 100) / 100}`, // 1回分の倍率×個数を単一倍率で表示（分量編集の再計算が効く形式）
-        kcal: round1(sv.kcal * count), p: round1(sv.p * count), f: round1(sv.f * count), c: round1(sv.c * count),
-      });
+      // 1回分（servingOf）を個数ぶんに伸ばす。qty は ×倍率（グラム登録があれば g）＝分量編集の再計算が効く形式
+      const one: LocalItem = { name: fd.name, ...servingOf(fd) };
+      items.push(count === 1 ? one : rescaleByQty(one, servingQty(fd, ratioOf(fd) * count)));
       rest = rest.slice(0, idx) + rest.slice(idx + consumed);
       idx = rest.indexOf(n);
     }
@@ -146,57 +197,84 @@ function ratioOf(fd: MyFoodRow): number {
   return fd.serving_ratio != null && Number(fd.serving_ratio) > 0 ? Number(fd.serving_ratio) : 1;
 }
 
-// チップ連打対応: 同じ食品のチップをもう一度タップしたら、行を増やさず既存行に「1回分」を積み増す。
-// 対象は qty が「×倍率」形式の行だけ（gや杯に手編集済みの行は別物として触らない）。無ければ新規追加。
+/**
+ * 倍率 mult（×1 基準）を、その食品の qty の表記にする。
+ * グラム登録あり → 「75g」（人が読める量）／なし → 「×0.5」（従来）。どちらも数値が先頭にあるので rescaleByQty が効く
+ */
+export function servingQty(fd: MyFoodRow, mult: number): string {
+  const g = gramsOf(fd);
+  if (g != null) return `${fmtGrams(g * mult)}g`;
+  return `×${Math.round(mult * 100) / 100}`;
+}
+
+/**
+ * トレイのその行が、この食品の何倍（×1 基準）か。
+ * 「×倍率」形式か、グラム登録がある食品の「〇g」形式だけを自分の行と見る（杯・個に手編集済みの行は別物として触らない）
+ */
+export function servingMult(it: Pick<LocalItem, 'name' | 'qty'>, fd: MyFoodRow): number | null {
+  if (it.name !== fd.name) return null;
+  const q = String(it.qty ?? '');
+  if (/^×\d/.test(q)) return qtyNumber(q);
+  const g = gramsOf(fd);
+  if (g != null && /^\d+(?:\.\d+)?\s*g$/i.test(q)) {
+    const n = qtyNumber(q);
+    return n == null ? null : n / g;
+  }
+  return null;
+}
+
+// チップ連打対応: 同じ食品のチップをもう一度タップしたら、行を増やさず既存行に「1回分」を積み増す。無ければ新規追加
 export function addServing(items: LocalItem[], fd: MyFoodRow): LocalItem[] {
   const r = ratioOf(fd);
-  const idx = items.findIndex((it) => it.name === fd.name && /^×\d/.test(String(it.qty)));
-  if (idx === -1) {
-    const sv = servingOf(fd);
-    return [...items, { name: fd.name, ...sv }];
-  }
+  const idx = items.findIndex((it) => servingMult(it, fd) != null);
+  if (idx === -1) return [...items, { name: fd.name, ...servingOf(fd) }];
   const cur = items[idx];
-  const curMult = qtyNumber(cur.qty) ?? 0;
-  const newMult = Math.round((curMult + r) * 100) / 100;
-  const next = rescaleByQty(cur, `×${newMult}`);
-  return items.map((it, i) => (i === idx ? next : it));
+  const newMult = Math.round(((servingMult(cur, fd) ?? 0) + r) * 100) / 100;
+  return items.map((it, i) => (i === idx ? rescaleByQty(cur, servingQty(fd, newMult)) : it));
 }
 
 // チップの「−」: 1回分減らす。1回分未満になったら行ごと削除
 export function removeServing(items: LocalItem[], fd: MyFoodRow): LocalItem[] {
   const r = ratioOf(fd);
-  const idx = items.findIndex((it) => it.name === fd.name && /^×\d/.test(String(it.qty)));
+  const idx = items.findIndex((it) => servingMult(it, fd) != null);
   if (idx === -1) return items;
   const cur = items[idx];
-  const curMult = qtyNumber(cur.qty) ?? 0;
-  const newMult = Math.round((curMult - r) * 100) / 100;
+  const newMult = Math.round(((servingMult(cur, fd) ?? 0) - r) * 100) / 100;
   if (newMult < r * 0.5) return items.filter((_, i) => i !== idx); // 実質0回分 → 削除
-  return items.map((it, i) => (i === idx ? rescaleByQty(cur, `×${newMult}`) : it));
+  return items.map((it, i) => (i === idx ? rescaleByQty(cur, servingQty(fd, newMult)) : it));
 }
 
 // その食品が今「何回分」入っているか（チップのカウントバッジ用）。未追加ならnull
 export function servingCount(items: LocalItem[], fd: MyFoodRow): number | null {
-  const it = items.find((x) => x.name === fd.name && /^×\d/.test(String(x.qty)));
-  if (!it) return null;
-  const mult = qtyNumber(it.qty);
-  if (mult == null) return null;
-  return Math.round((mult / ratioOf(fd)) * 10) / 10;
+  for (const it of items) {
+    const mult = servingMult(it, fd);
+    if (mult != null) return Math.round((mult / ratioOf(fd)) * 10) / 10;
+  }
+  return null;
 }
 
 // チップで追加するときの1回分。
 // 登録合計＝基準(×1)とし、serving_ratio（タップ時の量）を掛けた値を返す。
-// qtyは「×0.17」形式（分量編集で数値を変えると自動再計算が効く）
-export function servingOf(fd: MyFoodRow): { qty: string; kcal: number; p: number; f: number; c: number } {
-  const r = fd.serving_ratio != null && Number(fd.serving_ratio) > 0 ? Number(fd.serving_ratio) : 1;
+// qty はグラム登録があれば「150g」、無ければ「×0.17」（どちらも分量編集で数値を変えると自動再計算が効く）。
+// 登録時の微量栄養素（nutrients）も同じ倍率で載せる＝栄養ランキング「自分の摂取」に届く
+export function servingOf(fd: MyFoodRow): Omit<LocalItem, 'name'> {
+  const r = ratioOf(fd);
   const round1 = (n: number) => Math.round(n * 10) / 10;
-  const rDisp = Math.round(r * 100) / 100;
-  return {
-    qty: `×${rDisp}`,
+  const out: Omit<LocalItem, 'name'> = {
+    qty: servingQty(fd, r),
     kcal: round1((Number(fd.kcal) || 0) * r),
     p: round1((Number(fd.p) || 0) * r),
     f: round1((Number(fd.f) || 0) * r),
     c: round1((Number(fd.c) || 0) * r),
   };
+  const nut = fd.nutrients;
+  if (nut && typeof nut === 'object') {
+    for (const k of NUTRIENT_KEYS) {
+      const v = Number(nut[k]);
+      if (nut[k] != null && Number.isFinite(v)) out[k] = round1(v * r);
+    }
+  }
+  return out;
 }
 
 // ===== 登録（my_foods への書き込み） =====
@@ -208,24 +286,36 @@ export type MyFoodInput = {
   kcal: number; p: number; f: number; c: number;
   kind?: 'food' | 'recipe';
   items?: FoodItem[] | null;
+  /** ×1 のグラム数（任意・migration-36）。チップで足す量を g で見せ、倍率や g で直せるようにする */
+  grams?: number | null;
+  /** 登録時の微量栄養素（×1 ぶん・任意・migration-36） */
+  nutrients?: Nutrients | null;
 };
 
 /**
  * 複数の食材（AI解析の品目一覧）を1つのマイ食品にまとめる純関数。
  * 名前が空なら「先頭の食材＋セット」。1品だけならその品の量を「1回分」にし、単品（food）として扱う。
  * 2品以上は unit=「1セット」・kind='recipe'（my_foods.kind の既存値）で、内訳を items に残す。
+ * グラムは品目の分量（"150g" / "1杯（約150g）"）から拾う。セットは全品目にグラムがあるときだけ合計を入れる。
+ * 微量栄養素は品目の値を合計する（AI が出していれば付く・無ければ null）
  */
 export function composeMyFood(name: string, items: FoodItem[]): MyFoodInput {
   const nm = String(name ?? '').trim();
   const total = sumItems(items);
   const first = items[0]?.name?.trim() ?? '';
   const single = items.length === 1;
+  const gramsList = items.map((it) => gramsFromQty(it.qty));
+  const grams = items.length > 0 && gramsList.every((g) => g != null)
+    ? Math.round(gramsList.reduce((a, g) => a + (g ?? 0), 0) * 10) / 10
+    : null;
   return {
     name: nm || (first ? t('{name}セット', { name: first }) : t('マイ食品')),
     unit: single ? (String(items[0].qty ?? '').trim() || t('1人前')) : t('1セット'),
     kcal: total.kcal, p: total.p, f: total.f, c: total.c,
     kind: single ? 'food' : 'recipe',
     items: single ? null : items,
+    grams,
+    nutrients: sumNutrients(items),
   };
 }
 
@@ -261,6 +351,13 @@ export async function saveMyFood(
     kind: input.kind ?? 'food',
   };
   const withItems = input.items && input.items.length > 0 ? { ...base, items: input.items } : null;
+  // grams / nutrients（migration-36）。無い旧DBでは PGRST204 になるので、段階的に落として再登録する
+  const g = input.grams != null && Number(input.grams) > 0 ? Number(input.grams) : null;
+  const extras: Record<string, unknown> = {
+    ...(g != null ? { grams: g } : {}),
+    ...(input.nutrients && Object.keys(input.nutrients).length > 0 ? { nutrients: input.nutrients } : {}),
+  };
+  const hasExtras = Object.keys(extras).length > 0;
   const write = async (row: Record<string, unknown>) => {
     try {
       const q = overwriteId
@@ -269,8 +366,11 @@ export async function saveMyFood(
       return (q.error ?? null) as { code?: string; message?: string } | null;
     } catch { return { message: 'network' }; }
   };
-  let err = await write(withItems ?? base);
-  if (err && withItems && isMissingItemsColumn(err)) err = await write(base);   // 列が無い → 内訳なしで再登録
+  const missingColumn = (e: { code?: string; message?: string } | null) =>
+    !!e && (e.code === 'PGRST204' || /column|schema|grams|nutrients|items/i.test(String(e.message ?? '')));
+  let err = await write({ ...(withItems ?? base), ...extras });
+  if (err && hasExtras && missingColumn(err)) err = await write(withItems ?? base);   // grams/nutrients 列が無い
+  if (err && withItems && isMissingItemsColumn(err)) err = await write(base);          // items 列も無い → 内訳なしで再登録
   if (err) return { ok: false, error: t('保存に失敗しました。もう一度お試しください。') };
   return { ok: true };
 }
