@@ -2,7 +2,7 @@
 // テキストを組み直すため、往復して形が変わらないことが重要（変わるとRM換算が読めなくなる）。
 import {
   parseLiftText, liftTextFrom, liftSetLabel, removeLiftAt, groupLiftsByDay,
-  volumeOf, effectiveKg, weightLookup,
+  volumeOf, effectiveKg, totalKg, sidesOf, weightLookup,
 } from '../liftLog';
 
 describe('記録テキストの解析', () => {
@@ -214,5 +214,84 @@ describe('日ごとのまとめ', () => {
 
   it('総挙上量はkg×回×セット', () => {
     expect(volumeOf({ name: 'ベンチプレス', kg: 80, reps: 8, sets: 3, mode: 'abs' })).toBe(1920);
+  });
+});
+
+// ダンベル種目は重さを片側で入力し、記録テキストに `片側20kg` とマーカーを書く（2026-09-24）。
+// マーカーが解釈の唯一の根拠（端末のフラグには依存しない）なので、読み書きと集計の意味をここで固定する。
+describe('片側入力（ダンベル種目）', () => {
+  it('`片側20kg×8×3` を片側の重さとして読む（side=true・mode=abs）', () => {
+    expect(parseLiftText('🏋️ ダンベルプレス 片側20kg×8×3')).toEqual([
+      { name: 'ダンベルプレス', kg: 20, reps: 8, sets: 3, mode: 'abs', side: true },
+    ]);
+  });
+
+  it('マーカーの無い記録は従来どおり（side を持たない＝その重さそのものが負荷）', () => {
+    const e = parseLiftText('🏋️ ダンベルプレス 20kg×8×3')[0];
+    expect(e).toEqual({ name: 'ダンベルプレス', kg: 20, reps: 8, sets: 3, mode: 'abs' });
+    expect('side' in e).toBe(false);
+    expect(volumeOf(e)).toBe(20 * 8 * 3);
+  });
+
+  it('加重と組み合わさった `片側+10kg` も読む（両手にダンベルを持つ自重種目）', () => {
+    expect(parseLiftText('🏋️ 懸垂 片側+10kg×8')[0]).toEqual({
+      name: '懸垂', kg: 10, reps: 8, sets: 1, mode: 'plus', side: true,
+    });
+  });
+
+  it('種目名に「片側」が含まれていてもマーカーと混同しない', () => {
+    const e = parseLiftText('🏋️ 片側レッグプレス 60kg×10')[0];
+    expect(e.name).toBe('片側レッグプレス');
+    expect('side' in e).toBe(false);
+  });
+
+  it.each([
+    '🏋️ ダンベルプレス 片側20kg×8×3',
+    '🏋️ ダンベルプレス 片側22.5kg×8、ダンベルロウ 片側30kg×10×3、ベンチプレス 80kg×5',
+    '🏋️ 懸垂 片側+10kg×8',
+    '🏋️ ダンベルプレス 20kg×8×3',
+  ])('組み直しても表記が変わらない: %s', (text) => {
+    expect(liftTextFrom(parseLiftText(text))).toBe(text);
+  });
+
+  it('表示: 既定は日本語マーカー、画面では訳語の関数で語順ごと差し替えられる', () => {
+    const e = parseLiftText('🏋️ ダンベルプレス 片側20kg×8×3')[0];
+    expect(liftSetLabel(e)).toBe('片側20kg×8×3');
+    expect(liftSetLabel(e, 'BW', (w) => `${w}/side`)).toBe('20kg/side×8×3');
+    // 加重つきは「加重」の + も重さの中に入る
+    expect(liftSetLabel(parseLiftText('🏋️ 懸垂 片側+10kg×8')[0])).toBe('片側+10kg×8');
+  });
+
+  it('実負荷（effectiveKg）は片側のまま、両側の合計（totalKg）と総挙上量（volumeOf）は×2', () => {
+    const e = parseLiftText('🏋️ ダンベルプレス 片側20kg×8×3')[0];
+    expect(effectiveKg(e)).toBe(20);
+    expect(sidesOf(e)).toBe(2);
+    expect(totalKg(e)).toBe(40);
+    expect(volumeOf(e)).toBe(40 * 8 * 3);
+    // 片側でない種目は totalKg = effectiveKg
+    const b = parseLiftText('🏋️ ベンチプレス 80kg×8')[0];
+    expect(sidesOf(b)).toBe(1);
+    expect(totalKg(b)).toBe(effectiveKg(b));
+  });
+
+  it('自重種目の片側加重は 体重×係数 + 加重×2（体重62・片側+10 → 実負荷72・合計82）', () => {
+    const e = parseLiftText('🏋️ 懸垂 片側+10kg×8')[0];
+    expect(effectiveKg(e, 62)).toBe(72);
+    expect(totalKg(e, 62)).toBe(82);
+    expect(volumeOf(e, 62)).toBe(82 * 8);
+  });
+
+  it('日ごとのまとめの総挙上量も両側ぶん', () => {
+    const days = groupLiftsByDay([
+      { id: 'a', date: '2026-09-24', text: '🏋️ ダンベルプレス 片側20kg×8×3、ベンチプレス 80kg×5' },
+    ]);
+    expect(days[0].volume).toBe(40 * 8 * 3 + 80 * 5);
+    expect(days[0].sets).toBe(4);
+    expect(days[0].lifts).toBe(2);
+  });
+
+  it('1種目だけ削除しても片側マーカーが残る', () => {
+    const e = parseLiftText('🏋️ ダンベルプレス 片側20kg×8×3、スクワット 100kg×5');
+    expect(removeLiftAt(e, 1)).toEqual({ kind: 'update', text: '🏋️ ダンベルプレス 片側20kg×8×3' });
   });
 });

@@ -26,8 +26,8 @@ import { enqueue, flush, pendingCount, isNetworkError } from '@/lib/offlineQueue
 import { C, RADIUS, SPACE, ICON, themed } from '@/lib/ui';
 import { todayJST } from '@/lib/calc';
 import { t } from '@/lib/i18n';
-import { isBodyweightLift, loadCustomLifts } from '@/lib/lifts';
-import { parseLiftText, liftSetLabel, effectiveKg, weightLookup } from '@/lib/liftLog';
+import { isBodyweightLift, isPerSideLift, loadCustomLifts } from '@/lib/lifts';
+import { parseLiftText, liftSetLabel, effectiveKg, totalKg, weightLookup } from '@/lib/liftLog';
 import {
   LIFT_SESSION_KEY, REST_DEFAULT_SEC, REST_CHOICES, type LiftSessionState, type SessionSet,
   parseSessionState, serializeSessionState, restLeftSec, nextSet, newSetId, setReady, setToEntry,
@@ -99,6 +99,8 @@ export default function LiftSessionScreen() {
   const weightAt = useMemo(() => weightLookup(weightRows), [weightRows]);
   const myWeight = weightRows.length > 0 && weightRows[0].weight != null ? Number(weightRows[0].weight) : null;
 
+  // ダンベル種目の重さは「片側20kg」と見せる（保存は日本語マーカー・表示は訳語で語順ごと差し替え）
+  const sideFmt = (w: string) => t('片側{w}', { w });
   /** 同じ種目の直近記録（前回参照・新しい行の初期値） */
   function lastRecordOf(name: string): { text: string; kg: number; reps: number; date: string } | null {
     const nm = name.trim();
@@ -106,7 +108,7 @@ export default function LiftSessionScreen() {
     for (const h of history) {
       for (const e of parseLiftText(h.text)) {
         if (e.name !== nm) continue;
-        return { text: liftSetLabel(e, t('自重')), kg: e.kg, reps: e.reps, date: h.date };
+        return { text: liftSetLabel(e, t('自重'), sideFmt), kg: e.kg, reps: e.reps, date: h.date };
       }
     }
     return null;
@@ -194,9 +196,10 @@ export default function LiftSessionScreen() {
   }
   function removeSet(id: string) { update({ sets: sets.filter((x) => x.id !== id) }); }
 
-  const volume = sessionVolume(sets, isBodyweightLift, myWeight);
+  // 総挙上量は両側ぶん（ダンベル種目は片側の入力×2）
+  const volume = sessionVolume(sets, isBodyweightLift, myWeight, isPerSideLift);
   const readySets = sets.filter((x) => setReady(x, isBodyweightLift));
-  const words = { bw: t('自重'), plus: t('加重'), assist: t('補助') };
+  const words = { bw: t('自重'), plus: t('加重'), assist: t('補助'), side: sideFmt };
 
   // ===== 保存 =====
   const [saving, setSaving] = useState(false);
@@ -204,7 +207,8 @@ export default function LiftSessionScreen() {
   const [saved, setSaved] = useState<string | null>(null);
   async function save() {
     if (!st) return;
-    const text = sessionText(sets, isBodyweightLift);
+    // ダンベル種目は `片側20kg` のマーカー付きで保存する（過去の記録の解釈を端末のフラグに依存させない）
+    const text = sessionText(sets, isBodyweightLift, isPerSideLift);
     if (!text) { setMsg(t('セットを1つ以上入れてください。')); return; }
     setSaving(true); setMsg(null);
     try {
@@ -233,14 +237,16 @@ export default function LiftSessionScreen() {
       pendingCount().then((n) => { if (n > 0) flush().catch(() => {}); }).catch(() => {});
     } finally { setSaving(false); }
   }
-  /** RMフィードバック: そのセッションの最高e1RMを目標・自己ベストと照合して一言返す */
+  /** RMフィードバック: そのセッションの最高e1RMを目標・自己ベストと照合して一言返す。
+   *  ダンベル種目の推定MAXは片側の重さ（effectiveKg は片手ぶん）。表示名に「（片側）」を添える */
   async function feedbackFor(name: string | undefined): Promise<string> {
     let fb = t('保存しました。続けることが、いちばん効く種目です。');
     if (!name) return fb;
     try {
+      const shown = isPerSideLift(name) ? t('{name}（片側）', { name }) : name;
       let est = 0; let bestKg = 0; let bestReps = 0;
       for (const x of readySets.filter((x) => x.name.trim() === name)) {
-        const loadKg = effectiveKg(setToEntry(x, isBodyweightLift), myWeight);
+        const loadKg = effectiveKg(setToEntry(x, isBodyweightLift, 1, isPerSideLift), myWeight);
         const e = Math.round(epley1RM(loadKg, x.reps));
         if (e > est) { est = e; bestKg = loadKg; bestReps = x.reps; }
       }
@@ -252,15 +258,15 @@ export default function LiftSessionScreen() {
       const { data: tg } = await supabase.from('training_goals').select('target_kg').eq('name', name).maybeSingle();
       const goalKg = tg ? Math.round(Number(tg.target_kg)) : null;
       if (goalKg && est >= goalKg) {
-        fb = t('🎉 目標達成！{name} 推定MAX {est}kg（目標{goal}kg超え）。次の目標を設定しよう', { name, est, goal: goalKg });
+        fb = t('🎉 目標達成！{name} 推定MAX {est}kg（目標{goal}kg超え）。次の目標を設定しよう', { name: shown, est, goal: goalKg });
       } else if (goalKg) {
         const need = repsNeededFor(goalKg, bestKg);
         fb = t('おしい！RM換算だとMAX {est}kg。目標{goal}kgまであと{left}kg', { est, goal: goalKg, left: goalKg - est })
           + (need && need > bestReps ? t('（{kg}kgなら{need}回で到達）', { kg: bestKg, need }) : '');
       } else if (bestPast > 0 && est > bestPast) {
-        fb = t('自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）', { name, est, d: est - bestPast });
+        fb = t('自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）', { name: shown, est, d: est - bestPast });
       } else {
-        fb = t('保存しました。{name} 推定MAX {est}kg（RM換算）', { name, est });
+        fb = t('保存しました。{name} 推定MAX {est}kg（RM換算）', { name: shown, est });
       }
     } catch { /* フィードバックが取れなくても保存は成功している */ }
     return fb;
@@ -370,15 +376,19 @@ export default function LiftSessionScreen() {
                   const bw = isBodyweightLift(x.name);
                   const showName = i === 0 || sets[i - 1].name !== x.name;
                   const setNo = sets.slice(0, i + 1).filter((y) => y.name === x.name).length;
-                  const load = bw && myWeight ? effectiveKg(setToEntry(x, isBodyweightLift), myWeight) : null;
+                  const entry = setToEntry(x, isBodyweightLift, 1, isPerSideLift);
+                  const side = entry.side === true;   // 片側入力（ダンベル）。重さの下に両側の合計を添える
+                  const sub = side
+                    ? t('両側 {n}kg', { n: totalKg(entry, myWeight) })
+                    : bw && myWeight ? t('実負荷 約{n}kg', { n: effectiveKg(entry, myWeight) }) : null;
                   return (
                     <View key={x.id}>
                       {showName && <Text style={s.liftName}>{x.name}</Text>}
                       <Pressable style={s.setRow} onPress={() => setDial({ set: x, isNew: false })}>
                         <Text style={s.setNo}>{setNo}</Text>
                         <View style={[s.cell, { flex: 1.3 }]}>
-                          <Text style={s.cellT} numberOfLines={1}>{loadLabel(x.kg, bw, words)}</Text>
-                          {load != null && <Text style={s.cellSub}>{t('実負荷 約{n}kg', { n: load })}</Text>}
+                          <Text style={s.cellT} numberOfLines={1}>{loadLabel(x.kg, bw, words, side)}</Text>
+                          {sub != null && <Text style={s.cellSub}>{sub}</Text>}
                         </View>
                         <View style={s.cell}>
                           <Text style={s.cellT}>{x.reps}<Text style={s.cellUnit}> {t('回')}</Text></Text>
@@ -442,6 +452,7 @@ export default function LiftSessionScreen() {
         <SetDial
           name={dial.set.name}
           bw={isBodyweightLift(dial.set.name)}
+          side={isPerSideLift(dial.set.name)}
           initialKg={dial.set.kg}
           initialReps={dial.set.reps}
           bodyWeight={myWeight}

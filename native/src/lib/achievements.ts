@@ -8,7 +8,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { todayJST } from './calc';
-import { parseLiftText, effectiveKg, weightLookup } from './liftLog';
+import { parseLiftText, effectiveKg, totalKg, weightLookup } from './liftLog';
 import { t } from './i18n';
 import { jstHour } from './jst';
 import {
@@ -457,8 +457,10 @@ async function runEvaluate(): Promise<AchievementReport> {
   for (const r of logs) {
     if (!r.text.startsWith('🏋️')) continue;
     for (const e2 of parseLiftText(r.text)) {
-      const kg = effectiveKg(e2, wLookup(r.date));
-      volByMonth.set(r.date.slice(0, 7), (volByMonth.get(r.date.slice(0, 7)) ?? 0) + kg * e2.reps * e2.sets);
+      const w = wLookup(r.date);
+      const kg = effectiveKg(e2, w);   // 自己ベストは片側の重さで見る（ダンベルは片側で語る）
+      // ボリュームは両側ぶん（片側入力のダンベル種目は×2。lib/liftLog.ts totalKg）
+      volByMonth.set(r.date.slice(0, 7), (volByMonth.get(r.date.slice(0, 7)) ?? 0) + totalKg(e2, w) * e2.reps * e2.sets);
       const prev = bestSoFar.get(e2.name)?.kg ?? 0;
       if (kg > prev) { bestSoFar.set(e2.name, { kg, date: r.date }); if (prev > 0) prCount++; }
     }

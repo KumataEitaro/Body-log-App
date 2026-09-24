@@ -6,6 +6,13 @@
 // 【重要】DBに書くのは canon（日本語固定）。既存の履歴テキストは
 // 「🏋️ ベンチプレス 80kg×8×3」の形式で、RM換算の解析がこの文字列に依存している。
 // 表示名を保存すると言語切替で解析が壊れるため、翻訳名は画面表示だけに使う。
+//
+// 【ユーザー追加種目の属性（2026-09-24）】名前だけでなく
+//   ・part … 対象部位（部位別ボリューム統計・履歴の部位フィルタに入る）
+//   ・bw   … 自重が負荷になる種目か（kg欄が「加重/補助」になる）
+//   ・db   … ダンベル種目か（重さを**片側**で入力する。保存テキストには `片側20kg` と書く）
+// を端末内に持つ。属性は端末ローカルなので、記録テキストの解釈は属性に依存させない
+// （片側かどうかはテキスト側の `片側` マーカーで決まる。lib/liftLog.ts）。
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from './i18n';
@@ -21,6 +28,13 @@ export type Lift = {
    * これがある種目は入力するkgを「加重」として扱い、実負荷 = 体重×bw + 加重 で見る。
    */
   bw?: number;
+  /**
+   * ダンベル種目（重さは片側＝片手ぶんで入力する）。
+   * 記録は `片側20kg×8×3` と書き、ボリュームは両側ぶん（×2）で数える。
+   * 明らかに両手にダンベルを持つ種目だけ true。バーベルでもダンベルでもやる種目
+   * （アームカール・ショルダープレス・シュラッグ等）は付けない＝入力した重さをそのまま負荷とみなす。
+   */
+  db?: boolean;
 };
 
 /** 部位。選ぶときに探しやすくする */
@@ -33,6 +47,9 @@ export const LIFT_PARTS: { key: string; label: string }[] = [
   { key: 'core', label: '体幹' },
   { key: 'full', label: '全身' },
 ];
+
+/** 部位グループの受け皿（基本7部位に当てはまらない種目・部位未設定のユーザー追加種目） */
+export const OTHER_PART = 'other';
 
 /** 表示名（t()はモジュール読み込み時に評価すると言語切替に追従しないため関数で包む） */
 export function liftName(id: string): string {
@@ -60,12 +77,16 @@ export function liftName(id: string): string {
   return map[id] ?? id;
 }
 
-/** 基本種目（47種）。無いものはユーザーが足せる */
+/**
+ * 基本種目（47種）。無いものはユーザーが足せる。
+ * db: true（片側入力のダンベル種目）は次の7種。ダンベル以外でもやる種目には付けない（型の説明を参照）
+ *   ダンベルプレス・ダンベルロウ・サイドレイズ・フロントレイズ・リアレイズ・ハンマーカール・キックバック
+ */
 export const LIFTS: Lift[] = [
   // 胸
   { id: 'bench', canon: 'ベンチプレス', part: 'chest' },
   { id: 'bench_incline', canon: 'インクラインベンチプレス', part: 'chest' },
-  { id: 'bench_dumbbell', canon: 'ダンベルプレス', part: 'chest' },
+  { id: 'bench_dumbbell', canon: 'ダンベルプレス', part: 'chest', db: true },
   { id: 'chest_fly', canon: 'チェストフライ', part: 'chest' },
   { id: 'chest_press', canon: 'チェストプレス', part: 'chest' },
   { id: 'push_up', canon: '腕立て伏せ', part: 'chest', bw: 0.64 },
@@ -75,7 +96,7 @@ export const LIFTS: Lift[] = [
   { id: 'lat_pulldown', canon: 'ラットプルダウン', part: 'back' },
   { id: 'pull_up', canon: '懸垂', part: 'back', bw: 1 },
   { id: 'row_barbell', canon: 'ベントオーバーロウ', part: 'back' },
-  { id: 'row_dumbbell', canon: 'ダンベルロウ', part: 'back' },
+  { id: 'row_dumbbell', canon: 'ダンベルロウ', part: 'back', db: true },
   { id: 'row_seated', canon: 'シーテッドロウ', part: 'back' },
   { id: 'back_ext', canon: 'バックエクステンション', part: 'back' },
   { id: 'shrug', canon: 'シュラッグ', part: 'back' },
@@ -92,16 +113,16 @@ export const LIFTS: Lift[] = [
   { id: 'rdl', canon: 'ルーマニアンデッドリフト', part: 'legs' },
   // 肩
   { id: 'shoulder_press', canon: 'ショルダープレス', part: 'shoulder' },
-  { id: 'side_raise', canon: 'サイドレイズ', part: 'shoulder' },
-  { id: 'front_raise', canon: 'フロントレイズ', part: 'shoulder' },
-  { id: 'rear_raise', canon: 'リアレイズ', part: 'shoulder' },
+  { id: 'side_raise', canon: 'サイドレイズ', part: 'shoulder', db: true },
+  { id: 'front_raise', canon: 'フロントレイズ', part: 'shoulder', db: true },
+  { id: 'rear_raise', canon: 'リアレイズ', part: 'shoulder', db: true },
   { id: 'upright_row', canon: 'アップライトロウ', part: 'shoulder' },
   // 腕
   { id: 'curl', canon: 'アームカール', part: 'arm' },
-  { id: 'hammer_curl', canon: 'ハンマーカール', part: 'arm' },
+  { id: 'hammer_curl', canon: 'ハンマーカール', part: 'arm', db: true },
   { id: 'triceps_ext', canon: 'トライセプスエクステンション', part: 'arm' },
   { id: 'triceps_push', canon: 'トライセプスプレスダウン', part: 'arm' },
-  { id: 'kickback', canon: 'キックバック', part: 'arm' },
+  { id: 'kickback', canon: 'キックバック', part: 'arm', db: true },
   { id: 'wrist_curl', canon: 'リストカール', part: 'arm' },
   // 体幹
   { id: 'plank', canon: 'プランク', part: 'core' },
@@ -120,7 +141,8 @@ export const LIFTS: Lift[] = [
 
 /**
  * 自重が負荷になる種目なら体重に対する割合、そうでなければ0を返す。
- * ユーザーが自分で足した種目は判断材料がないので0（入力したkgをそのまま負荷とみなす）。
+ * ユーザーが自分で足した種目は、追加時に「体重が負荷になる」を選んでいれば1、それ以外は0
+ * （入力したkgをそのまま負荷とみなす）。
  */
 export function bwRatioOf(canonName: string): number {
   const nm = canonName.trim();
@@ -136,12 +158,33 @@ export function isBodyweightLift(canonName: string): boolean {
 }
 
 /**
- * 種目名から部位キーを引く。基本47種以外（ユーザー追加）は 'other'。
- * 部位別の履歴フィルタと週間ボリューム統計が使う。
+ * 重さを片側（片手ぶん）で入力するダンベル種目か。
+ * 基本種目は db フラグ、ユーザー追加種目は追加時の「ダンベル種目」の選択で決まる。
+ * **入力画面の見せ方と保存時のマーカー付与にだけ使う**。過去の記録の解釈は
+ * テキストの `片側` マーカーで決まる（端末のフラグが変わっても履歴の意味が変わらないように）。
+ */
+export function isPerSideLift(canonName: string): boolean {
+  const nm = canonName.trim();
+  const base = LIFTS.find((l) => l.canon === nm);
+  if (base) return base.db === true;
+  return customLifts.find((c) => c.n === nm)?.db === true;
+}
+
+/**
+ * 種目名から部位キーを引く。基本47種はカタログの部位、ユーザー追加種目は追加時に選んだ部位。
+ * どちらにも無ければ 'other'。部位別の履歴フィルタと週間ボリューム統計が使う。
  */
 export function liftPartOf(canonName: string): string {
   const nm = canonName.trim();
-  return LIFTS.find((l) => l.canon === nm)?.part ?? 'other';
+  const base = LIFTS.find((l) => l.canon === nm)?.part;
+  if (base) return base;
+  const custom = customLifts.find((c) => c.n === nm)?.part;
+  return custom && isPartKey(custom) ? custom : OTHER_PART;
+}
+
+/** 部位キーとして受け付けるか（基本7部位＋'other'） */
+export function isPartKey(key: string): boolean {
+  return key === OTHER_PART || LIFT_PARTS.some((p) => p.key === key);
 }
 
 /** 部位キーの表示名（t()に通す前の日本語）。'other' はユーザー追加種目の受け皿 */
@@ -150,24 +193,44 @@ export function liftPartLabel(key: string): string {
 }
 
 // ===== ユーザーが追加した種目（端末内に保存） =====
-// 保存形式は {n: 名前, bw?: 1}。以前は文字列の配列だったので、読み込み時に旧形式も受ける
+// 保存形式は {n: 名前, bw?: 1, part?: 部位キー, db?: true}。
+// 以前は文字列の配列 → {n, bw} だったので、読み込み時に旧形式も受ける
 const CUSTOM_KEY = 'bl-custom-lifts';
 
-type CustomLift = { n: string; bw?: number };
+export type CustomLift = {
+  n: string;
+  bw?: number;      // 1 = 体重が負荷になる（懸垂タイプ）
+  part?: string;    // 部位キー（LIFT_PARTS のいずれか、または 'other'）。無ければ 'other' 扱い
+  db?: boolean;     // true = ダンベル種目（重さは片側で入力）
+};
+
+/** addCustomLift のオプション。以前の第2引数（bodyweight: boolean）も受ける */
+export type CustomLiftOpts = { bodyweight?: boolean; part?: string | null; dumbbell?: boolean };
 
 let customLifts: CustomLift[] = [];
 let customNames: string[] = [];   // useSyncExternalStore用（毎回新配列を作ると無限再描画になる）
 const listeners = new Set<() => void>();
 const emit = () => { customNames = customLifts.map((c) => c.n); listeners.forEach((l) => l()); };
 
+/** 保存されていた1件を今の形にそろえる。名前の無いものは null */
+function normalizeCustom(x: unknown): CustomLift | null {
+  if (typeof x === 'string') return x.trim() ? { n: x.trim() } : null;
+  if (!x || typeof x !== 'object') return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.n !== 'string' || !o.n.trim()) return null;
+  const c: CustomLift = { n: o.n.trim() };
+  if (typeof o.bw === 'number' && o.bw > 0) c.bw = o.bw;
+  if (typeof o.part === 'string' && isPartKey(o.part)) c.part = o.part;
+  if (o.db === true) c.db = true;
+  return c;
+}
+
 export async function loadCustomLifts(): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(CUSTOM_KEY);
     const v = raw ? (JSON.parse(raw) as unknown[]) : [];
     if (Array.isArray(v)) {
-      customLifts = v
-        .map((x) => (typeof x === 'string' ? { n: x } : (x as CustomLift)))
-        .filter((x) => x && typeof x.n === 'string' && x.n.trim().length > 0);
+      customLifts = v.map(normalizeCustom).filter((x): x is CustomLift => x != null);
     }
   } catch { /* 空のまま */ }
   emit();
@@ -177,13 +240,22 @@ async function persist(): Promise<void> {
   try { await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(customLifts)); } catch { /* 表示は既に反映済み */ }
 }
 
-/** 種目を追加する。基本種目と同じ名前は足さない。bodyweight=懸垂タイプ（体重が負荷） */
-export async function addCustomLift(name: string, bodyweight = false): Promise<boolean> {
+/**
+ * 種目を追加する。基本種目と同じ名前は足さない。
+ * @param opts bodyweight=懸垂タイプ（体重が負荷）／part=対象部位／dumbbell=ダンベル種目（片側入力）。
+ *             boolean を渡すと以前どおり bodyweight の指定として扱う
+ */
+export async function addCustomLift(name: string, opts: CustomLiftOpts | boolean = {}): Promise<boolean> {
   const nm = name.trim();
   if (!nm) return false;
   if (LIFTS.some((l) => l.canon === nm)) return false;   // 基本種目に既にある
   if (customLifts.some((c) => c.n === nm)) return false; // 追加済み
-  customLifts = [...customLifts, bodyweight ? { n: nm, bw: 1 } : { n: nm }];
+  const o: CustomLiftOpts = typeof opts === 'boolean' ? { bodyweight: opts } : opts;
+  const c: CustomLift = { n: nm };
+  if (o.bodyweight) c.bw = 1;
+  if (o.part && isPartKey(o.part)) c.part = o.part;
+  if (o.dumbbell) c.db = true;
+  customLifts = [...customLifts, c];
   emit();
   await persist();
   return true;
@@ -197,6 +269,9 @@ export async function removeCustomLift(name: string): Promise<void> {
 
 export function getCustomLifts(): string[] { return customNames; }
 
+/** 追加した種目を属性ごと返す（一覧で部位グループに振り分ける・タグを出すため） */
+export function getCustomLiftDefs(): CustomLift[] { return customLifts; }
+
 /** カスタム種目の自重係数（懸垂タイプなら1、通常は0） */
 export function customBwOf(name: string): number {
   return customLifts.find((c) => c.n === name.trim())?.bw ?? 0;
@@ -207,5 +282,18 @@ export function useCustomLifts(): string[] {
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
     getCustomLifts,
     getCustomLifts,
+  );
+}
+
+/**
+ * 追加した種目（属性つき）を購読する。
+ * 統計カード（部位別ボリューム・履歴の部位フィルタ）は liftPartOf を描画中に呼ぶので、
+ * 端末から読み終わったときに描き直されるようにこれを購読しておく。
+ */
+export function useCustomLiftDefs(): CustomLift[] {
+  return useSyncExternalStore(
+    (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+    getCustomLiftDefs,
+    getCustomLiftDefs,
   );
 }
