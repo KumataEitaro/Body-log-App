@@ -2290,7 +2290,6 @@ export const EN: Record<string, string> = {
   "予定の登録に失敗しました。もう一度お試しください。": "Failed to schedule. Please try again.",
   "予定を入れました。その日のぶんは、今日から少しずつ空けておきます。": "Scheduled! We'll start saving up some calories for that day starting today.",
   "レスト終了": "End Rest",
-  "次のセットへ。": "Next Set",
   "保存しました。続けることが、いちばん効く種目です。": "Saved! Consistency is the best exercise.",
   "自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）": "New Personal Record! — {name} Est. 1RM {est}kg (+{d}kg from last time)",
   "開始": "Start",

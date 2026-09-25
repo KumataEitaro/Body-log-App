@@ -2212,7 +2212,6 @@ export const ID: Record<string, string> = {
   "予定の登録に失敗しました。もう一度お試しください。": "Gagal menjadwalkan. Silakan coba lagi.",
   "予定を入れました。その日のぶんは、今日から少しずつ空けておきます。": "Jadwal telah ditambahkan. Kalori untuk hari itu akan dikurangi sedikit demi sedikit mulai hari ini.",
   "レスト終了": "Selesai Istirahat",
-  "次のセットへ。": "Lanjut ke set berikutnya.",
   "保存しました。続けることが、いちばん効く種目です。": "Tersimpan. Konsistensi adalah latihan yang paling efektif.",
   "自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）": "Rekor Pribadi Baru — {name} Estimasi MAX {est}kg (Naik +{d}kg dari sebelumnya)",
   "開始": "Mulai",

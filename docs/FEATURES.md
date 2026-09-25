@@ -2551,3 +2551,43 @@ AsyncStorage `bl-custom-lifts`（既存キー・サインアウトで消える C
 - **言語**: 既定は iPhone / Android の言語設定に従う（対応外の言語は英語）。手動で選ぶと固定され、言語の一覧の先頭
   「端末の設定に従う（自動）」で戻せる（いまの端末言語を添えて表示）。前景復帰のたびに端末の言語を見直す（Android は言語変更で
   アプリが再起動されないことがある）。`lib/i18n.ts` `setLocaleAuto` / `syncDeviceLocale`
+## レストタイマーはダイナミックアイランドへ（Live Activity 既定ON・終了通知は廃止）（2026-09-25）
+
+> 熊田さん「筋トレのレストタイマーの通知のイメージが違う。『ダイナミックアイランドでの通知機能の実装の仕方』について
+> 綿密に調査したうえで実装して。今ある通知の機能はなくしてよし。」
+
+### 何が変わるか
+- **iOS ビルドの既定で Live Activity が入る**。セットを足してレストが始まると、アプリを閉じても
+  **ダイナミックアイランド（iPhone 14 Pro 以降）／ロック画面（iOS 16.1 以降の全機種）に残り時間が減っていく**。
+  長押しで展開（種目名＋残り時間）、タップで筋トレ記録画面へ。0 になると OS が「レスト終了」表示に切り替える（`staleDate`）
+- **レスト終了時のローカル通知（「レスト終了／次のセットへ。」バナー）は廃止**。`lib/restTimer.ts` から expo-notifications の
+  予約・取り消し・許可確認を外した。前景の触覚＋バイブ、どのタブにも出る帯（`RestTimerBar`）は従来どおり
+- Android は無変更（Live Activity 相当が無い。画面外表示は docs/TODO.md B10 の残課題）
+
+### 戻し方（ロールバック）
+Codemagic の Start new build で環境変数 **`DISABLE_LIVE_ACTIVITY` = `true`** を足すだけ。`native/app.config.js` が app.json を
+1文字も変えずに返し、`codemagic.yaml` の関連ステップも止まる＝導入前と同一のビルド。旧 `ENABLE_LIVE_ACTIVITY` は廃止（付けても何も起きない）。
+
+### 熊田さんの手番（1回だけ）
+Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity`** を作り、App Groups capability に
+**`group.com.gotcha.bodylog.rn`** を紐付ける（本体 `com.gotcha.bodylog.rn` にも同じ紐付け）。
+自動署名は App ID は作れても group の紐付けだけはできない（App Store Connect API に口が無い）。手順・URL・確認方法は `docs/LIVE-ACTIVITY.md` §0。
+
+### 調査の結論（詳細と出典 URL は docs/LIVE-ACTIVITY.md §2）
+- expo-widgets 57.0.19 の `autolinking.rb` は拡張ターゲットの pod を expo / expo-widgets / @expo/ui ＋ React 本体に絞る。
+  **AdMob / RevenueCat / HealthKit は拡張に入らない**＝expo/expo#44695（Closed）の形は BodyLog では起きない見込み。
+  BodyLog の plugin はどれも Podfile を書き換えないので root からの継承も無い
+- **App Group は Live Activity でも必須**（拡張が 'widget' 関数の出力を App Group の UserDefaults から読む）。plugin が prebuild で
+  本体 entitlements・`NSSupportsLiveActivities`・`ExpoWidgetsAppGroupIdentifier` を書く。無条件に足される `aps-environment` は既存ステップが外す
+- Codemagic の自動署名は `com.gotcha.bodylog.rn.*` の拡張プロファイルもマッチする（`.widget` の実績）。
+  「署名プロファイルの整合」ステップを拡張し、**本体と `…rn.liveactivity` の App Groups** を含むプロファイルへ自動で作り直す（手動削除不要）。
+  App ID 未作成（プロファイルが1本も無い）ときは案内を出して止まる
+
+### 触ったファイル
+- `lib/restTimer.ts`（通知の予約・取消・許可確認を削除。`armRest` は Live Activity の開始／終了だけ。起動時の拾い直しで種目名も渡す）
+- `lib/restActivity.ts`（`staleDate`＝終了時刻、`doneLabel` を渡す）、`liveactivity/RestActivity.tsx`（`isStale` で「レスト終了」表示）
+- `app.config.js`（既定ON・`DISABLE_LIVE_ACTIVITY` で退避）、`codemagic.yaml`（下ごしらえ確認・整合ステップの拡張）
+- テスト: `__tests__/liveActivity.test.ts`（既定ON／退避／yaml との整合／'widget' 制約／isStale）、`__tests__/restTimer.test.ts`（島の開始・終了・出し直し・拾い直し・通知の不在）
+- 辞書: `次のセットへ。`（通知本文にしか使っていなかった）を10辞書から削除
+- `docs/LIVE-ACTIVITY.md` を既定ON設計に全面改稿（チェックリスト・調査結果・失敗時の読み方・B案）
+

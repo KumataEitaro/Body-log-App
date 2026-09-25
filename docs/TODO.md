@@ -366,8 +366,8 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
 - **画面を離れても終了通知が来る**（`lib/restTimer.ts`。以前は「背景に回った瞬間」にしか
   予約しておらず、戻るボタンで離れると一度も予約されなかった）
 - **iOS の Live Activity / ダイナミックアイランド**（`src/liveactivity/RestActivity.tsx`）。
-  コードは入っている。**点灯には Apple 側の App ID 作成と `ENABLE_LIVE_ACTIVITY=true` の
-  CI ビルドが要る → docs/LIVE-ACTIVITY.md**
+  2026-09-25 から **iOS ビルドの既定で入る**。**点灯に残るのは Apple 側の App ID 作成＋App Group の紐付けだけ
+  → docs/LIVE-ACTIVITY.md §0**（退避は `DISABLE_LIVE_ACTIVITY=true`）
 
 残り:
 - **Android**: 進行中通知に `usesChronometer` ＋ `setChronometerCountDown`（`when`=終了時刻）。
@@ -377,9 +377,11 @@ App Store Connect の標準指標＋Vercel Analytics＋自前の最小イベン�
   将来 Android 16 の Live Updates（`setRequestPromotedOngoing`）へ1行で乗せられる
 - iOS の実機確認（ダイナミックアイランドは iPhone 14 Pro 以降）
 
-**方針変更**: 以前ここに「Live Activity が使える端末では終了通知を出さない」と書いていたが、
-**Live Activity は音を鳴らさない**。ジムでポケットに入れている場面では
-「島＝目で見る／通知＝音と振動」で役割が違うので、**両方出す**のが正しい。
+**方針変更（2026-09-25）**: 熊田さん「レストタイマーの通知のイメージが違う。ダイナミックアイランドにして。
+今ある通知の機能はなくしてよし」→ **終了時のローカル通知は廃止**し、画面の外は Live Activity（島＋ロック画面）に一本化。
+Live Activity は iOS ビルドの**既定で入る**ようにした（退避は `DISABLE_LIVE_ACTIVITY=true`・旧 `ENABLE_LIVE_ACTIVITY` は廃止）。
+点灯に残るのは Apple 側の App ID `com.gotcha.bodylog.rn.liveactivity`＋App Group の紐付けだけ → docs/LIVE-ACTIVITY.md §0。
+（2026-09-17 の「島は音を鳴らさないので両方出す」は取り消し）
 
 ### B11. 🟡 「あとのカロリーで何を食べる？」のレシピ: 分量（g・個数・調味料）と手順を出す
 - 分量は g／個数で、調味料も含める。**手順も出す**

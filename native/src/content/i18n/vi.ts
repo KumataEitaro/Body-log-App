@@ -2212,7 +2212,6 @@ export const VI: Record<string, string> = {
   "予定の登録に失敗しました。もう一度お試しください。": "Không thể đăng ký lịch trình. Vui lòng thử lại.",
   "予定を入れました。その日のぶんは、今日から少しずつ空けておきます。": "Đã thêm lịch trình. Lượng calo cho ngày đó sẽ được chừa ra dần dần từ hôm nay.",
   "レスト終了": "Kết thúc nghỉ",
-  "次のセットへ。": "Sang hiệp tiếp theo.",
   "保存しました。続けることが、いちばん効く種目です。": "Đã lưu. Kiên trì chính là bài tập hiệu quả nhất.",
   "自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）": "Kỷ lục cá nhân mới — {name} MAX ước tính {est}kg (So với lần trước +{d}kg)",
   "開始": "Bắt đầu",

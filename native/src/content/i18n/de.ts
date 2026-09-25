@@ -2212,7 +2212,6 @@ export const DE: Record<string, string> = {
   "予定の登録に失敗しました。もう一度お試しください。": "Eintragen des Termins fehlgeschlagen. Bitte versuche es noch einmal.",
   "予定を入れました。その日のぶんは、今日から少しずつ空けておきます。": "Termin eingetragen. Wir sparen ab heute schon mal ein paar Kalorien für diesen Tag auf.",
   "レスト終了": "Pause beenden",
-  "次のセットへ。": "Auf zum nächsten Satz.",
   "保存しました。続けることが、いちばん効く種目です。": "Gespeichert. Dranzubleiben ist die effektivste Übung von allen.",
   "自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）": "Persönliche Bestleistung! — {name} geschätztes MAX {est}kg (+{d}kg im Vergleich zum Vorjahr)",
   "開始": "Start",
