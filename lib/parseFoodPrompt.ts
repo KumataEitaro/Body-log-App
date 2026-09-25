@@ -8,6 +8,11 @@
 // どんな入力でも reply（AIの一言）を必ず返させ、品目に変換できない入力を
 // 黙って捨てる経路を無くす。曖昧な量はまず標準量で仮定して assumptions に明示し、
 // 仮定次第で数百kcal変わるものだけ questions で聞き返す（全部聞くと記録が遅くなる）。
+//
+// 栄養素の項目（salt〜mo の31キー）は lib/items.ts の NUTRIENT_KEYS / NUTRIENT_META から生成する。
+// 正本は native/src/lib/items.ts で、tests/items.test.ts が両者の一致を固定する（2026-09-25・栄養ランキング改修）。
+import { nutrientPromptJson, nutrientPromptSpec } from './items';
+
 export function buildParseFoodPrompt(input: {
   text: string;
   dictBlock: string;
@@ -21,8 +26,8 @@ export function buildParseFoodPrompt(input: {
   return (
     'あなたは日本の管理栄養士 兼 トレーニング記録係です。ユーザーの1日の記録メモ（と食事写真）を解析してください。\n' +
     '\n【タスク1: 食事】メモと写真に写っている食事の各品目と合計の kcal・たんぱく質P(g)・脂質F(g)・炭水化物C(g) を推定する。\n' +
-    '- 分析用に各品目で次の栄養素も推定する（不明・微量は0。大まかな推定でよい）:\n' +
-    '  salt=食塩相当量(g,小数1) fib=食物繊維(g,小数1) sug=糖類(g) k=カリウム(mg) ca=カルシウム(mg) mg=マグネシウム(mg) fe=鉄(mg,小数1) zn=亜鉛(mg,小数1) vd=ビタミンD(μg,小数1) vc=ビタミンC(mg)\n' +
+    '- 分析用に各品目で次の栄養素も推定する（日本食品標準成分表（八訂）の近い食品の値から、分量に合わせて大まかに推定。含まれない・微量は0。単位は表記どおり。小数の指定が無いものは整数）:\n' +
+    '  ' + nutrientPromptSpec() + '\n' +
     '- 数量不明の調味料は大さじ1として計算\n' +
     '- 肉・魚・米などのグラム数は生の重量とみなす\n' +
     '- 写真は写っている量から標準的な1人前を推定\n' +
@@ -45,9 +50,9 @@ export function buildParseFoodPrompt(input: {
     (dietBlock || '') +
     (outLang ? `\n出力言語: items[].name・qty・mood・questions・reply・assumptionsの文字列は${outLang}で書くこと。\n` : '') +
     '\n【禁止事項】疾病名の指摘・医療的な診断・治療の提案は行わないこと（本サービスは医療機器ではない）。\n' +
-    '\n数値は四捨五入した整数。必ず次のJSON形式のみを返す:\n' +
+    '\n数値は四捨五入した整数（小数を指定した栄養素はその桁）。必ず次のJSON形式のみを返す:\n' +
     // 制約が設定されている人だけ items に dietFlag を足す（未設定の人の応答形は従来どおり）
-    `{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,"salt":0,"fib":0,"sug":0,"k":0,"ca":0,"mg":0,"fe":0,"zn":0,"vd":0,"vc":0${dietBlock ? ',"dietFlag":"none"' : ''}}],` +
+    `{"items":[{"name":"品目","qty":"分量","kcal":0,"p":0,"f":0,"c":0,${nutrientPromptJson()}${dietBlock ? ',"dietFlag":"none"' : ''}}],` +
     '"total":{"kcal":0,"p":0,"f":0,"c":0},' +
     '"weight":null,"waist":null,"ex":null,"adj":0,"mood":null,' +
     '"reply":"AIの一言(必須)","assumptions":[],"questions":[]}\n' +
