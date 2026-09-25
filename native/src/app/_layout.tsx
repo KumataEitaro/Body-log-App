@@ -11,7 +11,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { LaunchProvider } from '@/components/LaunchIntro';
-import { loadLocale, useLocale, t } from '@/lib/i18n';
+import { loadLocale, syncDeviceLocale, useLocale, t } from '@/lib/i18n';
 import { loadUnits } from '@/lib/units';
 import { loadTheme, useTheme } from '@/lib/theme';
 import { setLocaleChangeHandler } from '@/lib/i18n';
@@ -166,6 +166,15 @@ export default function RootLayout() {
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') run(); });
     return () => sub.remove();
   }, [ready, authed]);
+
+  // 言語は端末の設定に従う（手動で選んだ人は除く・2026-09-25）。iOS は言語変更でアプリが再起動されるが
+  // Android は再起動されないことがあるので、前景復帰のたびに端末の言語を見直す
+  useEffect(() => {
+    if (!ready) return;
+    syncDeviceLocale();
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') syncDeviceLocale(); });
+    return () => sub.remove();
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;

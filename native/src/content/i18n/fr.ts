@@ -2475,4 +2475,8 @@ export const FR: Record<string, string> = {
   "片側": "par côté",
   "片側で入力したダンベル種目は両側の合計で数えています。": "Les exercices aux haltères saisis par côté sont comptés pour les deux côtés.",
   "「片側」はダンベル種目で、片手ぶんの重さです。": "Par côté = exercice aux haltères, le poids d’une main.",
+  // セットのチップ統一・言語の自動追従（2026-09-25）
+  "{name}（セット）": "{name} (ensemble)",
+  "端末の設定に従う（自動）": "Suivre le réglage de l’appareil (auto)",
+  "（いまは{lang}）": "(actuellement {lang})",
 };

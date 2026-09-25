@@ -15,7 +15,7 @@ import {
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, UtensilsCrossed, X , CalendarClock } from 'lucide-react-native';
+import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, X, CalendarClock } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
@@ -85,7 +85,7 @@ import { detectStruggle } from '@/lib/adaptive';
 import { summarizeDay, dayExerciseKcal, type LogRow } from '@/lib/day';
 import { sumItems, type FoodItem, qtyNumber } from '@/lib/items';
 import { addServing, removeServing, servingCount, type MyFoodRow, gramsOf, gramsFromQty, fmtGrams, rescaleToGrams, servingOf } from '@/lib/foods';
-import { listMyMeals, deleteMyMeal, saveMyMeal, type MyMeal } from '@/lib/meals';
+import { listMyMeals, type MyMeal } from '@/lib/meals';
 import { applyMult, currentMult, MULT_STEPS } from '@/lib/mealAdjust';
 import { swapsFor, swapLine, emojiText, swapKcalDelta } from '@/lib/smartSwap';
 import SaveMealSheet from '@/components/SaveMealSheet';
@@ -873,18 +873,21 @@ export default function LogScreen() {
     }));
   }
 
-  // セットのチップ: 長押しで削除（確認ダイアログなし・Undoスナックバーで約5秒の取り消し猶予）。
-  // 復元は削除前に控えた内容を新しい行として保存し直す（idはDB採番）
-  async function deleteMealNow(m: MyMeal) {
-    if (!uid) return;
-    const ok = await deleteMyMeal(m.id);
-    if (!ok) { setMsg({ ok: false, text: t('削除に失敗しました。もう一度お試しください。') }); return; }
-    setMyMeals(await listMyMeals());
-    undoBar.show(t('マイ食品「{name}」を削除しました', { name: m.name }), async () => {
-      const r = await saveMyMeal(uid, m.name, m.items);
-      if (!r.ok) { setMsg({ ok: false, text: t('元に戻せませんでした。通信環境を確認してください。') }); return; }
-      setMyMeals(await listMyMeals());
-    });
+  // セットのチップ: 長押しで「全品目をそのまま即記録」（単品の quickSaveFood と同じ最短経路・2026-09-25）
+  async function quickSaveMeal(m: MyMeal) {
+    if (!uid || saving) return;
+    setSaving(true);
+    try {
+      const r = await saveParsed(uid, {
+        items: [...m.items], weight: null, waist: null, ex: null, adj: 0, mood: null,
+      }, m.name, viewDate, mealAt);
+      if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setMsg(r.queued
+        ? { ok: true, text: t('圏外のため端末に保存しました。電波が戻ったら自動で同期され、フィードに出ます。') }
+        : { ok: true, text: t('「{name}」を記録しました（長押しで即記録）', { name: m.name }) });
+      await load();
+    } finally { setSaving(false); }
   }
 
   function decFood(fd: MyFood) {
@@ -1667,13 +1670,16 @@ export default function LogScreen() {
   // 先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
   // 長押しで削除→Undoスナックバー）。セットは常に先頭固定
   const myFoodsSection = (myFoods.length > 0 || myMeals.length > 0) ? (() => {
+    // セット（複数品目）のチップ。2026-09-25 熊田さん「何でおからケーキだけ表示が違うの？統一感出したい」→
+    // 単品と同じ見た目・同じ操作（タップでトレイへ・長押しで即記録）に揃えた。以前は皿アイコン＋アクセント面で、
+    // 長押しが「削除」だった（単品は長押しで即記録＝同じ列で長押しの意味が違う罠）。削除は設定＞マイ食品の管理から
     const mealChipEl = (m: MyMeal) => (
-      <Pressable key={m.id} style={s.mealChip}
-                 onPress={() => tapMeal(m)}
-                 onLongPress={() => deleteMealNow(m)} delayLongPress={450}>
-        <UtensilsCrossed size={13} color={C.teal} />
-        <Text style={s.mealChipT} numberOfLines={1}>{m.name}</Text>
-      </Pressable>
+      <View key={m.id} style={s.chip}>
+        <Pressable onPress={() => tapMeal(m)} onLongPress={() => quickSaveMeal(m)} delayLongPress={450} style={s.chipMain}
+                   accessibilityRole="button" accessibilityLabel={t('{name}（セット）', { name: m.name })}>
+          <Text style={s.chipT} numberOfLines={1}>＋ {m.name}</Text>
+        </Pressable>
+      </View>
     );
     const chipEl = (fd: MyFood) => {
       const cnt = parsed ? servingCount(parsed.items, fd) : null;
@@ -2933,13 +2939,6 @@ const s = themed(() => ({
     borderWidth: 1.5, borderColor: C.line, borderRadius: RADIUS.chip, marginRight: 6, overflow: 'hidden',
   },
   chipOn: { borderColor: C.ink },
-  // セット（複数品目）のチップ（単品のマイ食品と見た目で区別: 皿アイコン＋アクセント面・teal文字）
-  mealChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: C.accentBadge, borderWidth: 1.5, borderColor: C.accentBorder,
-    borderRadius: RADIUS.chip, paddingVertical: 9, paddingHorizontal: 13, marginRight: 6, maxWidth: 180,
-  },
-  mealChipT: { fontSize: 13, fontWeight: '800', color: C.accentInk },
   // 量調整ポップ（トレイ直下のインライン展開）
   adjustPop: {
     backgroundColor: C.panel, borderWidth: 1, borderColor: C.accentBorder,

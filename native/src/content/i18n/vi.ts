@@ -2475,4 +2475,8 @@ export const VI: Record<string, string> = {
   "片側": "mỗi bên",
   "片側で入力したダンベル種目は両側の合計で数えています。": "Bài tập tạ đơn nhập theo mỗi bên được tính cho cả hai bên.",
   "「片側」はダンベル種目で、片手ぶんの重さです。": "Mỗi bên = bài tập tạ đơn, trọng lượng của một tay.",
+  // セットのチップ統一・言語の自動追従（2026-09-25）
+  "{name}（セット）": "{name} (bộ)",
+  "端末の設定に従う（自動）": "Theo cài đặt thiết bị (tự động)",
+  "（いまは{lang}）": "(hiện là {lang})",
 };

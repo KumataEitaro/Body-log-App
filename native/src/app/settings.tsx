@@ -30,7 +30,7 @@ import { AVATAR_GROUPS, useAvatar, setAvatar } from '@/lib/avatar';
 import NotificationCenter, { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { BellRing, FileText, Droplet, Bug } from 'lucide-react-native';
 import { shareMedicalReport } from '@/lib/medicalReport';
-import { t, apiLang, useLocale, setLocale, LOCALES, type LocaleCode } from '@/lib/i18n';
+import { t, apiLang, useLocale, useLocaleExplicit, setLocale, setLocaleAuto, deviceLocaleLabel, LOCALES, type LocaleCode } from '@/lib/i18n';
 import { useUnits, setUnits, fmtWeight, fmtHeight } from '@/lib/units';
 import { useTheme, setTheme, ACCENTS, PALETTES, PFC_SWATCHES, PFC_PRESETS, BG_TINTS, paletteFor, darkPaletteFor, type PfcColors } from '@/lib/theme';
 import { SegmentedControl as Seg } from '@/components/ui/Selectable';
@@ -277,6 +277,7 @@ export default function SettingsScreen() {
   useEffect(() => { load(); }, [load]);
 
   const locale = useLocale();
+  const localeExplicit = useLocaleExplicit();   // 手動で選んだか（false = 端末の設定に従う）
   const units = useUnits();
   const theme = useTheme();
   const todo = useTodoBadge();
@@ -1212,10 +1213,19 @@ export default function SettingsScreen() {
       <View style={s.sheetBody}>
         <SheetHeader icon={<Languages size={ICON.lg} color={C.teal} />} title={t("言語")} />
         <ScrollView>
+          {/* 既定は端末の設定に従う（iPhone / Android の言語）。手動で選ぶと固定され、この行で自動に戻せる（2026-09-25） */}
+          <Pressable style={s.langRow} onPress={() => { setLocaleAuto().catch(() => {}); setSheet(null); }}
+                     accessibilityRole="button" accessibilityState={{ selected: !localeExplicit }}>
+            <Text style={[s.langT, !localeExplicit && { color: C.accentInk, fontWeight: '800' }]}>
+              {t('端末の設定に従う（自動）')}<Text style={{ color: C.sub, fontWeight: '600' }}> {t('（いまは{lang}）', { lang: deviceLocaleLabel() })}</Text>
+            </Text>
+            {!localeExplicit && <Text style={{ color: C.accentInk, fontWeight: '800' }}>✓</Text>}
+          </Pressable>
           {LOCALES.map((l) => (
-            <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}>
-              <Text style={[s.langT, locale === l.code && { color: C.accentInk, fontWeight: '800' }]}>{l.label}</Text>
-              {locale === l.code && <Text style={{ color: C.accentInk, fontWeight: '800' }}>✓</Text>}
+            <Pressable key={l.code} style={s.langRow} onPress={() => { setLocale(l.code as LocaleCode); setSheet(null); }}
+                       accessibilityRole="button" accessibilityState={{ selected: localeExplicit && locale === l.code }}>
+              <Text style={[s.langT, localeExplicit && locale === l.code && { color: C.accentInk, fontWeight: '800' }]}>{l.label}</Text>
+              {localeExplicit && locale === l.code && <Text style={{ color: C.accentInk, fontWeight: '800' }}>✓</Text>}
             </Pressable>
           ))}
           <Text style={s.note}>{t('未翻訳の項目は日本語で表示されます。翻訳は順次追加していきます。')}</Text>
