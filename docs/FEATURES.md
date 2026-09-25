@@ -2591,3 +2591,19 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 - 辞書: `次のセットへ。`（通知本文にしか使っていなかった）を10辞書から削除
 - `docs/LIVE-ACTIVITY.md` を既定ON設計に全面改稿（チェックリスト・調査結果・失敗時の読み方・B案）
 
+## 過食アラート v2 の研究設計とコア実装（2026-09-25・feat/binge-risk-v2・UI未配線）
+- **なぜ**: 熊田さん「アラートの頻度を上げる。ただし精度は落とさない。両立が論理的に可能か徹底的に検証して」。答え: 同じ判別力では
+  頻度↑＝精度↓（Neyman–Pearson）。両立できるのは ①情報を増やす（AUC↑） ②段を分ける（頻繁で軽い nudge／稀で重い warning）
+  ③単位を日→状況（夕方・空腹・予定）に変える、の3つだけ。基礎率8%/日では AUC 0.85 でも精度50%を守れるのは週0.4本
+- **研究設計書**: `docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md`（定義の統一〔+400/+800/単食2,500が併存〕・二正規モデルの数表・
+  追加データのランキング16種・MAPロジスティック回帰〔文献由来の事前分布＋本人履歴の縮小〕・ローリング検証・自己制限ガード・
+  1タップの新規入力6種・段別の介入・オーナー判断事項6点・参考文献）
+- **コア実装**（純関数・決定的・端末内）: `native/src/lib/bingeRisk.ts` — `RISK_FEATURES`（朝に分かる16特徴＋事前重み）・
+  `fitRiskModel`/`assessBingeRiskV2`（Newton法のMAP推定・完全分離でも発散しない）・`intradayLogit`（時間内ハザード）・
+  `effectiveThresholds`/`tierOf`（期待効用の閾値 nudge 0.156／warning 0.39＋基礎率床1.5倍/3倍）・
+  `guardThresholds`/`withinWeeklyBudget`（直近28日の精度が床を割ると閾値を自動で上げる・週予算4/2）・
+  `backtestBingeRisk`（未来を見ないローリング検証: Brier/AUC/較正ビン/段別精度）・`binormalPrecision`（理論値）
+- **jest**: `native/src/lib/__tests__/bingeRisk.test.ts` 25件（情報があるときだけ精度床を守った本数が増える・同モデルで本数↑＝精度↓・
+  ガードの発火と時効・較正の算術・少データで事前分布へ縮小）
+- **未配線**: `log.tsx` の caution 枠への接続・辞書16キー・`AlertOutcome` の保存は親が研究設計書 §8 に沿って行う。
+  HealthKit の追加許可（安静時心拍/HRV/呼吸数/手首温）と過食の定義（推奨 +600）はオーナー判断（§9）
