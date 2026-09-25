@@ -2212,7 +2212,6 @@ export const PT: Record<string, string> = {
   "予定の登録に失敗しました。もう一度お試しください。": "Não foi possível agendar. Tente novamente.",
   "予定を入れました。その日のぶんは、今日から少しずつ空けておきます。": "Agendado! Vamos abrir espaço aos poucos a partir de hoje para esse dia.",
   "レスト終了": "Fim do descanso",
-  "次のセットへ。": "Próxima série.",
   "保存しました。続けることが、いちばん効く種目です。": "Salvo! A consistência é o exercício mais eficaz.",
   "自己ベスト更新 — {name} 推定MAX {est}kg（前回比 +{d}kg）": "Novo recorde pessoal — {name} Máx. estimado {est}kg (+{d}kg em relação ao anterior)",
   "開始": "Começar",

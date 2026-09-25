@@ -163,94 +163,153 @@ workflows:
           # 拡張ターゲットをpbxprojへ注入（この後のagvtoolがウィジェットのビルド番号も揃える）
           gem list -i xcodeproj > /dev/null 2>&1 || gem install xcodeproj --no-document
           ruby scripts/add-widget-target-rn.rb
-      - name: Live Activity の App Group を本体に足す (ENABLE_LIVE_ACTIVITY=true のみ)
+      - name: Live Activity（ダイナミックアイランド）の下ごしらえを確認 (DISABLE_LIVE_ACTIVITY=true で停止)
         script: |
-          # ダイナミックアイランドのレスト残り時間（docs/LIVE-ACTIVITY.md）。
-          # 拡張ターゲット自体は native/app.config.js の expo-widgets plugin が prebuild で作る。
-          # ここがやるのは「本体アプリの entitlements に App Group を入れる」ことだけ
-          # （ENABLE_WIDGET のステップと同じ内容なので、両方立っていても重複しないようにする）。
-          # ENABLE_LIVE_ACTIVITY 未設定なら何もしない＝従来ビルドと完全に同一。
-          if [ "$ENABLE_LIVE_ACTIVITY" != "true" ]; then
-            echo "ENABLE_LIVE_ACTIVITY != true → Live Activity なしでビルド（従来と同一）"
+          # ダイナミックアイランドのレスト残り時間（docs/LIVE-ACTIVITY.md）。**2026-09-25 から既定で入る。**
+          # 拡張ターゲット（ExpoWidgetsTarget・Bundle ID …rn.liveactivity）・本体の App Group entitlement・
+          # NSSupportsLiveActivities・Podfile の拡張 target は、native/app.config.js の expo-widgets plugin が
+          # prebuild で入れる。ここがやるのは「本当に入ったか」の確認と、App Group の正規化（1件に揃える）だけ。
+          #
+          # 退避: 環境変数 DISABLE_LIVE_ACTIVITY=true → app.config.js が app.json をそのまま返し、ここも何もしない
+          #       ＝Live Activity 導入前のビルドと完全に同一（yaml の vars には書かない。UI から都度指定する）。
+          if [ "$DISABLE_LIVE_ACTIVITY" = "true" ]; then
+            echo "DISABLE_LIVE_ACTIVITY=true → Live Activity なしでビルド（導入前と同一）"
             exit 0
           fi
+          set -e
           ENT="native/ios/BodyLog/BodyLog.entitlements"
-          if /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" "$ENT" >/dev/null 2>&1; then
-            echo "App Group は既にある（ENABLE_WIDGET のステップが入れた）"
-          else
-            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENT" || true
-            /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string group.com.gotcha.bodylog.rn" "$ENT" || true
-          fi
+          GROUP="group.com.gotcha.bodylog.rn"
+          # App Group を「ちょうど1件」に正規化する。plugin（prebuild）と ENABLE_WIDGET のステップの両方が
+          # 同じ group を Add しうるので、重複していても欠けていてもここで1件に揃える（同じ値なので安全）
+          /usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$ENT" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENT"
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups:0 string $GROUP" "$ENT"
           plutil -p "$ENT"
-          # NSSupportsLiveActivities は app.config.js が infoPlist に入れる → prebuild 済みの Info.plist を確認
-          /usr/libexec/PlistBuddy -c "Print :NSSupportsLiveActivities" native/ios/BodyLog/Info.plist             || echo "⚠️ NSSupportsLiveActivities が Info.plist にありません（app.config.js のゲートを確認）"
+          # 入っているはずのものを確認。欠けていたら「島が出ないビルド」を静かに出荷しないよう、ここで止める
+          FAIL=0
+          /usr/libexec/PlistBuddy -c "Print :NSSupportsLiveActivities" native/ios/BodyLog/Info.plist >/dev/null 2>&1 && echo "✅ NSSupportsLiveActivities" || { echo "❌ NSSupportsLiveActivities が Info.plist に無い"; FAIL=1; }
+          grep -q 'ExpoWidgetsTarget' native/ios/BodyLog.xcodeproj/project.pbxproj && echo "✅ 拡張ターゲット ExpoWidgetsTarget" || { echo "❌ ExpoWidgetsTarget が pbxproj に無い"; FAIL=1; }
+          grep -q 'com.gotcha.bodylog.rn.liveactivity' native/ios/BodyLog.xcodeproj/project.pbxproj && echo "✅ 拡張の Bundle ID (…rn.liveactivity)" || { echo "❌ 拡張の Bundle ID (…rn.liveactivity) が pbxproj に無い"; FAIL=1; }
+          grep -q 'target "ExpoWidgetsTarget"' native/ios/Podfile && echo "✅ Podfile の拡張 target" || { echo "❌ Podfile に拡張 target が無い"; FAIL=1; }
+          [ -f native/ios/ExpoWidgetsTarget/ExpoWidgetsTarget.entitlements ] && echo "✅ 拡張の entitlements" || { echo "❌ 拡張の entitlements が無い"; FAIL=1; }
+          if [ "$FAIL" = "1" ]; then
+            echo "❌ app.config.js の expo-widgets plugin が prebuild で効いていません。" >&2
+            echo "   まず戻すなら環境変数 DISABLE_LIVE_ACTIVITY=true で再ビルド。原因は docs/LIVE-ACTIVITY.md「失敗したときの読み方」。" >&2
+            exit 1
+          fi
       - name: 署名プロファイルの整合（entitlementに合わないプロファイルを捨てて作り直す）
         script: |
           # Codemagicの自動署名は既存プロファイルを再利用するため、App IDにcapabilityを足しても
-          # 古いプロファイル（Associated Domains無し）で署名が失敗し続ける（2026-09-03 build_ipa(5)）。
+          # 古いプロファイル（Associated Domains無し／App Groups無し）で署名が失敗し続ける（2026-09-03 build_ipa(5)）。
           # ここで「ビルドに必要なentitlement」と「取得済みプロファイルのentitlement」を比較し、
           # 足りなければ該当プロファイルをポータルから削除→作り直し→再適用する。手作業の削除を不要にする。
+          #
+          # 見る対象（bundle id ／ 要る entitlement）— 2026-09-25 に Live Activity（既定ON）ぶんを足した:
+          #   ・本体 $BUNDLE_ID ………………… associated-domains（ENABLE_ASSOCIATED_DOMAINS=true のとき）
+          #                                    application-groups（Live Activity 既定ON／ENABLE_WIDGET=true。entitlements に入っていれば）
+          #   ・拡張 $BUNDLE_ID.liveactivity … application-groups（DISABLE_LIVE_ACTIVITY=true 以外）
+          # 拡張の App ID がポータルに無い（＝プロファイルが1本も無い）のは「古い」ではなく「未作成」。
+          # 削除しても直らないので、ここで止めて docs/LIVE-ACTIVITY.md 手順1 へ案内する。
           set -e   # 途中の失敗を握りつぶさない（2026-09-04 に握りつぶしで Build ipa が空振りした）
           ENT="native/ios/BodyLog/BodyLog.entitlements"
-          NEED_AD=0; /usr/libexec/PlistBuddy -c "Print :com.apple.developer.associated-domains" "$ENT" >/dev/null 2>&1 && NEED_AD=1
-          echo "必要: associated-domains=$NEED_AD (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset})"
-          if [ "$NEED_AD" = "1" ]; then
-            STALE=0
-            # パスに空白（"Provisioning Profiles"）があるため必ずクォートする。
-            # 2026-09-04: 未クォートで glob が2語に割れて1件もマッチせず、「要件を満たしている」と
-            # 誤判定して古いプロファイルのまま Build ipa に進み、Associated Domains で失敗した
-            for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
+          PROFILES="$HOME/Library/MobileDevice/Provisioning Profiles"
+          AD_KEY="com.apple.developer.associated-domains"
+          AG_KEY="com.apple.security.application-groups"
+          LA_BUNDLE_ID="$BUNDLE_ID.liveactivity"
+
+          NEED_AD=0; /usr/libexec/PlistBuddy -c "Print :$AD_KEY" "$ENT" >/dev/null 2>&1 && NEED_AD=1
+          NEED_AG=0; /usr/libexec/PlistBuddy -c "Print :$AG_KEY" "$ENT" >/dev/null 2>&1 && NEED_AG=1
+          NEED_LA=0; [ "$DISABLE_LIVE_ACTIVITY" != "true" ] && NEED_LA=1
+          echo "必要: associated-domains=$NEED_AD app-groups(本体)=$NEED_AG live-activity拡張=$NEED_LA (ENABLE_ASSOCIATED_DOMAINS=${ENABLE_ASSOCIATED_DOMAINS:-unset} DISABLE_LIVE_ACTIVITY=${DISABLE_LIVE_ACTIVITY:-unset})"
+
+          # 要件の一覧: 「bundle id|entitlement キー」を1行ずつ
+          REQS=""
+          [ "$NEED_AD" = "1" ] && REQS="$REQS$BUNDLE_ID|$AD_KEY"$'\n'
+          [ "$NEED_AG" = "1" ] && REQS="$REQS$BUNDLE_ID|$AG_KEY"$'\n'
+          [ "$NEED_LA" = "1" ] && REQS="$REQS$LA_BUNDLE_ID|$AG_KEY"$'\n'
+          if [ -z "$REQS" ]; then echo "capability 付きの entitlement は無い＝整合の確認は不要"; exit 0; fi
+
+          # 手元のプロファイルを見て、bundle id ごとに「有無」と「entitlement を含むか」を判定する。
+          # 戻り値 0:満たす 1:あるが古い 2:プロファイルが1本も無い
+          # パスに空白（"Provisioning Profiles"）があるため必ずクォートする。
+          # 2026-09-04: 未クォートで glob が2語に割れて1件もマッチせず、「要件を満たしている」と
+          # 誤判定して古いプロファイルのまま Build ipa に進み、Associated Domains で失敗した
+          check() {
+            local found=0 ok=0 f bid
+            for f in "$PROFILES/"*.mobileprovision; do
               [ -f "$f" ] || continue
               security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
-              BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
-              case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
-              if ! /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /tmp/prof.plist >/dev/null 2>&1; then
-                NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null); UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/prof.plist 2>/dev/null)
-                echo "古いプロファイルを検出: ${NAME} (${UUID}) — associated-domains 無し"; STALE=1
+              bid=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
+              [ "${bid#*.}" = "$1" ] || continue    # "TEAMID.bundle.id" → bundle.id を厳密一致（前方一致だと本体と拡張を取り違える）
+              found=1
+              if /usr/libexec/PlistBuddy -c "Print :Entitlements:$2" /tmp/prof.plist >/dev/null 2>&1; then ok=1; else
+                echo "  古いプロファイル: $(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null) ($(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/prof.plist 2>/dev/null)) — $2 無し"
               fi
             done
-            if [ "$STALE" = "1" ]; then
-              DELETE_FAILED=0
-              # このバンドルIDの App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し。
-              # 一覧が空（APIキーの権限で読めない・build(9)で実際にそうだった）なら削除もできないので、手動削除の案内へ
-              IDS=$(app-store-connect profiles list --bundle-id-identifier "$BUNDLE_ID" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id" 2>/dev/null)
-              if [ -z "$IDS" ]; then echo "⚠️ API からプロファイルの一覧が取れません（権限不足の可能性）。ポータルで手動削除が必要です"; DELETE_FAILED=1; fi
-              for id in $IDS; do
-                # 削除の失敗を握りつぶさない: APIキーの権限（Developer 役割）では削除できないことがあり、
-                # 2026-09-04 (7)(8) はこれが毎回失敗→手元だけ消える→ゼロで Build ipa が落ちるループだった
-                if app-store-connect profiles delete "$id"; then echo "deleted profile $id"; else echo "⚠️ profile $id の削除に失敗（APIキーの権限不足の可能性）"; DELETE_FAILED=1; fi
-              done
-              rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision
-              # 作り直しを試す。ユーザースクリプトの文脈では証明書の秘密鍵が渡らず失敗することがある
-              # （2026-09-04 build_ipa(7): 失敗が echo で握りつぶされ Build ipa が空のプロファイルで落ちた）。
-              # 失敗しても止めず、下の「実際に出来たか」の検証で判定する
-              app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create || echo "fetch-signing-files --create は失敗（下で判定）"
-              OK=0
-              for f in "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision; do
-                [ -f "$f" ] || continue
-                security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
-                BID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
-                case "$BID" in *"$BUNDLE_ID") ;; *) continue;; esac
-                /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.associated-domains" /tmp/prof.plist >/dev/null 2>&1 && OK=1
-              done
-              if [ "$OK" = "1" ]; then
-                # 新しいプロファイルを Xcode プロジェクトに掛け直す（Build ipa 側の use-profiles だけに任せない）
-                xcode-project use-profiles --project "native/ios/BodyLog.xcodeproj" --warn-only
-                echo "✅ プロファイルを作り直しました（Associated Domains込み）"
-              else
-                echo "❌ 要件を満たすプロファイルを手元に作れませんでした。" >&2
-                echo "   ポータルの古いプロファイルは削除済みなので、**このワークフローをもう一度実行**すると" >&2
-                echo "   Codemagic の自動署名（ビルド前）が現在の capability で新しいプロファイルを作ります。" >&2
-                if [ "${DELETE_FAILED:-0}" = "1" ]; then
-                  echo "   ⚠️ ポータルのプロファイル削除が失敗しています。手動で削除してください:" >&2
-                  echo "      https://developer.apple.com/account/resources/profiles/list → $BUNDLE_ID の App Store 用を Delete" >&2
-                fi
-                echo "   それでも同じなら Apple Developer → Identifiers → $BUNDLE_ID で Associated Domains が ON か確認。" >&2
-                exit 1
-              fi
-            else
-              echo "取得済みプロファイルは要件を満たしています"
+            [ "$ok" = "1" ] && return 0
+            [ "$found" = "1" ] && return 1
+            return 2
+          }
+          STALE=""; MISSING=""
+          while IFS='|' read -r bid key; do
+            [ -n "$bid" ] || continue
+            set +e; check "$bid" "$key"; rc=$?; set -e
+            case $rc in
+              0) echo "✅ $bid: $key を含むプロファイルあり";;
+              1) echo "⚠️ $bid: プロファイルはあるが $key が無い（古い）"; STALE="$STALE $bid";;
+              *) echo "❌ $bid: プロファイルが1本も無い（App ID 未作成の可能性）"; MISSING="$MISSING $bid";;
+            esac
+          done <<< "$REQS"
+
+          if [ -n "$MISSING" ]; then
+            echo "❌ 次の Bundle ID のプロファイルが取得できていません:$MISSING" >&2
+            echo "   Apple Developer → Identifiers に App ID があるか確認してください（docs/LIVE-ACTIVITY.md 手順1）:" >&2
+            echo "   https://developer.apple.com/account/resources/identifiers/list" >&2
+            echo "   拡張（$LA_BUNDLE_ID）は App Groups capability に group.com.gotcha.bodylog.rn を紐付けること。" >&2
+            echo "   いったん戻すなら環境変数 DISABLE_LIVE_ACTIVITY=true で再ビルド（Live Activity 導入前と同一のビルド）。" >&2
+            exit 1
+          fi
+          if [ -z "$STALE" ]; then echo "取得済みプロファイルは要件を満たしています"; exit 0; fi
+
+          DELETE_FAILED=0
+          # 古い bundle id の App Store 用プロファイルを全て削除（CIが自動生成する使い捨てなので安全）→作り直し。
+          # 一覧が空（APIキーの権限で読めない・build(9)で実際にそうだった）なら削除もできないので、手動削除の案内へ
+          for bid in $(echo "$STALE" | tr ' ' '\n' | sort -u); do
+            IDS=$(app-store-connect profiles list --bundle-id-identifier "$bid" --profile-type IOS_APP_STORE --json 2>/dev/null | jq -r ".[].id" 2>/dev/null)
+            if [ -z "$IDS" ]; then echo "⚠️ API から $bid のプロファイル一覧が取れません（権限不足の可能性）。ポータルで手動削除が必要です"; DELETE_FAILED=1; fi
+            for id in $IDS; do
+              # 削除の失敗を握りつぶさない: APIキーの権限（Developer 役割）では削除できないことがあり、
+              # 2026-09-04 (7)(8) はこれが毎回失敗→手元だけ消える→ゼロで Build ipa が落ちるループだった
+              if app-store-connect profiles delete "$id"; then echo "deleted profile $id ($bid)"; else echo "⚠️ profile $id の削除に失敗（APIキーの権限不足の可能性）"; DELETE_FAILED=1; fi
+            done
+          done
+          rm -f "$PROFILES/"*.mobileprovision
+          # 作り直しを試す（$BUNDLE_ID の前方一致＝拡張 …rn.liveactivity / …rn.widget もまとめて取り直す）。
+          # ユーザースクリプトの文脈では証明書の秘密鍵が渡らず失敗することがある
+          # （2026-09-04 build_ipa(7): 失敗が echo で握りつぶされ Build ipa が空のプロファイルで落ちた）。
+          # 失敗しても止めず、下の「実際に出来たか」の検証で判定する
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create || echo "fetch-signing-files --create は失敗（下で判定）"
+          ALL_OK=1
+          while IFS='|' read -r bid key; do
+            [ -n "$bid" ] || continue
+            set +e; check "$bid" "$key"; rc=$?; set -e
+            [ "$rc" = "0" ] || ALL_OK=0
+          done <<< "$REQS"
+          if [ "$ALL_OK" = "1" ]; then
+            # 新しいプロファイルを Xcode プロジェクトに掛け直す（Build ipa 側の use-profiles だけに任せない）
+            xcode-project use-profiles --project "native/ios/BodyLog.xcodeproj" --warn-only
+            echo "✅ プロファイルを作り直しました（要件の entitlement 込み）"
+          else
+            echo "❌ 要件を満たすプロファイルを手元に作れませんでした。" >&2
+            echo "   ポータルの古いプロファイルは削除済みなので、**このワークフローをもう一度実行**すると" >&2
+            echo "   Codemagic の自動署名（ビルド前）が現在の capability で新しいプロファイルを作ります。" >&2
+            if [ "${DELETE_FAILED:-0}" = "1" ]; then
+              echo "   ⚠️ ポータルのプロファイル削除が失敗しています。手動で削除してください:" >&2
+              echo "      https://developer.apple.com/account/resources/profiles/list → 該当 Bundle ID の App Store 用を Delete" >&2
             fi
+            echo "   それでも同じなら Apple Developer → Identifiers で capability（Associated Domains ／ App Groups と group の紐付け）が ON か確認。" >&2
+            echo "   Live Activity だけ切って先に出すなら環境変数 DISABLE_LIVE_ACTIVITY=true。" >&2
+            exit 1
           fi
       - name: Set build number
         script: |
