@@ -6,7 +6,7 @@ import { resolvePlan, getLimits, checkKindLimit } from '@/lib/plan';
 import { globalCapReached } from '@/lib/globalUsage';
 import { callGemini, parseJsonLoose } from '@/lib/gemini';
 import { buildCoachPrompt, COACH_ACTION_KINDS } from '@/lib/coachPrompt';
-import { NUTRIENT_KEYS, type FoodItem } from '@/lib/items';
+import { NUTRIENT_KEYS, NUTRIENT_META, type FoodItem, type NutrientKey } from '@/lib/items';
 import { computePlan, macroTargets, type Goal, type PlanEvent } from '@/lib/goal';
 import { PURPOSE_PRESETS } from '@/lib/purpose';
 import { bumpAiUsage } from '@/lib/aiUsage';
@@ -21,11 +21,14 @@ function addDays(d: string, n: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-const NUTRIENT_LABEL: Record<string, [string, string, number]> = {
-  // key: [表示名, 単位, 1日の目安]
-  salt: ['食塩相当量', 'g', 7.5], fib: ['食物繊維', 'g', 21], sug: ['糖類', 'g', 25],
-  k: ['カリウム', 'mg', 3000], ca: ['カルシウム', 'mg', 750], mg: ['マグネシウム', 'mg', 370],
-  fe: ['鉄', 'mg', 7.5], zn: ['亜鉛', 'mg', 11], vd: ['ビタミンD', 'μg', 8.5], vc: ['ビタミンC', 'mg', 100],
+// 1日の目安（日本人の食事摂取基準 2025年版・18〜49歳の男女の値を丸めた参考値）。判定には使わず、
+// 相談の文脈として「記録の平均が目安のどのあたりか」を AI に渡すためだけの数字。表示名・単位は lib/items.ts の NUTRIENT_META。
+// 厳密な性別×年齢別の基準はアプリ側 native/src/content/dri2025.ts（栄養ランキング「不足栄養素」タブ）が持つ
+const NUTRIENT_REF: Record<NutrientKey, number> = {
+  salt: 7, fib: 20, sug: 25, k: 2800, ca: 700, mg: 330, fe: 8, zn: 8.5, vd: 9, vc: 100,
+  satfat: 17, n6: 10, n3: 2, va: 800, ve: 6, vk: 150,
+  vb1: 1.0, vb2: 1.4, nia: 13, vb6: 1.3, vb12: 4, fol: 240, pan: 5.5, bio: 50,
+  phos: 900, cu: 0.8, mn: 3.3, iod: 140, se: 28, cr: 10, mo: 28,
 };
 
 export async function POST(req: Request) {
@@ -143,13 +146,17 @@ export async function POST(req: Request) {
       }
     }
   }
-  const nutLines = NUTRIENT_KEYS.map((k) => {
-    const t = nutTotals[k];
-    const [label, unit, ref] = NUTRIENT_LABEL[k];
-    if (!t || t.days.size === 0) return `${label}: データなし`;
-    const perDay = Math.round((t.sum / t.days.size) * 10) / 10;
-    return `${label}: 約${perDay}${unit}/日 (目安${ref}${unit}・記録${t.days.size}日分)`;
-  }).join(' / ');
+  // 値のある栄養素だけ並べる（31キーに増えたので「データなし」を並べない。旧記録は10キーしか持たない）
+  const nutRows = NUTRIENT_KEYS.filter((k) => (nutTotals[k]?.days.size ?? 0) > 0).map((k) => {
+    const tt = nutTotals[k]!;
+    const { label, unit, decimals } = NUTRIENT_META[k];
+    const perDay = Math.round((tt.sum / tt.days.size) * 10 ** Math.max(1, decimals)) / 10 ** Math.max(1, decimals);
+    return `${label}: 約${perDay}${unit}/日 (目安${NUTRIENT_REF[k]}${unit}・記録${tt.days.size}日分)`;
+  });
+  const nutMissing = NUTRIENT_KEYS.length - nutRows.length;
+  const nutLines = nutRows.length === 0
+    ? 'データなし'
+    : nutRows.join(' / ') + (nutMissing > 0 ? ` / （記録に値が無い栄養素 ${nutMissing}項目は省略）` : '');
 
   // ===== 今日のいま（残りkcal・残りPFC・食べたもの） =====
   // アプリのヒーローと同じ式で計算する（維持カロリー＋運動 − 計画の必要赤字）。

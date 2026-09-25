@@ -1,10 +1,63 @@
 // 品目リストの編集・再計算ロジック
 
-// 分析用の追加栄養素（AI解析から蓄積。UIには表示せずDBに貯める）
-// salt=食塩相当量g / fib=食物繊維g / sug=糖類g / k=カリウムmg / ca=カルシウムmg /
-// mg=マグネシウムmg / fe=鉄mg / zn=亜鉛mg / vd=ビタミンDμg / vc=ビタミンCmg
-export const NUTRIENT_KEYS = ['salt', 'fib', 'sug', 'k', 'ca', 'mg', 'fe', 'zn', 'vd', 'vc'] as const;
+// ===== 分析用の追加栄養素（AI解析から蓄積。栄養ランキング「自分の摂取」「不足栄養素」の集計に使う） =====
+//
+// キーは **日本人の食事摂取基準（2025年版）** で基準値（推奨量／目安量／目標量）が設定されている栄養素を網羅する
+// （content/dri2025.ts が同じキーで基準値を持ち、lib/nutrientIntake.ts が記録と突き合わせる）。
+// 2026-09-25 に 10 → 31 キーへ拡張。旧記録・登録済みマイ食品は新キーを持たない＝「不明」であって 0 ではない
+// （集計側が区別する。0 で埋めない）。
+//
+// この配列と NUTRIENT_META が正本。サーバー側 lib/items.ts（AI プロンプトの項目行と JSON 雛形を生成）は
+// これを写した鏡で、tests/items.test.ts が両者の一致を固定する。
+export const NUTRIENT_KEYS = [
+  // ---- 2026-09-24 以前からの10キー（並びは維持: 旧プロンプト・seed-demo と同じ） ----
+  'salt', 'fib', 'sug', 'k', 'ca', 'mg', 'fe', 'zn', 'vd', 'vc',
+  // ---- 脂質の内訳 ----
+  'satfat', 'n6', 'n3',
+  // ---- 脂溶性ビタミン ----
+  'va', 've', 'vk',
+  // ---- 水溶性ビタミン ----
+  'vb1', 'vb2', 'nia', 'vb6', 'vb12', 'fol', 'pan', 'bio',
+  // ---- ミネラル（k/ca/mg/fe/zn は上の10キー） ----
+  'phos', 'cu', 'mn', 'iod', 'se', 'cr', 'mo',
+] as const;
 export type NutrientKey = typeof NUTRIENT_KEYS[number];
+
+/** 表示情報。label は日本語原文（画面は t() に通す）・unit は成分表と同じ・decimals は表示と AI への指示桁 */
+export type NutrientMeta = { label: string; unit: string; decimals: 0 | 1 | 2 };
+export const NUTRIENT_META: Record<NutrientKey, NutrientMeta> = {
+  salt:   { label: '食塩相当量',   unit: 'g',     decimals: 1 },
+  fib:    { label: '食物繊維',     unit: 'g',     decimals: 1 },
+  sug:    { label: '糖類',         unit: 'g',     decimals: 0 },
+  k:      { label: 'カリウム',     unit: 'mg',    decimals: 0 },
+  ca:     { label: 'カルシウム',   unit: 'mg',    decimals: 0 },
+  mg:     { label: 'マグネシウム', unit: 'mg',    decimals: 0 },
+  fe:     { label: '鉄',           unit: 'mg',    decimals: 1 },
+  zn:     { label: '亜鉛',         unit: 'mg',    decimals: 1 },
+  vd:     { label: 'ビタミンD',    unit: 'µg',    decimals: 1 },
+  vc:     { label: 'ビタミンC',    unit: 'mg',    decimals: 0 },
+  satfat: { label: '飽和脂肪酸',   unit: 'g',     decimals: 1 },
+  n6:     { label: 'n-6系脂肪酸',  unit: 'g',     decimals: 1 },
+  n3:     { label: 'n-3系脂肪酸',  unit: 'g',     decimals: 1 },
+  va:     { label: 'ビタミンA',    unit: 'µgRAE', decimals: 0 },
+  ve:     { label: 'ビタミンE',    unit: 'mg',    decimals: 1 },
+  vk:     { label: 'ビタミンK',    unit: 'µg',    decimals: 0 },
+  vb1:    { label: 'ビタミンB1',   unit: 'mg',    decimals: 2 },
+  vb2:    { label: 'ビタミンB2',   unit: 'mg',    decimals: 2 },
+  nia:    { label: 'ナイアシン',   unit: 'mgNE',  decimals: 1 },
+  vb6:    { label: 'ビタミンB6',   unit: 'mg',    decimals: 2 },
+  vb12:   { label: 'ビタミンB12',  unit: 'µg',    decimals: 1 },
+  fol:    { label: '葉酸',         unit: 'µg',    decimals: 0 },
+  pan:    { label: 'パントテン酸', unit: 'mg',    decimals: 1 },
+  bio:    { label: 'ビオチン',     unit: 'µg',    decimals: 1 },
+  phos:   { label: 'リン',         unit: 'mg',    decimals: 0 },
+  cu:     { label: '銅',           unit: 'mg',    decimals: 2 },
+  mn:     { label: 'マンガン',     unit: 'mg',    decimals: 2 },
+  iod:    { label: 'ヨウ素',       unit: 'µg',    decimals: 0 },
+  se:     { label: 'セレン',       unit: 'µg',    decimals: 0 },
+  cr:     { label: 'クロム',       unit: 'µg',    decimals: 0 },
+  mo:     { label: 'モリブデン',   unit: 'µg',    decimals: 0 },
+};
 
 export type FoodItem = {
   name: string; qty: string; kcal: number; p: number; f: number; c: number;

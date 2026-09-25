@@ -176,7 +176,7 @@ export default function ColumnReader({ variant = 'full' }: { variant?: 'full' | 
         <View style={s.navIcon}><Trophy size={18} color={C.teal} /></View>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>{t('◯◯が多いのは？食材ランキング')}</Text>
-          <Text style={s.lead} numberOfLines={2}>{t('鉄・ビタミン・亜鉛…が多い食材と、同じ栄養をより少ないカロリーで取る「かしこい置き換え」。たんぱく源のティア表も')}</Text>
+          <Text style={s.lead} numberOfLines={2}>{t('自分の記録から栄養素ごとの摂取ランキングと不足しがちな栄養素・おすすめ食材。食材の図鑑と「かしこい置き換え」も')}</Text>
         </View>
         <ChevronRight size={16} color={C.faint} />
       </Pressable>

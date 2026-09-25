@@ -72,6 +72,8 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-food-freq-v2', 'bl-food-seen',
   'bl-purpose',            // ダイエットの目的（バルク/カット）
   'bl-wake-time',
+  'bl-nutri-menses',       // 栄養ランキング「不足栄養素」の鉄の基準（月経あり/なし）。本人の身体情報
+
   // --- 実績・バッジ ---
   'bl-badges-earned', 'bl-badges-seen-defs', 'bl-badges-unseen', 'bl-badges-banner',
   // --- 初回体験・ガイドの進捗（lib/firstrun.ts が :uid を付けるが、掃除は前方一致で拾う） ---
