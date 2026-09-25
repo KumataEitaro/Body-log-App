@@ -68,8 +68,50 @@ export async function setLocale(code: LocaleCode): Promise<void> {
   try { onLocaleChange?.(); } catch { /* 通知の再登録に失敗しても表示は切り替わっている */ }
 }
 
+/**
+ * 「端末の設定に従う（自動）」へ戻す（2026-09-25 熊田さん: iPhone / Android の言語設定に従う。手動選択も可能）。
+ * 保存した手動選択を消し、端末の言語から決め直す。以後は起動・前景復帰のたびに端末の言語を追う（syncDeviceLocale）
+ */
+export async function setLocaleAuto(): Promise<void> {
+  explicit = false;
+  const next = detectDeviceLocale();
+  const changed = next !== locale;
+  locale = next;
+  emit();
+  try { await AsyncStorage.removeItem(KEY); } catch { /* 表示は既に切り替わっている */ }
+  if (changed) { try { onLocaleChange?.(); } catch { /* 同上 */ } }
+}
+
+/**
+ * 端末の言語が変わっていたら追従する（手動選択中は何もしない）。
+ * iOS は言語変更でアプリが再起動されるが、Android は再起動されないことがあるので、前景復帰のたびに呼ぶ
+ */
+export function syncDeviceLocale(): boolean {
+  if (explicit) return false;
+  const next = detectDeviceLocale();
+  if (next === locale) return false;
+  locale = next;
+  emit();
+  try { onLocaleChange?.(); } catch { /* 通知の再登録に失敗しても表示は切り替わっている */ }
+  return true;
+}
+
+/** 端末の言語（対応言語に丸めたもの）の表示名。「端末の設定に従う（いまは English）」の補足に使う */
+export function deviceLocaleLabel(): string {
+  const code = detectDeviceLocale();
+  return LOCALES.find((l) => l.code === code)?.label ?? code;
+}
+
 export function getLocale(): LocaleCode { return locale; }
 export function isExplicitLocale(): boolean { return explicit; }
+/** 手動選択の有無をフック側で追えるように（自動⇄手動の切替でも再描画する） */
+export function useLocaleExplicit(): boolean {
+  return useSyncExternalStore(
+    (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+    isExplicitLocale,
+    isExplicitLocale,
+  );
+}
 
 export function useLocale(): LocaleCode {
   return useSyncExternalStore(

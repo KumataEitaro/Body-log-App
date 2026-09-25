@@ -2542,3 +2542,12 @@ AsyncStorage `bl-custom-lifts`（既存キー・サインアウトで消える C
 - `lib/liftSession.ts` — `isSide` 引数・`loadLabel` の片側・`setToEntry`/`sessionText`/`sessionVolume`/`roundTrips`
 - `components/LiftPicker.tsx`（追加フォーム・部位グループ・削除）、`SetDial.tsx`、`LiftHistoryCard.tsx`、`LiftingProgress.tsx`、`app/lift-session.tsx`
 - テスト: `lib/__tests__/{liftLog,lifts,training,liftSession}.test.ts`（旧書式・新書式・×2・部位）。10辞書に13キー
+
+## マイ食品のセットのチップを単品と統一・言語は端末の設定に従う（2026-09-25・v1.1.16）
+
+- **セット（複数品目のマイ食品）のチップ**は、これまで皿アイコン＋アクセント面で単品と見た目が違い、長押しの意味も違った
+  （単品＝即記録、セット＝削除）。熊田さん「何でおからケーキだけ表示が違うの？統一感出したい」→ 見た目も操作も単品と同じにした
+  （＋ 名前・タップでトレイへ・長押しで全品目を即記録）。セットの削除・名前変更は設定＞マイ食品の管理から（従来どおり）
+- **言語**: 既定は iPhone / Android の言語設定に従う（対応外の言語は英語）。手動で選ぶと固定され、言語の一覧の先頭
+  「端末の設定に従う（自動）」で戻せる（いまの端末言語を添えて表示）。前景復帰のたびに端末の言語を見直す（Android は言語変更で
+  アプリが再起動されないことがある）。`lib/i18n.ts` `setLocaleAuto` / `syncDeviceLocale`

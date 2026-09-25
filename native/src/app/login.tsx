@@ -11,7 +11,7 @@ import { authErrorMessage, configMissingMessage } from '@/lib/authErrors';
 import { parseAuthCallback } from '@/lib/authCallback';
 import { C, sheetTopPad, themed } from '@/lib/ui';
 import { useTheme } from '@/lib/theme';
-import { t, useLocale, setLocale, LOCALES } from '@/lib/i18n';
+import { t, useLocale, useLocaleExplicit, setLocale, setLocaleAuto, deviceLocaleLabel, LOCALES } from '@/lib/i18n';
 import { Languages, Check, KeyRound } from 'lucide-react-native';
 
 // OAuthのリダイレクト受け取り（Web/一部Androidの復帰経路）。
@@ -269,6 +269,7 @@ export default function LoginScreen() {
 
   const isLogin = mode === 'login';
   const locale = useLocale();
+  const localeExplicit = useLocaleExplicit();   // 手動で選んだか（false = 端末の設定に従う）
   const [langOpen, setLangOpen] = useState(false);
   const langLabel = LOCALES.find((l) => l.code === locale)?.label ?? '日本語';
 
@@ -435,11 +436,20 @@ export default function LoginScreen() {
             </Pressable>
           </View>
           <ScrollView>
+            {/* 既定は端末の設定に従う（iPhone / Android の言語）。手動で選ぶと固定され、この行で自動に戻せる（2026-09-25） */}
+            <Pressable style={s.langRow} onPress={() => { setLocaleAuto().catch(() => {}); setLangOpen(false); }}
+                       accessibilityRole="button" accessibilityState={{ selected: !localeExplicit }}>
+              <Text style={s.langRowT}>
+                {t('端末の設定に従う（自動）')}<Text style={{ color: C.sub, fontWeight: '600' }}> {t('（いまは{lang}）', { lang: deviceLocaleLabel() })}</Text>
+              </Text>
+              {!localeExplicit && <Check size={18} color={C.teal} strokeWidth={3} />}
+            </Pressable>
             {LOCALES.map((l) => (
               <Pressable key={l.code} style={s.langRow}
-                         onPress={() => { setLocale(l.code); setLangOpen(false); }}>
+                         onPress={() => { setLocale(l.code); setLangOpen(false); }}
+                         accessibilityRole="button" accessibilityState={{ selected: localeExplicit && locale === l.code }}>
                 <Text style={s.langRowT}>{l.label}</Text>
-                {locale === l.code && <Check size={18} color={C.teal} strokeWidth={3} />}
+                {localeExplicit && locale === l.code && <Check size={18} color={C.teal} strokeWidth={3} />}
               </Pressable>
             ))}
           </ScrollView>

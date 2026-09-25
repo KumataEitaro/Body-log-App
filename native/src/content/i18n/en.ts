@@ -2524,4 +2524,8 @@ export const EN: Record<string, string> = {
   "片側": "per side",
   "片側で入力したダンベル種目は両側の合計で数えています。": "Dumbbell exercises entered per side are counted for both sides.",
   "「片側」はダンベル種目で、片手ぶんの重さです。": "Per side = dumbbell exercise, the weight in one hand.",
+  // セットのチップ統一・言語の自動追従（2026-09-25）
+  "{name}（セット）": "{name} (set)",
+  "端末の設定に従う（自動）": "Follow device setting (auto)",
+  "（いまは{lang}）": "(now {lang})",
 };

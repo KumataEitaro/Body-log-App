@@ -2475,4 +2475,8 @@ export const ID: Record<string, string> = {
   "片側": "per sisi",
   "片側で入力したダンベル種目は両側の合計で数えています。": "Latihan dumbbell yang dimasukkan per sisi dihitung untuk kedua sisi.",
   "「片側」はダンベル種目で、片手ぶんの重さです。": "Per sisi = latihan dumbbell, berat di satu tangan.",
+  // セットのチップ統一・言語の自動追従（2026-09-25）
+  "{name}（セット）": "{name} (set)",
+  "端末の設定に従う（自動）": "Ikuti pengaturan perangkat (otomatis)",
+  "（いまは{lang}）": "(sekarang {lang})",
 };

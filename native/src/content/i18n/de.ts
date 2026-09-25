@@ -2475,4 +2475,8 @@ export const DE: Record<string, string> = {
   "片側": "pro Seite",
   "片側で入力したダンベル種目は両側の合計で数えています。": "Pro Seite eingegebene Kurzhantelübungen werden für beide Seiten gezählt.",
   "「片側」はダンベル種目で、片手ぶんの重さです。": "Pro Seite = Kurzhantelübung, das Gewicht in einer Hand.",
+  // セットのチップ統一・言語の自動追従（2026-09-25）
+  "{name}（セット）": "{name} (Set)",
+  "端末の設定に従う（自動）": "Geräteeinstellung folgen (automatisch)",
+  "（いまは{lang}）": "(derzeit {lang})",
 };
