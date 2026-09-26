@@ -430,8 +430,6 @@ export const ES: Record<string, string> = {
   'タップして選ぶ': 'Toca para elegir',
   '・タップで内容': '· toca para ver el contenido',
   '・タップで詳細': '· toca para ver el detalle',
-  '▾ ひらく': '▾ Desplegar',
-  '▴ とじる': '▴ Plegar',
   '▲ 食べた翌日、上がりやすい': '▲ Suele subir al día siguiente',
   '▼ 食べた翌日、下がりやすい': '▼ Suele bajar al día siguiente',
   '食材とあなたの体の傾向': 'Alimentos y cómo responde tu cuerpo',
@@ -2674,4 +2672,10 @@ export const ES: Record<string, string> = {
   "落ち着き": "Calma",
   "記録しました。今夜の予報に反映します。": "Guardado. Se reflejará en el pronóstico de esta noche.",
   "金曜・土曜": "Viernes o sábado",
+  // ===== ＋シート圧縮・入力シート「マイ食品を追加」（2026-09-26・feat/plus-sheet-compact） =====
+  "身体を記録": "Registrar cuerpo",
+  "体重・ウエスト・体脂肪率": "Peso, cintura y grasa corporal",
+  "カロリー目標・体重目標": "Objetivos de calorías y peso",
+  "AIに相談": "Consultar a la IA",
+  "まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。": "Aún no hay nada guardado. Toca “Añadir un alimento” para guardarlo y añadirlo con un toque la próxima vez.",
 };

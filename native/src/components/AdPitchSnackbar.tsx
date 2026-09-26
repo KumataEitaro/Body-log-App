@@ -22,7 +22,7 @@
 // 今日の提示が2回未満。**RCキー未設定の現運用では常に false ＝この部品は眠ったまま**。
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Reanimated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Reanimated, { Easing, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
@@ -92,8 +92,9 @@ function Bar({ onClose, onOpen }: { onClose: () => void; onOpen: () => void }) {
   }, []);
   return (
     <Reanimated.View
-      entering={reduce ? undefined : SlideInDown.springify().damping(18)}
-      exiting={reduce ? undefined : SlideOutDown.duration(180)}
+      // UndoSnackbar と同じ「静かなモーション」（240ms ease-out 入場・160ms 退場・バネ無し。2026-09-26）
+      entering={reduce ? undefined : SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}
+      exiting={reduce ? undefined : SlideOutDown.duration(160)}
       style={sp.bar}
       testID="ad-pitch-snackbar"
     >

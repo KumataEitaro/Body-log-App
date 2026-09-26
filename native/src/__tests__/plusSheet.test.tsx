@@ -3,13 +3,15 @@
 // 2026-09-04 の再設計で、シートは「食事だけ大きいカード＋残りはリスト行」になった。
 // （2×2の大きなカードを並べる形は、アイコンとラベルを縦積みするため縦中央の計算が要り、
 //   新アーキ×iOS の lineHeight 問題で文字が下に寄る事故を招いた。詳細は PlusSheet.tsx 冒頭）
-// ここが壊れると記録が一切できなくなるので、①食事カードが1枚 ②運動・体の写真・体重・「マイ食品を登録」・
-// 「あとのカロリーで何を食べる？」がリスト行として在る ③食事は1タップで meal:text が閉じ切ってから届く
-// ④2×2グリッドが無い ⑤体重は従来どおりシート内2段目、を検証する。
+// ここが壊れると記録が一切できなくなるので、①食事カードが1枚 ②身体を記録・先の予定・目標設定・AIに相談が
+// リスト行として在る ③食事は1タップで meal:text が閉じ切ってから届く ④2×2グリッドが無い
+// ⑤体重・ウエストは「身体を記録」の下の段でシート内保存、を検証する。
 // 食事タブ本体（LogScreen）が＋ボタンと入力シートを持ってマウントできることも見る。
 //
-// 2026-09-10: ＋は4タブ共通になり（components/PlusEntry.tsx）、区切り線の下に「マイ食品を登録」が増えた
-// （シートの高さ 428pt → 486pt）。行の並び自体もここで固定する（貼る場所を間違えると記録4種と混ざる）。
+// 2026-09-10: ＋は4タブ共通になり（components/PlusEntry.tsx）、区切り線の下に「マイ食品を登録」が増えた（486pt）。
+// 2026-09-26: 熊田さん「項目が多すぎる。親指が届く高さに」→ 1段目を5項目（食事・身体・先の予定・目標設定・AIに相談）に
+// 絞った（約390pt）。運動・筋トレ・マイ食品を登録・何を食べる？の行は廃止し、体重・ウエスト・体脂肪率は「身体を記録」の
+// 2段目へ。テストの行リスト・並び・段の遷移はこの仕様に合わせて書き換えた。
 import renderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Text, View } from 'react-native';
 import PlusSheet from '../components/PlusSheet';
@@ -43,7 +45,7 @@ function hasText(tree: ReactTestRenderer, text: string): boolean {
 }
 
 describe('＋シート（食事は大カード・他はリスト行）', () => {
-  it('食事の大カードが1枚だけ・運動/体の写真/体重/あとのカロリーで何を食べる？はリスト行（段表示は出さない）', async () => {
+  it('食事の大カードが1枚だけ・身体を記録/先の予定/目標設定/AIに相談の4行だけ（段表示は出さない）', async () => {
     const tree = await mount(
       <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />,
     );
@@ -57,28 +59,32 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     // アイコンとラベルは必ず横並び（縦積みに戻したらここで落ちる）
     expect(styleOf(meal).flexDirection).toBe('row');
 
-    // ② 残りはすべて高さ52のリスト行で、右端にシェブロンが付く
-    for (const l of ['運動（歩く・走る・泳ぐ）', '筋トレ', '体重', 'ウエスト', '体脂肪率（AIで推定）', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '先の予定を入れる']) {
+    // ② 残りはすべて高さ52のリスト行で、右端にシェブロンが付く（4行。親指が届く高さに収める）
+    for (const l of ['身体を記録', '先の予定を入れる', '目標設定', 'AIに相談']) {
       const row = item(tree, l);
       expect(row).toBeTruthy();
       expect(styleOf(row).height).toBe(52);
       expect(styleOf(row).flexDirection).toBe('row');
     }
 
-    // ②' 並びは固定: 記録（食事・運動・体の写真・体重）→ 区切り線 → 準備・相談（マイ食品を登録・
-    //     何を食べる？・先の予定）。マイ食品の登録は「食べた記録」ではないので上の4種に混ぜない
+    // ②' 並びは固定: 食事 → 身体を記録 → 先の予定 → 目標設定 → AIに相談
     const order = tree.root
       .findAll((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('plus-') && typeof n.props?.onPress === 'function')
       .map((n) => n.props.testID as string)
       // 同じ testID が Row と中の Pressable の両方に付く（＝連続して2回出る）ので畳む
       .filter((id, i, arr) => id !== arr[i - 1]);
-    // 2026-09-18: 体の写真（plus-bodyphoto）を廃止し、体重の隣にウエストと体脂肪率（AI推定）を置いた
-    expect(order).toEqual(['plus-meal', 'plus-exercise', 'plus-lift', 'plus-weight', 'plus-waist', 'plus-bodyfat', 'plus-myfood-add', 'plus-whattoeat', 'plus-plan']);
+    expect(order).toEqual(['plus-meal', 'plus-body', 'plus-plan', 'plus-goal', 'plus-coach']);
+
+    // ②'' 2026-09-26 に外した行は1段目に無い。運動・筋トレ → 運動タブのタイル、マイ食品を登録 → 入力シートの
+    //     「マイ食品を追加」、何を食べる？ → 食事タブのヒーロー。体の3つは「身体を記録」の下（別テスト）
+    for (const l of ['運動（歩く・走る・泳ぐ）', '筋トレ', 'マイ食品を登録', 'あとのカロリーで何を食べる？', '体重', 'ウエスト', '体脂肪率（AIで推定）']) {
+      expect(item(tree, l)).toBeUndefined();
+    }
 
     // ③ 2×2グリッド（flexWrap で折り返す枡・幅%指定・正方形に近い高さ）はもう無い
     const wrapped = tree.root.findAll((n) => n.type === View && (styleOf(n) as { flexWrap?: string }).flexWrap === 'wrap');
     expect(wrapped).toHaveLength(0);
-    for (const l of ['食事を記録', '運動（歩く・走る・泳ぐ）', '筋トレ', 'ウエスト', '体重', 'あとのカロリーで何を食べる？']) {
+    for (const l of ['食事を記録', '身体を記録', '先の予定を入れる', '目標設定', 'AIに相談']) {
       expect(styleOf(item(tree, l)).width).toBeUndefined();   // 旧タイルは width:'47.5%'
     }
 
@@ -90,9 +96,10 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
       expect(n.props.adjustsFontSizeToFit).toBeFalsy();
     }
 
-    // ⑤ 食事は直行なので「記録する」の下に段は無い（体重だけ2段）
+    // ⑤ 段番号（1/2・2/2）は出さない。階層はパンくず（記録する › 身体を記録 › 体重）で見せる（2026-09-26）
     expect(hasText(tree, '1/2')).toBe(false);
     expect(hasText(tree, '2/2')).toBe(false);
+    expect(hasText(tree, '2/3')).toBe(false);
     // 入力方法の選択画面（旧2段目）は廃止した＝入力シート側にマイ食品・写真アイコンが載っているため
     expect(item(tree, 'テキストで入力')).toBeUndefined();
     expect(item(tree, 'マイ食品')).toBeUndefined();
@@ -120,12 +127,12 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     await act(async () => { tree.unmount(); });
   });
 
-  it('リスト行の行動もそのまま外へ出る（運動・筋トレ・体脂肪率・マイ食品を登録・何を食べる？・先の予定）', async () => {
-    for (const [label, action] of [
-      ['運動（歩く・走る・泳ぐ）', 'exercise'], ['筋トレ', 'lift'], ['体脂肪率（AIで推定）', 'bodyfat'],
-      // マイ食品の登録シート（AddFoodSheet）も、＋シートが閉じ切ってから開く（iOSのModal兄弟問題）
-      ['マイ食品を登録', 'myfood:add'],
-      ['あとのカロリーで何を食べる？', 'meal:whattoeat'], ['先の予定を入れる', 'plan'],
+  it('リスト行の行動もそのまま外へ出る（先の予定・目標設定・AIに相談、身体を記録 › 体脂肪率）', async () => {
+    // [押す順番, 期待する行動]。体脂肪率だけ「身体を記録」の段を挟む
+    for (const [path, action] of [
+      [['先の予定を入れる'], 'plan'], [['目標設定'], 'goal'], [['AIに相談'], 'coach'],
+      // 体脂肪率のシート（BodyFatSheet）も、＋シートが閉じ切ってから開く（iOSのModal兄弟問題）
+      [['身体を記録', '体脂肪率（AIで推定）'], 'bodyfat'],
     ] as const) {
       const onAction = jest.fn();
       let visible = true;
@@ -133,12 +140,44 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
         <PlusSheet visible={visible} onClose={() => { visible = false; }} onAction={onAction} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />
       );
       const tree = await mount(el());
-      await act(async () => { item(tree, label).props.onPress(); });
+      for (const label of path) await act(async () => { item(tree, label).props.onPress(); });
       await act(async () => { tree.update(el()); });
       await act(async () => { jest.advanceTimersByTime(1000); });
       expect(onAction).toHaveBeenCalledWith(action);
       await act(async () => { tree.unmount(); });
     }
+  });
+
+  // 2026-09-26: 体重・ウエスト・体脂肪率は1行「身体を記録」にまとめ、押すと次の段で3つから選ぶ
+  it('身体を記録 → 2段目は 体重・ウエスト・体脂肪率（AIで推定）の3行。パンくずは「記録する › 身体を記録 › 体重」、戻るは1段ずつ', async () => {
+    const tree = await mount(
+      <PlusSheet visible onClose={() => {}} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="—" />,
+    );
+    expect(item(tree, '戻る')).toBeUndefined();   // 1段目に戻るは無い
+    await act(async () => { item(tree, '身体を記録').props.onPress(); });
+    expect(item(tree, '食事を記録')).toBeUndefined();   // 1段目は消える
+    const order = tree.root
+      .findAll((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('plus-') && typeof n.props?.onPress === 'function')
+      .map((n) => n.props.testID as string)
+      .filter((id, i, arr) => id !== arr[i - 1]);
+    expect(order).toEqual(['plus-weight', 'plus-waist', 'plus-bodyfat']);
+    for (const l of ['体重', 'ウエスト', '体脂肪率（AIで推定）']) expect(styleOf(item(tree, l)).height).toBe(52);
+    expect(hasText(tree, '記録する › ')).toBe(true);   // パンくずの前段
+
+    // 体重 → 3段目（数値入力）。パンくずは「記録する › 身体を記録 › 体重」
+    await act(async () => { item(tree, '体重').props.onPress(); });
+    // 数値入力が出ている（TextInput はホスト側にも同じ props が伝播して2つ見つかるので個数は数えない）
+    expect(tree.root.findAll((n) => n.props?.keyboardType === 'decimal-pad').length).toBeGreaterThan(0);
+    expect(hasText(tree, '記録する › 身体を記録 › ')).toBe(true);
+    // 戻るは身体の段へ（1段目まで戻さない）
+    await act(async () => { item(tree, '戻る').props.onPress(); });
+    expect(item(tree, 'ウエスト')).toBeTruthy();
+    expect(item(tree, '食事を記録')).toBeUndefined();
+    // もう一度戻ると1段目
+    await act(async () => { item(tree, '戻る').props.onPress(); });
+    expect(item(tree, '食事を記録')).toBeTruthy();
+    expect(item(tree, '体重')).toBeUndefined();
+    await act(async () => { tree.unmount(); });
   });
 
   it('体重 → シート内で数値を入れて保存（成功で閉じる／エラー文はシート内に出る）', async () => {
@@ -147,6 +186,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
     const tree = await mount(
       <PlusSheet visible onClose={onClose} onAction={() => {}} onSaveWeight={onSaveWeight} weightUnit="kg" weightPlaceholder="70.0" />,
     );
+    await act(async () => { item(tree, '身体を記録').props.onPress(); });   // 2026-09-26: 体重は「身体を記録」の下
     await act(async () => { item(tree, '体重').props.onPress(); });
     const input = tree.root.findAll((n) => n.props?.keyboardType === 'decimal-pad')[0];
     expect(input).toBeTruthy();
@@ -170,6 +210,7 @@ describe('＋シート（食事は大カード・他はリスト行）', () => {
       <PlusSheet visible onClose={onClose} onAction={() => {}} onSaveWeight={async () => null} weightUnit="kg" weightPlaceholder="70.0"
                  onSaveWaist={onSaveWaist} waistUnit="cm" waistPlaceholder="80.0" />,
     );
+    await act(async () => { item(tree, '身体を記録').props.onPress(); });   // 2026-09-26: ウエストは「身体を記録」の下
     await act(async () => { item(tree, 'ウエスト').props.onPress(); });
     const input = tree.root.findAll((n) => n.props?.keyboardType === 'decimal-pad')[0];
     expect(input).toBeTruthy();

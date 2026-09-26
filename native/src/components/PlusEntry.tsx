@@ -9,16 +9,20 @@
 // 4タブが同じ部品を描くので、見た目・並び・挙動は必ず一致する（タブごとに＋を作り直さない）。
 //
 // 【行動の振り分け（onAction）】
-//   ① まず onLocal(a) をそのタブに問い合わせる。そのタブで自前処理できる行動（運動タブの exercise・
-//      食事タブの meal:*／whattoeat／plan）は true を返して横取りする。
+//   ① まず onLocal(a) をそのタブに問い合わせる。そのタブで自前処理できる行動（食事タブの meal:*／plan）は
+//      true を返して横取りする。
 //   ② 残りはここで共通処理:
-//        meal:text/myfood/library/camera・meal:whattoeat・plan → 食事タブへ遷移し、同じシートを開く
-//          （/log?open=text|myfood|library|camera|whattoeat|plan&ts=…。log.tsx が受けて 400ms 後に開く）
-//        exercise → /training?open=activity（運動タブが「運動を記録する」シートを開いた状態で着地）
+//        meal:text/myfood/library/camera・plan → 食事タブへ遷移し、同じシートを開く
+//          （/log?open=text|myfood|library|camera|plan&ts=…。log.tsx が受けて 400ms 後に開く）
+//        goal → 設定画面の目標シートへ push（/settings?open=goal・from は親タブ。戻るボタンが「‹ 食事」等と名乗る）
+//        coach → 相談タブへ切り替え（router.navigate('/coach')）
 //        bodyfat → その場で BodyFatSheet（写真から AI が体脂肪率を推定。**写真は保存しない**・数値だけ記録）
-//        myfood:add → その場で AddFoodSheet（どのタブでも登録できる。遷移しない）
-//        体重・ウエスト → PlusSheet の2段目で保存（遷移しない）
+//        myfood:add → その場で AddFoodSheet（どのタブでも登録できる。遷移しない）。2026-09-26 に＋シートの行から
+//          外れたが、食事タブの入力シート「マイ食品を追加」が同じ経路（AddFoodSheet・draft=null）を使う
+//        体重・ウエスト → PlusSheet の3段目で保存（遷移しない。2段目「身体を記録」で選ぶ）
 //   「体の写真」（bodyphoto → 概要タブの体写真ページ）は 2026-09-18 に廃止した。写真の保存はやめた。
+//   「運動」「筋トレ」「あとのカロリーで何を食べる？」の行は 2026-09-26 に廃止（熊田さん「項目が多すぎる」）。
+//   運動・筋トレの入口は運動タブの2枚のタイル、何を食べる？は食事タブのヒーロー行に残っている。
 //   PlusSheet は「閉じ切ってから onAction」を保証しているので、ここで開く Modal（AddFoodSheet）や
 //   遷移先で開く pageSheet が、表示中の Modal の兄弟にならない（iOSの制約）。
 //
@@ -42,7 +46,8 @@ import { C, RADIUS, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { navFrom, type NavFrom } from '@/lib/navHeader';
 
-/** 食事タブ側で受ける open= の値（PlusAction から 'meal:' を外したもの） */
+/** 食事タブ側で受ける open= の値（PlusAction から 'meal:' を外したもの）。
+ *  'whattoeat' は＋シートから外れた（2026-09-26）が、ディープリンクの受け口として log.tsx に残す */
 export type LogOpenParam = 'text' | 'myfood' | 'library' | 'camera' | 'whattoeat' | 'plan';
 
 /** PlusAction → /log?open= の値。食事タブへ渡さない行動は null */
@@ -52,7 +57,6 @@ export function logOpenParamOf(a: PlusAction): LogOpenParam | null {
     case 'meal:myfood': return 'myfood';
     case 'meal:library': return 'library';
     case 'meal:camera': return 'camera';
-    case 'meal:whattoeat': return 'whattoeat';
     case 'plan': return 'plan';
     default: return null;
   }
@@ -150,13 +154,14 @@ const PlusEntry = forwardRef<PlusEntryHandle, PlusEntryProps>(function PlusEntry
       return;
     }
     switch (a) {
-      case 'exercise':
-        router.navigate({ pathname: '/training', params: { open: 'activity', ts } } as never);
+      // 目標設定は設定画面の目標シートを直接開く（settings.tsx が ?open=goal を受ける）。
+      // from は親タブ（食事・運動・概要・相談）なので、戻るボタンが「‹ 食事」のように名乗れる
+      case 'goal':
+        router.push({ pathname: '/settings', params: navFrom(from, { open: 'goal' }) } as never);
         break;
-      // 筋トレは全画面の記録画面へ直行（2026-09-17）。有酸素とは入力がまったく違うので、
-      // ＋シートの時点で行き先を分けておく。日付は親が持っていればそれ、無ければ今日
-      case 'lift':
-        router.push({ pathname: '/lift-session', params: navFrom(from, { date: date ?? todayJST() }) } as never);
+      // AIに相談は相談タブへ切り替えるだけ（相談タブにいるときは何も起きない）
+      case 'coach':
+        router.navigate('/coach' as never);
         break;
       // 体脂肪率は写真から AI が推定する。写真は保存しない（BodyFatSheet の冒頭コメント）
       case 'bodyfat':

@@ -227,7 +227,8 @@ export default function TrainingScreen() {
     }).catch(() => {});
   }, []);
   const [actSheet, setActSheet] = useState(false);
-  // 食事タブの＋シート「運動」から（/training?open=activity&ts=…）: 「運動を記録する」シートが開いた状態で着地する。
+  // /training?open=activity&ts=… で「運動を記録する」シートが開いた状態で着地する。
+  // 2026-09-26 まで食事タブの＋シート「運動」がここへ飛ばしていた（行は廃止）。ディープリンクの受け口として残す。
   // ts は同じ選択を続けて選んでも毎回開き直すためのノンス
   const { open: openParam, ts: openTs } = useLocalSearchParams<{ open?: string; ts?: string }>();
   useEffect(() => {
@@ -793,7 +794,8 @@ export default function TrainingScreen() {
     {/* 右下の＋（2026-09-10・食事タブと同じ components/PlusEntry.tsx）。
         「運動」はこのタブにいるので遷移せず、その場で「運動を記録する」シートを開く（onLocal で横取り）。
         食事系・先の予定は食事タブへ、体脂肪率・マイ食品の登録はその場で（PlusEntry の共通処理） */}
-    <PlusEntry from="training" onLocal={(a) => { if (a === 'exercise') { setActSheet(true); return true; } return false; }} />
+    {/* 2026-09-26: ＋シートから「運動」「筋トレ」の行が消えたので onLocal は不要。運動の入口はこのタブの2枚のタイル */}
+    <PlusEntry from="training" />
 
     {/* 運動を記録するシート（種目を毎回選ぶ → 時間ダイアル → 保存） */}
     <ActivityLogSheet visible={actSheet} onClose={() => setActSheet(false)} weightKg={myWeight} freq={actFreq} busy={actSaving} onSave={saveActivity} />

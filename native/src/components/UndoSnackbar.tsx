@@ -93,9 +93,11 @@ function SnackBar({ item, onDone }: { item: Item; onDone: (key: number) => void 
 
   return (
     <Reanimated.View
-      // スプリング入場/退場。視差軽減設定ではアニメーションなしで即時に出し入れする
-      entering={reduce ? undefined : SlideInDown.springify().damping(18)}
-      exiting={reduce ? undefined : SlideOutDown.duration(180)}
+      // 入場は 240ms の ease-out（オーバーシュート無し）、退場は 160ms。視差軽減設定ではアニメーションなしで即時に出し入れする。
+      // 2026-09-26 まで springify().damping(18) だったが減衰が足りず、削除のたびに「びよーん」と揺れて見えた（熊田さん指摘）。
+      // Apple HIG / Material 3 Expressive の「静かなモーション」（150〜300ms・ease-out・オーバーシュート無し）に合わせる
+      entering={reduce ? undefined : SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}
+      exiting={reduce ? undefined : SlideOutDown.duration(160)}
       style={sw.bar}
       accessibilityLiveRegion="polite"
     >

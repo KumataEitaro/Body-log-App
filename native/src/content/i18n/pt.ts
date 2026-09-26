@@ -157,7 +157,6 @@ export const PT: Record<string, string> = {
   "まだ記録がありません。下から1回分ずつ記録しましょう。": "Nenhum registro ainda. Adicione uma porção por vez abaixo.",
   "行を長押しで削除できます": "Toque e segure uma linha para excluir",
   "{n}件": "{n} salvos",
-  "▾ ひらく": "▾ Abrir",
   "↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。": "Toque em ↺ para mover para a bandeja abaixo. Remova itens no ×, ajuste e salve com ✓.",
   "追加後 ": "Após adicionar",
   "残り {n}kcal": "Restam {n} kcal",
@@ -1953,7 +1952,6 @@ export const PT: Record<string, string> = {
   "＋から開く入力シートの上にも「追加後の残り」が出ます。保存する前に結果が分かるから、量の調整はトレイの上でできます。": "A tela de edição aberta pelo ＋ também mostra o \"restante após adicionar\". Como você vê o resultado antes de salvar, dá para ajustar as porções direto na bandeja.",
   "まだ相談履歴がありません。": "Sem histórico de chat ainda.",
   "（あとから概算: 食べすぎ +{n}kcal）": "(Estimativa posterior: comeu demais +{n}kcal)",
-  "▴ とじる": "▴ Fechar",
   "カメラの許可が必要です。": "A permissão da câmera é necessária.",
   "撮り直す": "Refazer",
   "直近7日の記録を見ると、気になる傾向が2つあります。": "Olhando os registros dos últimos 7 dias, há duas tendências que chamam a atenção.",
@@ -2634,4 +2632,10 @@ export const PT: Record<string, string> = {
   "落ち着き": "Calmo",
   "記録しました。今夜の予報に反映します。": "Salvo. Será refletido na previsão desta noite.",
   "金曜・土曜": "Sexta ou sábado",
+  // ===== ＋シート圧縮・入力シート「マイ食品を追加」（2026-09-26・feat/plus-sheet-compact） =====
+  "身体を記録": "Registrar corpo",
+  "体重・ウエスト・体脂肪率": "Peso, cintura e gordura corporal",
+  "カロリー目標・体重目標": "Metas de calorias e peso",
+  "AIに相談": "Perguntar à IA",
+  "まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。": "Nada salvo ainda. Toque em “Adicionar alimento” para salvar e adicionar com um toque da próxima vez.",
 };

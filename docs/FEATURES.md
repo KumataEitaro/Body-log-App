@@ -2704,3 +2704,47 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 ### 確認のしかた
 - 概要 → 設定: 戻るボタンが「‹ 概要」、「戻る」の直下（1行分の余白）から「設定」の見出しが始まる
 - スクロールしてもヘッダー直下に薄い文字の帯は出ない（44pt のバーの下をくぐる分だけが iOS 標準のぼかしになる）
+
+## ＋シートを5項目に圧縮・入力シートに「マイ食品を追加」・削除時の静かなモーション・運動種目のアイコン化（2026-09-26・feat/plus-sheet-compact）
+
+熊田さん「右下の＋の『記録する』は項目が多すぎる。右手で持ったとき親指が届く高さに収めたい」ほか4点。
+
+### やったこと
+1. **＋シート（`native/src/components/PlusSheet.tsx`）を5項目に**: 食事を記録（大カード）／身体を記録／先の予定を入れる／目標設定／AIに相談。
+   - 「身体を記録」を押すと2段目で 体重・ウエスト・体脂肪率（AIで推定）を選ぶ。パンくずは「記録する › 身体を記録 › 体重」。
+     数値の段の「戻る」は身体の段へ（1段目まで戻さない）。段番号（2/2）はやめた。
+   - 「目標設定」は `router.push({ pathname: '/settings', params: navFrom(from, { open: 'goal' }) })`（`PlusEntry.tsx`）。
+     `from` は親タブなので戻るボタンが「‹ 食事」等と名乗る（`navConsistency` の PUSH_SITES に既に載っているので追加行なし）。
+   - 「AIに相談」は `router.navigate('/coach')`（相談タブへ切り替え）。
+   - 削除した行: 運動（歩く・走る・泳ぐ）／筋トレ／マイ食品を登録／あとのカロリーで何を食べる？と区切り線。
+     代替導線: 運動・筋トレ → 運動タブの2枚のタイル（`tile-activity` / `tile-lift`）、マイ食品 → 入力シートの「マイ食品を追加」、
+     何を食べる？ → 食事タブのヒーロー行（`setEatOpen(true)`）。
+   - 型: `PlusAction` から `'exercise' | 'lift' | 'meal:whattoeat'` を外し `'goal' | 'coach'` を追加。`'myfood:add'`（AddFoodSheet を開く共通処理）は残す。
+     `PlusStep` に `'body'`。`training.tsx` の `onLocal`（exercise 横取り）は不要になり削除。`/training?open=activity` の受け口はディープリンク用に残置。
+   - 高さ: 486pt → 約390pt（＋insets.bottom）。行間・見出し余白も詰めた。
+2. **食事タブの入力シート（`native/src/app/(tabs)/log.tsx`）**
+   - 「マイ食品」欄の見出し右端に **「＋ マイ食品を追加」**（`C.teal`・testID `myfood-add`）。0件でも見出し＋ボタン＋案内文だけは出す。
+     押すと AddFoodSheet（draft=null）が開く。**入力シート（pageSheet）の内側に描く**（iOS は表示中 Modal の兄弟に別 Modal を出せないため、
+     PlusEntry 側のシートは使えない）。保存後は `load()`＋「マイ食品に登録しました。」の案内＝PlusEntry の `onMyFoodSaved` と同じ。
+   - 「前の食事をもう一度」は**常に展開**。`recentOpen` と「▾ ひらく／▴ とじる」（辞書10言語）を削除。
+3. **削除時の「びよーん」をやめた**: `UndoSnackbar.tsx` / `AdPitchSnackbar.tsx` の入場を `SlideInDown.springify().damping(18)` →
+   `SlideInDown.duration(240).easing(Easing.out(Easing.cubic))`、退場 `SlideOutDown.duration(160)`。reduce-motion は従来どおり無効化。
+   さらに当日フィードの各行を `Reanimated.View` にして `layout={LinearTransition.duration(220)}` と `exiting={FadeOut.duration(160)}`
+   （`useReduceMotion()` が true なら付けない）。map 描画の十数行なので性能影響なし。`jest.setup.js` の reanimated モックに
+   `SlideInDown.duration().easing()` と `LinearTransition.duration()` を足した。
+4. **運動種目の絵文字 → lucide アイコン**: `native/src/lib/activityIcons.ts`（新規）に `ACTIVITY_ICON: Record<string, LucideIcon>`（54件すべて明示）と
+   `GROUP_ICON`（カテゴリ既定）、`activityIcon(id)`。`ActivityLogSheet.tsx` の一覧（36pt）と選択後の見出し（48pt）を
+   ＋シートと同じ「薄い teal の丸地＋線アイコン」に。`activities.ts` の `e`（絵文字）は削除していない。
+   速めの派生種目は元の種目と同じ絵（速さはラベルが伝える）。`src/__tests__/activityIcons.test.ts` で全種目の登録を固定。
+5. 辞書10言語に追加: 「身体を記録」「体重・ウエスト・体脂肪率」「カロリー目標・体重目標」「AIに相談」
+   「まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。」（案内文は各言語の既存訳「マイ食品を追加」を埋め込み）。
+
+### 確認のしかた
+- ＋ → 5項目（食事の大カード＋4行）だけ。シートが画面の下半分に収まる。
+- ＋ → 身体を記録 → 体重／ウエスト／体脂肪率の3行。体重 → 数値入力。戻る → 身体の段 → 戻る → 1段目。
+- ＋ → 目標設定 → 設定の目標シートが直接開き、戻るボタンが「‹ 食事」（開いたタブ名）。＋ → AIに相談 → 相談タブ。
+- 食事タブ → ＋ → 食事を記録 → 「マイ食品」見出しの右端に「＋ マイ食品を追加」→ 登録シート → 保存でチップが増える。マイ食品0件でも出る。
+- 同じシートで「前の食事をもう一度」が開閉なしで並んでいる。
+- 記録行を長押し → 削除: スナックバーが揺れずに出て、消えた行の下の行が滑らかに詰まる。
+- 運動タブ → 運動を記録する → 種目一覧の左端が丸地の線アイコン。
+- `cd native && npx tsc --noEmit && npx jest --silent` がともに 0。
