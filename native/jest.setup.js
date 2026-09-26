@@ -69,10 +69,11 @@ jest.mock('react-native-reanimated', () => {
     FadeInRight: { duration: () => ({ delay: () => ({}) }) },
     FadeInUp: { duration: () => ({ delay: () => ({}) }) },
     ZoomIn: { springify: () => ({ damping: () => ({}) }) },
-    // UndoSnackbarの入退場（スプリング入場/タイミング退場）
-    SlideInDown: { springify: () => ({ damping: () => ({}) }) },
+    // UndoSnackbarの入退場（2026-09-26 から duration().easing() のタイミング入場。springify は旧形の互換）
+    SlideInDown: { springify: () => ({ damping: () => ({}) }), duration: () => ({ easing: () => ({}) }) },
     SlideOutDown: { duration: () => ({}) },
-    LinearTransition: { springify: () => ({}) },
+    // 食事フィードの行の layout アニメ（LinearTransition.duration）
+    LinearTransition: { springify: () => ({}), duration: () => ({}) },
   };
 });
 

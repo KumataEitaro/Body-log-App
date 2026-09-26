@@ -117,7 +117,6 @@ export const ID: Record<string, string> = {
   "まだ記録がありません。下から1回分ずつ記録しましょう。": "Belum ada catatan. Tambahkan satu per satu di bawah.",
   "行を長押しで削除できます": "Tekan lama baris untuk menghapus",
   "{n}件": "{n} catatan",
-  "▾ ひらく": "▾ Buka",
   "↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。": "Tekan ↺ untuk memasukkan ke baki di bawah. Hapus menu dengan ×, atur porsi, lalu simpan dengan ✓.",
   "追加後 ": "Setelah ditambah",
   "残り {n}kcal": "Sisa {n} kcal",
@@ -1953,7 +1952,6 @@ export const ID: Record<string, string> = {
   "＋から開く入力シートの上にも「追加後の残り」が出ます。保存する前に結果が分かるから、量の調整はトレイの上でできます。": "\"Sisa setelah ditambahkan\" juga muncul di bagian atas lembar input dari ＋. Kamu bisa tahu hasilnya sebelum menyimpan, jadi penyesuaian porsi bisa dilakukan langsung di baki.",
   "まだ相談履歴がありません。": "Belum ada riwayat chat.",
   "（あとから概算: 食べすぎ +{n}kcal）": "(Estimasi nanti: Makan berlebih +{n}kcal)",
-  "▴ とじる": "▴ Tutup",
   "カメラの許可が必要です。": "Izin kamera diperlukan.",
   "撮り直す": "Ambil ulang",
   "直近7日の記録を見ると、気になる傾向が2つあります。": "Melihat catatan 7 hari terakhir, ada 2 tren yang perlu diperhatikan.",
@@ -2634,4 +2632,10 @@ export const ID: Record<string, string> = {
   "落ち着き": "Tenang",
   "記録しました。今夜の予報に反映します。": "Tersimpan. Akan tercermin di prakiraan malam ini.",
   "金曜・土曜": "Jumat atau Sabtu",
+  // ===== ＋シート圧縮・入力シート「マイ食品を追加」（2026-09-26・feat/plus-sheet-compact） =====
+  "身体を記録": "Catat tubuh",
+  "体重・ウエスト・体脂肪率": "Berat, lingkar pinggang, lemak tubuh",
+  "カロリー目標・体重目標": "Target kalori & berat badan",
+  "AIに相談": "Tanya AI",
+  "まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。": "Belum ada yang tersimpan. Ketuk “Tambah makanan saya” untuk menyimpan, lalu tambahkan dengan sekali ketuk lain kali.",
 };

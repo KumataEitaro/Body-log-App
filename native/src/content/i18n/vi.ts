@@ -157,7 +157,6 @@ export const VI: Record<string, string> = {
   "まだ記録がありません。下から1回分ずつ記録しましょう。": "Chưa có ghi chép nào. Hãy thêm từng món ở phía dưới nhé.",
   "行を長押しで削除できます": "Nhấn giữ một dòng để xóa",
   "{n}件": "{n} mục",
-  "▾ ひらく": "▾ Mở",
   "↺で下のトレイに入ります。品目を×で外して量を調整してから✓保存してください。": "Nhấn ↺ để đưa vào khay bên dưới. Dùng × để bỏ bớt món, chỉnh lại lượng rồi bấm ✓ để lưu.",
   "追加後 ": "Sau khi thêm",
   "残り {n}kcal": "Còn lại {n} kcal",
@@ -1953,7 +1952,6 @@ export const VI: Record<string, string> = {
   "＋から開く入力シートの上にも「追加後の残り」が出ます。保存する前に結果が分かるから、量の調整はトレイの上でできます。": "Ngay phía trên bảng nhập mở từ ＋ cũng hiển thị \"Lượng còn lại sau khi thêm\". Bạn sẽ biết trước kết quả trước khi lưu, nên có thể thoải mái chỉnh lượng ngay trên khay.",
   "まだ相談履歴がありません。": "Chưa có lịch sử tư vấn.",
   "（あとから概算: 食べすぎ +{n}kcal）": "（Ước tính sau: Ăn quá mức +{n}kcal）",
-  "▴ とじる": "▴ Đóng",
   "カメラの許可が必要です。": "Yêu cầu quyền truy cập camera.",
   "撮り直す": "Chụp lại",
   "直近7日の記録を見ると、気になる傾向が2つあります。": "Nhìn vào nhật ký 7 ngày qua, có 2 xu hướng đáng chú ý.",
@@ -2634,4 +2632,10 @@ export const VI: Record<string, string> = {
   "落ち着き": "Bình tĩnh",
   "記録しました。今夜の予報に反映します。": "Đã lưu. Sẽ phản ánh vào dự báo tối nay.",
   "金曜・土曜": "Thứ Sáu hoặc Thứ Bảy",
+  // ===== ＋シート圧縮・入力シート「マイ食品を追加」（2026-09-26・feat/plus-sheet-compact） =====
+  "身体を記録": "Ghi cơ thể",
+  "体重・ウエスト・体脂肪率": "Cân nặng, vòng eo, mỡ cơ thể",
+  "カロリー目標・体重目標": "Mục tiêu calo và cân nặng",
+  "AIに相談": "Hỏi AI",
+  "まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。": "Chưa có mục nào. Chạm “Thêm món ăn” để lưu, lần sau chỉ cần một chạm.",
 };

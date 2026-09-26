@@ -14,6 +14,8 @@ import {
   View, Text, TextInput, Pressable, ScrollView, StyleSheet,
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
+// 当日フィードの行の layout/exiting アニメだけ Reanimated（RN の Animated は起動時の時差入場に使っている）
+import Reanimated, { LinearTransition, FadeOut } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, X, CalendarClock, Moon } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
@@ -118,7 +120,7 @@ import { computePlan, macroTargets, type Goal } from '@/lib/goal';
 import { dailyAllowance, overLevel, balanceOf, balanceFill, type BalanceDay, type Balance } from '@/lib/deficit';
 import { useKcalAdjust } from '@/lib/kcalAdjust';
 import { t, apiLang } from '@/lib/i18n';
-import { useCountUp } from '@/lib/motion';
+import { useCountUp, useReduceMotion } from '@/lib/motion';
 import { consumePendingMeal } from '@/lib/pendingMeal';
 import { usePurpose, purposeOf } from '@/lib/purpose';
 import { setDayStatus } from '@/lib/dayStatus';
@@ -244,6 +246,8 @@ export default function LogScreen() {
   const router = useRouter();
   // 削除のUndoスナックバー。右下の＋ボタン（56px）と重ならない高さに出す
   const undoBar = useUndoSnackbar(insets.bottom + 80);
+  // 「視差効果を減らす」ON の人には、フィードの行の layout/exiting アニメを付けない
+  const reduceMotion = useReduceMotion();
   const [uid, setUid] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   // 「まだ読んでいない」と「読んだが行が無い」を区別する。前者で空状態を出すと
@@ -271,7 +275,6 @@ export default function LogScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
-  const [recentOpen, setRecentOpen] = useState(false);
   // ===== ＋ボタン → シート → 入力シート（＋とシートの開閉は components/PlusEntry.tsx が持つ） =====
   // 先の予定（飲み会・外食・チートデイ）のシート。＋シートの「先の予定を入れる」から開く
   const [eventPlanOpen, setEventPlanOpen] = useState(false);
@@ -380,14 +383,13 @@ export default function LogScreen() {
     }
   }
   // ＋シートで選んだ行動のうち、このタブで自前処理できるもの（true を返して PlusEntry の共通処理を横取り）。
-  // 運動・体脂肪率・マイ食品の登録は PlusEntry の共通処理（運動タブへ遷移・BodyFatSheet・AddFoodSheet）に任せる
+  // 体脂肪率・目標設定・AIに相談・マイ食品の登録は PlusEntry の共通処理（BodyFatSheet・設定へ push・相談タブへ・AddFoodSheet）に任せる
   function onPlusLocal(a: PlusAction): boolean {
     switch (a) {
       case 'meal:text': openFromParam('text'); return true;
       case 'meal:myfood': openFromParam('myfood'); return true;
       case 'meal:library': openFromParam('library'); return true;
       case 'meal:camera': openFromParam('camera'); return true;
-      case 'meal:whattoeat': openFromParam('whattoeat'); return true;
       case 'plan': openFromParam('plan'); return true;
       default: return false;
     }
@@ -1753,6 +1755,8 @@ export default function LogScreen() {
   // 品目単位で操作するために展開している記録行（1回の食事＝1レコードのまま、中身を開く）
   const [openLog, setOpenLog] = useState<string | null>(null);
   const [foodDraft, setFoodDraft] = useState<MyFoodDraft | null>(null);
+  // 入力シート内「マイ食品を追加」→ 空の登録シート（入力シートの内側に描く。iOS の Modal 兄弟問題を踏まない）
+  const [myFoodAddOpen, setMyFoodAddOpen] = useState(false);
   const chipsRef = useRef<View | null>(null);   // 案内でハイライトする対象
   // 編集を始めた日付。表示日を動かしたら編集を打ち切る（記録が別の日へ移るのを防ぐ）
   const editingDateRef = useRef<string | null>(null);
@@ -1799,7 +1803,9 @@ export default function LogScreen() {
   // タップ=トレイへ・−で減・長押しで即記録。常に全展開（TODO B2・2026-09-18。1行スクロールと切替は廃止）。
   // 先頭にセット（複数品目）のチップ（皿アイコン＋アクセント面で区別・タップでセット全品目をトレイへ・
   // 長押しで削除→Undoスナックバー）。セットは常に先頭固定
-  const myFoodsSection = (myFoods.length > 0 || myMeals.length > 0) ? (() => {
+  // 2026-09-26: 0件でも欄（見出し＋「マイ食品を追加」）は出す。チップと注記だけ件数で出し分ける
+  const hasMyFoods = myFoods.length > 0 || myMeals.length > 0;
+  const myFoodsSection = (() => {
     // セット（複数品目）のチップ。2026-09-25 熊田さん「何でおからケーキだけ表示が違うの？統一感出したい」→
     // 単品と同じ見た目・同じ操作（タップでトレイへ・長押しで即記録）に揃えた。以前は皿アイコン＋アクセント面で、
     // 長押しが「削除」だった（単品は長押しで即記録＝同じ列で長押しの意味が違う罠）。削除は設定＞マイ食品の管理から
@@ -1834,29 +1840,38 @@ export default function LogScreen() {
       <View style={s.sheetSection} ref={chipsRef} collapsable={false}>
         <View style={s.sheetSectionHead}>
           <Text style={s.sheetSectionT}>{t('マイ食品')}</Text>
-          <Text style={s.sheetSectionSub} numberOfLines={1}>{t('タップでトレイへ・長押しで即記録')}</Text>
+          {hasMyFoods
+            ? <Text style={s.sheetSectionSub} numberOfLines={1}>{t('タップでトレイへ・長押しで即記録')}</Text>
+            : <View style={{ flex: 1 }} />}
+          {/* 見出し右端の「マイ食品を追加」（2026-09-26）。＋シートの「マイ食品を登録」行を廃止し、登録の入口を
+              チップのすぐ横へ移した。0件のときも見出しとこのボタンだけは出す（初めての人がここから登録できる）。
+              開く先は入力シートの内側に描いた AddFoodSheet（下の myFoodAddOpen。iOS の Modal 兄弟問題を踏まない） */}
+          <Pressable onPress={() => setMyFoodAddOpen(true)} hitSlop={8} style={s.sheetSectionBtn}
+                     accessibilityRole="button" accessibilityLabel={t('マイ食品を追加')} testID="myfood-add">
+            <Plus size={ICON.sm} color={C.teal} strokeWidth={ICON.strokeBold} />
+            <Text style={s.sheetSectionBtnT}>{t('マイ食品を追加')}</Text>
+          </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
+        {hasMyFoods
+          ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 }}>{[...myMeals.map(mealChipEl), ...orderedFoods.map(chipEl)]}</View>
+          : <Text style={[s.mutedT, { fontSize: 13 }]}>{t('まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。')}</Text>}
       </View>
     );
-  })() : null;
+  })();
 
   // ===== 前の食事をもう一度（入力シートの中・2026-09-24） =====
   // 以前は食事タブ本体の構造カード（'recent'）だったが、「もう一度食べる」は入力の場面で使うもの。
   // 熊田さん「食事の登録画面（＋ボタンの後、食事の記録）の中でこの機能を追加したい」→ ここへ移した。
   // ↺ は品目をトレイへ積む（AI解析なし・保存済みの栄養値をそのまま使う）。書き換え中は出さない（別の記録が混ざる）
+  // 2026-09-26 熊田さん: 常に展開。以前の「▾ ひらく／▴ とじる」トグルは、開くまで中身が見えず1タップ増えるだけだった
   const recentSection = recentMeals.length > 0 && editingId == null ? (
     <View style={s.sheetSection}>
-      <Pressable style={s.sheetSectionHead} onPress={() => setRecentOpen((v) => !v)} hitSlop={6}
-                 accessibilityRole="button" accessibilityState={{ expanded: recentOpen }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-          <History size={14} color={C.teal} />
-          <Text style={s.sheetSectionT}>{t('前の食事をもう一度')}</Text>
-          <Text style={s.sheetSectionSub} numberOfLines={1}>{t('{n}件', { n: recentMeals.length })}</Text>
-        </View>
-        <Text style={{ color: C.sub, fontSize: 13, fontWeight: '800' }}>{recentOpen ? t('▴ とじる') : t('▾ ひらく')}</Text>
-      </Pressable>
-      {recentOpen && recentMeals.map((m) => (
+      <View style={s.sheetSectionHead}>
+        <History size={14} color={C.teal} />
+        <Text style={s.sheetSectionT}>{t('前の食事をもう一度')}</Text>
+        <Text style={s.sheetSectionSub} numberOfLines={1}>{t('{n}件', { n: recentMeals.length })}</Text>
+      </View>
+      {recentMeals.map((m) => (
         <View key={m.id} style={[s.feedRow, { alignItems: 'center' }]}>
           <Text style={s.feedTime}>{m.date.slice(5).replace('-', '/')}</Text>
           <View style={{ flex: 1 }}><ItemsTitle items={m.items} /></View>
@@ -1867,9 +1882,7 @@ export default function LogScreen() {
           </Pressable>
         </View>
       ))}
-      {recentOpen && (
-        <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺でトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
-      )}
+      <Text style={[s.mutedT, { fontSize: 13, marginTop: 6 }]}>{t('↺でトレイに入ります。品目を×で外して量を調整してから✓保存してください。')}</Text>
     </View>
   ) : null;
 
@@ -2475,8 +2488,13 @@ export default function LogScreen() {
           {dayLogs.length === 0 && <Text style={s.mutedT}>{t('まだ記録がありません。右下の＋から1回分ずつ記録しましょう。')}</Text>}
           {dayLogs.map((l) => {
             const items = (l.items ?? []) as FoodItem[];
+            // 削除で消える行は 160ms でフェードし、残りの行は 220ms で詰まる（LinearTransition・2026-09-26）。
+            // 以前は行が瞬時に消えて下の行がガクッと跳ねていた。視差効果を減らす設定では付けない。
+            // 当日の記録は map で描く十数行なので layout アニメの計測コストは無視できる（FlatList ではない）
             return (
-            <View key={l.id}>
+            <Reanimated.View key={l.id}
+                             layout={reduceMotion ? undefined : LinearTransition.duration(220)}
+                             exiting={reduceMotion ? undefined : FadeOut.duration(160)}>
             {/* 記録行のタイポグラフィは components/FoodRowText.tsx に集約（品名15/700・量12.5/600・
                 PFCラベル色＋数値・kcal右寄せ固定幅）。トレイの品目行とまったく同じ階層で読める */}
             <Pressable style={({ pressed }) => [s.feedRow, pressed && { opacity: 0.6 }]}
@@ -2521,7 +2539,7 @@ export default function LogScreen() {
                 </Pressable>
               </View>
             ))}
-            </View>
+            </Reanimated.View>
             );
           })}
           {dayLogs.length > 0 && <Text style={s.hint}>{t('行を長押しで削除できます')}</Text>}
@@ -2950,6 +2968,14 @@ export default function LogScreen() {
           </Modal>
           {/* ✓保存の長押しからのセット登録は、シートの内側でだけ描く（同じ理由） */}
           {saveMealSheetEl}
+          {/* 「マイ食品を追加」（マイ食品欄の見出し右端・2026-09-26）→ 登録シート。入力シート（pageSheet）の内側に描く:
+              iOS は表示中の Modal の兄弟に別の Modal を出せないので、PlusEntry 側の AddFoodSheet（シートの外）は
+              ここからは使えない。同じ部品・同じ draft=null・同じ保存後処理（load＋案内）で、描く場所だけ内側にする */}
+          <AddFoodSheet
+            visible={myFoodAddOpen} draft={null}
+            onClose={() => setMyFoodAddOpen(false)}
+            onSaved={() => { load(); setMsg({ ok: true, text: t('マイ食品に登録しました。下のチップから1タップで足せます。') }); }}
+          />
         </KeyboardAvoidingView>
       </Modal>
       {/* 削除のUndoスナックバー（＋ボタンの上に重ねる。触れない領域は素通し） */}
@@ -3174,6 +3200,9 @@ const s = themed(() => ({
   sheetSectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   sheetSectionT: { fontSize: 15, fontWeight: '800', color: C.ink },
   sheetSectionSub: { flex: 1, fontSize: 11, fontWeight: '600', color: C.faint },
+  // 見出し右端のテキストボタン（「マイ食品を追加」）。＋アイコン＋teal の 13/800（2026-09-26）
+  sheetSectionBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingLeft: 6 },
+  sheetSectionBtnT: { fontSize: 13, fontWeight: '800', color: C.teal },
   sheetEmpty: { fontSize: 13, color: C.sub, lineHeight: 19, marginTop: 8 },
   // 下端のコンポーザー（旧ドック本体）。面は C.panel、上に薄い区切り
   composer: {

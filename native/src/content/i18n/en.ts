@@ -242,8 +242,6 @@ export const EN: Record<string, string> = {
   '≡ 並べ替え': '≡ Reorder',
   '▲ 食べた翌日、上がりやすい': '▲ Weight tends to rise the next day',
   '▼ 食べた翌日、下がりやすい': '▼ Weight tends to fall the next day',
-  '▾ ひらく': '▾ Open',
-  '▴ とじる': '▴ Close',
   "体重を取り込む（過去90日）": "Import weight (last 90 days)",
   '✓ 適用しました（「概要」タブに反映）': '✓ Applied (see the Overview tab)',
   '✕ 閉じる': '✕ Close',
@@ -2683,4 +2681,10 @@ export const EN: Record<string, string> = {
   "落ち着き": "Calm",
   "記録しました。今夜の予報に反映します。": "Saved. Tonight’s forecast will reflect it.",
   "金曜・土曜": "Friday or Saturday",
+  // ===== ＋シート圧縮・入力シート「マイ食品を追加」（2026-09-26・feat/plus-sheet-compact） =====
+  "身体を記録": "Log body",
+  "体重・ウエスト・体脂肪率": "Weight, waist, body fat",
+  "カロリー目標・体重目標": "Calorie and weight goals",
+  "AIに相談": "Ask the AI coach",
+  "まだ登録がありません。「マイ食品を追加」から登録すると、次から1タップで足せます。": "Nothing saved yet. Tap “Add a food” to save one, then add it with one tap next time.",
 };

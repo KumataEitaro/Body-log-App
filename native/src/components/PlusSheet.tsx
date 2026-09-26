@@ -1,12 +1,21 @@
-// ＋ボタンのボトムシート（2026-09-04・「食事だけ大きいカード＋残りはリスト行」へ再設計）
+// ＋ボタンのボトムシート（2026-09-26・「親指が届く高さ」へ圧縮）
 //
-// 構成: 食事＝高さ84の大カード（使用頻度が圧倒的に高い主導線）／運動・筋トレ・体重・ウエスト・体脂肪率＝高さ56のリスト行／
-//       区切り線を挟んで「マイ食品を登録」「何を食べる？」「先の予定」（記録ではなく準備・相談なので性質で分ける）
-// 2026-09-10: このシートは食事タブ専用ではなくなった。4タブ全部の右下＋（components/PlusEntry.tsx）から開き、
-//       行動の振り分け（その場で処理／食事タブへ遷移して同じシートを開く）は PlusEntry が持つ。
-//       シートの高さ: 428pt → **486pt**（＋insets.bottom。行1本＝52＋行間6）
-// 体重だけシート内でもう1段（数値を入れて保存。画面を移らずに済ませる）。
-// 運動・筋トレ・体脂肪率はシートを閉じて既存の画面／別シートへ（運動タブの「運動を記録する」シート／概要の体写真カメラ）
+// 構成（1段目は5項目だけ）:
+//   食事を記録        高さ76の大カード（使用頻度が圧倒的に高い主導線・入力シートへ直行）
+//   身体を記録        → 2段目で 体重／ウエスト／体脂肪率（AIで推定）を選ぶ
+//   先の予定を入れる  食事タブの EventPlanSheet（飲み会・チートデイ）
+//   目標設定          設定画面の目標シート（/settings?open=goal）へ
+//   AIに相談          相談タブへ切り替え
+//
+// 2026-09-26 熊田さん「項目が多すぎる。右手でスマホを持ったとき親指が届く高さ（プルアップの大きさ）に収めたい」。
+//   9行あった旧構成（運動・筋トレ・体重・ウエスト・体脂肪率・区切り線・マイ食品を登録・何を食べる？・先の予定）から
+//   「運動」「筋トレ」（入口は運動タブの2枚のタイル）、「マイ食品を登録」（入口は食事の入力シート「マイ食品を追加」）、
+//   「あとのカロリーで何を食べる？」（入口は食事タブのヒーロー）を外し、体の3つは「身体を記録」1行にまとめた。
+//   シートの高さ: 486pt → 約 390pt（＋insets.bottom）。5行＋見出しが画面の下半分に収まる。
+// 2026-09-10: このシートは食事タブ専用ではない。4タブ全部の右下＋（components/PlusEntry.tsx）から開き、
+//       行動の振り分け（その場で処理／食事タブへ遷移して同じシートを開く／設定・相談タブへ）は PlusEntry が持つ。
+// 体重・ウエストはシート内でもう1段（数値を入れて保存。画面を移らずに済ませる）。
+// 体脂肪率はシートを閉じてから BodyFatSheet（写真から AI 推定・写真は保存しない）へ。
 //
 // 【なぜ2×2グリッドをやめたか（熊田さん判断 2026-09-04）】
 // 大きなカードを2×2に並べる形は「アプリランチャー風グリッド」で、2つの構造的な弱点がある。
@@ -29,7 +38,7 @@ import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-g
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import {
-  Utensils, Dumbbell, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, BookmarkPlus, Footprints, Ruler, Percent,
+  Utensils, Scale, Sparkles, X, ChevronLeft, ChevronRight, CalendarPlus, Ruler, Percent, PersonStanding, Target,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,31 +51,31 @@ import { useThemeRefresh } from '@/lib/theme';
  *  タブバーは SF Symbols（食事 fork.knife／運動 figure.strengthtraining.traditional）だが、
  *  シートは Lucide で Android と同一の絵にしつつ**概念をタブに合わせる**:
  *    食事         Utensils       交差(UtensilsCrossed)ではなく平行＝タブの fork.knife に近い
- *    運動         Dumbbell       タブは「筋トレする人」。旧 Activity（心拍の波線）は運動に見えなかった
+ *    身体を記録   PersonStanding 「体の数値」の入口。中の3つ（体重・ウエスト・体脂肪率）とは別の絵にして階層を見せる
  *    体重         Scale          体重計として読みやすい（旧 Weight は分銅で伝わらない）
  *    ウエスト     Ruler          巻き尺。体重と並べたときに「測る」が伝わる（2026-09-18）
  *    体脂肪率     Percent        AI 推定の結果は % の数値だけを残す（写真は保存しない・2026-09-18）
- *    何を食べる？ Sparkles       アプリ内でAIを表す共通記号（維持）
- *    マイ食品を登録 BookmarkPlus 「あとで1タップで呼び出せるように取っておく」＝ブックマーク＋。
- *                                食事の Utensils（記録）とも、相談タブの SquarePen（新しい相談）や
- *                                NotebookPen（ノート＝記録に見える）とも意味が被らない（2026-09-10） */
-const ROW_ICON: Record<'meal' | 'exercise' | 'lift' | 'weight' | 'waist' | 'bodyfat' | 'whattoeat' | 'plan' | 'myfoodAdd', LucideIcon> = {
+ *    先の予定     CalendarPlus   カレンダーに足す
+ *    目標設定     Target         概要タブの「目標設定」行（changes.tsx）と同じ絵
+ *    AIに相談     Sparkles       アプリ内でAIを表す共通記号 */
+const ROW_ICON: Record<'meal' | 'body' | 'weight' | 'waist' | 'bodyfat' | 'plan' | 'goal' | 'coach', LucideIcon> = {
   meal: Utensils,
-  exercise: Footprints,   // 歩いた・走った・泳いだ（有酸素）
-  lift: Dumbbell,        // 筋トレ（重量×回数×セット）
+  body: PersonStanding,
   weight: Scale,
   waist: Ruler,
   bodyfat: Percent,
-  whattoeat: Sparkles,
   plan: CalendarPlus,
-  myfoodAdd: BookmarkPlus,
+  goal: Target,
+  coach: Sparkles,
 };
 
-/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（'meal:whattoeat' は「何を食べる？」シート）。
- *  'myfood:add' はマイ食品の登録シート（components/AddFoodSheet.tsx・どのタブでもその場で開く） */
-export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'meal:whattoeat' | 'exercise' | 'lift' | 'bodyfat' | 'plan' | 'myfood:add';
-/** シート内で完結する数値入力の段。'weight' と 'waist' は同じ見た目（数字＋単位＋保存） */
-export type PlusStep = 'root' | 'meal' | 'weight' | 'waist';
+/** シートから外へ出す行動。'meal:*' は食事タブの入力シートを開く（シートから選べるのは 'meal:text' だけ。
+ *  残りは /log?open=… のディープリンク用に残す）。'goal' は設定画面の目標シート、'coach' は相談タブへ。
+ *  'myfood:add' はマイ食品の登録シート（components/AddFoodSheet.tsx）。2026-09-26 からシートの行ではなく、
+ *  食事タブの入力シート「マイ食品を追加」が同じ経路を使う（PlusEntry の共通処理は残す） */
+export type PlusAction = 'meal:myfood' | 'meal:text' | 'meal:library' | 'meal:camera' | 'bodyfat' | 'plan' | 'goal' | 'coach' | 'myfood:add';
+/** シート内の段。'body' は 体重／ウエスト／体脂肪率 を選ぶ段。'weight' と 'waist' は同じ見た目（数字＋単位＋保存） */
+export type PlusStep = 'root' | 'body' | 'weight' | 'waist';
 /** シート内で保存する体の数値の種類 */
 export type MeasureKind = 'weight' | 'waist';
 
@@ -157,13 +166,16 @@ export default function PlusSheet({
     });
   const slide = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
 
-  const crumb = step === 'weight' ? t('体重') : step === 'waist' ? t('ウエスト') : t('記録する');
-  // 「記録する」の下に段があるのは体重とウエストだけ（食事は直行になった）。1段のときは段表示を出さない
-  const stepLabel = step === 'root' ? null : '2/2';
+  // パンくず: 記録する › 身体を記録 › 体重。数値の段の「戻る」は身体の段へ（1段目まで戻さない）
+  const back: PlusStep = measure ? 'body' : 'root';
+  const crumb = step === 'weight' ? t('体重') : step === 'waist' ? t('ウエスト') : step === 'body' ? t('身体を記録') : t('記録する');
+  const crumbPrev = step === 'root' ? null
+    : step === 'body' ? `${t('記録する')} › `
+    : `${t('記録する')} › ${t('身体を記録')} › `;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={flush} statusBarTranslucent>
-      {/* KAV は**体重の段だけ**に効かせる（数値入力でキーボードが出るのはここだけ）。
+      {/* KAV は**数値の段だけ**に効かせる（数値入力でキーボードが出るのはここだけ）。
           根の段まで包むと、キーボードが無いのにシート下へ見えない余白が残り、
           「記録方法を選ぶだけ」のシートが不必要に背高くなる（βフィードバック 2026-09-03） */}
       <KeyboardAvoidingView
@@ -177,15 +189,14 @@ export default function PlusSheet({
             <View style={s.grip} />
             <View style={s.head}>
               {step !== 'root' ? (
-                <Pressable onPress={() => go('root')} hitSlop={10} style={s.headBtn} accessibilityRole="button" accessibilityLabel={t('戻る')}>
+                <Pressable onPress={() => go(back)} hitSlop={10} style={s.headBtn} accessibilityRole="button" accessibilityLabel={t('戻る')}>
                   <ChevronLeft size={ICON.lg} color={C.ink} strokeWidth={ICON.stroke} />
                 </Pressable>
               ) : <View style={s.headBtn} />}
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={s.crumb} numberOfLines={1}>
-                  {step === 'root' ? crumb : <><Text style={s.crumbPrev}>{t('記録する')} › </Text>{crumb}</>}
+                  {crumbPrev != null && <Text style={s.crumbPrev}>{crumbPrev}</Text>}{crumb}
                 </Text>
-                {stepLabel && <Text style={s.step}>{stepLabel}</Text>}
               </View>
               <Pressable onPress={onClose} hitSlop={10} style={s.headBtn} accessibilityRole="button" accessibilityLabel={t('閉じる')}>
                 <X size={ICON.lg} color={C.sub} strokeWidth={ICON.stroke} />
@@ -194,42 +205,34 @@ export default function PlusSheet({
 
             {step === 'root' && (
               <View>
-                {/* 食事だけ大きなカード（高さ84）。＋を押す理由の大半が食事の記録なので、
+                {/* 食事だけ大きなカード（高さ76）。＋を押す理由の大半が食事の記録なので、
                     他の4つと同格に並べず主導線として一段大きく見せる。
                     食事は2段目を挟まず**テキスト入力へ直行**（βフィードバック 2026-09-03:
                     「食事と入力したら、食事入力をすぐやりたい」）。入力シートにはマイ食品チップ・
                     写真/撮影アイコンが既に載っており、入力方法の選択画面は二重の階層だった */}
                 <MealCard onPress={() => pick('meal:text')} />
 
-                {/* 残りの記録はリスト行（高さ56・行間6）。運動は「歩いた・泳いだ」も含む一般の運動 */}
+                {/* 残りはリスト行（高さ52・行間6）。4行で親指の届く高さに収める（2026-09-26） */}
                 <View style={s.rows}>
-                  {/* 運動は「歩いた・泳いだ」と「筋トレ」で入力がまったく違う（時間ダイアル vs 重量×回数×セット）。
-                      2026-09-17 まで「運動」1行で、押すと**問答無用で有酸素の記録シート**が開いていた。
-                      筋トレをしたい人が毎回そこから引き返すことになるので、ここで選ばせる（熊田さん指摘） */}
-                  <Row icon="exercise" label={t('運動（歩く・走る・泳ぐ）')} onPress={() => pick('exercise')} testID="plus-exercise" />
-                  <Row icon="lift" label={t('筋トレ')} onPress={() => pick('lift')} testID="plus-lift" />
-                  {/* 体の数値（体重・ウエスト）はシート内の2段目で保存。体脂肪率は写真から AI が推定するので
-                      別シート（BodyFatSheet）へ。旧「体の写真」行は 2026-09-18 に廃止（写真の保存はやめた） */}
-                  <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
-                  <Row icon="waist" label={t('ウエスト')} onPress={() => go('waist')} testID="plus-waist" />
-                  <Row icon="bodyfat" label={t('体脂肪率（AIで推定）')} onPress={() => pick('bodyfat')} testID="plus-bodyfat" />
-                </View>
-
-                {/* 区切り線: 上（起きたことを記録する）と下（これからのことを決める）を性質で分ける。
-                    ＋を押す習慣に乗せる第2の入口だが、記録ではないので記録4種と混ぜない */}
-                <View style={s.divider} />
-                <View style={s.rows}>
-                  {/* マイ食品の登録（2026-09-10・熊田さん「そのプラスボタンからマイ食品を登録できるようにして」）。
-                      「食べた」の記録ではなく**次からの1タップのための準備**なので、記録4行と分けて区切り線の下に置く。
-                      従来は 設定 › マイ食品の管理 › ＋ か、保存後の案内からしか登録できなかった。
-                      シートが閉じ切ってから AddFoodSheet（pageSheet）が開く＝iOSのModal兄弟問題を踏まない */}
-                  <Row icon="myfoodAdd" label={t('マイ食品を登録')} onPress={() => pick('myfood:add')} testID="plus-myfood-add" />
-                  <Row icon="whattoeat" label={t('あとのカロリーで何を食べる？')} onPress={() => pick('meal:whattoeat')} testID="plus-whattoeat" />
+                  {/* 体の数値は3つとも「身体を記録」の下へ（体重・ウエストはシート内保存、体脂肪率は BodyFatSheet） */}
+                  <Row icon="body" label={t('身体を記録')} sub={t('体重・ウエスト・体脂肪率')} onPress={() => go('body')} testID="plus-body" />
                   {/* 先の予定（飲み会・チートデイ）。「明日 飲み会がある」と気づくのは記録中か
-                      予定を思い出したときで、設定画面を開いている時ではない。従来は設定の奥（4タップ以上）
-                      にしか入口が無く、当日には間に合わなかった */}
+                      予定を思い出したときで、設定画面を開いている時ではない */}
                   <Row icon="plan" label={t('先の予定を入れる')} onPress={() => pick('plan')} testID="plus-plan" />
+                  {/* 目標設定は設定画面の目標シートへ飛ぶ（/settings?open=goal）。＋を押す習慣に乗せる入口 */}
+                  <Row icon="goal" label={t('目標設定')} sub={t('カロリー目標・体重目標')} onPress={() => pick('goal')} testID="plus-goal" />
+                  {/* AIに相談は相談タブへ切り替えるだけ（旧「あとのカロリーで何を食べる？」の代わりに汎用の入口） */}
+                  <Row icon="coach" label={t('AIに相談')} onPress={() => pick('coach')} testID="plus-coach" />
                 </View>
+              </View>
+            )}
+
+            {step === 'body' && (
+              <View style={s.rows}>
+                <Row icon="weight" label={t('体重')} onPress={() => go('weight')} testID="plus-weight" />
+                <Row icon="waist" label={t('ウエスト')} onPress={() => go('waist')} testID="plus-waist" />
+                {/* 体脂肪率は写真から AI が推定するので別シート（BodyFatSheet）へ。閉じ切ってから開く */}
+                <Row icon="bodyfat" label={t('体脂肪率（AIで推定）')} onPress={() => pick('bodyfat')} testID="plus-bodyfat" />
               </View>
             )}
 
@@ -260,7 +263,7 @@ export default function PlusSheet({
   );
 }
 
-/** 食事の大カード（高さ84）。アイコン48ptの角丸＋ラベル17/800を**横並び**で置く */
+/** 食事の大カード（高さ76）。アイコン48ptの角丸＋ラベル17/800を**横並び**で置く */
 function MealCard({ onPress }: { onPress: () => void }) {
   const Icon = ROW_ICON.meal;
   const label = t('食事を記録');
@@ -278,9 +281,10 @@ function MealCard({ onPress }: { onPress: () => void }) {
   );
 }
 
-/** リスト行（高さ56＝タップ領域44pt以上）。アイコン40ptの角丸・ラベル16/700・右端にシェブロン。
+/** リスト行（高さ52＝タップ領域44pt以上）。アイコン40ptの角丸・ラベル16/700・右端にシェブロン。
+ *  sub を渡すとラベルの下に 11/600 の補足（「体重・ウエスト・体脂肪率」）。行の高さは変えない。
  *  アイコンとラベルは必ず**横並び**（縦積みをやめた理由はファイル冒頭のコメント） */
-function Row({ icon, label, onPress, testID }: { icon: keyof typeof ROW_ICON; label: string; onPress: () => void; testID?: string }) {
+function Row({ icon, label, sub, onPress, testID }: { icon: keyof typeof ROW_ICON; label: string; sub?: string; onPress: () => void; testID?: string }) {
   const Icon = ROW_ICON[icon];
   return (
     <Pressable
@@ -291,7 +295,10 @@ function Row({ icon, label, onPress, testID }: { icon: keyof typeof ROW_ICON; la
       <View style={s.rowIcon}>
         <Icon size={ICON.md} color={C.accentInk} strokeWidth={ICON.stroke} />
       </View>
-      <Text style={s.rowT} numberOfLines={1} maxFontSizeMultiplier={1.3}>{label}</Text>
+      <View style={s.rowTexts}>
+        <Text style={s.rowT} numberOfLines={1} maxFontSizeMultiplier={1.3}>{label}</Text>
+        {sub != null && <Text style={s.rowSub} numberOfLines={1} maxFontSizeMultiplier={1.2}>{sub}</Text>}
+      </View>
       <ChevronRight size={ICON.md} color={C.faint} strokeWidth={ICON.stroke} />
     </Pressable>
   );
@@ -305,13 +312,12 @@ const s = themed(() => ({
     shadowColor: C.shadow, shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: -4 }, elevation: 12,
   },
   grip: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: C.line, marginBottom: 6 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   headBtn: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   crumb: { fontSize: 17, fontWeight: '800', color: C.ink },
   crumbPrev: { color: C.sub, fontWeight: '700' },
-  step: { fontSize: 11, fontWeight: '700', color: C.faint, marginTop: 1, fontVariant: ['tabular-nums'] },
 
-  // 食事の大カード: 高さ84・アイコン48＋ラベル17/800を横並び（縦中央の計算が要らない）
+  // 食事の大カード: 高さ76・アイコン48＋ラベル17/800を横並び（縦中央の計算が要らない）
   mealCard: {
     height: 76, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18,
     backgroundColor: C.panel, borderRadius: RADIUS.card, borderWidth: 1.5, borderColor: C.hairline,
@@ -323,18 +329,18 @@ const s = themed(() => ({
   // 併用でも位置ずれの報告あり #52642 / #42044）。横並びなので折り返しも不要＝1行で足りる
   mealT: { flex: 1, fontSize: 17, fontWeight: '800', color: C.ink, includeFontPadding: false },
 
-  // リスト行: 高さ56（タップ領域44pt以上）・行間6
-  rows: { marginTop: 10, gap: 6 },
+  // リスト行: 高さ52（タップ領域44pt以上）・行間6
+  rows: { marginTop: 8, gap: 6 },
   row: {
     height: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12,
     backgroundColor: C.panel, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.hairline,
   },
   rowIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
-  rowT: { flex: 1, fontSize: 16, fontWeight: '700', color: C.ink, includeFontPadding: false },
+  rowTexts: { flex: 1 },
+  rowT: { fontSize: 16, fontWeight: '700', color: C.ink, includeFontPadding: false },
+  rowSub: { fontSize: 11, fontWeight: '600', color: C.faint, includeFontPadding: false, marginTop: 1 },
   // 押下は面をアクセントのごく薄い色に変えるだけ（縮小や縁の変化は行では過剰）
   pressedFace: { backgroundColor: C.accentSoft, borderColor: C.teal },
-  // 記録（上）と相談（下）を分ける1pxライン。上下12ptの余白で「別のかたまり」に見せる
-  divider: { height: 1, backgroundColor: C.hairline, marginTop: 10, marginBottom: 10 },
 
   weightBox: { gap: 12, paddingTop: 4 },
   wRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

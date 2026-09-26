@@ -7,9 +7,13 @@
 //   ① 4タブすべてが PlusEntry を1つだけ描く（タブごとに＋を作り直していない）
 //   ② ガイド照射キー 'dock' の登録は食事タブの＋だけ（複数登録すると照射が画面外のボタンへずれる）
 //   ③ 相談タブは実測した下端コンポーザーぶん持ち上がり、キーボード表示中は出ない
-//   ④ 「マイ食品を登録」の行があり、＋シートが閉じ切ってから登録シートが開く（iOSのModal兄弟問題）
-//   ⑤ 他タブの食事系は /log?open=… で食事タブへ、運動・体の写真はそのタブにいれば遷移せずその場で開く
+//   ④ 行動 'myfood:add' が届けば登録シート（AddFoodSheet）がその場で開く。＋シートの「マイ食品を登録」行は
+//      2026-09-26 に廃止し、食事タブの入力シート「マイ食品を追加」が同じ AddFoodSheet を開く
+//   ⑤ 他タブの食事系は /log?open=… で食事タブへ、目標設定は /settings?open=goal へ push、AIに相談は相談タブへ
 //   ⑥ 食事タブは /log?open=… を受けて同じシートを開く
+// 2026-09-26: ＋シートを5項目（食事・身体を記録・先の予定・目標設定・AIに相談）に絞った（熊田さん「項目が多すぎる」）。
+//   運動・筋トレの行（→ 運動タブのタイル）と「あとのカロリーで何を食べる？」（→ 食事タブのヒーロー）のテストは
+//   仕様変更に合わせて書き換えた。体脂肪率は「身体を記録」の段を挟む
 import fs from 'fs';
 import path from 'path';
 import renderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -55,10 +59,11 @@ async function mount(el: React.ReactElement): Promise<ReactTestRenderer> {
 function item(tree: ReactTestRenderer, label: string) {
   return tree.root.findAll((n) => n.props?.accessibilityLabel === label && typeof n.props?.onPress === 'function')[0];
 }
-/** ＋を押して1段目を開き、行を選んで（シートが閉じ切るまで進めて）行動を届ける */
-async function pickFromPlus(tree: ReactTestRenderer, label: string) {
+/** ＋を押して1段目を開き、行を順に選んで（シートが閉じ切るまで進めて）行動を届ける。
+ *  2段目を挟むものは ['身体を記録', '体脂肪率（AIで推定）'] のように順に渡す */
+async function pickFromPlus(tree: ReactTestRenderer, ...labels: string[]) {
   await act(async () => { item(tree, '記録を追加').props.onPress(); });
-  await act(async () => { item(tree, label).props.onPress(); });
+  for (const label of labels) await act(async () => { item(tree, label).props.onPress(); });
   await act(async () => { jest.advanceTimersByTime(1000); });
 }
 
@@ -126,21 +131,34 @@ describe('＋ボタン（4タブ共通）', () => {
   });
 });
 
-describe('マイ食品を登録（どのタブからでも）', () => {
-  it('＋シートに行があり、シートが閉じ切ってから登録シート（AddFoodSheet）が開く', async () => {
+describe('マイ食品の登録（myfood:add）', () => {
+  // 2026-09-26: ＋シートの「マイ食品を登録」行は廃止（項目を5つに絞った）。行動 'myfood:add' と PlusEntry の
+  // 共通処理（その場で AddFoodSheet）は残し、食事タブの入力シート「マイ食品を追加」が同じシートを開く
+  it('＋シートに「マイ食品を登録」の行は無いが、myfood:add が届けばその場で登録シート（AddFoodSheet）が開く', async () => {
     const tree = await mount(<PlusEntry />);
     await act(async () => { item(tree, '記録を追加').props.onPress(); });
     expect(tree.root.findByType(PlusSheet).props.visible).toBe(true);
-    const row = item(tree, 'マイ食品を登録');
-    expect(row).toBeTruthy();
-    await act(async () => { row.props.onPress(); });
-    // 閉じ切る前に開くと iOS では表示中Modalの兄弟になり、何も出ない
-    expect(tree.root.findByType(PlusSheet).props.visible).toBe(false);
+    expect(item(tree, 'マイ食品を登録')).toBeUndefined();
     expect(tree.root.findByType(AddFoodSheet).props.visible).toBe(false);
-    await act(async () => { jest.advanceTimersByTime(1000); });
+    // シートが閉じ切ってから届く行動（PlusSheet の onAction 契約）を直接流す
+    await act(async () => { tree.root.findByType(PlusSheet).props.onAction('myfood:add'); });
     expect(tree.root.findByType(AddFoodSheet).props.visible).toBe(true);
     expect(tree.root.findByType(AddFoodSheet).props.draft).toBeNull();   // 空のシート（AI計算が主導線）
     expect(mockNavigate).not.toHaveBeenCalled();                          // その場で開く＝タブを移らない
+    await act(async () => { tree.unmount(); });
+  });
+
+  it('食事タブの入力シートに「マイ食品を追加」があり（マイ食品0件でも出る）、シートの内側の AddFoodSheet を開く', async () => {
+    mockParams = { open: 'text', ts: '1' };
+    const tree = await mount(<LogScreen />);
+    const btn = item(tree, 'マイ食品を追加');
+    expect(btn).toBeTruthy();
+    const openSheets = () => tree.root.findAllByType(AddFoodSheet).filter((n) => n.props.visible === true);
+    expect(openSheets()).toHaveLength(0);
+    await act(async () => { btn.props.onPress(); });
+    expect(openSheets()).toHaveLength(1);
+    expect(openSheets()[0].props.draft).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
     await act(async () => { tree.unmount(); });
   });
 
@@ -152,13 +170,12 @@ describe('マイ食品を登録（どのタブからでも）', () => {
 });
 
 describe('＋シートの行動の振り分け', () => {
-  it('自前処理しないタブでは食事タブ・運動タブ・概要タブへ渡す', async () => {
+  it('自前処理しないタブでは食事タブへ渡す（食事を記録・先の予定）', async () => {
     const cases: [string, string, Record<string, string>][] = [
       ['食事を記録', '/log', { open: 'text' }],
-      ['あとのカロリーで何を食べる？', '/log', { open: 'whattoeat' }],
       ['先の予定を入れる', '/log', { open: 'plan' }],
-      ['運動（歩く・走る・泳ぐ）', '/training', { open: 'activity' }],
       // 「体の写真」（/changes?open=photos）は 2026-09-18 に廃止。体脂肪率はその場のシートで AI 推定する（下のテスト）
+      // 「あとのカロリーで何を食べる？」（/log?open=whattoeat）と「運動」（/training?open=activity）の行は 2026-09-26 に廃止
     ];
     for (const [label, pathname, params] of cases) {
       mockNavigate.mockClear();
@@ -173,30 +190,45 @@ describe('＋シートの行動の振り分け', () => {
     }
   });
 
-  it('運動タブの「運動（歩く・走る・泳ぐ）」は遷移せずその場で「運動を記録する」シートを開く', async () => {
+  // 2026-09-26: ＋シートから「運動」「筋トレ」の行を外した（項目を5つに）。入口は運動タブの2枚のタイルに残っている
+  it('運動・筋トレの入口は運動タブのタイル（＋シートには無い）。運動タイルはその場で「運動を記録する」シートを開く', async () => {
     const tree = await mount(<TrainingScreen />);
-    await pickFromPlus(tree, '運動（歩く・走る・泳ぐ）');
+    await act(async () => { item(tree, '記録を追加').props.onPress(); });
+    expect(item(tree, '運動（歩く・走る・泳ぐ）')).toBeUndefined();
+    expect(item(tree, '筋トレ')).toBeUndefined();
+    await act(async () => { item(tree, '閉じる').props.onPress(); });
+    const tile = (id: string) => tree.root.findAll((n) => n.props?.testID === id && typeof n.props?.onPress === 'function')[0];
+    expect(tile('tile-lift')).toBeTruthy();                // 筋トレ → /lift-session（training.tsx openLiftSession）
+    expect(tree.root.findByType(ActivityLogSheet).props.visible).toBe(false);
+    await act(async () => { tile('tile-activity').props.onPress(); });
     expect(tree.root.findByType(ActivityLogSheet).props.visible).toBe(true);
     expect(mockNavigate).not.toHaveBeenCalled();
     await act(async () => { tree.unmount(); });
   });
 
-  // 2026-09-17 熊田さん「プラスメニューから運動の記録をするときに、急に『運動の記録』に飛ぶので、
-  // 『筋トレを記録』と選ばせてほしい」。有酸素（時間ダイアル）と筋トレ（重量×回数×セット）は
-  // 入力がまったく違うので、＋シートの時点で行き先を割る
-  it('「筋トレ」は有酸素とは別に、筋トレ記録画面へ直行する（戻るラベルと日付つき）', async () => {
+  it('「目標設定」は設定画面の目標シートへ push（/settings?open=goal・from は親タブ）', async () => {
     for (const [Screen, from] of [[TrainingScreen, 'training'], [LogScreen, 'log']] as const) {
       mockPush.mockClear(); mockNavigate.mockClear();
       const tree = await mount(<Screen />);
-      await pickFromPlus(tree, '筋トレ');
-      expect(mockNavigate).not.toHaveBeenCalled();        // 運動タブの有酸素シートへは行かない
+      await pickFromPlus(tree, '目標設定');
+      expect(mockNavigate).not.toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledTimes(1);
       const arg = mockPush.mock.calls[0][0] as { pathname: string; params: Record<string, string> };
-      expect(arg.pathname).toBe('/lift-session');
+      expect(arg.pathname).toBe('/settings');
+      expect(arg.params.open).toBe('goal');               // settings.tsx が受けて目標シートを直接開く
       expect(arg.params.from).toBe(from);                 // 戻るボタンが「‹ 運動」「‹ 食事」と名乗る
-      expect(arg.params.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       await act(async () => { tree.unmount(); });
     }
+  });
+
+  it('「AIに相談」は相談タブへ切り替える（router.navigate）', async () => {
+    mockPush.mockClear();
+    const tree = await mount(<PlusEntry />);
+    await pickFromPlus(tree, 'AIに相談');
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('/coach');
+    await act(async () => { tree.unmount(); });
   });
 
   // 2026-09-18 熊田さん「体の写真保存はエラーが出るのであきらめる。機能として消して。
@@ -206,7 +238,7 @@ describe('＋シートの行動の振り分け', () => {
       mockNavigate.mockClear();
       const tree = await mount(<Screen />);
       expect(tree.root.findByType(BodyFatSheet).props.visible).toBe(false);
-      await pickFromPlus(tree, '体脂肪率（AIで推定）');
+      await pickFromPlus(tree, '身体を記録', '体脂肪率（AIで推定）');   // 2026-09-26: 「身体を記録」の段を挟む
       expect(tree.root.findByType(BodyFatSheet).props.visible).toBe(true);
       expect(mockNavigate).not.toHaveBeenCalled();
       // 「写真は保存されません」の明示がシートにある
@@ -227,13 +259,13 @@ describe('＋シートの行動の振り分け', () => {
     const onLocal = tree.root.findByType(PlusEntry).props.onLocal as (a: string) => boolean;
     const handled: Record<string, boolean> = {};
     await act(async () => {
-      for (const a of ['meal:text', 'meal:myfood', 'meal:library', 'meal:camera', 'meal:whattoeat', 'plan',
-        // 運動・筋トレ・体脂肪率・マイ食品の登録は共通処理（他タブへ／筋トレ記録画面へ／その場で BodyFatSheet・AddFoodSheet）に任せる
-        'exercise', 'lift', 'bodyfat', 'myfood:add']) handled[a] = onLocal(a);
+      for (const a of ['meal:text', 'meal:myfood', 'meal:library', 'meal:camera', 'plan',
+        // 体脂肪率・目標設定・AIに相談・マイ食品の登録は共通処理（その場で BodyFatSheet／設定へ push／相談タブへ／AddFoodSheet）に任せる
+        'bodyfat', 'goal', 'coach', 'myfood:add']) handled[a] = onLocal(a);
     });
     expect(handled).toEqual({
-      'meal:text': true, 'meal:myfood': true, 'meal:library': true, 'meal:camera': true, 'meal:whattoeat': true, plan: true,
-      exercise: false, lift: false, bodyfat: false, 'myfood:add': false,
+      'meal:text': true, 'meal:myfood': true, 'meal:library': true, 'meal:camera': true, plan: true,
+      bodyfat: false, goal: false, coach: false, 'myfood:add': false,
     });
     await act(async () => { tree.unmount(); });
   });
