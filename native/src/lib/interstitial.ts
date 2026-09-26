@@ -66,11 +66,11 @@ export const INTERSTITIAL_WARMUP_MS = 30 * 1000;
  * 新しい行に広告を出したいときは、ここに明示的に true を書く＝意思を持って足す。
  */
 export const INTERSTITIAL_TARGETS: Readonly<Record<string, boolean>> = {
-  body: true,
-  volume: true,
-  strength: true,
-  week: true,
-  eating: false,
+  // 2026-09-26 概要は 食事の分析 / からだの分析 / 運動の分析 の3ページ（＋週のふりかえりはスタック画面）
+  body: true,        // からだの分析（旧 体の記録）
+  training: true,    // 運動の分析（旧 運動の量・筋トレの成長）
+  week: true,        // 週のふりかえり（スタック画面へ出るとき）
+  food: false,       // 食事の分析: 過食の引き金カードを含むので出さない（旧 eating と同じ理由）
   vitals: false,
   cycle: false,
   photos: false,

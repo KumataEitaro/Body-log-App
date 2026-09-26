@@ -45,9 +45,9 @@ export function LiveBar({ eaten, staged, target, color, height = 5, pulse, radiu
   const ghostW = useRef(new Animated.Value(ghostPct)).current;
 
   useEffect(() => {
-    // friction高め＝上品な減衰。チップ連打でも暴れない
-    Animated.spring(baseW, { toValue: basePct, friction: 9, tension: 70, useNativeDriver: false }).start();
-    Animated.spring(ghostW, { toValue: ghostPct, friction: 7, tension: 60, useNativeDriver: false }).start();
+    // 2026-09-26: バネ（friction 7〜9＝わずかに跳ねる）をやめ、240ms ease-out に。チップ連打でも暴れない
+    Animated.timing(baseW, { toValue: basePct, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(ghostW, { toValue: ghostPct, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [basePct, ghostPct, baseW, ghostW]);
 
   const fill = over ? C.coral : color;
@@ -77,7 +77,7 @@ export function LiveBar({ eaten, staged, target, color, height = 5, pulse, radiu
 export function GhostSegment({ pct, color, pulse }: { pct: number; color: string; pulse: Animated.Value }) {
   const w = useRef(new Animated.Value(pct)).current;
   useEffect(() => {
-    Animated.spring(w, { toValue: pct, friction: 7, tension: 60, useNativeDriver: false }).start();
+    Animated.timing(w, { toValue: pct, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [pct, w]);
   if (pct <= 0) return null;
   return (
@@ -108,8 +108,8 @@ export function GhostPair({ eaten, others, focus, target, color, pulse }: {
   const fW = useRef(new Animated.Value(focusPct)).current;
 
   useEffect(() => {
-    Animated.spring(oW, { toValue: othersPct, friction: 7, tension: 60, useNativeDriver: false }).start();
-    Animated.spring(fW, { toValue: focusPct, friction: 7, tension: 60, useNativeDriver: false }).start();
+    Animated.timing(oW, { toValue: othersPct, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(fW, { toValue: focusPct, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [othersPct, focusPct, oW, fW]);
 
   const fill = over ? C.coral : color;

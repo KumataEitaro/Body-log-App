@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
   const [w, setW] = useState(0);
   const x = useRef(new Animated.Value(idx)).current;
   useEffect(() => {
-    Animated.spring(x, { toValue: idx, useNativeDriver: true, speed: 16, bounciness: 5 }).start();
+    Animated.spring(x, { toValue: idx, useNativeDriver: true, speed: 16, bounciness: 0 }).start();   // 2026-09-26 跳ね返り禁止
   }, [idx, x]);
   const segW = w > 0 ? (w - 6) / options.length : 0;
   return (

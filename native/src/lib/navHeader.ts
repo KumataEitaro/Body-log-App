@@ -1,55 +1,47 @@
 // スタック画面のヘッダーを1か所に集約する（2026-09-16）。
 //
-// なぜ要るか:
-//   タブ外のスタック画面（設定・実績・法則図鑑・栄養ランキング・週次レビュー・筋トレ記録・ペイウォール）は
-//   それぞれが `Stack.Screen options` を**手書きでコピーしていた**。結果:
-//     ・戻るラベルが全部「戻る」。一方、概要タブの中の詳細ページは「‹ 概要」と**行き先を名乗る**。
-//       同じアプリの中で流儀が2つある（熊田さん指摘・2026-09-16）
-//     ・`headerTintColor` や `headerTransparent` の有無が画面ごとに揺れていた
-//
-// iOS の作法では、戻るボタンは**前の画面の名前**を出す。
-// ところがこのアプリのスタック画面は**複数のタブから開かれる**（例: 実績は 概要・食事・設定・🔥チップの4か所）。
-// 固定文字では正しく名乗れないので、**開く側が `from` を渡し、開かれた側がそれを表示する**。
-// 渡し忘れても「戻る」に落ちるだけで壊れない（テストで渡し忘れを見張る）。
+// 2026-09-26 熊田さん: 戻るボタンは**すべて「戻る」に統一**する（「‹ 概要」のように行き先を名乗らない）。
+//   経緯: 2026-09-16 に「開く側が ?from= を渡し、開かれた側が『‹ 概要』と名乗る」流儀にしたが、
+//   概要タブの中の詳細ページ（自前の戻る行）や from を渡し忘れた入口（設定など）が「戻る」のままで、
+//   同じアプリの中に2つの流儀がずっと同居していた。名乗る流儀は入口が増えるたびに漏れる構造なので、
+//   **常に「戻る」** という漏れようのない規則へ倒す（UI の統一は最優先）。
+//   `?from=` の仕組み（navFrom / useNavFromParam）は残す: ts ノンス（同じ画面を2回続けて開く）と、
+//   筋トレ記録画面の「保存後の戻り先」の判定に使う。**表示文言には使わない**。
+//   見張り: __tests__/navConsistency.test.ts（静的）＋ __tests__/navHeader.test.ts（実行時）
 import { useLocalSearchParams } from 'expo-router';
 import { Platform } from 'react-native';
 import { C } from './ui';
 import { t } from './i18n';
 
-/** 遷移元の識別子。URL に載るので短い英字にする（表示名は下の表で引く） */
+/** 遷移元の識別子。URL に載るので短い英字にする（戻り先の判定にだけ使う。表示には使わない） */
 export type NavFrom =
   | 'log' | 'training' | 'coach' | 'changes'
   | 'settings' | 'achievements' | 'laws' | 'nutrient' | 'weekly';
 
-/** `from` → 戻るボタンに出す名前。タブ名・画面名と一字一句そろえる */
-export function fromLabel(from: string | undefined): string {
-  switch (from) {
-    case 'log': return t('食事');
-    case 'training': return t('運動');
-    case 'coach': return t('相談');
-    case 'changes': return t('概要');
-    case 'settings': return t('設定');
-    case 'achievements': return t('実績');
-    case 'laws': return t('あなたの法則');
-    case 'nutrient': return t('栄養ランキング');
-    case 'weekly': return t('週のふりかえり');
-    // 渡し忘れ・ディープリンク・通知からの起動。汎用に落とす（壊さない）
-    default: return t('戻る');
-  }
+/**
+ * 戻るボタンの文言。**どこから来ても「戻る」**（2026-09-26）。
+ * 引数は旧 API との互換のために受け取るが、文言には一切使わない（テストが見張る）
+ */
+export function fromLabel(_from?: string | undefined): string {
+  return t('戻る');
 }
 
 /**
- * スタック画面の `Stack.Screen options` を作る。全画面がこれを使う＝見た目が揃う。
+ * スタック画面の `Stack.Screen options`。全画面がこれを使う＝見た目が揃う。
+ * 引数を取らない: 画面ごとに戻るラベルを変えられない形にしておく（統一の担保）。
  *
  * タイトルは本文側で出す流儀なので `title: ''` のまま（ヘッダーは戻る導線だけを担う）。
  * iOS はヘッダーを透過させて本文の背景を活かし、Android は不透明にする
  * （Android の透過ヘッダーは本文と重なって読めなくなるため。2026-09-01 のβ報告）。
+ * iOS 26+ で不透明ヘッダーにすると automatic inset が二重に効いて空白帯が出る（2026-09-26・設定画面）。
  */
-export function stackHeaderOptions(backTitle: string) {
+export function stackHeaderOptions() {
   return {
     headerShown: true,
     title: '',
-    headerBackTitle: backTitle,
+    headerBackTitle: t('戻る'),
+    // iOS は横幅が足りないと戻るラベルを省く。'default' を明示して「戻る」を出す意思を残す（'minimal' 禁止）
+    headerBackButtonDisplayMode: 'default',
     headerTintColor: C.teal,
     headerShadowVisible: false,
     ...(Platform.OS === 'ios'
@@ -58,20 +50,14 @@ export function stackHeaderOptions(backTitle: string) {
   } as const;
 }
 
-/**
- * 画面側で1行呼ぶだけ。`?from=changes` を読んで「‹ 概要」になる。
- * 渡されていなければ「戻る」。
- */
+/** 画面側で1行呼ぶだけ。戻るラベルは常に「戻る」 */
 export function useStackHeader() {
-  return stackHeaderOptions(fromLabel(useNavFromParam()));
+  return stackHeaderOptions();
 }
 
 /**
  * `?from=` の値だけを読む。
- * `stackHeaderOptions` に乗らない独自のヘッダー設定を持つ画面
- * （筋トレ記録＝タイトルあり／週次レビュー）が、戻るラベルだけをここから取るために使う。
- * 設定も以前は例外（不透明ヘッダー＋headerLargeStyle）だったが、iOS 26+ で「戻る」の下に
- * 空白帯が出る原因になっていたので 2026-09-26 に共通の options へ戻した。
+ * 筋トレ記録画面が「保存後の戻り先」の判定に使う（表示文言には使わない・2026-09-26）。
  */
 export function useNavFromParam(): string | undefined {
   const { from } = useLocalSearchParams<{ from?: string }>();

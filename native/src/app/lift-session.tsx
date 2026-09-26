@@ -296,8 +296,9 @@ export default function LiftSessionScreen() {
   }
 
   const isToday = st?.date === todayJST();
-  // 保存後の戻るボタン。来た場所（?from=）を名乗る。渡されていない・運動タブなら従来どおり「運動タブへ戻る」
-  const backLabel = backFrom && backFrom !== 'training' ? t('{name}へ戻る', { name: fromLabel(backFrom) }) : t('運動タブへ戻る');
+  // 保存後の戻るボタン。2026-09-26 熊田さん: 戻るボタンはすべて「戻る」に統一（行き先を名乗らない）。
+  // 戻り先そのものは router.back()（来た画面）なので from は判定に不要になった
+  const backLabel = t('戻る');
   const dateLabel = st ? st.date.slice(5).replace('-', '/') : '';
   const restPct = left != null && restSec > 0 ? Math.max(0, Math.min(100, (left / restSec) * 100)) : 0;
   const currentName = sets[sets.length - 1]?.name ?? null;
@@ -353,7 +354,7 @@ export default function LiftSessionScreen() {
             <Text style={s.savedT}>{saved}</Text>
             {/* 保存のあとに来るのは、ふつう**別の種目**。戻るのは全部終わったときだけ（熊田さん 2026-09-18）。
                 だから「次の種目を入力する」を上に置く。ただし2つを色で差別しない＝どちらも同じ見え方（filled）。
-                以前は「運動タブへ戻る」だけが filled で、戻るように誘導しているように見えていた */}
+                以前は「戻る」だけが filled で、戻るように誘導しているように見えていた */}
             <OptionButton style={{ marginTop: 14 }} label={t('次の種目を入力する')} onPress={startAnother} />
             <OptionButton style={{ marginTop: 8 }} label={backLabel} onPress={() => router.back()} />
           </View>

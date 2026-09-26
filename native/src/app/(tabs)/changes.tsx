@@ -9,16 +9,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InteractiveChart, { type ChartPoint } from '@/components/InteractiveChart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
-  FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
+  FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withTiming, Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Skeleton from '@/components/Skeleton';
 import { useUndoSnackbar } from '@/components/UndoSnackbar';
 import { Plus, Salad, Trophy, ChevronLeft, ArrowUpRight } from 'lucide-react-native';
 
-// タブの外（スタック画面）へ出る行。見た目が同じ13行のうちこの3行だけ戻り方が違うので、
-// 押す前に分かる印（↗）を付ける（NAV-AUDIT D-05 案A・2026-09-18）
-const EXTERNAL_ROWS = new Set(['laws', 'week', 'nutrients']);
+// 2026-09-26: 法則図鑑・栄養ランキング・週次レビューはページの中の入口カード（↗つき）から開く。
+// トップの4行はすべてタブ内の詳細ページ（設定だけスタック画面）なので EXTERNAL_ROWS は廃止
 import * as Haptics from 'expo-haptics';
 import Svg, { Polyline, Line } from 'react-native-svg';
 import { useGuide, useGuideTarget } from '@/components/GuideTour';
@@ -36,7 +35,7 @@ import CrownBadge from '@/components/CrownBadge';
 import AdSlot from '@/components/AdSlot';
 import { useInterstitial } from '@/lib/interstitialAd';
 import { useAdPitch } from '@/components/AdPitchSnackbar';
-import { Settings as SettingsIcon, Target, Award, BellRing } from 'lucide-react-native';
+import { Settings as SettingsIcon, Award, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useTodoBadge, TodoBadge } from '@/components/NotificationCenter';
 import { unseenBadgeCount } from '@/lib/achievements';
 import GoalSummaryCard from '@/components/GoalSummaryCard';
@@ -113,26 +112,43 @@ const ranges = () => [{ label: t('30日'), d: 30 }, { label: t('90日'), d: 90 }
 // nutrients は食材ナビの栄養ランキング図鑑（/nutrient-rank）への外部遷移行（laws と同じ扱い・2026-09-03）
 // 2026-09-18: 'photos'（体の写真）を廃止。写真の保存はやめ、体脂肪率は右下の＋から AI 推定の数値だけを記録する。
 // 保存済みの並び・非表示に 'photos' が残っていても useCardLayout/useCardOrder が既知キーだけに揃える
-const ALL_ORDER_DEFAULT = ['body', 'vitals', 'cycle', 'laws', 'bulkguard', 'cycles', 'eating', 'week', 'nutrients', 'volume', 'strength', 'health'];
-// 統合行→詳細で縦に積む旧カードの並び
-const DETAIL_STACKS: Record<string, string[]> = {
-  body: ['goal', 'kpi', 'chart', 'table'],
-  eating: ['slots', 'weekmap', 'trends', 'binge'],
-  week: ['digest', 'calendar'],
-  volume: ['tkpi', 'tcal', 'tbal', 'tpart', 'ttable'],
-  // lifthist=筋トレ履歴（運動タブから移設。入力は運動タブ・振り返りは概要タブの役割分離）
-  strength: ['tchart', 'tpr', 'tgoal', 'lifthist'],
+// 2026-09-26 熊田さん「概要をテコ入れ。大項目を4つに: 設定・食事の分析・からだの分析・運動の分析。ばらけている
+// 各項目はその4つの中に統合」。設定は先頭に固定（settingsRow）、実績は末尾に固定（achievementsRow）。
+// ここに並ぶのは分析の3ページ。旧12行（体の記録・バイタル・生理周期・法則・ガード・サイクル・食べ方・週・栄養・
+// 運動の量・筋トレ・歩数）は DETAIL_STACKS で3ページの中に縦に積む
+const ALL_ORDER_DEFAULT = ['food', 'body', 'training'];
+// 旧キー（ディープリンク /changes?open=…・きょうのハイライト・detailGate の src）→ 3ページのどれか。
+// 古いリンクを壊さないための対応表。知らないキーは null（無視）
+const PAGE_OF: Record<string, string> = {
+  food: 'food', eating: 'food', week: 'food', nutrients: 'food',
+  body: 'body', vitals: 'body', cycle: 'body', cycles: 'body', bulkguard: 'body', laws: 'body',
+  training: 'training', volume: 'training', strength: 'training', health: 'training',
 };
+function pageOf(key: string | null | undefined): string | null {
+  if (!key) return null;
+  return PAGE_OF[key] ?? null;
+}
+// ページ→中に縦に積むカードの並び
+//   食事の分析: 摂取カロリーの棒グラフ（intakebars・2026-09-26）→ 食べ方（slots/weekmap/trends/binge）→ 週の数字（digest/calendar）→ 栄養ランキングへの入口
+//   からだの分析: 目標・数値タイル・推移グラフ・体の写真・数字の表 → バイタル → ガード → サイクル → 法則図鑑への入口 → 生理周期（畳んで末尾）
+//   運動の分析: 週間サマリー・運動カレンダー・週別バランス・部位別・挙上表 → 挙上推移・自己ベスト・目標・筋トレ履歴 → 歩数・睡眠
+const DETAIL_STACKS: Record<string, string[]> = {
+  food: ['intakebars', 'slots', 'weekmap', 'trends', 'binge', 'digest', 'calendar', 'nutrientsLink'],
+  body: ['goal', 'kpi', 'chart', 'photos', 'table', 'vitals', 'bulkguard', 'cycles', 'lawsLink', 'cycle'],
+  // lifthist=筋トレ履歴（運動タブから移設。入力は運動タブ・振り返りは概要タブの役割分離）
+  training: ['tkpi', 'tcal', 'tbal', 'tpart', 'ttable', 'tchart', 'tpr', 'tgoal', 'lifthist', 'health'],
+};
+// 食べ方の分析（スタンダード以上）の4カード。無料の人にはこの4枚の代わりに案内カード1枚（eatingLocked）を出す
+const EATING_CARDS = ['slots', 'weekmap', 'trends', 'binge'];
 // メニューのセクション小見出し（Appleヘルスケアの「トレンド」「ハイライト」式）。
 // キー→セクションの対応は固定。描画は常に「セクション順→セクション内は保存順」に正規化するため、
 // ドラッグでセクションを跨いで落としても自セクション内の相対位置だけが反映される（クラッシュしない）
 // 「設定」ブロックはここに入れない: 並べ替え・非表示の対象になってしまい、
 // 非表示にされると（右上の⚙を廃止したので）設定へ二度と辿り着けなくなる。
 // 設定ブロックは headerJSX に固定で描く（見た目は同じ sectionH ＋ menuRow）
+// 2026-09-26: 4大項目化で小見出しは廃止（4行に見出しは要らない）。セクションは1つ＝並びの正規化だけに使う
 const SECTION_DEFS: { title: () => string; keys: string[] }[] = [
-  { title: () => t('からだの変化'), keys: ['body', 'vitals', 'cycle', 'laws', 'bulkguard', 'cycles'] },
-  { title: () => t('食事の傾向'), keys: ['eating', 'week', 'nutrients'] },
-  { title: () => t('運動の傾向'), keys: ['volume', 'strength', 'health'] },
+  { title: () => '', keys: ['food', 'body', 'training'] },
 ];
 // セクション順→セクション内は引数の相対順。未知キーは末尾へ（防御・落とさない）
 function normalizeOrder(order: string[]): string[] {
@@ -143,12 +159,15 @@ function normalizeOrder(order: string[]): string[] {
 }
 const CARD_LABELS = (): Record<string, string> => ({
   // 統合行（メニュー・詳細タイトル・⊕シートで使う）
-  body: t('体の記録'), eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
+  // 4大項目（2026-09-26）。body は「体の記録」から「からだの分析」へ改名（ページの中身は体の記録＋バイタル＋…）
+  food: t('食事の分析'), body: t('からだの分析'), training: t('運動の分析'),
+  eating: t('食べ方の分析'), week: t('週のふりかえり'), volume: t('運動の量'), strength: t('筋トレの成長'),
   laws: t('あなたの法則'), bulkguard: t('リーンバルク・ガード'), cycles: t('サイクル比較'), health: t('歩数・睡眠'),
   vitals: t('バイタル'), cycle: t('生理周期'), nutrients: t('栄養ランキング'),
   // 統合詳細の中の旧カード名（エラー境界の表示名として残す）
   digest: t('週間ダイジェスト'), slots: t('食べる時間帯'), kpi: t('サマリー'), calendar: t('カレンダー'), chart: t('推移グラフ'), binge: t('過食の引き金'), weekmap: t('曜日のリズム'), goal: t('目標'),
   table: t('数字で見る'), trends: t('食材の傾向'), ttable: t('挙上重量の表'),
+  intakebars: t('摂取カロリー'), photos: t('体の写真'), eatingLocked: t('食べ方の分析'), nutrientsLink: t('栄養ランキング'), lawsLink: t('あなたの法則'),
   tkpi: t('週間サマリー'), tcal: t('運動カレンダー'), tbal: t('週別バランス'), tpart: t('部位別ボリューム'), tchart: t('挙上重量の推移'), tgoal: t('運動目標'), tpr: t('自己ベスト'), lifthist: t('筋トレ履歴'),
 });
 // 保存済み順序を現行カード構成とマージ（将来カードが増えても壊れない）
@@ -302,11 +321,11 @@ export default function ChangesScreen() {
     })
     .onEnd((e) => {
       'worklet';
-      // 離した位置が幅の1/3超 or 十分な速度なら閉じる。未満ならスプリングで元の位置へ
+      // 離した位置が幅の1/3超 or 十分な速度なら閉じる。未満なら ease-out で元の位置へ（2026-09-26 バネ廃止）
       if (e.translationX > winW / 3 || e.velocityX > 800) {
         detailTx.value = withTiming(winW, { duration: 150 }, () => { runOnJS(closeDetailByGesture)(); });
       } else {
-        detailTx.value = withSpring(0, { damping: 20, stiffness: 220 });
+        detailTx.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
       }
     }), [winW, detailTx, closeDetailByGesture]);
   const detailSlide = useAnimatedStyle(() => ({ transform: [{ translateX: detailTx.value }] }));
@@ -433,11 +452,10 @@ export default function ChangesScreen() {
   }, [cycleOn]);
   useEffect(() => { loadCycle(); }, [loadCycle]);
 
-  // 設定で生理周期をOFFにしたら、開きっぱなしの詳細ページも閉じる
-  // （「消したはずの画面」が残っていると、見せない約束を破ったことになる）
-  useEffect(() => {
-    if (!cycleOn) setDetailKey((k) => (k === 'cycle' ? null : k));
-  }, [cycleOn]);
+  // 生理周期はからだの分析ページの末尾に**畳んだ状態**で置く（2026-09-26 熊田さん「パッと見たくない」）。
+  // OFF にすると区画ごと消える（unavailable）。開閉は画面を離れるとリセット（毎回畳んだ状態から）
+  const [cycleOpen, setCycleOpen] = useState(false);
+  useEffect(() => { if (!cycleOn) setCycleOpen(false); }, [cycleOn]);
 
   // カレンダーの日タップ → その日の記録を取得して下に表示
   async function openDay(dateKey: string) {
@@ -818,10 +836,35 @@ export default function ChangesScreen() {
   // 統合行は詳細ページで旧カードを縦に積む（各カードのmarginBottom:12がそのまま余白になる）。
   // カード1枚の例外でページ全体が落ちないよう、旧カード単位で境界を保つ。
   // どのカードで起きたかを名前で出せるので、原因の切り分けにもなる
+  // ページに積むカードの並び（unavailable を除く）。食べ方の分析（4カード）は無料の人には案内カード1枚に置き換える。
+  // 王冠の判定はメニュー行・ハイライト・ディープリンクと同じ detailGate を通す（入口が違っても結果は同じ）
+  function pageStack(key: string): string[] {
+    const base = DETAIL_STACKS[key] ?? [key];
+    const ks = base.filter((k) => !unavailable.includes(k));
+    if (key !== 'food' || !detailGate('eating', gate.gated).blocked) return ks;
+    return ks.flatMap((k) => (EATING_CARDS.includes(k) ? (k === EATING_CARDS[0] ? ['eatingLocked'] : []) : [k]));
+  }
   function card(key: string): ReactNode {
-    const stack = DETAIL_STACKS[key];
-    if (stack) return <View>{stack.map((k) => <View key={k}>{subCard(k)}</View>)}</View>;
-    return subCard(key);
+    return <View>{pageStack(key).map((k) => <View key={k}>{subCard(k)}</View>)}</View>;
+  }
+  // ページの中から別のスタック画面へ出る入口カード（↗）。法則図鑑・栄養ランキング
+  function linkCard(key: 'lawsLink' | 'nutrientsLink'): ReactNode {
+    const pathname = key === 'lawsLink' ? '/laws' : '/nutrient-rank';
+    const label = CARD_LABELS()[key];
+    const sub = key === 'lawsLink' ? (lawLine ?? t('記録が貯まると、あなたの法則が見つかります')) : t('自分の摂取ランキング・不足栄養素・食材図鑑');
+    return (
+      <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
+                 accessibilityRole="button" accessibilityLabel={label} accessibilityHint={t('別のページを開きます')}
+                 android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
+                 onPress={() => { Haptics.selectionAsync().catch(() => {}); router.push({ pathname, params: navFrom('changes') } as never); }}>
+        <View style={s.menuIcon}>{menuIconOf(key === 'lawsLink' ? 'laws' : 'nutrients')}</View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.menuT}>{label}</Text>
+          <Text style={s.menuSub} numberOfLines={1}>{sub}</Text>
+        </View>
+        <ArrowUpRight size={16} color={C.faint} testID={`external-${key}`} />
+      </Pressable>
+    );
   }
 
   function subCard(key: string): ReactNode {
@@ -844,8 +887,6 @@ export default function ChangesScreen() {
       case 'chart': return chartCard;
       // バイタル（血圧・脈拍・血糖）。migration-25未適用でも空状態で成立する
       case 'vitals': return <VitalsCard width={winW - 60} />;
-      // 生理周期（migration-28未適用でも空状態で成立する）。保存・削除のたびに帯を貼り直す
-      case 'cycle': return <MenstrualCycleCard onChanged={loadCycle} />;
       case 'binge': return <BingeTriggerCard />;
       // 画面が既に持っているrows（date/intake/target）をそのまま渡す（再取得しない最小構成）
       case 'weekmap': return <WeekdayHeatmapCard rows={rows} />;
@@ -862,6 +903,38 @@ export default function ChangesScreen() {
       case 'tpr': return <PersonalBestCard />;
       case 'tgoal': return <GoalSummaryCard mode="training" />;
       case 'lifthist': return <LiftHistoryCard showUndo={undoBar.show} />;
+      // 2026-09-26 4大項目化で増えたカード
+      case 'lawsLink': return linkCard('lawsLink');
+      case 'nutrientsLink': return linkCard('nutrientsLink');
+      // 摂取カロリーの棒グラフ・体の写真は別ブランチ（feat/analysis-cards）で作り、統合時にここへ差す
+      case 'intakebars': return null;
+      case 'photos': return null;
+      // 無料の人向け: 食べ方の分析（4カード）の代わりに1枚。タップで文脈ペイウォール（src=eating）
+      case 'eatingLocked': return (
+        <Pressable style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]} accessibilityRole="button"
+                   accessibilityLabel={t('食べ方の分析')} testID="eating-locked"
+                   onPress={() => { Haptics.selectionAsync().catch(() => {}); router.push(paywallPath('eating') as never); }}>
+          <View style={s.h2Row}><Salad size={16} color={C.teal} /><Text style={[s.h2, { marginBottom: 0 }]}>{t('食べ方の分析')}</Text><CrownBadge size={14} /></View>
+          <Text style={s.note}>{t('食べる時間帯・曜日のリズム・食材の傾向・過食の引き金。スタンダード以上で食べ方の分析が開きます。')}</Text>
+          <Text style={[s.note, { color: C.accentInk, fontWeight: '800', marginTop: 6 }]}>{t('プランを見る')} ›</Text>
+        </Pressable>
+      );
+      // 生理周期はページ末尾に畳んで置く。見出し行だけ常に出し、タップで本体（MenstrualCycleCard）を開く
+      case 'cycle': return (
+        <View>
+          <Pressable style={({ pressed }) => [s.menuRow, pressed && { opacity: 0.9 }]} accessibilityRole="button"
+                     accessibilityState={{ expanded: cycleOpen }} accessibilityLabel={t('生理周期')} testID="cycle-toggle"
+                     onPress={() => { Haptics.selectionAsync().catch(() => {}); setCycleOpen((v) => !v); }}>
+            <View style={s.menuIcon}>{menuIconOf('cycle')}</View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.menuT}>{t('生理周期')}</Text>
+              <Text style={s.menuSub} numberOfLines={1}>{cycleSummary(cycleStarts, today)}</Text>
+            </View>
+            {cycleOpen ? <ChevronUp size={18} color={C.faint} /> : <ChevronDown size={18} color={C.faint} />}
+          </Pressable>
+          {cycleOpen && <MenstrualCycleCard onChanged={loadCycle} />}
+        </View>
+      );
       default: return null;
     }
   }
@@ -896,6 +969,19 @@ export default function ChangesScreen() {
 
   function summaryOf(key: string): string {
     switch (key) {
+      case 'food': {
+        // 今週の平均摂取と目標内の日数。記録が無い週は旧 eating の要約（最多時間帯）に落ちる
+        const ws = weekStartOf2(today);
+        const wk = rows.filter((r) => r.date >= ws && r.date <= today && r.intake != null);
+        if (wk.length === 0) return summaryOf('eating');
+        const avg = Math.round(wk.reduce((a, r) => a + (r.intake ?? 0), 0) / wk.length);
+        const ok = wk.filter((r) => r.diff != null && r.diff <= 0).length;
+        return t('今週の平均 {n}kcal・目標内 {a}/{b}日', { n: avg.toLocaleString(), a: ok, b: wk.length });
+      }
+      case 'training': {
+        const st = Platform.OS === 'ios' ? activity?.find((d) => d.date === today)?.steps : undefined;
+        return st != null ? t('きょう{n}歩', { n: st.toLocaleString() }) : t('運動の量・筋トレの成長・歩数と睡眠');
+      }
       case 'body': {
         // 旧kpi行の要約: 現在体重＋1週間の変化（30日の流れは詳細のヘッダー・グラフで見せる）
         if (latestW2 == null && latestWaist == null && latestBf == null) return t('体重を記録するとここに変化が出ます');
@@ -974,7 +1060,8 @@ export default function ChangesScreen() {
     const p = { size: 17, color: C.teal } as const;
     switch (key) {
       case 'body': return <PersonStanding {...p} />;
-      case 'eating': return <Salad {...p} />;
+      case 'food': case 'eating': return <Salad {...p} />;
+      case 'training': return <Dumbbell {...p} />;
       case 'week': return <CalendarDays {...p} />;
       case 'volume': return <Dumbbell {...p} />;
       case 'strength': return <Trophy {...p} />;
@@ -1027,12 +1114,18 @@ export default function ChangesScreen() {
   // 入口が違っても行き先が同じなら結果は同じ（NAV-AUDIT D-07）。広告の導線を2本作らない（熊田さん）
   const { open: openParam, ts: openTs, serie: serieParam } = useLocalSearchParams<{ open?: string; ts?: string; serie?: string }>();
   useEffect(() => {
-    if (!openParam || !ALL_ORDER_DEFAULT.includes(openParam) || EXTERNAL_ROWS.has(openParam) && openParam !== 'week') return;
+    // 旧キー（body / strength / week / eating …）は PAGE_OF で3ページへ写像。laws・nutrients は
+    // それ自体がスタック画面なので概要ではなくそちらへ（古いリンクの互換）
+    if (openParam === 'laws' || openParam === 'nutrients') {
+      router.push({ pathname: openParam === 'laws' ? '/laws' : '/nutrient-rank', params: navFrom('changes') } as never);
+      return;
+    }
+    const page = pageOf(openParam);
+    if (!page) return;
     const sk = series().find((x) => x.key === serieParam)?.key;
     if (sk) setSerie(sk);
-    const g = detailGate(openParam, gate.gated);
-    if (g.blocked) { router.push(paywallPath(g.src) as never); return; }
-    openDetail(openParam);
+    // 食事の分析ページは無料でも開ける（食べ方の4カードだけページ内で案内カードに置き換わる）
+    openDetail(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openParam, openTs]);
 
@@ -1090,75 +1183,20 @@ export default function ChangesScreen() {
       </View>
     );
   }
-  // セクション先頭キー→見出し（正規化済みvisibleOrderで先頭判定。非表示/unavailableで
-  // 先頭が変われば自動で次の行に付く。編集中も表示されるがドラッグの対象にはならない）
-  const sectionHeadOf = new Map<string, string>();
-  for (const sec of SECTION_DEFS) {
-    const first = visibleOrder.find((k) => sec.keys.includes(k));
-    if (first) sectionHeadOf.set(first, sec.title());
-  }
-  // 広告枠（概要タブ・1枠）: 「からだ」セクションと「食事」セクションの間＝食事セクションの
-  // 見出しの直上。詳細ページ（detailKey!=null）には置かない。並び替え中も非表示。
-  // 食事セクションの行が全部隠されているときは枠を出さない（無理に別の場所へ置かない）
-  const adBeforeKey = visibleOrder.find((k) => SECTION_DEFS[1].keys.includes(k)) ?? null;
   function menuRow(key: string) {
     const withSpark = key === 'body' && sparkVals.length >= 2;
-    // 王冠ゲーティング: 有料機能は行を隠さず王冠つきで見せ、タップで文脈ペイウォールへ
-    // （moment of intent）。gate.activeがfalse（現在の全機能無料ビルド）では従来どおり。
-    // 旧digest行の王冠は統合先のweek行へ付け替え（ペイウォールsrcはdigestのまま）。
-    // 新ティア: 食べ方の分析（eating詳細）もスタンダード以上の機能（src=eating）
-    //
-    // week行だけは王冠つきでも遷移を止めない（N4）: 行き先の週次レビュー画面が
-    // 「見出し＋体重変化までは無料・評価文と来週の目標はスタンダード」と自前でゲートするため、
-    // ここで蹴るとロック中の人が体重変化すら見られなくなる（law-detailと同じ流儀）
-    // 王冠の判定は lib/detailGate.ts に集約（2026-09-16）。
-    // 同じ詳細ページへの入口が「メニュー行」と「きょうのハイライト」の2つあり、
-    // ハイライト側に判定が無くて**有料の機能が無料で開けていた**（NAV-AUDIT D-07）。
-    const g = detailGate(key, gate.gated);
-    const crowned = g.crowned;
-    const crownBlocks = g.blocked;
-    const secTitle = sectionHeadOf.get(key);
-    const external = EXTERNAL_ROWS.has(key);
-    const row = (
+    // 王冠: 食事の分析ページは無料でも開くが、中の「食べ方の分析」4カードがスタンダード以上。
+    // 行には王冠だけ付け、遷移は止めない（週のふりかえり・law-detail と同じ流儀）。判定は lib/detailGate.ts
+    const crowned = key === 'food' && detailGate('eating', gate.gated).crowned;
+    return (
       <Pressable style={({ pressed }) => [s.menuRow, pressed && { transform: [{ scale: 0.985 }], opacity: 0.9 }]}
                  accessibilityRole="button" accessibilityLabel={CARD_LABELS()[key] ?? key}
-                 accessibilityHint={external ? t('別のページを開きます') : undefined}
                  // Androidリップル（Material 3の作法）。menuRow自身のborderRadius 16内にクリップされる
                  android_ripple={{ color: rgba(C.teal, 0.14), borderless: false }}
-                 // ガイドツアーの「変化を見る」ハイライトは体の記録行に当てる（詳細はタップ先）
+                 // ガイドツアーの「変化を見る」ハイライトはからだの分析行に当てる（詳細はタップ先）
                  ref={key === 'body' ? chartTarget : undefined} collapsable={false}
-                 onPress={() => {
-                   if (g.blocked) {
-                     Haptics.selectionAsync().catch(() => {});
-                     // typed routesが動的srcを知らないためas never（onboarding.tsxと同じ流儀）
-                     router.push(paywallPath(g.src) as never);
-                     return;
-                   }
-                   // 週のふりかえり行の行き先は週次レビュー画面（N4）。数字の一覧（週間ダイジェスト＋
-                   // カレンダー）は、その画面の「くわしく見る」からこの詳細ページへ入る
-                   if (key === 'week') {
-                     Haptics.selectionAsync().catch(() => {});
-                     router.push({ pathname: '/weekly-review', params: navFrom('changes') } as never);
-                     // 遷移を出したあとに全画面広告の判定（週のふりかえりは対象・週1回程度の
-                     // 頻度なので体験を壊しにくい）。王冠つきでも遷移は止めない＝広告も同じ流儀
-                     interstitial.maybeShow('week');
-                     return;
-                   }
-                   // lawsはカード詳細ではなく法則図鑑（スタック画面）への外部遷移
-                   // （実績と同じ「別ページに住む機能」なのでdetailKeyには入れない）
-                   if (key === 'laws') {
-                     Haptics.selectionAsync().catch(() => {});
-                     router.push({ pathname: '/laws', params: navFrom('changes') } as never);
-                     return;
-                   }
-                   // nutrients も同じく別ページに住む機能（食材ナビの栄養ランキング図鑑）
-                   if (key === 'nutrients') {
-                     Haptics.selectionAsync().catch(() => {});
-                     router.push({ pathname: '/nutrient-rank', params: navFrom('changes') } as never);
-                     return;
-                   }
-                   openDetail(key);
-                 }}>
+                 testID={`menu-${key}`}
+                 onPress={() => openDetail(key)}>
         <View style={s.menuIcon}>{menuIconOf(key)}</View>
         <View style={{ flex: 1 }}>
           <Text style={s.menuT}>{CARD_LABELS()[key] ?? key}</Text>
@@ -1166,18 +1204,8 @@ export default function ChangesScreen() {
         </View>
         {crowned && <CrownBadge size={14} />}
         {withSpark && <MiniSpark vals={sparkVals} color={C.teal} />}
-        {external ? <ArrowUpRight size={16} color={C.faint} testID={`external-${key}`} /> : <Text style={s.menuGo}>›</Text>}
+        <Text style={s.menuGo}>›</Text>
       </Pressable>
-    );
-    // セクション先頭ならヘルスケア風の小見出し＋余白を上に足す（見出しは行と一体で描くため、
-    // ReorderableCards側に見出し行を挿入する改造が不要＝並べ替えの座標計算も従来のまま）
-    if (secTitle == null) return row;
-    return (
-      <View>
-        {key === adBeforeKey && <AdSlot placement="changes" />}
-        <Text style={s.sectionH}>{secTitle}</Text>
-        {row}
-      </View>
     );
   }
 
@@ -1206,40 +1234,28 @@ export default function ChangesScreen() {
       </Pressable>
     );
   }
-  // 他のスタック画面と同じく from を渡す（戻るボタンが「‹ 概要」を名乗る）。ts は navFrom が付ける
+  // 他のスタック画面と同じく navFrom で push（ts＝同じ行き先を2回続けて開くためのノンス。戻るラベルは常に「戻る」）
   const openSettings = (open?: string) => router.push(
     { pathname: '/settings', params: navFrom('changes', open ? { open } : undefined) } as never,
   );
-  // 概要タブ最上部のブロック（2026-09-04・右上の⚙を廃止してここへ集約）。
-  //
-  // 2026-09-24 熊田さん: 並びは **設定 → 通知センター → 目標設定**。実績は概要の**いちばん下**へ（achievementsRow）。
-  // （2026-09-16 の「よく押す順（実績→通知→目標→設定）」は見出し「あなたの記録と設定」と中身のずれを直す暫定案だった。
-  //   設定が先頭に来ることで、このブロックが見出しどおり「設定の入口」として読める）
+  // 概要タブ最上部のブロック（2026-09-04・右上の⚙を廃止してここへ集約）。実績は概要の**いちばん下**（achievementsRow・2026-09-24）
   const achievementsRow = settingsRow({
     key: 'achievements', icon: <Award size={17} color={C.teal} />, label: t('実績'),
     sub: t('ストリーク・バッジ・ストーリー共有'), badge: unseenBadges,
     onPress: () => router.push({ pathname: '/achievements', params: navFrom('changes') } as never),
   });
+  // 2026-09-26 熊田さん: 概要の大項目は 設定 → 食事の分析 → からだの分析 → 運動の分析 の4つ。
+  // 通知センターの行は概要から外す（設定の中にある。未対応の件数は設定行のバッジで見える）。
+  // 目標設定の行も外す（右下の＋「目標設定」と設定の中から開く）。見出しは無し（4行に見出しは要らない）
   const settingsBlock = (
     <View>
-      <Text style={s.sectionH}>{t('あなたの記録と設定')}</Text>
       {settingsRow({
         key: 'settings', icon: <SettingsIcon size={17} color={C.teal} />, label: t('設定'),
-        sub: t('プロフィール・マイ食品・食べないもの・テーマ・言語・通知・ヘルスケア連携'),
-        onPress: () => openSettings(), guideRef: gearTarget,
-      })}
-      {settingsRow({
-        key: 'notice', icon: <BellRing size={17} color={C.teal} />, label: t('通知センター'),
         sub: todo.count > 0
           ? t('入力すべき項目が{n}件あります', { n: todo.count })
-          : t('いま対応が必要な項目はありません'),
+          : t('プロフィール・目標・通知・マイ食品・テーマ・言語・ヘルスケア連携'),
         badge: todo.count,
-        onPress: () => openSettings('notice'),
-      })}
-      {settingsRow({
-        key: 'goal', icon: <Target size={17} color={C.teal} />, label: t('目標設定'),
-        sub: t('体重・必要な赤字・1日に食べられる量・運動・記録と歩数の週目標・PFC'),
-        onPress: () => openSettings('goal'),
+        onPress: () => openSettings(), guideRef: gearTarget,
       })}
     </View>
   );
@@ -1255,16 +1271,9 @@ export default function ChangesScreen() {
           // 「週のふりかえり」はメニュー行と同じ行き先（週次レビュー画面）へ（NAV-AUDIT D-06）。
           // 以前はここだけタブ内詳細（数字の一覧）を開いていて、隣り合う2つの入口が別の場所を指していた
           if (target === 'week') { router.push({ pathname: '/weekly-review', params: navFrom('changes') } as never); return; }
-          // メニュー行と**同じ王冠判定**を通す（2026-09-16・NAV-AUDIT D-07）。
-          // ここに判定が無かったため、無料のまま有料の「食べ方の分析」が開けていた。
-          // 行き先が同じなら、入口が違っても結果は同じでなければならない
-          const hg = detailGate(target, gate.gated);
-          if (hg.blocked) {
-            Haptics.selectionAsync().catch(() => {});
-            router.push(paywallPath(hg.src) as never);
-            return;
-          }
-          openDetail(target);
+          // 旧ターゲット（eating / strength / body）は3ページへ写像。食事の分析は無料でも開き、
+          // 食べ方の4カードだけページ内で案内カードになる（王冠判定は pageStack が detailGate で行う＝入口が違っても同じ）
+          openDetail(pageOf(target) ?? 'body');
         }}
       />
     </>
@@ -1307,6 +1316,8 @@ export default function ChangesScreen() {
           {stickyHeaderJSX}
           {headerJSX}
           {visibleOrder.map((k) => <View key={k}>{menuRow(k)}</View>)}
+          {/* 広告枠（概要タブ・1枠）: 4行の下・実績の上。詳細ページには置かない */}
+          <AdSlot placement="changes" />
           {/* 実績は概要のいちばん下（2026-09-24 熊田さん）。バッジ・ストリークは「振り返ったあとに見るもの」 */}
           <View style={{ marginTop: 18 }}>{achievementsRow}</View>
         </ScrollView>
@@ -1323,7 +1334,7 @@ export default function ChangesScreen() {
               <Animated.View key={detailKey} entering={FadeInDown.duration(260)}>
                 <Pressable style={s.backRow} onPress={() => { Haptics.selectionAsync().catch(() => {}); setDetailKey(null); }} hitSlop={8}>
                   <ChevronLeft size={ICON.xl} color={C.teal} />
-                  <Text style={s.backT}>{t('概要')}</Text>
+                  <Text style={s.backT}>{t('戻る')}</Text>
                 </Pressable>
                 {/* 見出し行。体の記録だけ右上に共有アイコン（体重変化グラフの透過ステッカー。体重が2点以上あるとき） */}
                 <View style={s.detailTitleRow}>

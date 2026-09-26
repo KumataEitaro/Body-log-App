@@ -106,10 +106,13 @@ describe('設定への導線（2026-09-04・右上の⚙を廃止）', () => {
   // アプリを消して入れ直す以外に設定へ戻る手段が無くなる。
   const changes = read('app/(tabs)/changes.tsx');
 
-  it('概要タブに設定ブロックの4行が存在する', () => {
-    // 目標設定・実績・通知センター・設定。どれか1つでも消えたら気づけるようにする
-    for (const label of ['目標設定', '実績', '通知センター', '設定']) {
+  it('概要タブに設定の行と実績の行が存在する（2026-09-26: 通知センター・目標設定の行は概要に出さない）', () => {
+    // 設定・実績。どちらか消えたら気づけるようにする（通知センターは設定の中、目標設定は＋シートと設定の中）
+    for (const label of ['実績', '設定']) {
       expect(changes).toContain(`label: t('${label}')`);
+    }
+    for (const label of ['目標設定', '通知センター']) {
+      expect(changes).not.toContain(`label: t('${label}')`);
     }
     expect(changes).toContain("const settingsBlock = (");
   });
@@ -136,9 +139,12 @@ describe('設定への導線（2026-09-04・右上の⚙を廃止）', () => {
     expect(users).toEqual([]);
   });
 
-  it('概要タブのセクション名が現行の呼称になっている', () => {
-    for (const title of ['からだの変化', '食事の傾向', '運動の傾向']) {
+  it('概要タブの大項目名が現行の呼称になっている（2026-09-26: 食事の分析・からだの分析・運動の分析。旧小見出しは無い）', () => {
+    for (const title of ['食事の分析', 'からだの分析', '運動の分析']) {
       expect(changes).toContain(`t('${title}')`);
+    }
+    for (const title of ['からだの変化', '食事の傾向', '運動の傾向']) {
+      expect(changes).not.toContain(`t('${title}')`);
     }
   });
 });

@@ -5,7 +5,7 @@
 //  ・表示は登録から14日以内。全完了した瞬間に祝祭→24時間たつと自動で消える
 //  ・途中でも×でいつでも消せる（責めない。cards.hideなので⊕から戻せる）
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
@@ -116,7 +116,8 @@ export default function StartChecklist({ editing, onHide, onFocusInput, onTakePh
 
   const doneCount = checks ? CHECK_IDS.filter((k) => checks[k]).length : 0;
   useEffect(() => {
-    Animated.spring(progress, { toValue: doneCount / CHECK_IDS.length, useNativeDriver: false, friction: 8, tension: 60 }).start();
+    // 2026-09-26: バネ→ease-out の timing（びよーん禁止・静かなモーション）
+    Animated.timing(progress, { toValue: doneCount / CHECK_IDS.length, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [doneCount, progress]);
 
   if (!show || !checks || suppressed) return null;

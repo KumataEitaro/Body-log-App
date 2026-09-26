@@ -2748,3 +2748,54 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 - 記録行を長押し → 削除: スナックバーが揺れずに出て、消えた行の下の行が滑らかに詰まる。
 - 運動タブ → 運動を記録する → 種目一覧の左端が丸地の線アイコン。
 - `cd native && npx tsc --noEmit && npx jest --silent` がともに 0。
+## 概要タブを4大項目に再編・戻るボタンを「戻る」に統一・跳ねるバネの棚卸し（2026-09-26・feat/overview-4・v1.1.18）
+
+### 概要タブ（`native/src/app/(tabs)/changes.tsx`）
+熊田さん「項目が多すぎる。大項目を4つに: 設定・食事の分析・からだの分析・運動の分析。ばらけている各項目はその4つの中に統合。UIの統一」。
+- トップは **設定 → 食事の分析 → からだの分析 → 運動の分析** の4行（＋いちばん下に実績・その上に広告枠1つ）。小見出し（からだの変化／食事の傾向／運動の傾向）は廃止
+- **通知センターの行は概要から外した**（設定の中にある。未対応の件数は設定行のバッジと副文「入力すべき項目が n 件あります」で見える）
+- **目標設定の行も外した**（右下＋の「目標設定」と設定の中から開く）
+- 旧12行はページの中に縦に積む（`DETAIL_STACKS`）:
+  - 食事の分析: 摂取カロリーの棒グラフ（`intakebars`・feat/analysis-cards の `IntakeBarsCard`）→ 食べる時間帯 → 曜日ヒートマップ → 食材の傾向 → 過食の引き金 → 週間ダイジェスト → カレンダー → 栄養ランキングへの入口カード（↗）
+  - からだの分析: 目標 → 数値タイル → 推移グラフ → 体の写真（`photos`・feat/analysis-cards の `BodyPhotosCard`）→ 数字の表 → バイタル → リーンバルク・ガード → サイクル比較 → 法則図鑑への入口カード（↗）→ **生理周期（末尾・畳んだ状態）**
+  - 運動の分析: 週間サマリー → 運動カレンダー → 週別バランス → 部位別 → 挙上表 → 挙上推移 → 自己ベスト → 目標 → 筋トレ履歴 → 歩数・睡眠（iOS）
+- **生理周期**（熊田さん「パッと見たくない」）: からだの分析ページの末尾に見出し行だけ出し、タップで本体（MenstrualCycleCard）が開く。設定 OFF なら行ごと出ない。画面を離れると畳んだ状態に戻る
+- 王冠: 食事の分析ページは無料でも開く。中の「食べ方の分析」4カード（時間帯・ヒートマップ・食材・過食）がスタンダード以上で、無料の人には案内カード1枚（`eatingLocked`・タップで /paywall?src=eating）に置き換わる。判定は `lib/detailGate.ts` を `pageStack()` で通す（メニュー行・ハイライト・ディープリンクのどこから入っても同じ）
+- ディープリンク互換: `/changes?open=strength|volume|health` → 運動の分析、`open=eating|week` → 食事の分析、`open=vitals|cycle|cycles|bulkguard` → からだの分析、`open=laws|nutrients` → それぞれのスタック画面（`PAGE_OF`）。食事タブの収支ボックス（`open=body&serie=intake`）は従来どおり
+- 全画面広告の対象（`lib/interstitial.ts`）: body / training / week。food は過食の引き金を含むので出さない（旧 eating と同じ理由）
+- 運動タブの案内文「概要 →『筋トレの成長』で見られます」→「『運動の分析』で見られます」
+
+### 戻るボタン（`native/src/lib/navHeader.ts`）
+熊田さん「戻るボタンの問題、すべて戻るボタンに統一して。『＜概要』ではなく。漏れがないかをしっかり検証」。
+- `fromLabel()` は引数を見ずに常に「戻る」。`stackHeaderOptions()` は**引数を取らない**（画面ごとに戻るラベルを変えられない形）。`headerBackButtonDisplayMode: 'default'` を明示（iOS が横幅不足でラベルを省くのを許さない）
+- 概要タブの詳細ページの自前の戻る行「‹ 概要」→「‹ 戻る」。筋トレ記録の保存後ボタン「{name}へ戻る／運動タブへ戻る」→「戻る」
+- `?from=` の仕組み（navFrom / useNavFromParam）は残す: ts ノンス（同じ画面を2回続けて開く）のため。表示文言には使わない
+- **検証は3つの角度**:
+  1. 静的（`__tests__/navConsistency.test.ts`）: fromLabel に switch が無い／stackHeaderOptions が引数なし／全スタック画面が共通 options か fromLabel 経由／`headerBackTitle: t('戻る以外')`・`へ戻る`・`headerBackTitleVisible: false`・`headerBackButtonDisplayMode: 'minimal'`・`headerBackVisible: false` が無い／概要の自前の戻る行が「戻る」／app・components・lib 全体に「‹ 概要」「＜食事」式の文字列が無い
+  2. 実行時（`__tests__/navHeader.test.ts`）: 13 通りの from（正規の9つ・undefined・空・不正・「概要」）で fromLabel が「戻る」、useStackHeader が from を渡されても「戻る」
+  3. 構造: options を作る関数が引数を取らない＝将来「この画面だけ名乗る」を書けない
+- Android の native ヘッダーは OS 標準で矢印のみ（ラベル無し）。これは iOS の「‹ 戻る」と同じ意味の標準表現
+
+### 跳ねるバネ（びよーん）の棚卸し（`__tests__/motionConvention.test.ts` が見張る）
+熊田さん「食べた記録を削除するときの、びよーんと動く挙動、これいらない。ほかにびよーんという挙動つけているところある？洗い出して。直して」。
+方針＝2026 年の静かなモーション（Apple HIG／Material 3 Expressive）: 150〜320ms・ease-out（`Easing.out(Easing.cubic)`）・オーバーシュート無し・視差軽減を尊重。
+| 場所 | 前 | 後 |
+|---|---|---|
+| Undo スナックバー・広告なし案内（`UndoSnackbar.tsx` / `AdPitchSnackbar.tsx`）＝**削除時の「びよーん」の正体** | `SlideInDown.springify().damping(18)` | `SlideInDown.duration(240).easing(ease-out)`（feat/plus-sheet-compact） |
+| バッジ獲得の祝祭（`achievements.tsx`） | spring friction 5 | timing 280ms |
+| 法則発見の祝祭（`laws.tsx`） | spring friction 5 | timing 280ms |
+| ガイドの進捗バー・カード（`GuideTour.tsx`） | spring friction 8 / 5 | timing 260 / 240ms |
+| 入力中のカロリーバー 5本（`LivePreviewBar.tsx`） | spring friction 7〜9 | timing 240ms |
+| オンボーディングの進捗（`onboarding.tsx`） | withSpring damping 15 | withTiming 320ms |
+| 概要の詳細ページのエッジスワイプ戻り（`changes.tsx`） | withSpring damping 20 | withTiming 200ms |
+| スタートチェックリストの進捗（`StartChecklist.tsx`） | spring friction 8 | timing 260ms |
+| セグメントのつまみ（`ui/Selectable.tsx`） | bounciness 5 | bounciness 0 |
+| ドラッグ並べ替え（`ReorderableCards/Chips.tsx`） | 減衰比 0.87（跳ね返る） | `overshootClamping: true` |
+残す（跳ねない）: PlusSheet の開閉・DateStrip の追従（overshootClamping 済み）、押下の縮み（bounciness 0）。
+規約テスト: `Animated.spring` は bounciness 0 / overshootClamping true を明示したものだけ、`withSpring` は overshootClamping 必須、`.springify()`・`Easing.bounce/elastic/back` 禁止。
+
+### 確認のしかた
+- 概要: 4行（設定・食事の分析・からだの分析・運動の分析）＋いちばん下に実績。通知センター・目標設定の行が無い。設定行に未対応件数のバッジ
+- からだの分析 → いちばん下に「生理周期」行（設定 ON のときだけ）。タップで開く
+- どの画面でも左上は「‹ 戻る」。概要の詳細ページも「‹ 戻る」
+- 記録を削除 → 下から出る「削除しました」バーが跳ねずに滑り込む

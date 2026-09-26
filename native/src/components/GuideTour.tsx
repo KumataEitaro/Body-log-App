@@ -13,7 +13,7 @@ import {
 } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Dimensions, Animated,
-  ScrollView, Modal,
+  ScrollView, Modal, Easing,
 } from 'react-native';
 import Svg, { Rect, Mask } from 'react-native-svg';
 import { getFirstRunFlag, setFirstRunFlag } from '@/lib/firstrun';
@@ -329,7 +329,7 @@ function ChapterProgress({ chapter, idx, light }: { chapter: GuideChapter; idx: 
   const k = (idx + 1) / chapter.steps.length;
   useEffect(() => {
     if (reduceMotion) { v.setValue(k); return; }
-    Animated.spring(v, { toValue: k, useNativeDriver: false, friction: 8, tension: 60 }).start();
+    Animated.timing(v, { toValue: k, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();   // 2026-09-26 バネ→timing
   }, [k, v, reduceMotion]);
   return (
     <View style={{ marginBottom: 10 }}>
@@ -408,7 +408,7 @@ function ChapterDoneCard({ mode, chapter, allDone, reduceMotion, onFinishAuto, o
   const scale = useRef(new Animated.Value(reduceMotion ? 1 : 0.8)).current;
   useEffect(() => {
     if (reduceMotion) return;
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 90 }).start();
+    Animated.timing(scale, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();   // 2026-09-26 バネ→timing
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (

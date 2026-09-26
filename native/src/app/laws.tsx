@@ -8,7 +8,7 @@
 //  ・分析は全て端末内ローカル（lib/laws.ts）。サーバへは何も送らない
 import { useEffect, useRef, useState } from 'react';
 import { useThemeRefresh } from '@/lib/theme';
-import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, Animated as RNAnimated, Easing, Platform } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { PartyPopper, Utensils, Salad, CalendarRange, Tornado, Moon, HeartPulse, Undo2, BedDouble, BookOpen, ChevronRight, Sparkles } from 'lucide-react-native';
@@ -45,7 +45,8 @@ function CelebrateOverlay({ laws, onClose }: { laws: Law[]; onClose: () => void 
   const scale = useRef(new RNAnimated.Value(0.6)).current;
   useEffect(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 120 }).start();
+    // 2026-09-26: バネをやめ ease-out の timing に（びよーん禁止・静かなモーション）
+    RNAnimated.timing(scale, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [scale]);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
