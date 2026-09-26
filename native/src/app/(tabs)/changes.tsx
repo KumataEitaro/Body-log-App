@@ -44,6 +44,9 @@ import ThemeRemount from '@/components/ThemeRemount';
 import { FAB_CLEARANCE } from '@/components/PlusFab';
 import BingeTriggerCard from '@/components/BingeTriggerCard';
 import WeekdayHeatmapCard from '@/components/WeekdayHeatmapCard';
+// 2026-09-26（feat/analysis-cards）: 食事の分析の先頭＝摂取カロリーの棒グラフ、からだの分析＝体の写真（推定体脂肪率とセット）
+import IntakeBarsCard from '@/components/IntakeBarsCard';
+import BodyPhotosCard from '@/components/BodyPhotosCard';
 import { BodyTable, LiftTable, TableEntryCard, type BodyMetric } from '@/components/DataTableCard';
 import { toItemEntries, slotOf } from '@/lib/itemLog';
 import { Table2, Share2 } from 'lucide-react-native';
@@ -906,9 +909,10 @@ export default function ChangesScreen() {
       // 2026-09-26 4大項目化で増えたカード
       case 'lawsLink': return linkCard('lawsLink');
       case 'nutrientsLink': return linkCard('nutrientsLink');
-      // 摂取カロリーの棒グラフ・体の写真は別ブランチ（feat/analysis-cards）で作り、統合時にここへ差す
-      case 'intakebars': return null;
-      case 'photos': return null;
+      // 摂取カロリーの棒グラフ（7日/30日/90日・平均・目標以下＝緑）。画面が持つ日別 rows をそのまま渡す（再取得しない）
+      case 'intakebars': return <IntakeBarsCard rows={rows.map((r) => ({ date: r.date, intake: r.intake, goal: r.target }))} />;
+      // 体の写真（＋ → 身体を記録 → 体脂肪率で保存したもの）。最新 vs 前回・タイムライン・拡大・削除
+      case 'photos': return <BodyPhotosCard />;
       // 無料の人向け: 食べ方の分析（4カード）の代わりに1枚。タップで文脈ペイウォール（src=eating）
       case 'eatingLocked': return (
         <Pressable style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]} accessibilityRole="button"
