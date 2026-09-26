@@ -59,7 +59,7 @@ import StatusBarMask from '@/components/StatusBarMask';
 import ActivityLevelPicker from '@/components/ActivityLevelPicker';
 import * as Clipboard from 'expo-clipboard';
 import { readBootErrors, clearBootErrors, formatBootErrors, type BootError } from '@/lib/boot';
-import { fromLabel, useNavFromParam, navFrom } from '@/lib/navHeader';
+import { useStackHeader, navFrom } from '@/lib/navHeader';
 
 // マイ食品（単品）の一覧行。items は複数食材をAIで合算した登録の内訳（migration-31・列が無いDBでは undefined）
 type MyFoodLite = { id: string; name: string; kcal: number; items?: unknown; created_at?: string | null };
@@ -182,7 +182,7 @@ const bt = themed(() => ({
 }));
 
 export default function SettingsScreen() {
-  const backFrom = useNavFromParam();   // 戻るラベルを「どこから来たか」で決める（lib/navHeader.ts）
+  const stackHeader = useStackHeader();   // 戻るラベルは ?from= で決まる（lib/navHeader.ts）
   const router2 = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -594,15 +594,13 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-    {/* タブ外のスタック画面になったため、戻る導線はネイティブヘッダーで出す（タイトルは本文側のまま） */}
-    <Stack.Screen options={{
-      headerShown: true, title: '', headerBackTitle: fromLabel(backFrom),
-      headerTintColor: C.teal, headerShadowVisible: false, headerStyle: { backgroundColor: C.bg },
-      // 大型タイトル領域もテーマに合わせる。ここが未指定だとダークで
-      // 「戻る」の下に白い帯が残る（βフィードバック 2026-09-01）
-      headerLargeStyle: { backgroundColor: C.bg },
-      headerLargeTitleStyle: { color: C.ink },
-    }} />
+    {/* タブ外のスタック画面になったため、戻る導線はネイティブヘッダーで出す（タイトルは本文側のまま）。
+        見た目は他のスタック画面と同じ stackHeaderOptions（iOS は透過ヘッダー）。
+        以前はここだけ不透明ヘッダー＋headerLargeStyle を手書きしていたが、iOS 26+ では不透明ヘッダーだと
+        ScrollView の automatic inset がステータスバー分を二重に足し、「戻る」の下に約 60pt の空白帯ができ、
+        そこへスクロールした本文の「設定」がエッジ効果で薄く二重に見えた（2026-09-26 熊田さんスクショ）。
+        2026-09-01 の「白帯」修正はその帯に色を塗っただけで、帯そのものはこの共通化で消える */}
+    <Stack.Screen options={stackHeader} />
     <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }} contentContainerStyle={s.scroll}>
       {/* 入口（概要タブの「設定」行）と同じ語を名乗る。以前は「マイページ」で、押した語と着いた語が違った（NAV-AUDIT D-09） */}
       <Text style={s.h}>{t('設定')}</Text>

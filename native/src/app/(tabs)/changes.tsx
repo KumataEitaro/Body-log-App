@@ -1206,9 +1206,9 @@ export default function ChangesScreen() {
       </Pressable>
     );
   }
-  // 同じ画面へ2回続けて飛ぶとき expo-router は同一パスを無視するので、ts で毎回別URLにする
+  // 他のスタック画面と同じく from を渡す（戻るボタンが「‹ 概要」を名乗る）。ts は navFrom が付ける
   const openSettings = (open?: string) => router.push(
-    (open ? `/settings?open=${open}&ts=${Date.now()}` : '/settings') as never,
+    { pathname: '/settings', params: navFrom('changes', open ? { open } : undefined) } as never,
   );
   // 概要タブ最上部のブロック（2026-09-04・右上の⚙を廃止してここへ集約）。
   //

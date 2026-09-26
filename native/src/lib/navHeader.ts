@@ -69,8 +69,9 @@ export function useStackHeader() {
 /**
  * `?from=` の値だけを読む。
  * `stackHeaderOptions` に乗らない独自のヘッダー設定を持つ画面
- * （設定＝headerLargeStyle あり／筋トレ記録＝タイトルあり／週次レビュー）が、
- * 戻るラベルだけをここから取るために使う。
+ * （筋トレ記録＝タイトルあり／週次レビュー）が、戻るラベルだけをここから取るために使う。
+ * 設定も以前は例外（不透明ヘッダー＋headerLargeStyle）だったが、iOS 26+ で「戻る」の下に
+ * 空白帯が出る原因になっていたので 2026-09-26 に共通の options へ戻した。
  */
 export function useNavFromParam(): string | undefined {
   const { from } = useLocalSearchParams<{ from?: string }>();

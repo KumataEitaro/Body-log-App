@@ -108,12 +108,14 @@ describe('ヘッダーの見た目は1か所で決める', () => {
     expect(src).toMatch(/headerTintColor: C\.teal/);
   });
 
-  it('画面ごとに headerTintColor を手書きしていない（共通化から外れた画面を見つける）', () => {
+  it('画面ごとに headerTintColor / headerLargeStyle を手書きしていない（共通化から外れた画面を見つける）', () => {
     const offenders = STACK_SCREENS.filter((f) => {
       const src = read(f);
-      // 共通の options を使っていれば手書きは不要。独自ヘッダーの3画面だけ例外
-      const custom = ['app/settings.tsx', 'app/lift-session.tsx', 'app/weekly-review.tsx'].includes(f);
-      return !custom && /headerTintColor/.test(src);
+      // 共通の options を使っていれば手書きは不要。独自ヘッダーの2画面だけ例外。
+      // 設定は 2026-09-26 まで例外だった（不透明ヘッダー＋headerLargeStyle）。iOS 26+ ではそれが
+      // 「戻る」の下の空白帯と、薄く二重に見える本文タイトルの原因だったので、共通化して例外から外した
+      const custom = ['app/lift-session.tsx', 'app/weekly-review.tsx'].includes(f);
+      return !custom && /headerTintColor:|headerLargeStyle:|headerLargeTitleStyle:/.test(src);   // コロン付き＝実際の prop 指定だけ（コメントの語は拾わない）
     });
     expect(offenders).toEqual([]);
   });
