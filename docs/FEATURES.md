@@ -2675,3 +2675,32 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 - **出したアラートの結果**を `bl-binge-alert-outcomes` に記録し、翌日以降そのラベルで埋めてガードの材料にする
 - 必要な SQL: `supabase/migration-38.sql`（logs.overfull / logs.alcohol / entries.craving / entries.stress）
 - テスト: bingeRisk（25）・features（zスコア）・alcohol・bingeRiskStore・logCards（craving の調停）
+
+## 設定画面のヘッダーを共通の stackHeaderOptions にそろえた（2026-09-26・v1.1.17）
+
+### 症状（熊田さんスクショ 2026-09-26 18:45・iPhone・ダーク）
+- 「戻る」ボタンの下に約 60pt の何もない帯があってから「設定」の見出しが始まる
+- 少しスクロールすると、本文の「設定」が帯の中で薄い灰色になり、位置によっては薄い「設定」と濃い「設定」が上下に重なって見える
+
+### 原因
+- 設定画面だけがヘッダーを手書きしていた（不透明 `headerStyle` ＋ `headerLargeStyle`／`headerLargeTitleStyle`）。
+  他のスタック画面は `lib/navHeader.ts` の `stackHeaderOptions`（iOS は `headerTransparent: true`）
+- iOS 26 以降、react-native-screens は**不透明ヘッダー**のとき safe area を自前で手当てする経路に入る
+  （`RNSScreenStackHeaderConfig.mm` の「iOS 26+ … edgesForExtendedLayout for non-transparent header」）。
+  そこで `ScrollView contentInsetAdjustmentBehavior="automatic"` がステータスバー分（iPhone 16 Pro で 62pt）を
+  **もう一度**足し、ヘッダー下に空白帯ができる
+- iOS 26 の UIScrollView は上端 inset に入った内容を「エッジ効果」で薄く・ぼかして描くので、
+  帯の中にスクロールした本文の「設定」が薄い二重像に見えた
+- 2026-09-01 の「ダークで白帯」修正（`headerLargeStyle` に背景色）は、この帯に**色を塗っただけ**で帯は残っていた
+
+### 直し方
+- `native/src/app/settings.tsx`: `useStackHeader()` → `<Stack.Screen options={stackHeader} />`。手書きの options と
+  `headerLargeStyle`／`headerLargeTitleStyle` を削除。iOS は透過ヘッダー＋automatic inset（＝ヘッダー高さぶんだけ）、
+  Android は従来どおり不透明 `C.bg`（変化なし）
+- `native/src/app/(tabs)/changes.tsx`: 概要 → 設定 の push も `navFrom('changes', { open })` で from を渡す。
+  スクショの戻るボタンが「戻る」だったのはここだけ from を渡していなかったため（他の行は「‹ 概要」）
+- `native/src/__tests__/navConsistency.test.ts`: 設定を「独自ヘッダーの例外」から外し、`headerLargeStyle` の手書きも検出する
+
+### 確認のしかた
+- 概要 → 設定: 戻るボタンが「‹ 概要」、「戻る」の直下（1行分の余白）から「設定」の見出しが始まる
+- スクロールしてもヘッダー直下に薄い文字の帯は出ない（44pt のバーの下をくぐる分だけが iOS 標準のぼかしになる）
