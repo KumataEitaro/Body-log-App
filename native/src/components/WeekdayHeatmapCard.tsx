@@ -10,6 +10,9 @@ import { todayJST } from '@/lib/calc';
 
 export type WeekRow = { date: string; intake: number | null; target: number };
 
+/** 目標内（クリア）セルの緑の濃さ。セルと凡例で同じ値を使う（ライト・ダークとも 32% で面から浮く） */
+const IN_GOAL_ALPHA = 0.32;
+
 // ヘッダは月はじまり（このアプリのカレンダー・週集計はすべて月曜起点）
 const DOW_MON = () => [t('月'), t('火'), t('水'), t('木'), t('金'), t('土'), t('日')];
 // getDay()(0=日)の曜日名。既存の「{d}曜日」文と同じ辞書キーを使う
@@ -108,13 +111,15 @@ export default function WeekdayHeatmapCard({ rows }: { rows: WeekRow[] }) {
     }));
   }
 
-  // セル色: 超過はアンバーを濃度で段階化（+600kcalで最濃）、目標内は薄いteal。
-  // 生HEXを増やさず、共通のrgba()でCトークンから導出する
+  // セル色: 超過はアンバーを濃度で段階化（+600kcalで最濃）、目標内（クリア）は緑。
+  // 2026-09-26 熊田さん「目標クリアの日を緑に」: 以前は薄い teal だったが、アクセント色と同系で
+  // 「達成」と読めなかった。達成の塗りは C.success（Leaf Green・ダークでは少し明るい #3fbf74）に統一。
+  // 生HEXを増やさず、共通のrgba()でCトークンから導出する（ライト: 白地に 32% で淡い緑、ダーク: 面に 32% で深い緑）
   function cellStyle(diff: number | null, future: boolean) {
     if (future) return { backgroundColor: 'transparent' };
     if (diff == null) return { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.line };
     if (diff > 0) return { backgroundColor: rgba(C.amber, 0.25 + 0.6 * Math.min(1, diff / 600)) };
-    return { backgroundColor: rgba(C.teal, 0.22) };
+    return { backgroundColor: rgba(C.success, IN_GOAL_ALPHA) };
   }
 
   const worst = rhythm.worstDow;
@@ -145,7 +150,7 @@ export default function WeekdayHeatmapCard({ rows }: { rows: WeekRow[] }) {
           <Text style={s.legendT}>{t('超過')}</Text>
         </View>
         <View style={s.legendItem}>
-          <View style={[s.legendDot, { backgroundColor: rgba(C.teal, 0.22) }]} />
+          <View style={[s.legendDot, { backgroundColor: rgba(C.success, IN_GOAL_ALPHA) }]} />
           <Text style={s.legendT}>{t('目標内')}</Text>
         </View>
         <View style={s.legendItem}>

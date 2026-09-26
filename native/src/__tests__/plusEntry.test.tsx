@@ -233,7 +233,9 @@ describe('＋シートの行動の振り分け', () => {
 
   // 2026-09-18 熊田さん「体の写真保存はエラーが出るのであきらめる。機能として消して。
   // 代わりに AI で測定した体脂肪率の保存のみ出来るようにして（画像の保存はできませんと明示して）」
-  it('「体脂肪率（AIで推定）」はどのタブでも遷移せず、その場で BodyFatSheet が開く（写真は保存しないと明示）', async () => {
+  // 2026-09-26 熊田さん「自分の体の画像を保存（推定体脂肪率とセットで）」→ 写真も保存する形に戻した。
+  // シートには「写真も保存する」の切替と、非公開の場所に保存される旨の明示がある
+  it('「体脂肪率（AIで推定）」はどのタブでも遷移せず、その場で BodyFatSheet が開く（写真の保存先を明示）', async () => {
     for (const Screen of [ChangesScreen, LogScreen]) {
       mockNavigate.mockClear();
       const tree = await mount(<Screen />);
@@ -241,8 +243,9 @@ describe('＋シートの行動の振り分け', () => {
       await pickFromPlus(tree, '身体を記録', '体脂肪率（AIで推定）');   // 2026-09-26: 「身体を記録」の段を挟む
       expect(tree.root.findByType(BodyFatSheet).props.visible).toBe(true);
       expect(mockNavigate).not.toHaveBeenCalled();
-      // 「写真は保存されません」の明示がシートにある
-      expect(tree.root.findAll((n) => n.props?.testID === 'bodyfat-no-photo-notice').length).toBeGreaterThan(0);
+      // 「写真は自分だけが見られる非公開の場所に保存される」の明示と「写真も保存する」の切替がシートにある
+      expect(tree.root.findAll((n) => n.props?.testID === 'bodyfat-photo-notice').length).toBeGreaterThan(0);
+      expect(tree.root.findAll((n) => n.props?.testID === 'bodyfat-save-photo-switch').length).toBeGreaterThan(0);
       await act(async () => { tree.unmount(); });
     }
   });
