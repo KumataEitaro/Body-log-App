@@ -11,6 +11,7 @@ import { kgToDisplay, useUnits } from '@/lib/units';
 import { Chip } from '@/components/ui/Selectable';
 import { parse1RMs, epley1RM } from '@/lib/rm';
 import { weightLookup } from '@/lib/liftLog';
+import { tableStats } from '@/lib/tableStats';
 import { useThemeRefresh } from '@/lib/theme';
 
 type Row = { date: string; weight: number | null; waist: number | null; bodyfat: number | null };
@@ -70,6 +71,9 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight', kcalRows
   // kcal は整数、体の指標は小数1桁（体重は表示単位に換算）
   const fmt = (v: number) => (isKcal ? Math.round(v).toLocaleString() : (metric === 'weight' ? kgToDisplay(v, units.weight) : v).toFixed(1));
   const unitLabel = metric === 'weight' ? units.weight : UNIT[metric];
+  // 表示している期間の平均（熊田さん 2026-09-26「摂取カロリーの表に期間の平均を」）。
+  // 表の行＝記録がある日なので、平均は記録日の単純平均。期間は最初〜最後の日数（lib/tableStats.ts）
+  const stat = useMemo(() => tableStats(table), [table]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -91,6 +95,14 @@ export function BodyTable({ visible, onClose, initialMetric = 'weight', kcalRows
           <Text style={s.empty}>{t('この項目の記録はまだありません。')}</Text>
         ) : (
           <>
+            {/* 期間平均の要約行。表と同じ字面（tabular-nums・sub/ink）で、行の「前回比 +XX」はそのまま残す */}
+            {stat.avg != null && (
+              <View style={s.avgRow} testID="body-table-period-avg">
+                <Text style={s.avgLabel}>{t('期間平均')}</Text>
+                <Text style={s.avgVal}>{fmt(stat.avg)}<Text style={s.avgUnit}>{unitLabel}</Text></Text>
+                <Text style={s.avgSub}>{t('（{n}日・記録 {m} 日）', { n: stat.spanDays, m: stat.count })}</Text>
+              </View>
+            )}
             <View style={s.thead}>
               <Text style={[s.th, { flex: 1.2 }]}>{t('日付')}</Text>
               <Text style={[s.th, s.num]}>{unitLabel}</Text>
@@ -236,6 +248,12 @@ const s = themed(() => ({
     backgroundColor: C.chipBg, borderRadius: 8, paddingHorizontal: 8,
   },
   th: { flex: 1, fontSize: 11, fontWeight: '800', color: C.sub },
+  // 期間平均の要約行（表の1行と同じ余白・同じ数字の書体。色は sub/ink で表から外れない）
+  avgRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 8, paddingBottom: 8 },
+  avgLabel: { fontSize: 13, fontWeight: '700', color: C.sub },
+  avgVal: { fontSize: 15, fontWeight: '800', color: C.ink, fontVariant: ['tabular-nums'] },
+  avgUnit: { fontSize: 12, fontWeight: '700', color: C.sub },
+  avgSub: { fontSize: 12, color: C.faint, fontVariant: ['tabular-nums'] },
   tr: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 0.5, borderBottomColor: C.line },
   td: { flex: 1, fontSize: 15, color: C.ink, fontVariant: ['tabular-nums'] },
   num: { textAlign: 'right' },
