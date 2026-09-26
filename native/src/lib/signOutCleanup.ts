@@ -84,6 +84,8 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-cards-log', 'bl-cards-exercise',
   'bl-order-all2', 'bl-order-exercise', 'bl-hidden-all2',
   'bl-foods-order', 'bl-foods-view', 'bl-ex-view',
+  'bl-intake-bars-range',  // 摂取カロリー棒グラフの区間（7/30/90日）。表示の好みだが本人の画面状態なので消す側
+  'bl-bodyphoto-save',     // 体脂肪率シートの「写真も保存する」を OFF にした記憶（本人の選択）
   'bl-columns-read',
   'bl-avatar',
   'bl-rest-sec', 'bl-rest-count',
