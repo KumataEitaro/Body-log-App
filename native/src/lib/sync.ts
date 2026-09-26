@@ -22,7 +22,18 @@ export async function syncEntriesForDate(userId: string, d: string): Promise<(Lo
     if (meals.length > 0) rescheduleMealGapReminder(new Date(meals[meals.length - 1].at)).catch(() => {});
   }
   if (logs !== null && rows.length === 0) {
-    await supabase.from('entries').delete().eq('user_id', userId).eq('date', d);
+    // その日の記録が全部消えた。ただし夜の渇望チェック／朝のストレス（migration-38・過食アラート v2）が
+    // 入っている行は消さず、この同期が知っている列だけ空にする（1タップの答えを食事の削除で失わない）。
+    // 列が無い旧DBでは select が落ちる → 従来どおり行ごと消す
+    const { data: keep, error: keepErr } = await supabase.from('entries').select('craving,stress').eq('user_id', userId).eq('date', d).maybeSingle();
+    const k = keep as { craving?: number | null; stress?: number | null } | null;
+    if (!keepErr && k && (k.craving != null || k.stress != null)) {
+      await supabase.from('entries').update({
+        ex: 'オフ', adj: 0, intake: null, p: null, f: null, c: null, weight: null, waist: null, mood: '', food_text: '', photo_urls: [],
+      }).eq('user_id', userId).eq('date', d);
+    } else {
+      await supabase.from('entries').delete().eq('user_id', userId).eq('date', d);
+    }
   } else if (rows.length > 0) {
     const s = summarizeDay(rows);
     await supabase.from('entries').upsert({
@@ -34,6 +45,7 @@ export async function syncEntriesForDate(userId: string, d: string): Promise<(Lo
       // 体脂肪率は「その日に記録があるときだけ」書く。null で上書きすると、旧「体の写真」カードが
       // entries に直接入れていた過去の値（logs に行が無い）が同期のたびに消える（2026-09-18）
       ...(s.bodyfat != null ? { bodyfat: s.bodyfat } : {}),
+      // craving / stress / active_kcal（migration-36/38）は**ここでは書かない**＝upsert は列挙した列しか触らないので残る
     }, { onConflict: 'user_id,date' });
   }
   // ホームウィジェットへ今日サマリーを書き出す（投げっぱなし・失敗無視。

@@ -93,6 +93,8 @@ export const CLEARED_KEYS: readonly string[] = [
   'bl-diet-tip-shown', 'bl-diet-tip-declined',
   'bl-food-suggest-shown', 'bl-food-suggest-declined',
   'bl-insight-alert-closed', 'bl-insight-alert-history', 'bl-insight-alert-notified',
+  // --- 過食アラート v2（lib/bingeRiskStore.ts・2026-09-25）: 本人の履歴で学習した重み・出したアラートと結果・渇望チェックの閉じた日 ---
+  'bl-binge-model', 'bl-binge-alert-outcomes', 'bl-craving-snooze',
   'bl-review-asked', 'bl-feedback-bug-at',
   // --- 通知（予約IDと設定。掃除の前に予約そのものも取り消す） ---
   'bl-notif-ids', 'bl-notif-smart-ids', 'bl-notif-daily', 'bl-notif-daily-mode',

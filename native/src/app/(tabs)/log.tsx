@@ -15,7 +15,7 @@ import {
   ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Image, Alert, Animated, Easing, Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, X, CalendarClock } from 'lucide-react-native';
+import { History, Camera, Images, Weight, Activity, ArrowUp, Smile, Sparkles, X, CalendarClock, Moon } from 'lucide-react-native';
 import DockIconButton from '@/components/DockIconButton';
 import AdBanner from '@/components/AdBanner';
 import DateStrip from '@/components/DateStrip';
@@ -73,8 +73,14 @@ import {
   resolveMealTime, buildAtJST, hmJST, parseHm, fmtHm, roundHm, slotOf,
 } from '@/lib/timeSlots';
 // 起床時刻（設定 > 通知）と「朝の窓」。深夜に朝のものを出さないための判定は全部この純関数群に閉じる
-import { beforeWake, previousDayTarget, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
-import { assessBingeRisk, type BingeRisk, type InsightDay } from '@/lib/insights';
+import { beforeWake, isMorningWindow, previousDayTarget, useWakeTime, wakeOrDefault } from '@/lib/wakeTime';
+import { type InsightDay } from '@/lib/insights';
+// 過食リスク v2（docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md §8・2026-09-25）: 純関数のモデル＋端末保存の I/O＋文言
+import { assessWithModel, guardThresholds, withinWeeklyBudget, shouldAskCraving, DEFAULT_THRESHOLDS, type BingeRiskV2 } from '@/lib/bingeRisk';
+import { loadOrFitModel, syncOutcomes, recordAlert, hoursSinceLastMeal, readCravingSnoozed, writeCravingSnooze } from '@/lib/bingeRiskStore';
+import { riskReasonText, riskTierTitle, cravingLabel, stressLabel } from '@/lib/bingeRiskText';
+import { buildDayFeatures, invalidateDayFeatures } from '@/lib/features';
+import { isMissingMigration38Column, migration38Hint } from '@/lib/migration38';
 // 気づきアラート（docs/INSIGHTS-ENGINE.md §8・E2）: 本人の法則で駆動する事前アラート。判定は lib/correlate、配線は lib/insightAlerts
 import { loadInsightAlerts, closeInsightAlert, maybeScheduleMorningNotification, lawLinkForAlert, type InsightAlertState } from '@/lib/insightAlerts';
 import type { Alert as InsightAlert } from '@/lib/correlate';
@@ -253,6 +259,11 @@ export default function LogScreen() {
   // セット登録シートの下書き（alsoSave=トレイの✓保存長押し経由: 保存も一緒に行う）
   const [mealDraft, setMealDraft] = useState<{ items: FoodItem[]; alsoSave: boolean } | null>(null);
   const [dayLogs, setDayLogs] = useState<DayLog[]>([]);
+  // 1タップ入力（migration-38・過食アラート v2）: 表示日の entries.craving（夜の渇望 0–3）／entries.stress（朝の気ぜわしさ 0–3）。
+  // 列が無い旧DBでは null のまま。stressUnavailable は保存が列無しで落ちたとき（以後その日は聞かない）
+  const [cravingToday, setCravingToday] = useState<number | null>(null);
+  const [stressToday, setStressToday] = useState<number | null>(null);
+  const [stressUnavailable, setStressUnavailable] = useState(false);
   const [chat, setChat] = useState('');
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [saving, setSaving] = useState(false);
@@ -496,8 +507,12 @@ export default function LogScreen() {
         .lt('date', viewDate).not('kcal', 'is', null)
         .order('at', { ascending: false }).limit(40),
       listMyMeals(),   // テーブル未作成なら空（セットのチップが出ないだけ）
-      // 表示日に反映済みの運動ぶん（列が無い旧DBでは error → 0 のまま）
-      supabase.from('entries').select('active_kcal').eq('date', viewDate).maybeSingle(),
+      // 表示日に反映済みの運動ぶん＋1タップ入力（craving / stress・migration-38）。
+      // 列が無い旧DBでは active_kcal だけで読み直し、それも無ければ error → 0 のまま
+      (async () => {
+        const full = await supabase.from('entries').select('active_kcal,craving,stress').eq('date', viewDate).maybeSingle();
+        return full.error ? supabase.from('entries').select('active_kcal').eq('date', viewDate).maybeSingle() : full;
+      })(),
     ]);
     if (profRes.data) setProfile(profRes.data as Profile);
     if (!profRes.error) setProfileLoaded(true);   // 通信できた＝「行が無い」も確定した情報として扱える
@@ -507,7 +522,10 @@ export default function LogScreen() {
     setMyFoods((foodRes.data as MyFood[]) || []);
     setMyMeals(mealsRes);
     setDayLogs((logRes.data as DayLog[]) || []);
-    setAppliedActive(actRes.error ? 0 : Math.max(0, Math.round(Number((actRes.data as { active_kcal?: number | null } | null)?.active_kcal ?? 0)) || 0));
+    const actRow = (actRes.error ? null : actRes.data) as { active_kcal?: number | null; craving?: number | null; stress?: number | null } | null;
+    setAppliedActive(Math.max(0, Math.round(Number(actRow?.active_kcal ?? 0)) || 0));
+    setCravingToday(actRow?.craving == null ? null : Number(actRow.craving));
+    setStressToday(actRow?.stress == null ? null : Number(actRow.stress));
     // 「もう一度食べる」候補: 品目内訳のある過去の食事を、同じ品目構成は最新1件に重複排除
     const seen = new Set<string>();
     const meals: RecentMeal[] = [];
@@ -982,6 +1000,11 @@ export default function LogScreen() {
       ...(canEdit ? [{ text: t('書き換える'), onPress: () => startEditLog(l) }] : []),
       // マイ食品（セット）: 品目内訳のある食事だけ登録できる（気分・体重だけの行では出さない）
       ...(items.length > 0 ? [{ text: t('マイ食品に登録'), onPress: () => setMealDraft({ items, alsoSave: false }) }] : []),
+      // 主観の印（migration-38・過食アラート v2）: 食事の行だけ。付け外しはトグル
+      ...(items.length > 0 ? [
+        { text: l.overfull ? t('「満腹を超えた」の印を外す') : t('満腹を超えて食べた（印をつける）'), onPress: () => setLogFlag(l, 'overfull', !l.overfull) },
+        { text: l.alcohol ? t('「お酒あり」の印を外す') : t('お酒あり（印をつける）'), onPress: () => setLogFlag(l, 'alcohol', !l.alcohol) },
+      ] : []),
       // 食材ナビ: 品目のどれかに置き換え候補があるときだけ（栄養ランキング図鑑のその品目へ）
       ...(swapTarget ? [{ text: t('置き換え候補を見る'), onPress: () => router.push({ pathname: '/nutrient-rank', params: navFrom('log', { food: swapTarget }) } as never) }] : []),
       { text: t('削除する'), style: 'destructive' as const, onPress: () => deleteLogNow(l) },
@@ -1220,8 +1243,57 @@ export default function LogScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, pastRows, bmr, plan, kcalAdjust, today, summary.intake, target, goalKcal, carries, planEvents, carryPrefs.mode, carryPrefs.days]);
 
-  // ===== 過食リスクの事前検知（Web版と同一ロジック・AsyncStorageで今日1回スヌーズ） =====
-  const [bingeRisk, setBingeRisk] = useState<BingeRisk | null>(null);
+  // ===== 過食リスク v2（lib/bingeRisk.ts・docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md §8・2026-09-25） =====
+  // 旧「点数式」（insights.assessBingeRisk）を置き換えた。本人の日次特徴量90日で**1日1回**学習した重み
+  // （lib/bingeRiskStore.ts 'bl-binge-model'）で今日を判定する。
+  //  ・朝: pDay（今日どこかで過食する確率）／夕方以降: pNow（時刻・最後の食事からの経過・今夜の渇望チェックを織り込んだ「いま」）
+  //  ・段: quiet / nudge（控えめ）/ warning（従来の強い見た目）。閾値は期待効用＋本人の基礎率の床＋**自己制限ガード**
+  //    （出したアラートの当たり具合が床を割ると自動で絞る・guardThresholds）＋週予算（nudge 4本・warning 2本）
+  //  ・出したアラートは 'bl-binge-alert-outcomes' に記録し、翌日以降その日のラベルで結果を埋める（ガードの材料）
+  //  ・記録14日未満は何も出さない（silent）。28日＆過食3回まで nudge 止まり（prior）
+  const [riskV2, setRiskV2] = useState<BingeRiskV2 | null>(null);
+  const [riskBudgetOk, setRiskBudgetOk] = useState(true);
+  const [riskSnoozed, setRiskSnoozed] = useState(true);
+  const [cravingSnoozed, setCravingSnoozed] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem('bl-risk-snooze').then((v) => setRiskSnoozed(v === todayKey)).catch(() => {});
+    readCravingSnoozed(todayKey).then(setCravingSnoozed).catch(() => {});
+  }, [todayKey]);
+  const riskHour = nowHm.h;
+  useEffect(() => {
+    if (!profile) return;
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await buildDayFeatures(90);
+        if (!alive || rows.length === 0) return;
+        const [model, outcomes] = await Promise.all([loadOrFitModel(rows, todayKey), syncOutcomes(rows, todayKey)]);
+        const guard = guardThresholds(outcomes, DEFAULT_THRESHOLDS, todayKey);
+        const r = assessWithModel(model, rows, todayKey, {
+          plannedEvent: dayPlan?.kind ?? null,
+          hour: riskHour,
+          hoursSinceLastMeal: hoursSinceLastMeal(dayLogs, Date.now()),
+          craving: cravingToday,
+        }, { thresholds: guard.thresholds });
+        if (!alive) return;
+        const budgetOk = r.tier === 'quiet' ? true : withinWeeklyBudget(outcomes, todayKey, r.tier);
+        setRiskV2(r);
+        setRiskBudgetOk(budgetOk);
+        // 出した（出せる）日を記録する。結果（その日過食したか）は翌日以降 syncOutcomes が埋める
+        if (r.tier !== 'quiet' && budgetOk) recordAlert(todayKey, r.tier, r.pNow).catch(() => {});
+      } catch { /* ベストエフォート（カードが出ないだけ） */ }
+    })();
+    return () => { alive = false; };
+    // 時（riskHour）を依存に入れる: 夕方以降は時間内ハザードで pNow が変わる。学習は日付＋履歴長でキャッシュされるので毎回は走らない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, todayKey, riskHour, dayLogsSig, cravingToday, dayPlan?.kind]);
+  // 今日スヌーズ済み（「気をつける」「+200kcal緩める」・従来の 'bl-risk-snooze'）・週予算超え・quiet は出さない
+  const riskCard: BingeRiskV2 | null = riskV2 && riskV2.tier !== 'quiet' && riskBudgetOk && !riskSnoozed ? riskV2 : null;
+  // 夜の渇望チェック（§6-1）を出すか（純関数 shouldAskCraving）。本人の重みが育つ前（silent/prior）は毎晩聞いてラベルを早く集める
+  const askCraving = viewDate === todayKey && profile != null && shouldAskCraving({
+    isToday: true, hour: riskHour, answered: cravingToday != null, snoozed: cravingSnoozed,
+    readiness: riskV2?.readiness ?? 'silent', pNow: riskV2?.pNow ?? 0, thresholds: riskV2?.thresholds ?? DEFAULT_THRESHOLDS,
+  });
   // 今日のひとこと帯（データ由来・採点なし・その日は×で閉じられる）
   const [brief, setBrief] = useState<Brief | null>(null);
   useEffect(() => {
@@ -1246,8 +1318,7 @@ export default function LogScreen() {
             mood: r.mood as string | null, text: r.food_text as string | null,
           };
         });
-        const risk = assessBingeRisk(days, new Date(t + 'T00:00:00').getDay());
-        if (risk.level !== 'low') setBingeRisk(risk);
+        // （旧: ここで assessBingeRisk を呼んでいた。判定は上の v2 の effect へ移した・2026-09-25）
 
         // 今日のひとこと帯（オフ設定・その日クローズ済みなら出さない）
         if ((await AsyncStorage.getItem('bl-brief-off')) !== '1'
@@ -1342,8 +1413,64 @@ export default function LogScreen() {
   // 統合カードの「気をつける」「+200kcal緩める」は、既存の過食リスクと今日の気づき（caution）をまとめて閉じる
   async function snoozeRisk() {
     try { await AsyncStorage.setItem('bl-risk-snooze', todayJST()); } catch { /* 無視 */ }
-    setBingeRisk(null);
+    setRiskSnoozed(true);
     if (cautionAlert) await closeAlert(cautionAlert);
+  }
+
+  // ===== 1タップ入力の保存（migration-38・過食アラート v2） =====
+  // entries を直接 upsert する（logs 経由ではない＝食事の行を増やさない）。lib/sync.ts の日次同期は
+  // この2列を書かないので、後から食事を保存しても値は残る。列が無い旧DBは migration-38 の案内を出す
+  async function saveDayField(col: 'craving' | 'stress', n: number): Promise<'ok' | 'missing' | 'error'> {
+    if (!uid) return 'error';
+    const { error } = await supabase.from('entries').upsert({ user_id: uid, date: viewDate, [col]: n }, { onConflict: 'user_id,date' });
+    if (error) {
+      const missing = isMissingMigration38Column(error);
+      setMsg({ ok: false, text: missing ? migration38Hint() : t('設定に失敗しました。もう一度お試しください。') });
+      return missing ? 'missing' : 'error';
+    }
+    invalidateDayFeatures();
+    return 'ok';
+  }
+  const [cravingBusy, setCravingBusy] = useState(false);
+  async function saveCraving(n: 0 | 1 | 2 | 3) {
+    if (cravingBusy) return;
+    setCravingBusy(true);
+    try {
+      if ((await saveDayField('craving', n)) === 'ok') {
+        setCravingToday(n);   // → v2 の effect が今夜の予報（時間内ハザード）に反映する
+        Haptics.selectionAsync().catch(() => {});
+        setMsg({ ok: true, text: t('記録しました。今夜の予報に反映します。') });
+      }
+    } finally { setCravingBusy(false); }
+  }
+  function cravingSnooze() {
+    writeCravingSnooze(todayKey).catch(() => {});
+    setCravingSnoozed(true);
+  }
+  const [stressBusy, setStressBusy] = useState(false);
+  async function saveStress(n: 0 | 1 | 2 | 3) {
+    if (stressBusy) return;
+    setStressBusy(true);
+    try {
+      const r = await saveDayField('stress', n);
+      if (r === 'ok') { setStressToday(n); Haptics.selectionAsync().catch(() => {}); }
+      if (r === 'missing') setStressUnavailable(true);   // 旧DB: 今日はもう聞かない（毎回失敗を見せない）
+    } finally { setStressBusy(false); }
+  }
+
+  // 記録に主観の印をつける／外す（長押しメニュー・migration-38）。overfull は過食ラベルの副基準、alcohol は翌日の特徴
+  async function setLogFlag(l: DayLog, col: 'overfull' | 'alcohol', on: boolean) {
+    const { error } = await supabase.from('logs').update({ [col]: on }).eq('id', l.id);
+    if (error) {
+      setMsg({ ok: false, text: isMissingMigration38Column(error) ? migration38Hint() : t('設定に失敗しました。もう一度お試しください。') });
+      return;
+    }
+    invalidateDayFeatures();
+    Haptics.selectionAsync().catch(() => {});
+    await load();
+    setMsg({ ok: true, text: !on ? t('印を外しました。') : col === 'overfull'
+      ? t('印をつけました。責めるためではなく、予報をあなたに合わせるための記録です。')
+      : t('お酒ありの印をつけました。') });
   }
 
   // 1タップ予防: 今日だけ目標を+200kcal緩める（チートデイ吸収の仕組みに乗せる）。
@@ -1539,7 +1666,10 @@ export default function LogScreen() {
   }, [todayKey]);
   const [moodBusy, setMoodBusy] = useState(false);
   const hasMoodToday = dayLogs.some((l) => l.mood);
-  const showMood = viewDate === todayKey && profile != null && !hasMoodToday && !moodSnoozed && !isBeforeWake;
+  // 2問目「今日の気ぜわしさ」（entries.stress・migration-38）: 気分を答えたあとも**朝の窓の間だけ**カードを残して聞く。
+  // 窓を過ぎたら（または旧DBで保存が落ちたら）従来どおり気分を答えた時点で畳む＝1日中居座らない
+  const stressPending = stressToday == null && !stressUnavailable && isMorningWindow(nowHm, wakeHm);
+  const showMood = viewDate === todayKey && profile != null && !moodSnoozed && !isBeforeWake && (!hasMoodToday || stressPending);
   async function saveMood(n: number) {
     if (!uid || moodBusy) return;
     setMoodBusy(true);
@@ -1759,9 +1889,10 @@ export default function LogScreen() {
     isToday: isViewToday,
     beforeWake: isBeforeWake,
     candidates: {
-      caution: bingeRisk || cautionAlert ? 1 : 0,
+      caution: riskCard || cautionAlert ? 1 : 0,
       dayPlan: askDayPlan ? 1 : 0,
       carry: carryCandidate ? 1 : 0,
+      craving: askCraving ? 1 : 0,
       backfill: backfill ? 1 : 0,
       checklist: vis('checklist') && checklistLive ? 1 : 0,
       mood: vis('mood') && showMood ? 1 : 0,
@@ -2180,12 +2311,12 @@ export default function LogScreen() {
             §8 気づきアラート（caution）が出た日はこの1枚に統合する: 見出しは「条件が{n}つそろっています」、
             箇条書きは本人の法則の条件（＋従来の理由）、ボタンは従来どおり、末尾に法則の解説へのリンク */}
         {attention.caution > 0 && (
-          <View style={[s.card, { borderColor: bingeRisk?.level === 'high' ? C.coral : C.amber, borderWidth: 1.5 }]}>
+          <View style={[s.card, { borderColor: riskCard?.tier === 'warning' ? C.coral : C.amber, borderWidth: 1.5 }]}>
             <View style={s.alertHead}>
               <Text style={[s.h2, { flex: 1, marginBottom: 0 }]}>
                 {cautionAlert
                   ? t('今日は食べすぎが起きやすい条件が{n}つそろっています', { n: cautionAlert.factors.length })
-                  : bingeRisk?.level === 'high' ? t('🌪 今日は食欲が爆発しやすい状態です') : t('🌤 今日は食欲が乱れやすいかも')}
+                  : riskTierTitle(riskCard?.tier ?? 'nudge')}
               </Text>
               <Pressable hitSlop={10} onPress={snoozeRisk} accessibilityRole="button" accessibilityLabel={t('今日は閉じる')}>
                 <Text style={s.alertX}>×</Text>
@@ -2194,9 +2325,13 @@ export default function LogScreen() {
             {cautionAlert?.factors.map((f) => (
               <Text key={f} style={[s.mutedT, { lineHeight: 20 }]}>・{f}</Text>
             ))}
-            {bingeRisk?.reasons.filter((r) => !cautionAlert?.factors.includes(r.text)).map((r) => (
-              <Text key={r.key} style={[s.mutedT, { lineHeight: 20 }]}>・{r.text}</Text>
+            {/* v2 の理由（寄与の大きい順・最大4件）。法則の条件と同じ文は畳む */}
+            {riskCard?.reasons.map((r) => riskReasonText(r.key)).filter((txt) => !cautionAlert?.factors.includes(txt)).map((txt) => (
+              <Text key={txt} style={[s.mutedT, { lineHeight: 20 }]}>・{txt}</Text>
             ))}
+            {riskCard?.readiness === 'prior' && !cautionAlert && (
+              <Text style={s.alertNote}>{t('まだ記録が少ないので、一般的な傾向をもとにした予報です。')}</Text>
+            )}
             {cautionAlert && (
               <Text style={s.alertNote}>{t('あなたの記録から見つかった法則にもとづく予報です（相関であり、原因とは限りません）')}</Text>
             )}
@@ -2271,18 +2406,52 @@ export default function LogScreen() {
               <Smile size={16} color={C.teal} />
               <Text style={[s.h2, { marginBottom: 0 }]}>{t('いまの気分は？')}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-              {([1, 2, 3, 4, 5] as const).map((lv) => (
-                <Pressable key={lv} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}
-                           disabled={moodBusy} onPress={() => saveMood(lv)}>
-                  <MoodFace level={lv} size={30} />
-                </Pressable>
-              ))}
-            </View>
+            {!hasMoodToday && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                {([1, 2, 3, 4, 5] as const).map((lv) => (
+                  <Pressable key={lv} style={({ pressed }) => [s.moodBtn, pressed && { transform: [{ scale: 0.92 }], backgroundColor: C.segTrack }]}
+                             disabled={moodBusy} onPress={() => saveMood(lv)}>
+                    <MoodFace level={lv} size={30} />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            {/* 2問目: 今日の気ぜわしさ 0–3（過食アラート v2・§6-3。気分とは別軸のストレス。数字は見せない） */}
+            {stressToday == null && !stressUnavailable && (
+              <View style={{ marginTop: 4, marginBottom: 6 }}>
+                <Text style={[s.mutedT, { fontSize: 13, marginBottom: 6 }]}>{t('今日の気ぜわしさは？')}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {([0, 1, 2, 3] as const).map((lv) => (
+                    <Chip key={lv} label={stressLabel(lv)} selected={false} disabled={stressBusy} onPress={() => saveStress(lv)} />
+                  ))}
+                </View>
+              </View>
+            )}
             <Text style={s.mutedT}>{t('気分と食欲はつながっています。記録するとAIの過食予報が賢くなります。')}</Text>
             <Pressable onPress={moodSnooze} style={{ marginTop: 6, alignSelf: 'center' }} hitSlop={8}>
               <Text style={[s.mutedT, { textDecorationLine: 'underline' }]}>{t('今日は聞かないで')}</Text>
             </Pressable>
+          </View>
+        )}
+
+        {/* 夜の渇望チェック（過食アラート v2・docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md §6-1）:
+            18〜23時・未回答・「モデルが迷っている日」または「本人の重みが育つ前」に1問だけ。
+            答えは entries.craving に入り、今夜の予報（時間内ハザード）と翌日の特徴・過食ラベルの材料になる。数字は見せない・責めない */}
+        {attention.craving > 0 && (
+          <View style={s.card}>
+            <View style={s.alertHead}>
+              <Moon size={16} color={C.teal} />
+              <Text style={[s.h2, { flex: 1, marginBottom: 0 }]}>{t('いま、食べたい気持ちは？')}</Text>
+              <Pressable hitSlop={10} onPress={cravingSnooze} accessibilityRole="button" accessibilityLabel={t('今日は閉じる')}>
+                <Text style={s.alertX}>×</Text>
+              </Pressable>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              {([0, 1, 2, 3] as const).map((lv) => (
+                <Chip key={lv} label={cravingLabel(lv)} selected={false} disabled={cravingBusy} onPress={() => saveCraving(lv)} />
+              ))}
+            </View>
+            <Text style={[s.mutedT, { marginTop: 8 }]}>{t('答えは責めるためではなく、夜の予報をあなたに合わせるためのものです。')}</Text>
           </View>
         )}
 
@@ -2326,6 +2495,13 @@ export default function LogScreen() {
                     : <Text style={s.feedTitle} numberOfLines={2}>{logTitle(l)}</Text>}
                 {l.kcal != null && l.p != null && (
                   <PfcInline p={Number(l.p)} f={Number(l.f ?? 0)} c={Number(l.c ?? 0)} />
+                )}
+                {/* 主観の印（長押しメニューで付け外し・migration-38）。責め色にしない */}
+                {(l.overfull === true || l.alcohol === true) && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 3 }}>
+                    {l.overfull === true && <Text style={s.feedTag}>{t('満腹超え')}</Text>}
+                    {l.alcohol === true && <Text style={s.feedTag}>{t('お酒あり')}</Text>}
+                  </View>
                 )}
               </View>
               {l.kcal != null && <KcalCell kcal={Number(l.kcal)} />}
@@ -2929,6 +3105,7 @@ const s = themed(() => ({
   feedIcon: { fontSize: 15, marginRight: 2, paddingTop: 1 },
   // 品目内訳の無い行（体重・運動・概算・メモ）の見出し。品名と同じ 15/700
   feedTitle: { fontSize: 15, fontWeight: '700', color: C.ink, lineHeight: 21 },
+  feedTag: { fontSize: 11, lineHeight: 15, fontWeight: '700', color: C.sub, backgroundColor: C.chipBg, borderRadius: RADIUS.chip, paddingHorizontal: 7, paddingVertical: 1, overflow: 'hidden' },
   msg: { fontSize: 15, fontWeight: '600', marginBottom: 10, paddingHorizontal: 4 },
   ta: {
     minHeight: 88, maxHeight: 180, backgroundColor: C.bg, borderWidth: 1, borderColor: C.line,

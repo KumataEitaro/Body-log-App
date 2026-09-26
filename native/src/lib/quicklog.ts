@@ -7,6 +7,8 @@ import { enqueue, isNetworkError, isPermissionError } from './offlineQueue';
 import { sumItems, type FoodItem } from './items';
 import { todayJST, EX_LEVELS, type ExLevel } from './calc';
 import { t, apiLang } from './i18n';
+import { looksAlcoholic } from './alcohol';
+import { isMissingMigration38Column } from './migration38';
 
 export type QuickImage = { data: string; mime: string };
 
@@ -110,7 +112,7 @@ export async function saveParsed(
   // （'中'・'moderate' 等）を返すと、その1語のために**食事まるごと**が保存できない。
   // 運動の強度は食事の記録の主役ではないので、読めない値は黙って「オフ」に落とす（2026-09-14）
   const ex: ExLevel = p.ex != null && (EX_LEVELS as readonly string[]).includes(p.ex) ? p.ex : 'オフ';
-  const row = {
+  const row: Record<string, unknown> & { user_id: string; date: string } = {
     user_id: uid, date: today,
     ...(at ? { at } : {}),
     items: p.items,
@@ -119,11 +121,18 @@ export async function saveParsed(
     weight: p.weight, waist: p.waist,
     ex, adj: p.adj, mood: p.mood || '',
     text: note, photo_urls: [],
+    // お酒の自動推定（migration-38・過食アラート v2）。true のときだけ列を書く＝お酒の無い保存は旧DBでも今までどおり通る
+    ...(looksAlcoholic(p.items) ? { alcohol: true } : {}),
   };
 
-  let error: { message: string } | null = null;
+  let error: { message: string; code?: string } | null = null;
   try {
     ({ error } = await supabase.from('logs').insert(row));
+    // alcohol 列が無い旧DB（migration-38 未適用）: 印だけ諦めて食事そのものは保存する
+    if (error && 'alcohol' in row && isMissingMigration38Column(error)) {
+      delete row.alcohol;
+      ({ error } = await supabase.from('logs').insert(row));
+    }
   } catch (e) {
     // supabase-js は普通 { error } を返すが、fetch 自体が投げることがある（圏外・DNS失敗）
     error = { message: String((e as Error)?.message ?? e) };

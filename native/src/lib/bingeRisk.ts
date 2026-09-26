@@ -35,6 +35,8 @@ export type RiskContext = {
   hour?: number | null;
   /** 最後の食事からの経過時間（h）。5h を超えると上がる。省略時は考慮しない */
   hoursSinceLastMeal?: number | null;
+  /** 今夜の渇望チェック 0–3（entries.craving・§6-1）。同日の時間内ハザードに直接効く。未回答は null */
+  craving?: number | null;
 };
 
 export type RiskFeatureDef = {
@@ -235,6 +237,27 @@ export const RISK_FEATURES: readonly RiskFeatureDef[] = [
       const d = rows[i].weight_delta7 ?? prevOf(rows, i)?.weight_delta7 ?? null;
       return d == null ? null : d >= WEIGHT_UP_KG;
     } },
+  // ===== 2026-09-25 オーナー決定で追加した1タップ入力・生理指標（migration-38・HealthKit 4種） =====
+  // --- 朝のストレス 0–3（Goldschmidt 2014: ストレス→負の感情→過食。気分とは別軸で聞く） ---
+  { key: 'stress_high', label: '今朝のストレスが高め', prior: 0.5, tau: FEATURE_TAU,
+    test: (rows, i) => (rows[i].stress == null ? null : (rows[i].stress as number) >= 2) },
+  // --- 前夜の渇望 0–3（最も近接した前駆。翌日への持ち越しとして使う。同日の値は intradayLogit が使う） ---
+  { key: 'prev_craving_high', label: '昨夜、食べたい気持ちが強かった', prior: 0.5, tau: FEATURE_TAU,
+    test: (rows, i) => { const p = prevOf(rows, i); return p?.craving == null ? null : p.craving >= 2; } },
+  // --- 前日の飲酒（Yeomans 2010: 当夜の摂取↑。翌日は睡眠の質低下・二日酔いの食欲で持ち越す） ---
+  { key: 'prev_alcohol', label: '前日にお酒があった', prior: 0.3, tau: FEATURE_TAU,
+    test: (rows, i) => { const p = prevOf(rows, i); return p == null || !p.recorded ? null : p.alcohol; } },
+  // --- 生理指標: 文献の再現性が弱いので**事前重み 0**（本人データだけで学習）。安静時心拍・HRV は前日の値（今日の値は夜まで揃わない）、
+  //     呼吸数・手首温は昨夜の睡眠中の値（今朝の時点で確定） ---
+  { key: 'rhr_high', label: '安静時心拍がいつもより高い', prior: 0, tau: FEATURE_TAU,
+    test: (rows, i) => { const p = prevOf(rows, i); return p?.rhr_z == null ? null : p.rhr_z >= 1; } },
+  { key: 'hrv_low', label: '心拍変動（HRV）がいつもより低い', prior: 0, tau: FEATURE_TAU,
+    test: (rows, i) => { const p = prevOf(rows, i); return p?.hrv_z == null ? null : p.hrv_z <= -1; } },
+  { key: 'resp_high', label: '睡眠中の呼吸数がいつもより高い', prior: 0, tau: FEATURE_TAU,
+    test: (rows, i) => (rows[i].resp_z == null ? null : (rows[i].resp_z as number) >= 1) },
+  // 手首温の上昇は黄体期の代理にもなる（周期モード OFF の人でも拾える）。事前は小さく正
+  { key: 'wrist_temp_high', label: '手首温がいつもより高い', prior: 0.2, tau: FEATURE_TAU,
+    test: (rows, i) => (rows[i].wrist_temp_z == null ? null : (rows[i].wrist_temp_z as number) >= 1) },
 ];
 
 export const RISK_KEYS: readonly string[] = RISK_FEATURES.map((f) => f.key);
@@ -251,8 +274,14 @@ export function featureVector(rows: DayFeature[], i: number, ctx: RiskContext = 
   });
 }
 
-/** 結果ラベル。摂取の記録が無い日は「分からない」（null）＝学習にも評価にも使わない */
+/**
+ * 結果ラベル（2026-09-25 オーナー決定）:
+ *  ・主基準: 摂取 − 実効目標 ≥ +800（features.ts の binge。目標は changes.tsx と同じ式＝運動加算＋反映済み active_kcal）
+ *  ・副基準: その日の食事のどれかに「満腹を超えて食べた」の印（logs.overfull）→ 超過額に関係なく過食日
+ *  ・摂取の記録が無く印も無い日は「分からない」（null）＝学習にも評価にも使わない
+ */
 export function labelOf(row: DayFeature): boolean | null {
+  if (row.overfull) return true;
   return row.intake == null ? null : row.binge;
 }
 
@@ -408,9 +437,11 @@ export function predictRisk(model: RiskModel, x: Bit[]): RiskPrediction {
  * （結果ラベルが日単位なので学習できない。研究ドキュメント §4.3）。
  *  ・夕方17時以降 +0.3、20時以降 +0.6（Smyth 2009: 午後遅く〜夜にピーク）
  *  ・最後の食事から5h以上 +0.3、7h以上 +0.5（長い間隔は次の食事量を増やす）
- *  合計は +1.0（≒2.7倍）で頭打ち
+ *  時刻＋空腹の合計は +1.0（≒2.7倍）で頭打ち。
+ *  ・今夜の渇望チェック（§6-1・本人の直接申告）: 1→+0.2、2→+0.6、3→+1.0 を**別枠**で足す
+ *    （最も近接した前駆で、時刻や空腹とは独立の情報。0 は −0.2＝「落ち着いている」も情報）
  */
-export function intradayLogit(hour: number | null | undefined, hoursSinceLastMeal: number | null | undefined): number {
+export function intradayLogit(hour: number | null | undefined, hoursSinceLastMeal: number | null | undefined, craving?: number | null): number {
   let z = 0;
   if (hour != null && Number.isFinite(hour)) {
     if (hour >= 20 || hour < 3) z += 0.6;
@@ -420,7 +451,12 @@ export function intradayLogit(hour: number | null | undefined, hoursSinceLastMea
     if (hoursSinceLastMeal >= 7) z += 0.5;
     else if (hoursSinceLastMeal >= 5) z += 0.3;
   }
-  return Math.min(1, z);
+  z = Math.min(1, z);
+  if (craving != null && Number.isFinite(craving)) {
+    const c = Math.max(0, Math.min(3, Math.round(craving)));
+    z += [-0.2, 0.2, 0.6, 1.0][c];
+  }
+  return z;
 }
 
 /** 確率 → 段。silent は常に quiet、prior は nudge 止まり */
@@ -444,7 +480,16 @@ export function assessBingeRiskV2(rows: DayFeature[], today: string, ctx: RiskCo
   const idx = rows.findIndex((r) => r.date === today);
   const history = idx >= 0 ? rows.slice(0, idx) : rows.filter((r) => r.date < today);
   const model = fitRiskModel(history, opts.fit);
-  const baseRate = model.nTrain > 0 ? model.nBinge / model.nTrain : (opts.fit?.priorBaseRate ?? PRIOR_BASE_RATE);
+  return assessWithModel(model, rows, today, ctx, { thresholds: opts.thresholds, priorBaseRate: opts.fit?.priorBaseRate });
+}
+
+/**
+ * 学習済みモデルで今日を判定する（配線側は lib/bingeRiskStore.loadOrFitModel の1日1回のモデルを渡す）。
+ * thresholds には自己制限ガード（guardThresholds）の結果を渡す。基礎率の床はここで掛ける
+ */
+export function assessWithModel(model: RiskModel, rows: readonly DayFeature[], today: string, ctx: RiskContext = {}, opts: { thresholds?: TierThresholds; priorBaseRate?: number } = {}): BingeRiskV2 {
+  const idx = rows.findIndex((r) => r.date === today);
+  const baseRate = model.nTrain > 0 ? model.nBinge / model.nTrain : (opts.priorBaseRate ?? PRIOR_BASE_RATE);
   const thresholds = effectiveThresholds(opts.thresholds ?? DEFAULT_THRESHOLDS, baseRate);
   const weights: Record<string, number> = {};
   model.keys.forEach((k, j) => { weights[k] = Math.round(model.weights[j] * 1000) / 1000; });
@@ -452,9 +497,9 @@ export function assessBingeRiskV2(rows: DayFeature[], today: string, ctx: RiskCo
     return { date: today, readiness: 'silent', pDay: sigmoid(model.intercept), pNow: sigmoid(model.intercept), tier: 'quiet', thresholds, reasons: [],
       model: { nTrain: model.nTrain, nBinge: model.nBinge, baseRate, weights } };
   }
-  const x = featureVector(rows, idx, ctx);
+  const x = featureVector(rows as DayFeature[], idx, ctx);
   const pred = predictRisk(model, x);
-  const zNow = pred.logit + intradayLogit(ctx.hour, ctx.hoursSinceLastMeal);
+  const zNow = pred.logit + intradayLogit(ctx.hour, ctx.hoursSinceLastMeal, ctx.craving);
   const pNow = sigmoid(zNow);
   return {
     date: today, readiness: model.readiness, pDay: pred.p, pNow,
@@ -462,6 +507,36 @@ export function assessBingeRiskV2(rows: DayFeature[], today: string, ctx: RiskCo
     reasons: topReasons(pred.contributions),
     model: { nTrain: model.nTrain, nBinge: model.nBinge, baseRate, weights },
   };
+}
+
+// ===== 夜の渇望チェック（§6-1）を出すか =====
+
+export const CRAVING_ASK_FROM_H = 18;   // 18:00〜
+export const CRAVING_ASK_UNTIL_H = 23;  // 〜22:59
+/** 「モデルが迷っている」＝ nudge 閾値の ±この幅にいる日だけ聞く（確実に静かな日・確実に危ない日は聞かない） */
+export const CRAVING_UNCERTAIN_BAND = 0.08;
+
+export type CravingAskInput = {
+  isToday: boolean;
+  hour: number;                 // 端末ローカルの時
+  answered: boolean;            // 今日すでに答えた（entries.craving != null）
+  snoozed: boolean;             // ×で今日は閉じた
+  readiness: Readiness;
+  pNow: number;                 // いまの確率（渇望を入れる前）
+  thresholds: TierThresholds;
+};
+
+/**
+ * 出す条件: 今日・18〜23時・未回答・未スヌーズ、かつ「まだ本人の重みが育っていない（readiness ≠ full）」
+ * または「モデルが迷っている（pNow が nudge 閾値の ±0.08）」。
+ * 前者は**ラベルを早く集める**ため（記録が少ないうちは毎晩聞いてよい。答えが翌日の特徴とラベルの質になる）、
+ * 後者は質問攻めにしないため（N1 と同じ思想）。
+ */
+export function shouldAskCraving(i: CravingAskInput): boolean {
+  if (!i.isToday || i.answered || i.snoozed) return false;
+  if (!Number.isFinite(i.hour) || i.hour < CRAVING_ASK_FROM_H || i.hour >= CRAVING_ASK_UNTIL_H) return false;
+  if (i.readiness !== 'full') return true;
+  return Math.abs(i.pNow - i.thresholds.nudge) <= CRAVING_UNCERTAIN_BAND;
 }
 
 // ===== 自己制限ガード（精度が落ちたら頻度を絞る） =====

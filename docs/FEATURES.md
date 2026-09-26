@@ -2657,3 +2657,21 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 - 既存のすべての記録は互換（新キーが無い＝不明）。旧 QA ループの文面は変わるので、/api/parse-food-qa の再検証は次回の QA で
 - i18n: 10辞書に約100キー追加（栄養素名・判定語・基準の種類・年齢区分・画面文言）。`ColumnReader` の入口の説明文を更新
 - テスト: `native/src/lib/__tests__/{dri2025,nutrientIntake}.test.ts`、`tests/items.test.ts`。screens/themePalette/navConsistency/foodNav の既存テストは維持
+
+## 過食アラート v2（本人モデル・段階・自己制限ガード・主観ラベル・HealthKit 4種）（2026-09-26・v1.1.16）
+
+研究設計は docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md。熊田さんの決定: 過食の定義は +800（現行）、主観ラベルを足す、HealthKit を足す。
+
+- **判定**: 旧「点数式」（insights.assessBingeRisk）を置き換え。本人の日次特徴量 90 日で 1 日 1 回学習した MAP ロジスティック回帰
+  （文献由来の事前重み ＋ 本人データで縮小推定・`lib/bingeRisk.ts`）で今日の確率を出し、夕方以降は時刻・最後の食事からの経過・
+  今夜の渇望チェックを織り込む（時間内ハザード）。段は quiet / nudge（控えめ）/ warning（従来の強い見た目）。閾値は期待効用＋
+  本人の基礎率の床＋**自己制限ガード**（出したアラートの当たり具合が床を割ると自動で絞る）＋週予算（nudge 4・warning 2）
+- **ラベル**: 摂取 − 実効目標 ≥ +800、または食事のどれかに「満腹を超えて食べた」の印。記録 14 日未満は沈黙、28 日＆過食 3 回まで nudge 止まり
+- **主観ラベル・1タップ入力（migration-38）**: 記録行の長押しで「満腹を超えて食べた」「お酒あり」（フィードに印）。お酒は保存時に
+  品目名から自動推定（`lib/alcohol.ts`・ノンアル/甘酒/酒蒸し等は除外）。夜 18〜23 時の「いま、食べたい気持ちは？」（0〜3・本人の重みが育つ前は
+  毎晩、育ったあとは迷う日だけ）。気分カードの 2 問目「今日の気ぜわしさは？」（0〜3）。数字は見せない・責めない
+- **HealthKit**: 安静時心拍・HRV(SDNN)・睡眠中の呼吸数・睡眠時手首温を日別に読み、本人 28 日基準の z スコアで特徴にする（事前重み 0＝本人データだけで学習。
+  手首温だけ小さく正＝黄体期の代理）。既存ユーザーには追加した型だけ 1 回だけ許可ダイアログが出る
+- **出したアラートの結果**を `bl-binge-alert-outcomes` に記録し、翌日以降そのラベルで埋めてガードの材料にする
+- 必要な SQL: `supabase/migration-38.sql`（logs.overfull / logs.alcohol / entries.craving / entries.stress）
+- テスト: bingeRisk（25）・features（zスコア）・alcohol・bingeRiskStore・logCards（craving の調停）

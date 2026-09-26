@@ -50,6 +50,21 @@ const READ_TYPES = [
   // アクティブエネルギー（歩行・日常活動を含む実測消費）。歩数だけでは消費kcalが出せず
   // 「1万歩なのに消費0kcal」という不合理な表示になるため読み取り対象に加えた
   'HKQuantityTypeIdentifierActiveEnergyBurned',
+  // 過食アラート v2（docs/BINGE-PREVENTION-RESEARCH-2026-09-25.md §6-6・2026-09-25）: 安静時心拍・HRV(SDNN)・
+  // 睡眠中の呼吸数・睡眠時手首温。**本人28日基準からの逸脱（zスコア）**として特徴量にする（集団の事前重みは置かない）。
+  // 既存ユーザーには reauthIfNeeded が追加ぶんだけ1回ダイアログを出す（iOS は新しく求めた型だけを聞き直す）
+  'HKQuantityTypeIdentifierRestingHeartRate',
+  'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
+  'HKQuantityTypeIdentifierRespiratoryRate',
+  'HKQuantityTypeIdentifierAppleSleepingWristTemperature',
+] as const;
+
+/** 生理指標4種（READ_TYPES の部分集合）。前景の変更購読からは外す（HRV は1日に何度も書かれ、画面の再読込が増えるだけ） */
+export const VITAL_TYPES = [
+  'HKQuantityTypeIdentifierRestingHeartRate',
+  'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
+  'HKQuantityTypeIdentifierRespiratoryRate',
+  'HKQuantityTypeIdentifierAppleSleepingWristTemperature',
 ] as const;
 
 // ===== 連携状態（1か所で判定・全画面はこれだけを見る） =====
@@ -507,6 +522,66 @@ export async function readActivitySummary(days: number, endDate?: string): Promi
   }
 }
 
+// ===== 生理指標（過食アラート v2・本人基準の逸脱を見るための日次値） =====
+export type VitalsDay = {
+  date: string;                 // JST
+  rhr: number | null;           // 安静時心拍 bpm（その日のサンプル平均。Apple は1日1値）
+  hrv: number | null;           // HRV SDNN ms（その日の平均）
+  resp: number | null;          // 睡眠中の呼吸数 /min（起きた日に計上・平均）
+  wristTemp: number | null;     // 睡眠時手首温 °C（起きた日に計上・平均）
+};
+
+const VITALS_TTL_MS = 15 * 60 * 1000;
+let vitalsCache: { days: number; at: number; ver: number; data: VitalsDay[] | null } | null = null;
+let vitalsInflight: Promise<VitalsDay[] | null> | null = null;
+
+/** 直近 days 日の生理指標（日別平均・JST）。HealthKit が無い環境・未許可・失敗は null。15分キャッシュ＋同時呼び出しは1本に合流 */
+export async function readVitalsDaily(days: number): Promise<VitalsDay[] | null> {
+  if (!hk) return null;
+  const now = Date.now();
+  const ver = healthStoreState().version;
+  if (vitalsCache && vitalsCache.days >= days && vitalsCache.ver === ver && now - vitalsCache.at < VITALS_TTL_MS) return vitalsCache.data;
+  if (vitalsInflight) return vitalsInflight;
+  vitalsInflight = (async () => {
+    try {
+      const end = new Date();
+      const start = new Date(end.getTime() - days * 86400000);
+      const filter = { date: { startDate: start, endDate: end } };
+      // 型付きの unit 引数が識別子ごとに違うため、ワークアウトと同じく緩い型で呼ぶ
+      const anyHk = hk as unknown as {
+        queryQuantitySamples: (id: string, opts: unknown) => Promise<readonly { quantity: number; startDate: Date; endDate: Date }[]>;
+      };
+      const q = (id: string, unit: string) => anyHk.queryQuantitySamples(id, { unit, limit: -1, ascending: true, filter }).catch(() => [] as readonly { quantity: number; startDate: Date; endDate: Date }[]);
+      const [rhr, hrv, resp, temp] = await Promise.all([
+        q('HKQuantityTypeIdentifierRestingHeartRate', 'count/min'),
+        q('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', 'ms'),
+        q('HKQuantityTypeIdentifierRespiratoryRate', 'count/min'),
+        q('HKQuantityTypeIdentifierAppleSleepingWristTemperature', 'degC'),
+      ]);
+      const acc = new Map<string, { rhr: number[]; hrv: number[]; resp: number[]; temp: number[] }>();
+      const get = (d: string) => {
+        let v = acc.get(d);
+        if (!v) { v = { rhr: [], hrv: [], resp: [], temp: [] }; acc.set(d, v); }
+        return v;
+      };
+      // 安静時心拍・HRV は測った日、睡眠中の呼吸数・手首温は「起きた日」（睡眠と同じ流儀）に計上する
+      for (const s of rhr) { const v = Number(s.quantity); if (Number.isFinite(v) && v > 0) get(dateKeyJST(new Date(s.startDate))).rhr.push(v); }
+      for (const s of hrv) { const v = Number(s.quantity); if (Number.isFinite(v) && v > 0) get(dateKeyJST(new Date(s.startDate))).hrv.push(v); }
+      for (const s of resp) { const v = Number(s.quantity); if (Number.isFinite(v) && v > 0) get(dateKeyJST(new Date(s.endDate))).resp.push(v); }
+      for (const s of temp) { const v = Number(s.quantity); if (Number.isFinite(v) && v > 20 && v < 45) get(dateKeyJST(new Date(s.endDate))).temp.push(v); }
+      const avg = (xs: number[], digits: number) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10 ** digits) / 10 ** digits : null);
+      const data = [...acc.entries()]
+        .map(([date, v]) => ({ date, rhr: avg(v.rhr, 1), hrv: avg(v.hrv, 1), resp: avg(v.resp, 2), wristTemp: avg(v.temp, 2) }))
+        .sort((a, b) => (a.date < b.date ? -1 : 1));
+      vitalsCache = { days, at: Date.now(), ver, data };
+      return data;
+    } catch {
+      return null;
+    }
+  })().finally(() => { vitalsInflight = null; });
+  return vitalsInflight;
+}
+
 // =====================================================================
 // 自動同期（変更イベント駆動・バックグラウンド配信・体重の自動取り込み）
 // =====================================================================
@@ -578,8 +653,9 @@ export async function startHealthAutoSync(): Promise<void> {
 
   if (!autoSyncStarted) {
     autoSyncStarted = true;
-    // 前景の変更購読（HKObserverQuery）。型ごとに1本・アプリ生存中ずっと張っておく
+    // 前景の変更購読（HKObserverQuery）。型ごとに1本・アプリ生存中ずっと張っておく（生理指標4種は除く＝15分キャッシュで足りる）
     for (const id of READ_TYPES) {
+      if ((VITAL_TYPES as readonly string[]).includes(id)) continue;
       try {
         const sub = hk.subscribeToChanges(id as never, (args) => {
           if (args?.errorMessage) return;   // 権限なし等。黙って次のイベントを待つ

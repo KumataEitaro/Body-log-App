@@ -31,7 +31,10 @@
 // ヒーロー・収支・今日の記録・前の食事・体重入力・広告枠は「構造カード」（ユーザーが⊖/⊕で自分で
 // 管理する、または位置が固定）なのでこの調停の対象外。スポットライト（マイ食品の案内・食事の制約の案内）は
 // Modal であり、保存直後に1枚だけ・互いに排他で出るのでここには載せない。
-export type AttentionCard = 'caution' | 'dayPlan' | 'carry' | 'backfill' | 'checklist' | 'mood' | 'positive';
+//     カード … craving（夜の渇望チェック・2026-09-25 過食アラート v2）は carry の次。18〜23時にだけ候補になるので
+//                      朝のカード群とは実質競合せず、夜に残っているのは backfill（昨日の穴埋め）くらい。
+//                      渇望の答えは**今夜の予報そのもの**を変える（時間内ハザード）ので、穴埋めより先に読まれるべき
+export type AttentionCard = 'caution' | 'dayPlan' | 'carry' | 'craving' | 'backfill' | 'checklist' | 'mood' | 'positive';
 export type AttentionBand = 'badge' | 'firstLaw' | 'brief';
 export type AttentionKey = AttentionCard | AttentionBand;
 
@@ -39,11 +42,11 @@ export const MAX_CARDS = 2;
 export const MAX_BANDS = 2;
 
 /** 枠を取る順（先頭ほど優先） */
-export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'dayPlan', 'carry', 'backfill', 'checklist', 'mood', 'positive'];
+export const CARD_PRIORITY: readonly AttentionCard[] = ['caution', 'dayPlan', 'carry', 'craving', 'backfill', 'checklist', 'mood', 'positive'];
 export const BAND_PRIORITY: readonly AttentionBand[] = ['badge', 'firstLaw', 'brief'];
 
 /** 今日を表示しているときだけ意味を持つもの（過去日では候補から外す） */
-export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'carry', 'backfill', 'mood', 'positive', 'brief']);
+export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'carry', 'craving', 'backfill', 'mood', 'positive', 'brief']);
 
 /**
  * 「朝に出すもの」＝起床時刻より前（`beforeWake`）は候補から外すもの。
@@ -62,6 +65,8 @@ export const TODAY_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['cau
  *     朝の窓で絞ると「寝る前に思い出して埋める」という一番自然な導線を殺すことになる
  *   checklist / badge / firstLaw … 日付にも時刻にも依存しない（過去日でも出るのと同じ理由）
  *   brief（今日のひとこと帯）… 帯1行で、答えを求めない読み物なので深夜に出ても消費されない
+ *   craving（夜の渇望チェック）… 出す窓は 18〜23 時（lib/bingeRisk.ts shouldAskCraving が時刻で決める）。
+ *     「朝のもの」ではないので MORNING_ONLY には入れない（起床前の判定はそもそも時刻の窓で外れる）
  */
 export const MORNING_ONLY: ReadonlySet<AttentionKey> = new Set<AttentionKey>(['caution', 'dayPlan', 'carry', 'mood', 'positive']);
 

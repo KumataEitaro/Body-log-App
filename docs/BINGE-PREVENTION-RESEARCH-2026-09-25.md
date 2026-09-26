@@ -390,3 +390,14 @@ B=8 は「過食 1 回（+800 kcal ≒ 脂肪 0.1 kg 相当＋翌日の連鎖・
 - Watford TS et al. (2020) Resting state heart rate variability in clinical and subthreshold disordered eating: A meta-analysis. *Int J Eat Disord* 53(7):1021–1033. HRV の所見は不安定。https://onlinelibrary.wiley.com/doi/abs/10.1002/eat.23287
 - De Young KP et al. (2022) A biobehavioral circadian model of restrictive eating and binge eating. *Int J Eat Disord* 55(10):1291–1295. https://onlinelibrary.wiley.com/doi/abs/10.1002/eat.23758
 - 統計: Neyman J, Pearson ES (1933) On the problem of the most efficient tests of statistical hypotheses. *Phil Trans R Soc A* 231:289–337／Benjamini Y, Hochberg Y (1995) Controlling the false discovery rate. *J R Stat Soc B* 57:289–300／Haldane JBS (1956) The estimation and significance of the logarithm of a ratio of frequencies. *Ann Hum Genet* 20:309–311。
+
+## 11. 決定と実装状況（2026-09-26）
+
+熊田さんの決定: 過食の定義 **+800（現行のまま）**、主観ラベル **追加**、HealthKit 4 種 **追加**、残りは任せる。
+
+実装済み（feat/binge-risk-v2 → main）:
+- §4 のモデルを食事タブに配線（`app/(tabs)/log.tsx`・`lib/bingeRiskStore.ts`・`lib/bingeRiskText.ts`）。段 → 既存 caution 枠。理由は寄与の大きい順に最大 4 件
+- §6-1 夜の渇望チェック（entries.craving）／§6-2 満腹超えの印（logs.overfull）／§6-3 朝のストレス（entries.stress）／§6-4 お酒の自動推定（logs.alcohol・`lib/alcohol.ts`）
+- §6-6 HealthKit 4 種（`lib/health.ts readVitalsDaily` → `lib/features.ts` z スコア → `RISK_FEATURES` rhr_high / hrv_low / resp_high / wrist_temp_high）
+- §5.4 自己制限ガード・週予算・§5.3 最低データ量（silent 14 日 / full 28 日＆3 回）
+- 未着手: 設定の「頻度: 控えめ／ふつう／多め」（§8-5）、バックテスト結果の画面表示（§5・数値は `backtestBingeRisk` で出せる）
