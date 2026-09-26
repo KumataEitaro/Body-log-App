@@ -236,7 +236,9 @@ workflows:
           # 誤判定して古いプロファイルのまま Build ipa に進み、Associated Domains で失敗した
           check() {
             local found=0 ok=0 f bid
-            for f in "$PROFILES/"*.mobileprovision; do
+            # Xcode 16 以降の CLI は ~/Library/Developer/Xcode/UserData/Provisioning Profiles にも保存する（2026-09-26 build で
+            # profiles create --save がそこへ書き、MobileDevice 側だけ見ていた判定が「無い」と誤った）。両方を見る
+            for f in "$PROFILES/"*.mobileprovision "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/"*.mobileprovision; do
               [ -f "$f" ] || continue
               security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null || continue
               bid=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/prof.plist 2>/dev/null)
@@ -264,7 +266,7 @@ workflows:
             certs=$(app-store-connect certificates list --type IOS_DISTRIBUTION DISTRIBUTION --json 2>/dev/null | jq -r '.[].id' | tr '\n' ' ')
             if [ -z "${certs// /}" ]; then echo "  配布証明書が API から取れません（API キーの権限）"; return 1; fi
             # shellcheck disable=SC2086
-            app-store-connect profiles create "$rid" --certificate-ids $certs --type IOS_APP_STORE --name "bodylog ${bid##*.} appstore $(date +%Y%m%d%H%M%S)" --save
+            app-store-connect profiles create "$rid" --certificate-ids $certs --type IOS_APP_STORE --name "bodylog ${bid##*.} appstore $(date +%Y%m%d%H%M%S)" --profiles-dir "$PROFILES" --save
           }
           STALE=""; MISSING=""; STALE_FILES=""
           while IFS='|' read -r bid key; do
