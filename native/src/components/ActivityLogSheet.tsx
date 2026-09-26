@@ -6,14 +6,17 @@
 //   ① 種目を選ぶ（よく使う順 → 7カテゴリ・検索つき）
 //   ② 時間をダイアルで回す（5分刻み・任意で距離）→ 記録
 // の2段のシートにした。表示中チップの管理（bl-act-visible）は廃止し、一覧は常に全種目。
+// 2026-09-26: 種目の絵文字（🐕🚶🥾…）をやめ、lib/activityIcons.ts の lucide アイコンを
+// ＋シート（components/PlusSheet.tsx）の行と同じ「薄い teal の丸地＋線アイコン」で描く（熊田さん「洗練されたアイコンに」）
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { X, Search, ChevronLeft } from 'lucide-react-native';
-import { C, sheetTopPad, RADIUS, HEAD, themed } from '@/lib/ui';
+import { C, sheetTopPad, RADIUS, HEAD, ICON, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { ACTIVITIES, ACTIVITY_GROUPS, activityById, activityName, activityKcal, type Activity } from '@/lib/activities';
+import { activityIcon } from '@/lib/activityIcons';
 import { Wheel, WheelUnit } from '@/components/Wheel';
 import { OptionButton } from '@/components/ui/Selectable';
 import { useThemeRefresh } from '@/lib/theme';
@@ -74,14 +77,18 @@ export default function ActivityLogSheet({ visible, onClose, weightKg, freq, bus
     }
   }
 
-  const row = (a: Activity) => (
-    <Pressable key={a.id} style={s.row} onPress={() => setPicked(a)}>
-      <Text style={{ fontSize: 21 }}>{a.e}</Text>
-      <Text style={s.rowT}>{activityName(a.id)}</Text>
-      <Text style={s.rowMets}>{a.mets} METs</Text>
-      <Text style={s.arrow}>›</Text>
-    </Pressable>
-  );
+  const row = (a: Activity) => {
+    const Icon = activityIcon(a.id);
+    return (
+      <Pressable key={a.id} style={s.row} onPress={() => setPicked(a)}>
+        <View style={s.rowIcon}><Icon size={ICON.md} color={C.accentInk} strokeWidth={ICON.stroke} /></View>
+        <Text style={s.rowT}>{activityName(a.id)}</Text>
+        <Text style={s.rowMets}>{a.mets} METs</Text>
+        <Text style={s.arrow}>›</Text>
+      </Pressable>
+    );
+  };
+  const PickedIcon = picked ? activityIcon(picked.id) : null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -134,7 +141,9 @@ export default function ActivityLogSheet({ visible, onClose, weightKg, freq, bus
             </View>
             <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 30 }} keyboardShouldPersistTaps="handled">
               <View style={s.pickedRow}>
-                <Text style={{ fontSize: 34 }}>{picked.e}</Text>
+                {PickedIcon && (
+                  <View style={s.pickedIcon}><PickedIcon size={ICON.hero} color={C.accentInk} strokeWidth={ICON.stroke} /></View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={s.pickedT}>{activityName(picked.id)}</Text>
                   <Text style={s.pickedSub}>{picked.mets} METs</Text>
@@ -183,12 +192,16 @@ const s = themed(() => ({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: C.line,
   },
+  // 種目アイコン: ＋シートの行アイコン（40pt）より一回り小さい 36pt の丸地（一覧は行が密なので）
+  rowIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   rowT: { flex: 1, fontSize: 15, color: C.ink, fontWeight: '600' },
   rowMets: { fontSize: 11, color: C.faint, fontWeight: '700' },
   arrow: { fontSize: 21, color: C.faint },
   empty: { fontSize: 13, color: C.sub, textAlign: 'center', marginTop: 24 },
   note: { fontSize: 11.5, color: C.faint, lineHeight: 16, marginTop: 18 },
   pickedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6, marginBottom: 8 },
+  // 選択後の見出し: 食事の大カードと同じ 48pt の丸地（ICON.hero）
+  pickedIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.accentBadge, alignItems: 'center', justifyContent: 'center' },
   pickedT: { fontSize: 21, fontWeight: '800', color: C.ink },
   pickedSub: { fontSize: 12, color: C.sub, fontWeight: '700', marginTop: 2 },
   label: { fontSize: 13, fontWeight: '700', color: C.sub, marginTop: 14, marginBottom: 4 },
