@@ -2643,4 +2643,6 @@ export const ID: Record<string, string> = {
   "運動の量・筋トレの成長・歩数と睡眠": "Volume aktivitas · kemajuan latihan · langkah & tidur",
   "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "Grafik beban angkat ada di Ringkasan → Analisis olahraga (ketuk untuk pindah)",
   "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Riwayat latihan ada di Ringkasan → Analisis olahraga (ketuk untuk pindah)",
+  "概要タブは4つの大項目。「からだの分析」を開くと、体重のトレンドを「3週間で下向き」のような文章で教えます。グラフを読む力はいりません。": "Tab Ringkasan punya 4 bagian besar. Buka “Analisis tubuh” dan ia menjelaskan tren berat badan dengan kalimat seperti “turun selama 3 minggu”. Tak perlu membaca grafik.",
+  "概要タブのいちばん上に「設定」があります。通知センター・目標設定・テーマ12色・11言語・単位・ヘルスケア連携も、この行からいつでも。実績はいちばん下です。": "“Pengaturan” ada di paling atas tab Ringkasan. Pusat notifikasi, target, 12 tema, 11 bahasa, satuan, dan tautan Kesehatan selalu bisa dibuka dari baris ini. Pencapaian ada di paling bawah.",
 };

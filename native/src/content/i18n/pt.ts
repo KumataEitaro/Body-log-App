@@ -2643,4 +2643,6 @@ export const PT: Record<string, string> = {
   "運動の量・筋トレの成長・歩数と睡眠": "Volume de atividade · progresso de força · passos e sono",
   "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "O gráfico de cargas está em Visão geral → Análise de exercício (toque para ir)",
   "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "O histórico de musculação está em Visão geral → Análise de exercício (toque para ir)",
+  "概要タブは4つの大項目。「からだの分析」を開くと、体重のトレンドを「3週間で下向き」のような文章で教えます。グラフを読む力はいりません。": "A aba Visão geral tem 4 grandes itens. Abra “Análise corporal” e ela descreve a tendência do peso em frases como “em queda há 3 semanas”. Não precisa ler gráficos.",
+  "概要タブのいちばん上に「設定」があります。通知センター・目標設定・テーマ12色・11言語・単位・ヘルスケア連携も、この行からいつでも。実績はいちばん下です。": "“Ajustes” fica no topo da aba Visão geral. Central de notificações, metas, 12 temas, 11 idiomas, unidades e Saúde sempre a partir desta linha. As conquistas ficam lá embaixo.",
 };

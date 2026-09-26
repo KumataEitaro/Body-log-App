@@ -2643,4 +2643,6 @@ export const FR: Record<string, string> = {
   "運動の量・筋トレの成長・歩数と睡眠": "Volume d’activité · progrès en musculation · pas et sommeil",
   "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "Le graphique des charges est dans Aperçu → Analyse de l’exercice (touchez pour y aller)",
   "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "L’historique de musculation est dans Aperçu → Analyse de l’exercice (touchez pour y aller)",
+  "概要タブは4つの大項目。「からだの分析」を開くと、体重のトレンドを「3週間で下向き」のような文章で教えます。グラフを読む力はいりません。": "L’onglet Aperçu a 4 grandes rubriques. Ouvrez « Analyse du corps » : il décrit la tendance de votre poids en phrases comme « en baisse depuis 3 semaines ». Pas besoin de lire des courbes.",
+  "概要タブのいちばん上に「設定」があります。通知センター・目標設定・テーマ12色・11言語・単位・ヘルスケア連携も、この行からいつでも。実績はいちばん下です。": "« Réglages » est tout en haut de l’onglet Aperçu. Centre de notifications, objectifs, 12 thèmes, 11 langues, unités et Santé sont toujours accessibles depuis cette ligne. Les succès sont tout en bas.",
 };

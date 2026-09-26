@@ -2692,4 +2692,6 @@ export const EN: Record<string, string> = {
   "運動の量・筋トレの成長・歩数と睡眠": "Activity volume · lifting progress · steps & sleep",
   "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "The lifting-weight chart is in Overview → Exercise analysis (tap to go)",
   "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Lifting history is in Overview → Exercise analysis (tap to go)",
+  "概要タブは4つの大項目。「からだの分析」を開くと、体重のトレンドを「3週間で下向き」のような文章で教えます。グラフを読む力はいりません。": "The Overview tab has 4 sections. Open \"Body analysis\" and it tells you your weight trend in sentences like \"trending down over 3 weeks\". No need to read graphs.",
+  "概要タブのいちばん上に「設定」があります。通知センター・目標設定・テーマ12色・11言語・単位・ヘルスケア連携も、この行からいつでも。実績はいちばん下です。": "\"Settings\" sits at the top of the Overview tab. The notification center, goals, 12 themes, 11 languages, units and Health link are all one tap away from this row. Achievements are at the very bottom.",
 };
