@@ -262,6 +262,21 @@ workflows:
           done <<< "$REQS"
 
           if [ -n "$MISSING" ]; then
+            # 2026-09-26: 自動署名（ios_signing）は本体 ID の前方一致で拡張のプロファイルも取るが、App ID を
+            # 作った直後のビルドや、一覧に載る前のタイミングでは拾えないことがある。止める前に、無い ID を
+            # 名指しで1回だけ取りに行く（App ID があれば --create でプロファイルが出来る。無ければ変わらない）
+            for bid in $MISSING; do
+              app-store-connect fetch-signing-files "$bid" --platform IOS --type IOS_APP_STORE --create --strict-match-identifier || echo "  $bid: fetch-signing-files は失敗（下で再判定）"
+            done
+            STILL=""
+            for bid in $MISSING; do
+              set +e; check "$bid" "$AG_KEY"; rc=$?; set -e
+              [ "$rc" = "2" ] && STILL="$STILL $bid"
+              [ "$rc" = "1" ] && { echo "⚠️ $bid: プロファイルは出来たが $AG_KEY が無い（App Groups の紐付け待ち）"; STALE="$STALE $bid"; }
+            done
+            MISSING="$STILL"
+          fi
+          if [ -n "$MISSING" ]; then
             echo "❌ 次の Bundle ID のプロファイルが取得できていません:$MISSING" >&2
             echo "   Apple Developer → Identifiers に App ID があるか確認してください（docs/LIVE-ACTIVITY.md 手順1）:" >&2
             echo "   https://developer.apple.com/account/resources/identifiers/list" >&2
