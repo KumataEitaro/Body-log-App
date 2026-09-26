@@ -19,7 +19,7 @@ import { todayJST, mifflinBMR, targetKcal, type ExLevel } from './calc';
 import { moodScore } from './bingeAnalysis';
 import { parseLiftText, volumeOf, effectiveKg } from './liftLog';
 import { epley1RM } from './rm';
-import { healthAvailable, readActivitySummary, readSleepStages } from './health';
+import { healthAvailable, readActivitySummary, readSleepStages, readVitalsDaily } from './health';
 import { isCycleEnabled, listCycleStarts, cycleDay, isWaterRetentionWindow } from './cycle';
 import { sumTagGrams, FOOD_TAGS, type FoodTag } from '@/content/foodTags';
 import { jstHour } from './jst';
@@ -77,16 +77,34 @@ export type DayFeature = {
   // --- 周期（cycle.ts・生理周期ON時のみ） ---
   cycle_day: number | null;
   water_window: boolean;     // 月経開始の3日前〜開始後3日
+  // --- 主観ラベル・1タップ入力（migration-38・過食アラート v2・2026-09-25） ---
+  overfull: boolean;         // その日の食事のどれかに「満腹を超えて食べた」の印（logs.overfull）＝過食ラベルの副基準
+  alcohol: boolean;          // その日の食事のどれかに「お酒あり」（logs.alcohol・保存時に品目名から自動推定）
+  craving: number | null;    // 夜の渇望チェック 0–3（entries.craving。未回答は null）
+  stress: number | null;     // 朝の気ぜわしさ 0–3（entries.stress。未回答は null）
+  // --- 生理指標（HealthKit・lib/health.ts readVitalsDaily）。生値と、本人の直近28日基準からの z スコア ---
+  rhr: number | null;        // 安静時心拍 bpm
+  hrv_ms: number | null;     // HRV SDNN ms
+  resp_rate: number | null;  // 睡眠中の呼吸数 /min（起きた日に計上）
+  wrist_temp: number | null; // 睡眠時手首温 °C（起きた日に計上）
+  rhr_z: number | null;      // (当日 − 直近28日の平均) / SD。基準が7日未満なら null
+  hrv_z: number | null;
+  resp_z: number | null;
+  wrist_temp_z: number | null;
 };
 
 /** deriveDayFeatures への入力。DB行から機械的に組める形（純関数テストのため） */
 export type FeatureRaw = {
   today: string;                                             // YYYY-MM-DD
   days: number;                                              // 窓の長さ（今日を含む）
-  entries: { date: string; intake: number | null; p: number | null; weight: number | null; mood: string | null; target: number | null }[];
-  logs: { date: string; at: string | null; text: string | null; items: { name?: string; qty?: string; kcal?: number }[] | null }[];
+  entries: { date: string; intake: number | null; p: number | null; weight: number | null; mood: string | null; target: number | null;
+    craving?: number | null; stress?: number | null }[];
+  logs: { date: string; at: string | null; text: string | null; items: { name?: string; qty?: string; kcal?: number }[] | null;
+    overfull?: boolean | null; alcohol?: boolean | null }[];
   health: { date: string; steps: number; sleepH: number; activeKcal: number }[];
   stages: { date: string; deepMin: number; remMin: number }[];
+  /** 生理指標の日次値（無い環境では省略/空） */
+  vitals?: { date: string; rhr: number | null; hrv: number | null; resp: number | null; wristTemp: number | null }[];
   cycleStarts: string[];
   cycleEnabled: boolean;
 };
@@ -97,6 +115,30 @@ export const BINGE_INTAKE = 2500;     // 摂取2,500kcal超も「食べすぎ」
 export const SLEEP_GOAL_H = 7;        // 睡眠負債の基準（成人の推奨下限7h・AASM/SRS 2015）
 const DEBT_MIN_DAYS = 3;              // 5日のうち睡眠データがこれ未満なら負債は出さない（過小評価を避ける）
 const MOOD_AVG_MIN = 2;               // 3日平均は2日以上の記録があるときだけ
+export const Z_BASELINE_DAYS = 28;    // 生理指標の本人基準: 直近28日（当日を含まない）
+export const Z_MIN_BASELINE = 7;      // 基準が7日未満なら z は出さない（平均もSDも当てにならない）
+/** SD の下限（個人差が極端に小さい人で z が暴れないための床）。単位はそれぞれ bpm / ms / 回/分 / °C */
+export const Z_SD_FLOOR = { rhr: 1.5, hrv: 5, resp: 0.5, wristTemp: 0.15 } as const;
+
+/**
+ * 本人基準の z スコア列（純関数）。各 i について values[i−baselineDays .. i−1] の非null値を基準にし、
+ * 基準が minBaseline 未満、または values[i] が null なら null。SD は不偏（n−1）・下限 sdFloor
+ */
+export function zScores(values: readonly (number | null)[], sdFloor: number, baselineDays = Z_BASELINE_DAYS, minBaseline = Z_MIN_BASELINE): (number | null)[] {
+  const out: (number | null)[] = [];
+  for (let i = 0; i < values.length; i++) {
+    const x = values[i];
+    if (x == null) { out.push(null); continue; }
+    const base: number[] = [];
+    for (let k = Math.max(0, i - baselineDays); k < i; k++) { const v = values[k]; if (v != null) base.push(v); }
+    if (base.length < minBaseline) { out.push(null); continue; }
+    const mean = base.reduce((a, b) => a + b, 0) / base.length;
+    const varc = base.reduce((a, b) => a + (b - mean) ** 2, 0) / (base.length - 1);
+    const sd = Math.max(Math.sqrt(varc), sdFloor);
+    out.push(Math.round(((x - mean) / sd) * 100) / 100);
+  }
+  return out;
+}
 
 // ===== 日付ユーティリティ =====
 export function shiftDate(d: string, n: number): string {
@@ -125,6 +167,8 @@ export function emptyDayFeature(date: string): DayFeature {
     sleep_h: null, sleep_debt5: null, deep_min: null, rem_min: null,
     steps: null, active_kcal: null, lift_volume_kg: 0, lift_sessions: 0, e1rm_delta: null, pr: false,
     cycle_day: null, water_window: false,
+    overfull: false, alcohol: false, craving: null, stress: null,
+    rhr: null, hrv_ms: null, resp_rate: null, wrist_temp: null, rhr_z: null, hrv_z: null, resp_z: null, wrist_temp_z: null,
   };
 }
 
@@ -159,6 +203,10 @@ export function deriveDayFeatures(raw: FeatureRaw): DayFeature[] {
     if (r.intake != null && r.target != null) r.over = Math.round(r.intake - r.target);
     r.binge = (r.over != null && r.over >= BINGE_OVER) || (r.intake != null && r.intake > BINGE_INTAKE);
     if (r.intake != null || r.weight != null) r.recorded = true;
+    // 1タップ入力（migration-38）。0–3 の整数だけ受け付ける（壊れた値は未回答扱い）
+    const cr = e.craving; const st = e.stress;
+    r.craving = cr != null && Number.isInteger(Number(cr)) && Number(cr) >= 0 && Number(cr) <= 3 ? Number(cr) : null;
+    r.stress = st != null && Number.isInteger(Number(st)) && Number(st) >= 0 && Number(st) <= 3 ? Number(st) : null;
   }
 
   // --- logs: 食事の件数・時間帯・食材、🏋️の量 ---
@@ -218,6 +266,9 @@ export function deriveDayFeatures(raw: FeatureRaw): DayFeature[] {
     const items = l.items ?? [];
     if (items.length === 0) continue;
     r.meal_count += 1;
+    // 主観ラベル（migration-38）: どれか1食に印があれば、その日に立てる
+    if (l.overfull === true) r.overfull = true;
+    if (l.alcohol === true) r.alcohol = true;
     const list = dayItems.get(l.date) ?? [];
     for (const it of items) list.push({ name: it?.name, qty: it?.qty });
     dayItems.set(l.date, list);
@@ -265,6 +316,20 @@ export function deriveDayFeatures(raw: FeatureRaw): DayFeature[] {
     r.deep_min = Math.round(s.deepMin);
     r.rem_min = Math.round(s.remMin);
   }
+  // --- 生理指標（過食アラート v2）: 生値を載せてから、本人28日基準の z スコアを列ごとに出す ---
+  for (const v of raw.vitals ?? []) {
+    const r = at(v.date);
+    if (!r) continue;
+    r.rhr = v.rhr != null && Number.isFinite(v.rhr) ? r1(v.rhr) : null;
+    r.hrv_ms = v.hrv != null && Number.isFinite(v.hrv) ? r1(v.hrv) : null;
+    r.resp_rate = v.resp != null && Number.isFinite(v.resp) ? Math.round(v.resp * 100) / 100 : null;
+    r.wrist_temp = v.wristTemp != null && Number.isFinite(v.wristTemp) ? Math.round(v.wristTemp * 100) / 100 : null;
+  }
+  const zr = zScores(rows.map((r) => r.rhr), Z_SD_FLOOR.rhr);
+  const zh = zScores(rows.map((r) => r.hrv_ms), Z_SD_FLOOR.hrv);
+  const zp = zScores(rows.map((r) => r.resp_rate), Z_SD_FLOOR.resp);
+  const zt = zScores(rows.map((r) => r.wrist_temp), Z_SD_FLOOR.wristTemp);
+  rows.forEach((r, i) => { r.rhr_z = zr[i]; r.hrv_z = zh[i]; r.resp_z = zp[i]; r.wrist_temp_z = zt[i]; });
 
   // --- 周期（ON時のみ。OFFなら一切触らない＝null/false のまま） ---
   if (raw.cycleEnabled && raw.cycleStarts.length > 0) {
@@ -348,7 +413,7 @@ export function summarizeRecent(rows: DayFeature[], n = 7): {
 // ===== 取得＋キャッシュ =====
 
 const CACHE_KEY = 'bl-day-features';
-const CACHE_V = 1;                       // 列を増やしたら上げる（古いキャッシュを捨てる）
+const CACHE_V = 2;                       // 列を増やしたら上げる（古いキャッシュを捨てる）。2: 過食アラート v2 の列（2026-09-25）
 const TTL_MS = 15 * 60 * 1000;           // 同じ日の中は15分は組み直さない（相談・図鑑・ハイライトが同じ値を欲しがる）
 const STAGE_READS_MAX = 14;              // 1回の構築で読む睡眠ステージの日数上限（1日=1クエリなので）
 const STAGE_REFRESH_DAYS = 2;            // 直近2日はキャッシュがあっても読み直す（当日の睡眠は後から増える）
@@ -380,44 +445,70 @@ export function invalidateDayFeatures(): void {
 }
 
 type ProfileRow = { sex: 'male' | 'female'; height_cm: number; age: number; init_weight: number | null; life_factor: number };
-type EntryRow = { date: string; intake: number | null; p: number | null; weight: number | null; mood: string | null; ex: string | null; adj: number | null };
-type LogRow = { date: string; at: string | null; text: string | null; items: { name?: string; qty?: string; kcal?: number }[] | null };
+type EntryRow = { date: string; intake: number | null; p: number | null; weight: number | null; mood: string | null; ex: string | null; adj: number | null;
+  active_kcal?: number | null; craving?: number | null; stress?: number | null };
+type LogRow = { date: string; at: string | null; text: string | null; items: { name?: string; qty?: string; kcal?: number }[] | null;
+  overfull?: boolean | null; alcohol?: boolean | null };
+
+const ENTRY_COLS_BASE = 'date,intake,p,weight,mood,ex,adj';
+const LOG_COLS_BASE = 'date,at,text,items';
+
+/**
+ * 列を名指しした select は、その列が無い旧DBでは select ごと落ちる。新しい列から順に諦めて読み直す
+ * （active_kcal は migration-36、craving/stress と overfull/alcohol は migration-38）
+ */
+async function selectWithFallback<T>(build: (cols: string) => PromiseLike<{ data: unknown; error: unknown }>, colsList: string[]): Promise<T[]> {
+  for (const cols of colsList) {
+    const res = await build(cols);
+    if (!res.error) return (res.data ?? []) as T[];
+  }
+  return [];
+}
 
 /** entries / logs / HealthKit / cycle を1回ずつ読んで FeatureRaw を組む（未ログインは null） */
 async function fetchRaw(today: string, days: number, cachedStages: Map<string, { deepMin: number; remMin: number }>): Promise<FeatureRaw | null> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return null;
   const from = shiftDate(today, -(days - 1));
-  const [profRes, entRes, logRes, cycleOn] = await Promise.all([
+  const [profRes, entries, logs, cycleOn] = await Promise.all([
     supabase.from('profiles').select('sex,height_cm,age,init_weight,life_factor').eq('id', session.user.id).maybeSingle(),
-    supabase.from('entries').select('date,intake,p,weight,mood,ex,adj').gte('date', from).order('date', { ascending: true }).limit(1000),
-    supabase.from('logs').select('date,at,text,items').gte('date', from).order('date', { ascending: true }).limit(3000),
+    selectWithFallback<EntryRow>(
+      (cols) => supabase.from('entries').select(cols).gte('date', from).order('date', { ascending: true }).limit(1000),
+      [`${ENTRY_COLS_BASE},active_kcal,craving,stress`, `${ENTRY_COLS_BASE},active_kcal`, ENTRY_COLS_BASE],
+    ),
+    selectWithFallback<LogRow>(
+      (cols) => supabase.from('logs').select(cols).gte('date', from).order('date', { ascending: true }).limit(3000),
+      [`${LOG_COLS_BASE},overfull,alcohol`, LOG_COLS_BASE],
+    ),
     isCycleEnabled(),
   ]);
   const prof = profRes.data as ProfileRow | null;
-  const entries = (entRes.data ?? []) as EntryRow[];
-  const logs = (logRes.data ?? []) as LogRow[];
 
-  // 目安kcal: changes.tsx / laws.ts と同じ式（BMR×活動係数＋運動加算adj）。プロフィール無しなら目安は出せない
+  // 目安kcal: changes.tsx と同じ式（BMR×活動係数＋運動加算adj＋反映済みの運動ぶん active_kcal）。プロフィール無しなら目安は出せない
+  // 過食ラベル（binge）はこの目安に対する超過で決まるので、ヒーロー・収支カードと同じ式でなければならない（2026-09-25 オーナー決定）
   let w = Number(prof?.init_weight) || 70;
   const rawEntries: FeatureRaw['entries'] = entries.map((e) => {
     if (e.weight != null) w = Number(e.weight);
     let target: number | null = null;
     if (prof) {
       const bmr = mifflinBMR(prof.sex, w, Number(prof.height_cm), Number(prof.age));
-      target = targetKcal(bmr, Number(prof.life_factor), (e.ex as ExLevel) || 'オフ', Number(e.adj) || 0);
+      target = targetKcal(bmr, Number(prof.life_factor), (e.ex as ExLevel) || 'オフ', Number(e.adj) || 0) + (Number(e.active_kcal) || 0);
     }
     return { date: e.date, intake: e.intake == null ? null : Number(e.intake), p: e.p == null ? null : Number(e.p),
-      weight: e.weight == null ? null : Number(e.weight), mood: e.mood, target };
+      weight: e.weight == null ? null : Number(e.weight), mood: e.mood, target,
+      craving: e.craving == null ? null : Number(e.craving), stress: e.stress == null ? null : Number(e.stress) };
   });
 
   // HealthKit（hk無し環境・未許可・失敗は空＝睡眠/歩数の列が null になるだけ）
   let health: FeatureRaw['health'] = [];
   const stages: FeatureRaw['stages'] = [];
+  let vitals: FeatureRaw['vitals'] = [];
   try {
     if (healthAvailable()) {
       const r = await readActivitySummary(days);
       if (!('error' in r)) health = r;
+      // 生理指標（過食アラート v2）。許可が無い型は空で返るだけ（列が null になる）
+      try { vitals = (await readVitalsDaily(days)) ?? []; } catch { vitals = []; }
       // 睡眠ステージ: キャッシュに無い日＋直近2日だけ読む（差分更新）。上限14日/回
       const sleptDates = health.filter((h) => h.sleepH > 0).map((h) => h.date).sort().reverse();
       let reads = 0;
@@ -439,7 +530,7 @@ async function fetchRaw(today: string, days: number, cachedStages: Map<string, {
     try { cycleStarts = (await listCycleStarts()).map((c) => c.start_date); } catch { /* 未作成テーブル等は空 */ }
   }
 
-  return { today, days, entries: rawEntries, logs, health, stages, cycleStarts, cycleEnabled: cycleOn };
+  return { today, days, entries: rawEntries, logs, health, stages, vitals, cycleStarts, cycleEnabled: cycleOn };
 }
 
 /**

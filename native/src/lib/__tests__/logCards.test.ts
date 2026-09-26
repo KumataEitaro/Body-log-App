@@ -4,7 +4,7 @@
 import { arbitrateAttention, attentionCount, MAX_BANDS, MAX_CARDS, MORNING_ONLY, TODAY_ONLY, CARD_PRIORITY, BAND_PRIORITY } from '../logCards';
 
 const ALL_ON = {
-  caution: 1, dayPlan: 1, carry: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
+  caution: 1, dayPlan: 1, carry: 1, craving: 1, backfill: 1, checklist: 1, mood: 1, positive: 2,
   badge: 1, firstLaw: 1, brief: 1,
 };
 
@@ -49,6 +49,20 @@ describe('arbitrateAttention（ヒーロー直下の調停）', () => {
     const r2 = arbitrateAttention({ isToday: true, candidates: { dayPlan: 1, carry: 1 } }, 1);
     expect(r2.dayPlan).toBe(1);
     expect(r2.carry).toBe(0);
+  });
+
+  // 夜の渇望チェック（過食アラート v2・2026-09-26）: 答えは今夜の予報そのものを変えるので穴埋めより先。
+  // 朝のものではないので起床前の窓では止めない（出す時刻は shouldAskCraving が 18〜23 時で決める）
+  it('渇望チェックは繰り越し調整の次・昨日の穴埋めより先。今日だけ・起床前でも候補にはなる', () => {
+    const r = arbitrateAttention({ isToday: true, candidates: { craving: 1, backfill: 1 } }, 1);
+    expect(r.craving).toBe(1);
+    expect(r.backfill).toBe(0);
+    const r2 = arbitrateAttention({ isToday: true, candidates: { carry: 1, craving: 1 } }, 1);
+    expect(r2.carry).toBe(1);
+    expect(r2.craving).toBe(0);
+    expect(TODAY_ONLY.has('craving')).toBe(true);
+    expect(MORNING_ONLY.has('craving')).toBe(false);
+    expect(arbitrateAttention({ isToday: false, candidates: { craving: 1 } }).craving).toBe(0);
   });
 
   it('繰り越し調整は今日だけ・起床前は出さない（「きのう」が終わってから聞く）', () => {
@@ -122,15 +136,18 @@ describe('arbitrateAttention（起床前は「朝に出るもの」を出さな�
     expect(MORNING_ONLY.has('backfill')).toBe(false);
   });
 
+  // 夜の渇望チェック（craving）は 18〜23 時にしか候補にならない（shouldAskCraving）ので、深夜の場面では 0 にして評価する
+  const NIGHT_ON = { ...ALL_ON, craving: 0 };
+
   it('深夜でも日付・時刻に依存しないもの（チェックリスト・バッジ・最初の法則・ひとこと）は出る', () => {
-    const r = arbitrateAttention({ isToday: true, beforeWake: true, candidates: ALL_ON });
+    const r = arbitrateAttention({ isToday: true, beforeWake: true, candidates: NIGHT_ON });
     expect(r.checklist).toBe(1);
     expect(r.badge).toBe(1);
     expect(r.firstLaw).toBe(1);
   });
 
   it('深夜は上位の朝カードが枠を取らないので、下位（backfill/checklist）が繰り上がる＝枠を余らせない', () => {
-    const r = arbitrateAttention({ isToday: true, beforeWake: true, candidates: ALL_ON });
+    const r = arbitrateAttention({ isToday: true, beforeWake: true, candidates: NIGHT_ON });
     const cards = r.caution + r.dayPlan + r.carry + r.backfill + r.checklist + r.mood + r.positive;
     expect(cards).toBe(MAX_CARDS);
     expect(r.backfill).toBe(1);

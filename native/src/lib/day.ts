@@ -21,6 +21,10 @@ export type LogRow = {
   photo_urls?: string[] | null;
   /** 取込元（ヘルスケアのワークアウトは 'hk:<UUID>'・v17 以降）。目標への自動加算を止める判定に使う */
   source_id?: string | null;
+  /** 「満腹を超えて食べた」の印（migration-38・過食ラベルの副基準）。列が無い旧DBでは undefined */
+  overfull?: boolean | null;
+  /** 「お酒あり」（migration-38・保存時に品目名から自動推定 lib/alcohol.ts） */
+  alcohol?: boolean | null;
 };
 
 /**
