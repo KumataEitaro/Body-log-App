@@ -22,7 +22,7 @@ import { C, themed } from '@/lib/ui';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 
-const SPRING = { damping: 18, stiffness: 180, mass: 0.6 };
+const SPRING = { damping: 18, stiffness: 180, mass: 0.6, overshootClamping: true };   // 2026-09-26 跳ね返り禁止
 const EDGE = 130;       // 自動スクロール発火ゾーン(px)
 const EDGE_SPEED = 9;   // 自動スクロール速度(px/frame)
 

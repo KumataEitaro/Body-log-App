@@ -2674,4 +2674,13 @@ export const ES: Record<string, string> = {
   "落ち着き": "Calma",
   "記録しました。今夜の予報に反映します。": "Guardado. Se reflejará en el pronóstico de esta noche.",
   "金曜・土曜": "Viernes o sábado",
+  "食事の分析": "Análisis de comidas",
+  "からだの分析": "Análisis corporal",
+  "運動の分析": "Análisis de ejercicio",
+  "摂取カロリー": "Calorías ingeridas",
+  "プロフィール・目標・通知・マイ食品・テーマ・言語・ヘルスケア連携": "Perfil · objetivos · notificaciones · mis alimentos · tema · idioma · Salud",
+  "今週の平均 {n}kcal・目標内 {a}/{b}日": "Media semanal {n} kcal · en objetivo {a}/{b} días",
+  "運動の量・筋トレの成長・歩数と睡眠": "Volumen de actividad · progreso de fuerza · pasos y sueño",
+  "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "El gráfico de pesos está en Resumen → Análisis de ejercicio (toca para ir)",
+  "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Tu historial de fuerza está en Resumen → Análisis de ejercicio (toca para ir)",
 };

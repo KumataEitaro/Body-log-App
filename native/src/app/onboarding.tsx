@@ -8,7 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useThemeRefresh } from '@/lib/theme';
 import { View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Animated, {
-  FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
+  FadeInDown, useSharedValue, useAnimatedStyle, withTiming, Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -45,10 +45,11 @@ export default function Onboarding() {
   const purpose = usePurpose();
   const [msg, setMsg] = useState('');
 
-  // 進捗はドットではなくスプリングで満ちていくバー（前進の実感＝マイクロコミットメント）
+  // 進捗はドットではなく満ちていくバー（前進の実感＝マイクロコミットメント）。
+  // 2026-09-26: バネ（damping 15＝跳ねる）をやめ 320ms ease-out に
   const prog = useSharedValue(0.25);
   useEffect(() => {
-    prog.value = withSpring((step + 1) / 4, { damping: 15, stiffness: 140 });
+    prog.value = withTiming((step + 1) / 4, { duration: 320, easing: Easing.out(Easing.cubic) });
   }, [step, prog]);
   const progSt = useAnimatedStyle(() => ({ width: `${prog.value * 100}%` }));
 

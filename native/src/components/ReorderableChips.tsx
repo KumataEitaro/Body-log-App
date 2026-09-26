@@ -11,7 +11,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useReduceMotion } from '@/lib/motion';
 
-const SPRING = { damping: 18, stiffness: 200, mass: 0.5 };
+const SPRING = { damping: 18, stiffness: 200, mass: 0.5, overshootClamping: true };   // 2026-09-26 跳ね返り禁止
 const EDGE = 56;
 const EDGE_SPEED = 8;
 

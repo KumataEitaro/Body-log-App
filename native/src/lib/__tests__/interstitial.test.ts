@@ -140,11 +140,13 @@ describe('parseInterstitialHistory（壊れた値で落ちない）', () => {
 });
 
 describe('INTERSTITIAL_TARGETS（どのドリルダウンで出すか）', () => {
-  it('既定で出す: body / volume / strength / week（数字の振り返り）', () => {
+  it('既定で出す: body（からだの分析）/ training（運動の分析）/ week（週のふりかえり）', () => {
     expect(isInterstitialTarget('body')).toBe(true);
-    expect(isInterstitialTarget('volume')).toBe(true);
-    expect(isInterstitialTarget('strength')).toBe(true);
+    expect(isInterstitialTarget('training')).toBe(true);
     expect(isInterstitialTarget('week')).toBe(true);
+    // 旧キー（2026-09-26 の4大項目化で廃止）は表に無い＝出さない
+    expect(isInterstitialTarget('volume')).toBe(false);
+    expect(isInterstitialTarget('strength')).toBe(false);
   });
   it('既定で出さない: vitals（医療）/ cycle・photos（機微）/ nutrients・laws（読み物）', () => {
     expect(isInterstitialTarget('vitals')).toBe(false);
@@ -153,7 +155,8 @@ describe('INTERSTITIAL_TARGETS（どのドリルダウンで出すか）', () =>
     expect(isInterstitialTarget('nutrients')).toBe(false);
     expect(isInterstitialTarget('laws')).toBe(false);
   });
-  it('過食の引き金を含む eating・許諾ダイアログが出る health も出さない', () => {
+  it('過食の引き金を含む food（食事の分析）・許諾ダイアログが出る health も出さない', () => {
+    expect(isInterstitialTarget('food')).toBe(false);
     expect(isInterstitialTarget('eating')).toBe(false);
     expect(isInterstitialTarget('health')).toBe(false);
   });
@@ -163,8 +166,8 @@ describe('INTERSTITIAL_TARGETS（どのドリルダウンで出すか）', () =>
     expect(isInterstitialTarget(undefined)).toBe(false);
     expect(isInterstitialTarget('')).toBe(false);
   });
-  it('表は1か所だけ（真を持つキーは4つ）＝出す場所が増えていないことの見張り', () => {
+  it('表は1か所だけ（真を持つキーは3つ）＝出す場所が増えていないことの見張り', () => {
     const on = Object.keys(INTERSTITIAL_TARGETS).filter((k) => INTERSTITIAL_TARGETS[k]);
-    expect(on.sort()).toEqual(['body', 'strength', 'volume', 'week']);
+    expect(on.sort()).toEqual(['body', 'training', 'week']);
   });
 });

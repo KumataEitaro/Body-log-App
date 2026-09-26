@@ -2683,4 +2683,13 @@ export const EN: Record<string, string> = {
   "落ち着き": "Calm",
   "記録しました。今夜の予報に反映します。": "Saved. Tonight’s forecast will reflect it.",
   "金曜・土曜": "Friday or Saturday",
+  "食事の分析": "Meal analysis",
+  "からだの分析": "Body analysis",
+  "運動の分析": "Exercise analysis",
+  "摂取カロリー": "Calories eaten",
+  "プロフィール・目標・通知・マイ食品・テーマ・言語・ヘルスケア連携": "Profile · goals · notifications · my foods · theme · language · Health link",
+  "今週の平均 {n}kcal・目標内 {a}/{b}日": "This week avg {n} kcal · on target {a}/{b} days",
+  "運動の量・筋トレの成長・歩数と睡眠": "Activity volume · lifting progress · steps & sleep",
+  "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "The lifting-weight chart is in Overview → Exercise analysis (tap to go)",
+  "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Lifting history is in Overview → Exercise analysis (tap to go)",
 };

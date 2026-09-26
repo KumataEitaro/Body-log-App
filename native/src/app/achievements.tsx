@@ -36,7 +36,8 @@ function CelebrateOverlay({ badges, retroCount, onShare, onClose }: {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (!reduce) {
       RNAnimated.parallel([
-        RNAnimated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 110 }),
+        // 2026-09-26: バネ（friction 5＝跳ねる）をやめ、ease-out の timing に（びよーん禁止・静かなモーション）
+        RNAnimated.timing(scale, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         RNAnimated.timing(spin, { toValue: 1, duration: 620, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         RNAnimated.timing(ring, { toValue: 1, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]).start();

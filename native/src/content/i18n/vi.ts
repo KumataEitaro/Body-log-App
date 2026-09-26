@@ -2634,4 +2634,13 @@ export const VI: Record<string, string> = {
   "落ち着き": "Bình tĩnh",
   "記録しました。今夜の予報に反映します。": "Đã lưu. Sẽ phản ánh vào dự báo tối nay.",
   "金曜・土曜": "Thứ Sáu hoặc Thứ Bảy",
+  "食事の分析": "Phân tích bữa ăn",
+  "からだの分析": "Phân tích cơ thể",
+  "運動の分析": "Phân tích tập luyện",
+  "摂取カロリー": "Calo nạp vào",
+  "プロフィール・目標・通知・マイ食品・テーマ・言語・ヘルスケア連携": "Hồ sơ · mục tiêu · thông báo · món của tôi · giao diện · ngôn ngữ · liên kết Sức khỏe",
+  "今週の平均 {n}kcal・目標内 {a}/{b}日": "TB tuần này {n} kcal · đạt mục tiêu {a}/{b} ngày",
+  "運動の量・筋トレの成長・歩数と睡眠": "Lượng vận động · tiến bộ tập tạ · bước chân & giấc ngủ",
+  "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "Biểu đồ mức tạ ở Tổng quan → Phân tích tập luyện (chạm để tới)",
+  "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Lịch sử tập tạ ở Tổng quan → Phân tích tập luyện (chạm để tới)",
 };

@@ -2634,4 +2634,13 @@ export const ID: Record<string, string> = {
   "落ち着き": "Tenang",
   "記録しました。今夜の予報に反映します。": "Tersimpan. Akan tercermin di prakiraan malam ini.",
   "金曜・土曜": "Jumat atau Sabtu",
+  "食事の分析": "Analisis makan",
+  "からだの分析": "Analisis tubuh",
+  "運動の分析": "Analisis olahraga",
+  "摂取カロリー": "Kalori masuk",
+  "プロフィール・目標・通知・マイ食品・テーマ・言語・ヘルスケア連携": "Profil · target · notifikasi · makanan saya · tema · bahasa · tautan Kesehatan",
+  "今週の平均 {n}kcal・目標内 {a}/{b}日": "Rata-rata minggu ini {n} kkal · sesuai target {a}/{b} hari",
+  "運動の量・筋トレの成長・歩数と睡眠": "Volume aktivitas · kemajuan latihan · langkah & tidur",
+  "挙上重量の推移グラフは「概要」タブ →「運動の分析」で見られます（タップで移動）": "Grafik beban angkat ada di Ringkasan → Analisis olahraga (ketuk untuk pindah)",
+  "筋トレ履歴は「概要」タブ →「運動の分析」で見られます（タップで移動）": "Riwayat latihan ada di Ringkasan → Analisis olahraga (ketuk untuk pindah)",
 };
