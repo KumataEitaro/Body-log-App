@@ -322,18 +322,21 @@ workflows:
           for bid in $(echo "$STALE" | tr ' ' '\n' | sort -u); do
             create_profile "$bid" || echo "  $bid: プロファイルを作れませんでした（下で再判定）"
           done
-          ALL_OK=1
+          ALL_OK=1; LACKING=""
           while IFS='|' read -r bid key; do
             [ -n "$bid" ] || continue
             set +e; check "$bid" "$key"; rc=$?; set -e
-            [ "$rc" = "0" ] || ALL_OK=0
+            [ "$rc" = "0" ] || { ALL_OK=0; LACKING="$LACKING $bid に $key が無い /"; }
           done <<< "$REQS"
           if [ "$ALL_OK" = "1" ]; then
             # 新しいプロファイルを Xcode プロジェクトに掛け直す（Build ipa 側の use-profiles だけに任せない）
             xcode-project use-profiles --project "native/ios/BodyLog.xcodeproj" --warn-only
             echo "✅ プロファイルを作り直しました（要件の entitlement 込み）"
           else
-            echo "❌ 要件を満たすプロファイルを手元に作れませんでした。" >&2
+            echo "❌ 要件を満たすプロファイルを手元に作れませんでした。足りないもの:$LACKING" >&2
+            echo "   作り直した直後のプロファイルに entitlement が無い＝**その Bundle ID の App ID に capability が紐づいていない**。" >&2
+            echo "   Apple Developer → Identifiers → その Bundle ID を開く → App Groups にチェック → Edit で group.com.gotcha.bodylog.rn を選ぶ → Save" >&2
+            echo "   （Associated Domains なら同じ画面でチェックを入れて Save）。保存後にこのワークフローを再実行。" >&2
             echo "   ポータルの古いプロファイルは削除済みなので、**このワークフローをもう一度実行**すると" >&2
             echo "   Codemagic の自動署名（ビルド前）が現在の capability で新しいプロファイルを作ります。" >&2
             if [ "${DELETE_FAILED:-0}" = "1" ]; then
