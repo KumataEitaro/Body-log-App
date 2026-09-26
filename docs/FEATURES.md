@@ -2704,3 +2704,85 @@ Apple Developer portal で拡張の App ID **`com.gotcha.bodylog.rn.liveactivity
 ### 確認のしかた
 - 概要 → 設定: 戻るボタンが「‹ 概要」、「戻る」の直下（1行分の余白）から「設定」の見出しが始まる
 - スクロールしてもヘッダー直下に薄い文字の帯は出ない（44pt のバーの下をくぐる分だけが iOS 標準のぼかしになる）
+
+## 分析カード3点: 表の期間平均・目標クリアは緑＋摂取カロリー棒グラフ・体の写真の復活（2026-09-26・feat/analysis-cards）
+
+熊田さんの要望（2026-09-26）:
+> ① 摂取カロリーの表に「表示している期間の平均」を数字で出す。前回比の +XX は残す。見た目は今と同じ調子で
+> ② 食べ方の分析: 目標クリアの日を「緑」に。摂取カロリーの棒グラフを足す（参考: Calorie Tracker の Insights。7D/30D/90D・avg・緑の棒・点線の目標）
+> ③ 自分の体の画像を保存（推定体脂肪率とセットで）。うまく機能していないからテストして直して
+
+### ① 「推移の詳細」表に期間平均の要約行
+- `native/src/components/DataTableCard.tsx`（BodyTable）: 指標チップの下に 1 行「期間平均 1,742kcal（30日・記録 22 日）」。
+  kcal は整数＋千区切り、体の指標は小数1桁（体重は表示単位に換算する既存の `fmt`）。行の「前回比 +XX」と「7日平均」はそのまま。
+  字面は表と同じ（tabular-nums・sub/ink/faint）で、表の1行と同じ横余白
+- 計算は `native/src/lib/tableStats.ts`（純関数）: 値がある行の単純平均・記録日数・期間日数（最初〜最後の日、両端含む）。
+  未記録日は分母にも期間にも入れない。`lib/__tests__/tableStats.test.ts`（空・1件・欠損混じり・並び順・月またぎ・DST）
+
+### ② 曜日ヒートマップの「目標内」を緑に／摂取カロリー棒グラフ（新カード）
+- `native/src/components/WeekdayHeatmapCard.tsx`: 目標内セルと凡例を `rgba(C.teal, 0.22)` → `rgba(C.success, 0.32)`（Leaf Green #34b36a。
+  ダークは #3fbf74 で面 #111827 の上でも読める）。超過はアンバー濃淡のまま。以前はアクセントと同系で「達成」と読めなかった
+- `native/src/components/IntakeBarsCard.tsx`（新規・**マウントは概要タブが行う。食事の分析ページの先頭**）
+  - `import IntakeBarsCard, { type IntakeRow } from '@/components/IntakeBarsCard';`
+  - props: `{ rows: { date: string; intake: number | null; goal: number | null }[] }`
+    （date は 'YYYY-MM-DD'、goal はその日の目標kcal＝changes.tsx の `rows[].target`）
+    例: `<IntakeBarsCard rows={rows.map((r) => ({ date: r.date, intake: r.intake, goal: r.target }))} />`
+  - 7日／30日／90日のセグメント（既定 7日。選択は `bl-intake-bars-range` に保存＝サインアウトで消える側）、
+    見出し「摂取カロリー」＋右に「平均 1,742kcal」、react-native-svg の棒（目標以下＝緑 `C.success`・超過＝アンバー `C.amber`・未記録日は空）、
+    点線の目標ライン（区間の平均目標。色の判定はその日の目標で行う）、y 軸 0 起点 3〜4 目盛り、x 軸は最初／中央／最後の日付だけ、
+    90日は棒の隙間を詰める（7日 36%・30日 28%・90日 14%）。凡例に目標内／超過の日数と記録日数
+  - 集計は `native/src/lib/intakeBars.ts`（純関数）: 区間切り出し（毎日1本・未記録は null）・平均（記録日だけ）・
+    目標クリア判定（`intake <= goal` ＝クリア。曜日ヒートマップの `diff > 0` と同じ境界）・目盛り（1・2・5×10^n 刻み）。
+    `lib/__tests__/intakeBars.test.ts`
+
+### ③ 体の写真（推定体脂肪率とセット）の復活
+**なぜ以前うまく機能していなかったか（調査）**
+- `supabase/schema.sql` に `body_photos` が無い（`grep -n body_photos supabase/*.sql` → `apply-pending.sql` の v16 と `fix-body-photos.sql` だけ）。
+  本番 DB にテーブル／バケットが無い、または作った後に PostgREST のスキーマキャッシュが古いままだった可能性が高い
+  （`notify pgrst, 'reload schema'` は 74ce335 で後から足された）。旧 UI の「記録の保存に失敗しました」は **insert 側** の失敗
+- 旧実装は失敗の段階（upload / insert）を UI が区別せず、insert に失敗しても上げた写真を消さなかった（孤児ファイルが残る）
+- React Native の fetch は ArrayBuffer から Blob を作れないので、Storage の upload には **ArrayBuffer** を渡すのが確実（Supabase の RN ガイドと同じ）。
+  旧実装は `Uint8Array` をそのまま渡していた。storage-js 2.112 の `FileBody` 型は `ArrayBuffer | ArrayBufferView | …` なので型は通るが、経路が環境依存
+- 旧 `b64ToBytes` は `globalThis.atob` 前提。無い環境（古い Hermes）では即例外だった。いまは無ければ自前デコード（両経路の一致を jest で固定）
+
+**やったこと**
+- `native/src/lib/bodyPhotos.ts`（新規）: `base64ToBytes`（atob の有無で同じ結果）・`bytesToArrayBuffer`・`uploadBodyPhoto({ uid, date, base64 })`→path・
+  `insertBodyPhoto({ uid, date, path, bodyfat })`・`saveBodyPhoto`（upload → insert。insert 失敗時は upload したファイルを消す）・
+  `listBodyPhotos(limit)`（署名URL 1時間）・`deleteBodyPhoto(row)`（行 → ファイルの順。ファイルが消せなくても行は消えているので ok）・
+  `describePhotoError`（バケット無し／テーブル無し（42P01・PGRST205）／権限（42501・RLS）を区別し、エラー本文を添える）。
+  **失敗を握りつぶさない**: どの段（step）で何が失敗したかを返し、UI がそのまま出す。Supabase 呼び出しは deps で差し替え可能
+  （`lib/__tests__/bodyPhotos.test.ts`: base64 の一致・upload 失敗→insert しない・insert 失敗→後始末・一覧の署名URL・削除の順序）
+- `native/src/components/BodyFatSheet.tsx`: 保存時に **写真も保存**（既定ON。シート上部に「写真も保存する」スイッチ。OFF は `bl-bodyphoto-save`='0' で記憶）。
+  順序: 体脂肪率の保存（`lib/bodyLog.ts`・従来どおり）→ 写真アップロード → `body_photos` 行。
+  写真に失敗したらシートを閉じず「写真は保存できませんでした（体脂肪率 21.5% は保存済み）」＋エラー本文を出し、
+  ボタンは「写真をもう一度保存する」に変わる（体脂肪率を二重保存しない。「写真を保存せずに閉じる」も出す）。
+  文言「写真は保存されません」は削除 → 「写真は自分だけが見られる非公開の場所に保存されます」（testID `bodyfat-photo-notice`／`bodyfat-save-photo-switch`）
+- `native/src/components/BodyPhotosCard.tsx`（新規・**マウントは概要タブ（からだの分析ページ）が行う**）
+  - `import BodyPhotosCard from '@/components/BodyPhotosCard';` props: `{ refreshKey?: string | number }`（省略可。タブのフォーカスで自動再読込）
+  - 最新と前回の2枚を並べて比較（日付・体脂肪率%・前回との差）、横スクロールのタイムライン（3枚目以降）、タップで拡大（Modal）、
+    長押し／拡大中の「削除する」（Alert で確認）。**撮影の入口は置かない**。
+    空状態「＋ → 身体を記録 → 体脂肪率（AIで推定）で写真つきで記録できます」。読み込み失敗は本文つき＋「もう一度読み込む」
+- `supabase/migration-39.sql`（新規。`fix-body-photos.sql` も同内容に更新）: `body_photos`（user_id は default auth.uid()）・RLS・index・
+  非公開バケット `body-photos`（public=false を強制）・ストレージポリシー（`to authenticated`・フォルダ名＝uid）・確認 select・`notify pgrst, 'reload schema'`
+- `native/src/lib/signOutCleanup.ts`: `bl-intake-bars-range`・`bl-bodyphoto-save` を CLEARED に登録
+- `native/jest.setup.js`: supabase モックに `storage.from().upload / remove / createSignedUrl` を追加（親が BodyPhotosCard をマウントしても smoke が落ちない）
+- `native/src/__tests__/plusEntry.test.tsx`: 「写真は保存されません」の testID → `bodyfat-photo-notice`＋スイッチの存在
+- 辞書 23 キー × 10 言語（de/en/es/fr/id/ko/pt/th/vi/zh）
+
+**熊田さんに依頼する SQL（写真の保存にはこれが必要。実行するまで写真だけ失敗し、理由が画面に出ます）**
+1. https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new を開く
+2. `supabase/migration-39.sql` の全文を貼って Run（何度実行しても安全）
+3. 最後の select が `table=1 / policy=1 / bucket_private=1 / storage_policy=1 / entries_bodyfat=1` なら完了
+
+### 確認のしかた
+- tsc / jest: `cd native && npx tsc --noEmit && npx jest --silent`（終了コード 0）
+- 表: 概要 → 数字で見る → 摂取kcal のチップ: チップの下に「期間平均 …kcal（n日・記録 m 日）」。行の前回比 +XX と 7日平均は従来どおり。
+  体重のチップなら表示単位（kg/lb）に換算された小数1桁
+- 曜日のリズム: 目標内のセルと凡例が緑（ダークでも緑）
+- 棒グラフ（親がマウント後）: 7日/30日/90日 で切替、緑＝目標以下・アンバー＝超過・点線＝目標。切替はアプリを閉じても残る。記録が無い区間は
+  「この期間には摂取の記録がありません」
+- 写真: ＋ → 体脂肪率（AIで推定）→ 撮影 → 保存。migration-39 未実行なら「写真は保存できませんでした（体脂肪率 xx% は保存済み）」の下に
+  `[42P01 …]` や `[Bucket not found]` のような理由が出る。実行後は からだの分析ページの「体の写真」に最新／前回が並び、
+  タップで拡大・長押しで削除できる。スイッチを OFF にすると数値だけ保存され、次回も OFF のまま
+- 注意: PlusSheet に「身体を記録」の段は本ブランチには無い（現状は ＋ → 体脂肪率（AIで推定）が直接並ぶ）。空状態の文言は発注の指示どおりにしてあるので、
+  ＋シートの再編と合わなければ親側で文言だけ直す
