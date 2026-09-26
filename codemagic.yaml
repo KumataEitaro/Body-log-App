@@ -243,6 +243,7 @@ workflows:
               [ "${bid#*.}" = "$1" ] || continue    # "TEAMID.bundle.id" → bundle.id を厳密一致（前方一致だと本体と拡張を取り違える）
               found=1
               if /usr/libexec/PlistBuddy -c "Print :Entitlements:$2" /tmp/prof.plist >/dev/null 2>&1; then ok=1; else
+                STALE_FILES="$STALE_FILES$f"$'\n'
                 echo "  古いプロファイル: $(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/prof.plist 2>/dev/null) ($(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/prof.plist 2>/dev/null)) — $2 無し"
               fi
             done
@@ -250,7 +251,22 @@ workflows:
             [ "$found" = "1" ] && return 1
             return 2
           }
-          STALE=""; MISSING=""
+          # API でプロファイルを1本作って手元に保存する（$1 = bundle id）。
+          # fetch-signing-files --create はユーザースクリプトでは証明書の秘密鍵が渡らず
+          # 「Cannot save Signing Certificates without certificate private key」で落ちる（2026-09-26 build）。
+          # profiles create は秘密鍵を使わない（.mobileprovision を作って保存するだけ）。
+          # 証明書は自動署名が使っている配布証明書を含める必要があるが、どれかは script から分からないので
+          # チームの配布証明書を**全部**含める（プロファイルは複数の証明書を持てる。use-profiles は keychain にある1本と照合する）
+          create_profile() {
+            local bid="$1" rid certs
+            rid=$(app-store-connect bundle-ids list --bundle-id-identifier "$bid" --strict-match-identifier --platform IOS --json 2>/dev/null | jq -r '.[0].id // empty')
+            if [ -z "$rid" ]; then echo "  $bid: App ID がポータルに見つかりません（Identifiers に無い）"; return 1; fi
+            certs=$(app-store-connect certificates list --type IOS_DISTRIBUTION DISTRIBUTION --json 2>/dev/null | jq -r '.[].id' | tr '\n' ' ')
+            if [ -z "${certs// /}" ]; then echo "  配布証明書が API から取れません（API キーの権限）"; return 1; fi
+            # shellcheck disable=SC2086
+            app-store-connect profiles create "$rid" --certificate-ids $certs --type IOS_APP_STORE --name "bodylog ${bid##*.} appstore $(date +%Y%m%d%H%M%S)" --save
+          }
+          STALE=""; MISSING=""; STALE_FILES=""
           while IFS='|' read -r bid key; do
             [ -n "$bid" ] || continue
             set +e; check "$bid" "$key"; rc=$?; set -e
@@ -266,7 +282,7 @@ workflows:
             # 作った直後のビルドや、一覧に載る前のタイミングでは拾えないことがある。止める前に、無い ID を
             # 名指しで1回だけ取りに行く（App ID があれば --create でプロファイルが出来る。無ければ変わらない）
             for bid in $MISSING; do
-              app-store-connect fetch-signing-files "$bid" --platform IOS --type IOS_APP_STORE --create --strict-match-identifier || echo "  $bid: fetch-signing-files は失敗（下で再判定）"
+              create_profile "$bid" || echo "  $bid: プロファイルを作れませんでした（下で再判定）"
             done
             STILL=""
             for bid in $MISSING; do
@@ -280,7 +296,7 @@ workflows:
             echo "❌ 次の Bundle ID のプロファイルが取得できていません:$MISSING" >&2
             echo "   Apple Developer → Identifiers に App ID があるか確認してください（docs/LIVE-ACTIVITY.md 手順1）:" >&2
             echo "   https://developer.apple.com/account/resources/identifiers/list" >&2
-            echo "   拡張（$LA_BUNDLE_ID）は App Groups capability に group.com.gotcha.bodylog.rn を紐付けること。" >&2
+            echo "   拡張 com.gotcha.bodylog.rn.liveactivity は App Groups capability に group.com.gotcha.bodylog.rn を紐付けること。" >&2
             echo "   いったん戻すなら環境変数 DISABLE_LIVE_ACTIVITY=true で再ビルド（Live Activity 導入前と同一のビルド）。" >&2
             exit 1
           fi
@@ -298,12 +314,12 @@ workflows:
               if app-store-connect profiles delete "$id"; then echo "deleted profile $id ($bid)"; else echo "⚠️ profile $id の削除に失敗（APIキーの権限不足の可能性）"; DELETE_FAILED=1; fi
             done
           done
-          rm -f "$PROFILES/"*.mobileprovision
-          # 作り直しを試す（$BUNDLE_ID の前方一致＝拡張 …rn.liveactivity / …rn.widget もまとめて取り直す）。
-          # ユーザースクリプトの文脈では証明書の秘密鍵が渡らず失敗することがある
-          # （2026-09-04 build_ipa(7): 失敗が echo で握りつぶされ Build ipa が空のプロファイルで落ちた）。
-          # 失敗しても止めず、下の「実際に出来たか」の検証で判定する
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --platform IOS --type IOS_APP_STORE --create || echo "fetch-signing-files --create は失敗（下で判定）"
+          # 古いプロファイルの手元のファイルだけ消す（他の Bundle ID の新しいプロファイルは残す）
+          while IFS= read -r f; do [ -n "$f" ] && rm -f "$f"; done <<< "$STALE_FILES"
+          # 作り直し（create_profile・秘密鍵不要）。失敗しても止めず、下の「実際に出来たか」の検証で判定する
+          for bid in $(echo "$STALE" | tr ' ' '\n' | sort -u); do
+            create_profile "$bid" || echo "  $bid: プロファイルを作れませんでした（下で再判定）"
+          done
           ALL_OK=1
           while IFS='|' read -r bid key; do
             [ -n "$bid" ] || continue
