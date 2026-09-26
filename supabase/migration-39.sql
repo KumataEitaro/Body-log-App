@@ -1,17 +1,23 @@
--- ============================================================
--- BodyLog: 体の写真（body_photos）が保存できないときの修復 SQL
--- 2026-09-05 初版 → 2026-09-26 に migration-39.sql へ整理（**内容は migration-39.sql と同じ**）。
--- 正本は supabase/migration-39.sql。こちらは「fix-body-photos.sql を実行して」と書かれた古い
--- 画面文言・メモから辿り着いた人のために残している。どちらを実行しても同じ結果になる。
+-- migration-39（2026-09-26）体の写真（body_photos）の復活: テーブル・RLS・非公開バケット・ストレージポリシー
 -- 実行先: https://supabase.com/dashboard/project/rhyfspqxsfpdogzmizic/sql/new
--- ============================================================
+-- 何度実行しても安全（if not exists / drop policy if exists / on conflict）。
+--
+-- 背景: 2026-09-05〜18 に「写真の保存に失敗する」で機能を取り下げた（ef91b51）。
+--   ・supabase/schema.sql に body_photos が無い（apply-pending.sql の v16 と fix-body-photos.sql にしか無い）
+--     ＝本番 DB にテーブル／バケットが無い、または作った後に PostgREST のスキーマキャッシュが古いままで
+--       API がテーブルを知らなかった可能性が高い（旧 UI の「記録の保存に失敗しました」は insert 側の失敗）
+--   ・この SQL は fix-body-photos.sql を今の設計に合わせて整理したもの。実行後にアプリ側は
+--     lib/bodyPhotos.ts が「どの段で何が失敗したか」を画面に出すので、まだ失敗するなら本文を見れば分かる。
+--
+-- 使い方: このファイル全体を SQL Editor に貼って Run。最後の select が 1,1,1,1,1 なら準備完了。
 
 -- 1) 体脂肪率の列（v16 と同じ。既にあれば何もしない）
 alter table public.goals   add column if not exists target_bodyfat numeric;
 alter table public.entries add column if not exists bodyfat numeric;
 alter table public.logs    add column if not exists bodyfat numeric;
 
--- 2) 写真の行（1枚1行）。path は Storage 上の '<user_id>/<date>-<nonce>.jpg'
+-- 2) 写真の行（1枚1行）。path は Storage 上の '<user_id>/<date>-<nonce>.jpg'。
+--    user_id は既定で auth.uid()（アプリは明示的にも渡す。RLS の with check と一致する）
 create table if not exists public.body_photos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -28,7 +34,7 @@ drop policy if exists "body_photos_own" on public.body_photos;
 create policy "body_photos_own" on public.body_photos
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- 3) 非公開バケット（署名付き URL でだけ読める）
+-- 3) 非公開バケット（署名付き URL でだけ読める。公開に倒さない）
 insert into storage.buckets (id, name, public) values ('body-photos', 'body-photos', false)
   on conflict (id) do update set public = false;
 

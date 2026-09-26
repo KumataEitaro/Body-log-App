@@ -16,6 +16,14 @@ jest.mock('@/lib/supabase', () => {
   return {
     supabase: {
       from: jest.fn(() => makeChain()),
+      // Storage（体の写真・lib/bodyPhotos.ts）。上げる・消す・署名 URL はすべて成功の空応答
+      storage: {
+        from: jest.fn(() => ({
+          upload: jest.fn(async () => ({ data: null, error: null })),
+          remove: jest.fn(async () => ({ data: null, error: null })),
+          createSignedUrl: jest.fn(async () => ({ data: { signedUrl: null }, error: null })),
+        })),
+      },
       auth: {
         getSession: jest.fn(async () => ({ data: { session: { user: { id: 'test-user', email: 'test@example.com' }, access_token: 'token' } } })),
         onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
