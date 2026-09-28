@@ -4,6 +4,7 @@ jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageCode: mockLang }],
 }));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocale, isExplicitLocale, loadLocale, setLocale, setLocaleAuto, syncDeviceLocale, deviceLocaleLabel } from '@/lib/i18n';
 
 describe('言語は端末の設定に従う（手動選択も可能）', () => {
@@ -17,6 +18,30 @@ describe('言語は端末の設定に従う（手動選択も可能）', () => {
     await loadLocale();
     expect(getLocale()).toBe('en');
     expect(isExplicitLocale()).toBe(false);
+  });
+
+  // 2026-09-28 熊田さん「スマホは英語なのに BodyLog が英語にならない」: 旧ビルドやログイン画面で
+  // 一度「日本語」を押した端末には bl-locale='ja' だけが残り、それを「手動選択」と誤認して固定していた
+  it('印（bl-locale-explicit）の無い保存値は名残として捨て、端末の言語に従う（旧ビルドからの移行）', async () => {
+    await AsyncStorage.setItem('bl-locale', 'ja');
+    await loadLocale();
+    expect(getLocale()).toBe('en');
+    expect(isExplicitLocale()).toBe(false);
+    expect(await AsyncStorage.getItem('bl-locale')).toBeNull();   // 名残は消える＝次回も端末に従う
+  });
+
+  it('手動で選ぶと印つきで保存され、再起動（loadLocale）後も固定される', async () => {
+    await setLocale('ko');
+    expect(await AsyncStorage.getItem('bl-locale-explicit')).toBe('1');
+    mockLang = 'en';
+    await loadLocale();
+    expect(getLocale()).toBe('ko');
+    expect(isExplicitLocale()).toBe(true);
+    // 「端末の設定に従う」で値も印も消える
+    await setLocaleAuto();
+    expect(await AsyncStorage.getItem('bl-locale')).toBeNull();
+    expect(await AsyncStorage.getItem('bl-locale-explicit')).toBeNull();
+    expect(getLocale()).toBe('en');
   });
 
   it('対応外の端末言語は英語に丸める', async () => {

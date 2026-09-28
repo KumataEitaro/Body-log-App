@@ -29,6 +29,7 @@ import { resetProfileRowCache } from './profileRow';
 /** サインアウトしても残すキー（完全一致） */
 export const KEEP_KEYS: readonly string[] = [
   'bl-locale',           // 表示言語（端末の設定）
+  'bl-locale-explicit',  // 「言語を手動で選んだ」印（bl-locale とセット・2026-09-28）
   'bl-theme',            // テーマ（明暗・アクセント）
   'bl-units',            // 単位（kg/lb・cm/ft）
   'bl-boot-errors',      // 起動時の初期化エラー記録（端末の診断情報。設定の最下部から読む）
