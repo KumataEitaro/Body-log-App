@@ -27,6 +27,11 @@ export const LOCALES: { code: LocaleCode; label: string }[] = [
 
 
 const KEY = 'bl-locale';
+// 手動選択の印（2026-09-28 熊田さん「スマホは英語なのに BodyLog が英語にならない」）。
+// 以前は bl-locale が保存されているだけで「手動で選んだ」とみなしていた。ところが自動追従が無かった頃のビルドや
+// ログイン画面の言語ボタンで一度でも「日本語」を押した端末には bl-locale='ja' が残っていて、
+// 端末の言語を英語にしても日本語のまま固定されていた。**印が無い保存値は名残**として端末の設定に従う（一度きりの移行）
+const EXPLICIT_KEY = 'bl-locale-explicit';
 let locale: LocaleCode = 'ja';
 let explicit = false; // ユーザーが手動で選んだか（端末言語の追従を止める）
 const listeners = new Set<() => void>();
@@ -42,12 +47,15 @@ function detectDeviceLocale(): LocaleCode {
 
 export async function loadLocale(): Promise<void> {
   try {
-    const saved = await AsyncStorage.getItem(KEY);
-    if (saved && LOCALES.some((l) => l.code === saved)) {
+    const [saved, mark] = await Promise.all([AsyncStorage.getItem(KEY), AsyncStorage.getItem(EXPLICIT_KEY)]);
+    if (saved && mark === '1' && LOCALES.some((l) => l.code === saved)) {
       locale = saved as LocaleCode;
       explicit = true;
     } else {
+      // 印の無い保存値＝自動追従が無かった頃の名残。端末の設定に従い、名残は消す（次回からは通常の自動）
+      if (saved) { try { await AsyncStorage.removeItem(KEY); } catch { /* 消せなくても次回また同じ判定になるだけ */ } }
       locale = detectDeviceLocale();
+      explicit = false;
     }
   } catch {
     locale = 'ja';
@@ -64,7 +72,8 @@ export async function setLocale(code: LocaleCode): Promise<void> {
   locale = code;
   explicit = true;
   emit();
-  try { await AsyncStorage.setItem(KEY, code); } catch { /* 表示は既に切り替わっている */ }
+  // 値と「手動で選んだ」印を一緒に保存（印が無い値は次回起動で名残として捨てられる）
+  try { await AsyncStorage.multiSet([[KEY, code], [EXPLICIT_KEY, '1']]); } catch { /* 表示は既に切り替わっている */ }
   try { onLocaleChange?.(); } catch { /* 通知の再登録に失敗しても表示は切り替わっている */ }
 }
 
@@ -78,7 +87,7 @@ export async function setLocaleAuto(): Promise<void> {
   const changed = next !== locale;
   locale = next;
   emit();
-  try { await AsyncStorage.removeItem(KEY); } catch { /* 表示は既に切り替わっている */ }
+  try { await AsyncStorage.multiRemove([KEY, EXPLICIT_KEY]); } catch { /* 表示は既に切り替わっている */ }
   if (changed) { try { onLocaleChange?.(); } catch { /* 同上 */ } }
 }
 
