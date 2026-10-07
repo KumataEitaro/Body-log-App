@@ -17,7 +17,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover', // iOSノッチ領域まで描画してセーフエリア(env())を有効化
-  themeColor: '#f8fafc',
+  themeColor: '#ffffff',   // アイコンの地（native/src/lib/brand.ts BRAND.white）と同じ白
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

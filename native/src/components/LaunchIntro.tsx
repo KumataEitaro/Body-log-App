@@ -1,10 +1,15 @@
-// 起動イントロ（Withings風）: ネイティブスプラッシュ（白＋丸アイコン中央）をJS側で
+// 起動イントロ（Withings風）: ネイティブスプラッシュ（白地＋白い円盤のアイコン中央・ダークは Navy 地）をJS側で
 // 同一見た目のオーバーレイに引き継ぎ、一拍見せてからアイコンをスケール＋フェードで消す。
+// 2026-10-07: アイコンを白地の円盤に戻したのに合わせ、地の色は lib/brand.ts の BRAND（white / navy）に一本化。
+// 明暗は**端末の外観**（Appearance）で決める＝直前に出るネイティブスプラッシュ（app.json の splash / splash.dark）と同じ判定。
+// アプリ内テーマ（手動でライト固定など）は使わない: 継ぎ目を消すにはスプラッシュと同じ色でなければならず、テーマの差は
+// このオーバーレイが消えたあとの本体が担う（HIG「起動画面は端末の外観に合わせる」）
 // 消え始めと同時に introDone=true を流し、各画面がコンポーネントを時差入場させる。
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Appearance } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { themed } from '@/lib/ui';
+import { BRAND } from '@/lib/brand';
 
 // JSがロードされるまでネイティブスプラッシュを保持（失敗しても起動は続行）。
 // .catch() だけでは「Promiseを返す前の同期throw」（ネイティブモジュール未リンク等）を
@@ -27,6 +32,8 @@ export function LaunchProvider({ ready, children }: { ready: boolean; children: 
   const fade = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(1)).current;
   const started = useRef(false);
+  // 端末の外観はマウント時に1回読む（起動の数百ms の間に変わることはない。変わっても次回起動で追従する）
+  const coverBg = useRef(Appearance.getColorScheme() === 'dark' ? BRAND.navy : BRAND.white).current;
 
   useEffect(() => {
     const go = () => {
@@ -50,7 +57,7 @@ export function LaunchProvider({ ready, children }: { ready: boolean; children: 
     <LaunchCtx.Provider value={{ introDone }}>
       {children}
       {!gone && (
-        <Animated.View style={[s.cover, { opacity: fade }]} pointerEvents={introDone ? 'none' : 'auto'}>
+        <Animated.View style={[s.cover, { opacity: fade, backgroundColor: coverBg }]} pointerEvents={introDone ? 'none' : 'auto'}>
           <Animated.Image
             source={require('../../assets/images/splash-icon.png')}
             style={[s.icon, { transform: [{ scale }] }]}
@@ -62,12 +69,13 @@ export function LaunchProvider({ ready, children }: { ready: boolean; children: 
 }
 
 const s = themed(() => ({
-  // app.jsonのsplash設定（背景#C8FAFB＝アイコンの水色・imageWidth 160）と完全に同じ見た目にして、
-  // ネイティブスプラッシュ→JSオーバーレイのつなぎ目を消す。
-  // ここを変えるときは app.json の splash.backgroundColor も必ず一緒に変える（色が飛ぶ）
+  // app.jsonのsplash設定（背景 BRAND.white / dark は BRAND.navy・imageWidth 160・画像は白い角丸タイル）と完全に同じ見た目にして、
+  // ネイティブスプラッシュ→JSオーバーレイのつなぎ目を消す。地の色は描画側で coverBg を上書きする（端末の外観で決める）。
+  // ここを変えるときは app.json の splash.backgroundColor / splash.dark.backgroundColor も必ず一緒に変える（色が飛ぶ）。
+  // 画像（splash-icon.png）は角だけ透明な白いタイル: 白地では縁が見えず円盤だけが浮き、Navy 地では白いアイコンタイルに見える
   cover: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#C8FAFB', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+    alignItems: 'center', justifyContent: 'center', zIndex: 999,
   },
   icon: { width: 160, height: 160, resizeMode: 'contain' },
 }));
