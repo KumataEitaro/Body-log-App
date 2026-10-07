@@ -2902,3 +2902,49 @@ iPhone の言語は英語なのに BodyLog は日本語のまま。
 ### 確認のしかた
 - 端末の言語を英語にして起動 → 英語。設定 → 言語 で「日本語」を選ぶ → 日本語で固定。「端末の設定に従う」→ 英語に戻る。
 - jest `__tests__/localeAuto.test.ts`: 印の無い保存値の移行・印つきの固定・自動への復帰。
+
+## アプリアイコンを「白地・白い円盤・赤い円弧」に戻し、紐づく色と素材を再設計（2026-10-07・feat/brand-white-disc-icon・v1.1.20）
+
+熊田さん「前の白地に丸のアイコンに戻したい。立ち上げ時に写る画面の周囲の色など、紐づく色やイメージをすべて前のアイコンに合わせて再設計して。
+アイコンとブランドイメージ、最新の UI/UX の資料を徹底的に学習して、必要な処置を実行して」。
+
+### 学習した指針（Apple HIG / Android / Expo）と、それぞれから決めたこと
+| 指針 | 決めたこと |
+|---|---|
+| HIG「起動画面はアプリの最初の画面に近く、ロゴや文言の演出にしない。**端末の外観（ダーク）に合わせる**。起動後の画面と違う要素は不快なフラッシュになる」 | スプラッシュを**明・暗の2通り**にした（明＝純白地、暗＝Navy #0B1220 地）。JS オーバーレイ（LaunchIntro）は**端末の外観**で地を選ぶ＝ネイティブスプラッシュと同じ判定で継ぎ目を消す |
+| HIG「アイコンは 1024px の正方形・透明不可・角丸は OS が付ける。iOS 26 は Liquid Glass で層と光を OS が付与」 | icon.png は旧素材そのまま（1024・完全不透明・純白地・円盤は中央 ±2px＝`scripts/icon-center-check.js` 合格）。Icon Composer の `.icon`（層つき）は Mac が要るので**次の課題**に残す（PNG のままでも iOS 26 は自動でガラスに載せる） |
+| Android adaptive icon「前景は中央 66%（安全円 676px）に収める・背景は単色が基本・monochrome（テーマアイコン）は白1色のシルエット」 | foreground を 0.76 倍で再配置（円盤 ≈590px・bbox 217..807）。背景は `backgroundColor: #FFFFFF` の単色にして背景画像を廃止（タイル二重化の廃止）。monochrome は**新規に合成**（旧素材は写真マスクで不可）: リング（白60%）∪ 赤い円弧（白100%）の2段。内側の円は抜く＝24px でも「リング＋濃い一区間」として読める |
+| HIG Mono（clear / tinted）「主要素 100%・副要素 60〜65%」 | monochrome の2段（153 / 255）に適用。通知アイコン（expo-notifications）も同じ素材を使い、色は円弧の赤 |
+| Expo SDK 54+「expo-splash-screen は `dark: { image, backgroundColor }` を取る」 | app.json に dark を追加。画像は1素材（白い角丸タイル・角だけ透明）: 白地では縁が見えず円盤だけ、Navy 地では白いアイコンタイルに見える |
+
+### ブランド色（`native/src/lib/brand.ts`・新規）
+| 役割 | 値 | 使う場所 |
+|---|---|---|
+| white | #FFFFFF | ライトのスプラッシュ地・Android 適応アイコンの地・Web theme-color |
+| navy | #0B1220 | ダークのスプラッシュ地（theme.ts のダークの地と同値） |
+| signal | #F81D3F（1024px の円弧の実測平均） | 通知アイコンの色。白地で 4.0:1 なので小さい文字には使わない |
+| porcelain | #F1F1F2 | 円盤の面（参考値） |
+
+**UI のアクセントは変えない**（既定＝エレクトリック #4D7CFF）。理由: アイコンの赤を UI のアクセントにすると超過・警告（Berry #E43D5B）と同じ色になり、「選ばれている」と「食べすぎ」が見分けられなくなる。アイコンに紐づく色は BRAND に分離し、UI の色は従来どおり `C` トークン。
+PFC プリセット「アイコン調」は「スタンダード」に改名（key 'icon' は保存互換のため維持）。背景トーン「アクア」は選択肢として残す（色名の由来は 2026-09 のアイコン）。
+
+### 生成した素材（すべて icon.png 1024 から機械生成・`native/scripts/gen-brand-assets.js`。sharp はリポジトリ直下の node_modules から解決）
+- `native/assets/images/icon.png` 1024 不透明・純白地（iOS / App Store / Expo 既定）
+- `native/assets/images/splash-icon.png` 1024 白い角丸タイル（角丸率 22.37%・角だけ透明）
+- `native/assets/images/android-icon-foreground.png` 1024 不透明白地・円盤 0.76 倍中央
+- `native/assets/images/android-icon-monochrome.png` 1024 白・アルファ 0/153/255 の2段シルエット（テーマアイコン＋通知アイコン）
+- `native/assets/images/favicon.png` 48 ／ `public/icons/app-icon.png` 256 角丸タイル（招待ページ）／ `app/favicon.ico` 48（PNG-in-ICO）
+- 削除: `android-icon-background.png`（単色 backgroundColor に一本化）
+
+### 設定（`native/app.json`）
+- `android.adaptiveIcon`: backgroundColor #FFFFFF・foregroundImage・monochromeImage（backgroundImage を削除）
+- `expo-splash-screen`: backgroundColor #FFFFFF・image splash-icon.png・imageWidth 160・**dark: { backgroundColor #0B1220, image 同じ }**
+- `expo-notifications`: color #059669（旧グリーン）→ #F81D3F
+- Web `app/layout.tsx` themeColor #f8fafc → #ffffff
+
+### 見張り（`native/src/__tests__/brandAssets.test.ts`）
+app.json の各色 ＝ BRAND／LaunchIntro が BRAND を使い生 HEX を持たない／ダークの地 ＝ theme.ts のダーク bg／画像の寸法・不透明・透明角・monochrome の2段アルファと安全域／旧背景画像が無い。
+
+### 残る課題（Mac が要る）
+- Icon Composer で `.icon`（背景＝白、層＝円盤、円弧に Specular）を作り `ios.icon` に指定すると、iOS 26 の clear / tinted / dark 外観が本来の形になる。
+- Play ストアの 512px アイコンはコンソールで手動更新（`icon.png` を 512 に縮小したものをアップロード）。
