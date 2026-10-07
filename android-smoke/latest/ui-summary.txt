@@ -1,7 +1,7 @@
 == 前面のアプリ ==
-  mCurrentFocus=Window{aa9ff99 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
-  mFocusedApp=ActivityRecord{ae33c8f u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t7}
-  mCurrentFocus=Window{79043c6 u0 Application Not Responding: com.google.android.apps.nexuslauncher}
+  mCurrentFocus=Window{c587a06 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+  mFocusedApp=ActivityRecord{9b2b854 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t7}
+  mCurrentFocus=Window{9c91a9b u0 Application Not Responding: com.google.android.apps.nexuslauncher}
 
 == 画面に出ていたテキスト ==
 text="Close app"
