@@ -1,0 +1,9 @@
+== 前面のアプリ ==
+  mCurrentFocus=Window{df29130 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}
+  mFocusedApp=ActivityRecord{3c909d8 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t7}
+  mCurrentFocus=Window{dc59533 u0 Application Not Responding: com.google.android.apps.nexuslauncher}
+
+== 画面に出ていたテキスト ==
+text="Close app"
+text="Pixel Launcher isn't responding"
+text="Wait"

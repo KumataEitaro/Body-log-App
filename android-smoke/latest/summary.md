@@ -7,7 +7,7 @@
 ```
 ### JS 例外（ReactNativeJS）
 ```
-2:10-07 05:33:59.244  4130  4218 I ReactNativeJS: Running "main"
+2:10-15 04:40:20.613  4422  4456 I ReactNativeJS: Running "main"
 ```
 ### crash buffer 先頭 120 行
 ```
