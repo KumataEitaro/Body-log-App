@@ -432,7 +432,23 @@ workflows:
       - name: Expo prebuild（androidプロジェクト生成）
         script: |
           cd native
-          npx expo prebuild --platform android
+          # --clean: 前回の android/ が残っていても必ず作り直す（アイコン・splash の資材は prebuild が
+          # app.json から生成するため、古い生成物が残ると旧アイコンのまま出荷される。2026-10-15 熊田さん報告）
+          npx expo prebuild --platform android --clean
+      - name: アイコンの生成物が app.json どおりかを検証（旧アイコンのまま出荷しない最後の砦）
+        script: |
+          set -e
+          cd native
+          RES=android/app/src/main/res
+          echo "colors.xml:"; cat $RES/values/colors.xml
+          # 適応アイコンの地は白（app.json の android.adaptiveIcon.backgroundColor と同値）
+          grep -qi 'name="iconBackground">#FFFFFF' $RES/values/colors.xml || { echo "❌ iconBackground が #FFFFFF ではありません（app.json と prebuild の生成物が食い違い）" >&2; exit 1; }
+          # 前景・モノクロの webp が今回の prebuild で生成されている（サイズが 0 でない）
+          for n in ic_launcher_foreground ic_launcher_monochrome ic_launcher; do
+            test -s $RES/mipmap-xxxhdpi/$n.webp || { echo "❌ $RES/mipmap-xxxhdpi/$n.webp が無い" >&2; exit 1; }
+          done
+          ls -la $RES/mipmap-xxxhdpi/
+          echo "✅ アイコン資材は app.json から再生成されています"
       - name: リリース署名を注入（prebuildのbuild.gradleはreleaseもデバッグ鍵で署名するため）
         script: |
           # 2026-09-03: この注入が無いまま作った .aab は Play で
