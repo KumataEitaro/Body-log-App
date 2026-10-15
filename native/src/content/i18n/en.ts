@@ -2720,4 +2720,8 @@ export const EN: Record<string, string> = {
   "記録の保存に失敗しました。": "Could not save the record.",
   "（{n}日・記録 {m} 日）": "({n} days · {m} logged)",
   "＋ → 身体を記録 → 体脂肪率（AIで推定）で写真つきで記録できます": "Use ＋ → Log body → Body fat (AI estimate) to record with a photo",
+  "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで記録できます。": "It showed up in the last {days} days. Save it as a My Food and next time it's a one-tap log.",
+  "AI の解析を待たず、AI の回数も使いません。毎回同じ栄養値で、圏外でも記録できます。": "No waiting for AI and no AI credits used. Same nutrition values every time, and it works offline.",
+  "よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。AI を使わないので待ち時間も回数の消費もなく、栄養値も毎回同じです。定食のような組み合わせも1つにまとめられます。": "Save what you eat often and add it with one tap from the chips above the input. No AI means no waiting, no credits used, and the same nutrition values every time. Set meals can be saved as one item too.",
+  "よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。": "Save what you eat often and log it with one tap. No AI means no waiting and no credits used.",
 };

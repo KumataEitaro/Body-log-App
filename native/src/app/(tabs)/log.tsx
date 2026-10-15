@@ -2989,7 +2989,9 @@ export default function LogScreen() {
         // チップは入力シートの中にあるので、シートが開いているときだけハイライトする（閉じていれば中央カード）
         targetRef={inputOpen && myFoods.length > 0 ? chipsRef : undefined}
         title={t('{name}をよく食べるようですね', { name: suggest?.name ?? '' })}
-        text={t('直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで足せます。', { days: suggest?.days ?? 0 })}
+        text={t('直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで記録できます。', { days: suggest?.days ?? 0 })}
+        // 登録の利点を一言添える（2026-10-15 熊田さん）: AI の解析を待たない・AI の回数を使わない・毎回同じ栄養値・圏外でも記録できる
+        note={t('AI の解析を待たず、AI の回数も使いません。毎回同じ栄養値で、圏外でも記録できます。')}
         primaryLabel={t('登録してみる')}
         onPrimary={() => {
           if (suggest) {

@@ -2671,4 +2671,8 @@ export const PT: Record<string, string> = {
   "記録の保存に失敗しました。": "Não foi possível salvar o registro.",
   "（{n}日・記録 {m} 日）": "({n} dias · {m} registrados)",
   "＋ → 身体を記録 → 体脂肪率（AIで推定）で写真つきで記録できます": "Use ＋ → Registrar corpo → Gordura corporal (estimativa por IA) para registrar com foto",
+  "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで記録できます。": "Apareceu nos últimos {days} dias. Salve em Meus alimentos e da próxima vez registre com um toque.",
+  "AI の解析を待たず、AI の回数も使いません。毎回同じ栄養値で、圏外でも記録できます。": "Sem esperar a IA nem gastar análises. Mesmos valores nutricionais sempre, até sem conexão.",
+  "よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。AI を使わないので待ち時間も回数の消費もなく、栄養値も毎回同じです。定食のような組み合わせも1つにまとめられます。": "Salve o que você come com frequência e adicione com um toque pelos chips acima do campo. Sem IA não há espera nem gasto de análises, e os valores nutricionais são sempre os mesmos. Combinações tipo refeição também viram um único item.",
+  "よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。": "Salve o que você come com frequência e registre com um toque. Sem IA não há espera nem gasto de análises.",
 };
