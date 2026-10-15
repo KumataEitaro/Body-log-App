@@ -2671,4 +2671,8 @@ export const VI: Record<string, string> = {
   "記録の保存に失敗しました。": "Không thể lưu bản ghi.",
   "（{n}日・記録 {m} 日）": "({n} ngày · ghi {m} ngày)",
   "＋ → 身体を記録 → 体脂肪率（AIで推定）で写真つきで記録できます": "Dùng ＋ → Ghi cơ thể → % mỡ cơ thể (AI ước tính) để ghi kèm ảnh",
+  "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで記録できます。": "Xuất hiện trong {days} ngày gần đây. Lưu vào Món của tôi, lần sau chỉ cần một chạm.",
+  "AI の解析を待たず、AI の回数も使いません。毎回同じ栄養値で、圏外でも記録できます。": "Không chờ AI, không tốn lượt AI. Giá trị dinh dưỡng luôn giống nhau, dùng được cả khi ngoại tuyến.",
+  "よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。AI を使わないので待ち時間も回数の消費もなく、栄養値も毎回同じです。定食のような組み合わせも1つにまとめられます。": "Lưu món hay ăn và thêm bằng một chạm từ các thẻ phía trên ô nhập. Không dùng AI nên không chờ, không tốn lượt, giá trị dinh dưỡng luôn giống nhau. Một bữa trọn bộ cũng gộp được thành một món.",
+  "よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。": "Lưu món hay ăn và ghi lại bằng một chạm. Không dùng AI nên không chờ, không tốn lượt.",
 };

@@ -64,7 +64,7 @@ describe('マイ食品の管理 → 食品を追加', () => {
   it('登録0件のとき空状態の案内が出る', async () => {
     const tree = await mount(<GuideProvider><SettingsScreen /></GuideProvider>);
     await act(async () => { byLabel(tree, 'マイ食品の管理').props.onPress(); });
-    const empty = tree.root.findAll((n) => n.type === Text && n.props.children === 'よく食べるものを登録すると1タップで記録できます');
+    const empty = tree.root.findAll((n) => n.type === Text && n.props.children === 'よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。');
     expect(empty.length).toBeGreaterThan(0);
     await act(async () => { tree.unmount(); });
   });

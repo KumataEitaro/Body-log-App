@@ -275,7 +275,7 @@ export default function AddFoodSheet({ visible, draft, onClose, onSaved }: {
             </View>
             <Pressable onPress={onClose} hitSlop={8}><Text style={s.close}>{t('閉じる')}</Text></Pressable>
           </View>
-          <Text style={s.note}>{t('よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。定食のような組み合わせも1つにまとめられます。')}</Text>
+          <Text style={s.note}>{t('よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。AI を使わないので待ち時間も回数の消費もなく、栄養値も毎回同じです。定食のような組み合わせも1つにまとめられます。')}</Text>
 
           <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Text style={s.label}>{t('名前（任意）')}</Text>

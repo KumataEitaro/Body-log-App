@@ -1249,7 +1249,7 @@ export default function SettingsScreen() {
         <SheetHeader icon={<Salad size={ICON.lg} color={C.teal} />} title={t("マイ食品の管理")} />
         <ScrollView keyboardShouldPersistTaps="handled">
           {/* 空状態: 何ができるかを一言で。ボタンは登録の有無にかかわらず同じ位置に出す */}
-          {foodEntries.length === 0 && <Text style={[s.note, { marginBottom: 10 }]}>{t('よく食べるものを登録すると1タップで記録できます')}</Text>}
+          {foodEntries.length === 0 && <Text style={[s.note, { marginBottom: 10 }]}>{t('よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。')}</Text>}
           <OptionButton style={{ marginBottom: 12 }} label={t('＋ 食品を追加')} onPress={() => setFoodFormOpen(true)} />
           <Text style={s.note}>{t('複数品目のセットは、食事タブで「今日の記録」の行を長押し、またはトレイの✓保存を長押ししても登録できます。')}</Text>
           {msg && <Text style={[s.msg, { color: msg.ok ? C.teal : C.coral }]}>{msg.text}</Text>}

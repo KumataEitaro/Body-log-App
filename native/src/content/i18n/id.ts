@@ -2671,4 +2671,8 @@ export const ID: Record<string, string> = {
   "記録の保存に失敗しました。": "Gagal menyimpan catatan.",
   "（{n}日・記録 {m} 日）": "({n} hari · {m} tercatat)",
   "＋ → 身体を記録 → 体脂肪率（AIで推定）で写真つきで記録できます": "Gunakan ＋ → Catat tubuh → Lemak tubuh (perkiraan AI) untuk mencatat dengan foto",
+  "直近{days}日で登場しました。マイ食品に登録すると、次からは1タップで記録できます。": "Muncul dalam {days} hari terakhir. Simpan ke Makanan Saya, lain kali cukup satu ketukan.",
+  "AI の解析を待たず、AI の回数も使いません。毎回同じ栄養値で、圏外でも記録できます。": "Tanpa menunggu AI dan tanpa memakai kuota AI. Nilai gizi selalu sama, bisa dipakai offline.",
+  "よく食べるものを登録すると、入力欄の上のチップから1タップで足せます。AI を使わないので待ち時間も回数の消費もなく、栄養値も毎回同じです。定食のような組み合わせも1つにまとめられます。": "Simpan makanan yang sering dimakan dan tambahkan dengan satu ketukan dari chip di atas kolom input. Tanpa AI: tidak menunggu, tidak memakai kuota, nilai gizi selalu sama. Paket menu juga bisa disimpan sebagai satu item.",
+  "よく食べるものを登録すると、1タップで記録できます。AI を使わないので待ち時間も回数の消費もありません。": "Simpan makanan yang sering dimakan dan catat dengan satu ketukan. Tanpa AI: tidak menunggu, tidak memakai kuota.",
 };
